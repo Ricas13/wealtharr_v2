@@ -175,6 +175,15 @@ class StrategySignal(models.Model):
     as_of = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True)
+    review_outcome = models.CharField(
+        max_length=16, blank=True, default="",
+        choices=[
+            ("CONFIRMED", "Confirmed after review"),
+            ("FALSE_POSITIVE", "False signal"),
+            ("NOT_APPLICABLE", "Not applicable"),
+        ],
+    )
+    review_note = models.TextField(blank=True, default="")
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "signal_key"], name="unique_strategy_signal")]
         ordering = ["-created_at"]
