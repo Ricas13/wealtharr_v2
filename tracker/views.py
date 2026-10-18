@@ -297,6 +297,30 @@ def confirm_strategy_reset(request, pk):
 
 @login_required
 @require_POST
+def review_signal(request, pk, signal_pk):
+    """Review advisory guidance without modifying broker holdings or signal math."""
+    strategy = get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
+    signal = get_object_or_404(StrategySignal, pk=signal_pk, strategy=strategy)
+    outcome = request.POST.get("outcome", "")
+    note = request.POST.get("review_note", "").strip()[:2000]
+    if outcome not in ("CONFIRMED", "FALSE_POSITIVE", "NOT_APPLICABLE"):
+        messages.error(request, "Choose a valid review outcome.")
+        return redirect("strategy_detail", pk=pk)
+    if outcome == "FALSE_POSITIVE" and not note:
+        messages.error(request, "Add a short correction note when reporting a false 9Sig signal.")
+        return redirect("strategy_detail", pk=pk)
+    with transaction.atomic():
+        record = StrategySignal.objects.select_for_update().get(pk=signal.pk)
+        record.review_outcome = outcome
+        record.review_note = note
+        record.acknowledged_at = timezone.now()
+        record.save(update_fields=["review_outcome", "review_note", "acknowledged_at"])
+    messages.success(request, "Strategy notice reviewed. No holdings, cash or broker orders were changed.")
+    return redirect("strategy_detail", pk=pk)
+
+
+@login_required
+@require_POST
 def acknowledge_signal(request, pk, signal_pk):
     strategy = get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
     signal = get_object_or_404(StrategySignal, pk=signal_pk, strategy=strategy)
