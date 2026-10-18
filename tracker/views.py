@@ -195,6 +195,35 @@ def _monitoring_status(strategy):
     return {"active": True, "message": "Yahoo sync working. Last confirmed refresh: " + timezone.localtime(oldest).strftime("%d %b %Y %H:%M") + "."}
 
 
+def _next_quarter_settlement(today):
+    """First future calendar quarter-end, after which a market review is due."""
+    from calendar import monthrange
+    from datetime import date
+    m = ((today.month - 1) // 3 + 1) * 3
+    d = date(today.year, m, monthrange(today.year, m)[1])
+    if today > d:
+        m += 3
+        year = today.year
+        if m > 12:
+            m = 3
+            year += 1
+        d = date(year, m, monthrange(year, m)[1])
+    return d
+
+
+def _alert_settings_status(owner):
+    pref = NotificationPreference.objects.filter(owner=owner).first()
+    cfg = SystemIntegration.objects.filter(pk=1).first()
+    email_ready = bool(pref and pref.email_enabled and pref.destination_email and
+                       cfg and cfg.smtp_host and cfg.smtp_sender)
+    discord_ready = bool(pref and pref.discord_enabled and cfg and
+                         cfg.discord_url_ciphertext)
+    return {
+        "email": email_ready, "discord": discord_ready,
+        "enabled": email_ready or discord_ready,
+    }
+
+
 def render_strategy(request, strategy, entry_form=None, price_form=None):
     report = ledger_summary(strategy)
     holdings = []
@@ -210,6 +239,8 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
         "strategy": strategy, "report": report, "holdings": holdings,
         "chart_points": chart_points,
         "monitoring_status": _monitoring_status(strategy),
+        "alert_status": _alert_settings_status(request.user),
+        "next_quarter_end": _next_quarter_settlement(timezone.localdate()),
         "entries": entries, "signals": strategy.signals.all()[:12],
         "entry_form": entry_form or LedgerForm(), "price_form": price_form or PriceForm(),
         "automation_form": AutomationForm(instance=strategy),
