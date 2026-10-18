@@ -19,6 +19,7 @@ from .forms import AccountForm, AutomationForm, IntegrationForm, LedgerForm, Not
 from .models import Account, LedgerEntry, NotificationPreference, PriceMark, StrategyInstance, StrategyPreset, StrategySignal, SystemIntegration, WealthSnapshot
 from .services import consolidated, dispatch, ledger_summary, validate_and_record
 from .market_signals import review_strategy
+from .paper import create_paper_trial, PaperSetupUnavailable, PAPER_NAME
 
 @require_GET
 def home(request):
@@ -62,12 +63,35 @@ def sign_out(request):
     return redirect("home")
 
 @login_required
+@require_POST
+def start_paper_trial(request):
+    if request.POST.get("confirm_paper") != "PAPER_ONLY":
+        messages.error(request, "Please confirm virtual paper tracking.")
+        return redirect("dashboard")
+    try:
+        strategy, created = create_paper_trial(request.user)
+    except PaperSetupUnavailable as exc:
+        messages.error(request, str(exc))
+        return redirect("dashboard")
+    except StrategyPreset.DoesNotExist:
+        messages.error(request, "The 9Sig strategy is disabled by administration.")
+        return redirect("dashboard")
+    if created:
+        messages.success(request, "£1,000 virtual 9Sig tracker started from real Yahoo closing prices. No money was invested, and no broker was connected.")
+    else:
+        messages.info(request, "Your existing paper tracker is ready.")
+    return redirect("strategy_detail", pk=strategy.pk)
+
+
+@login_required
 def dashboard(request):
     data = consolidated(request.user)
     snapshots = WealthSnapshot.objects.filter(owner=request.user).order_by("as_of")
     chart = [{"date": s.as_of.isoformat(), "value": float(s.total_value),
               "contributed": float(s.net_contributed)} for s in snapshots]
-    data.update(chart=chart, accounts=Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies")),
+    data.update(chart=chart, paper_trial=StrategyInstance.objects.filter(owner=request.user,
+                account__kind="PAPER", account__name=PAPER_NAME).first(),
+                accounts=Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies")),
                 open_signals=StrategySignal.objects.filter(strategy__owner=request.user, acknowledged_at__isnull=True).select_related("strategy").order_by("-created_at")[:8])
     return render(request, "dashboard.html", data)
 
@@ -104,6 +128,24 @@ def new_strategy(request):
             form.add_error(None, exc)
     return render(request, "new_strategy.html", {"form": form, "presets": StrategyPreset.objects.filter(active=True)})
 
+def _monitoring_status(strategy):
+    """Browser-safe monitoring diagnostics; never include integration credentials."""
+    from datetime import timedelta
+    from .models import YahooSync
+    if not strategy.market_data_enabled:
+        return {"active": False, "message": "Price monitoring is switched off."}
+    symbols = [strategy.equity_symbol, strategy.safe_symbol, "TQQQ", "SPY"]
+    rows = {x.symbol: x for x in YahooSync.objects.filter(symbol__in=symbols)}
+    missing = [symbol for symbol in symbols
+               if symbol not in rows or not rows[symbol].last_success]
+    if missing:
+        return {"active": True, "message": "Monitoring enabled. First successful quote sync is pending for " + ", ".join(missing) + "."}
+    oldest = min(rows[symbol].last_success for symbol in symbols)
+    if oldest < timezone.now() - timedelta(days=8):
+        return {"active": True, "message": "A quote source is stale; check Yahoo prices before relying on values."}
+    return {"active": True, "message": "Yahoo sync working. Last confirmed refresh: " + timezone.localtime(oldest).strftime("%d %b %Y %H:%M") + "."}
+
+
 def render_strategy(request, strategy, entry_form=None, price_form=None):
     report = ledger_summary(strategy)
     holdings = []
@@ -113,6 +155,7 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
     entries = strategy.ledger.all().order_by("-occurred_on", "-pk")[:60]
     return render(request, "strategy.html", {
         "strategy": strategy, "report": report, "holdings": holdings,
+        "monitoring_status": _monitoring_status(strategy),
         "entries": entries, "signals": strategy.signals.all()[:12],
         "entry_form": entry_form or LedgerForm(), "price_form": price_form or PriceForm(),
         "automation_form": AutomationForm(instance=strategy),
