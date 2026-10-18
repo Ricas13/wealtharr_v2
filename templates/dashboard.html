@@ -9,7 +9,7 @@
     <span class="risk-pill high">LIVE TRIAL</span>
   </div>
   {% if paper_trial %}
-    <p class="muted">Your £1,000 virtual 60/40 starting allocation is tracked separately from ISA and general investment accounts. Review all suggestions before acting.</p>
+    <p class="muted">Your £1,000 virtual 60/40 starting allocation is tracked separately from real portfolio totals. Virtual value: <strong>{% if paper_summary.value is not None %}£{{ paper_summary.value|floatformat:2 }}{% else %}awaiting prices{% endif %}</strong>. Review all suggestions before acting.</p>
     <a class="btn btn-primary btn-sm" href="{% url 'strategy_detail' paper_trial.pk %}">Open my 9Sig paper trial →</a>
   {% else %}
     <p class="muted">Start with £1,000 virtual capital, £500/month planned contributions, 60% LQQ3.L and 40% ERNS.L at verified Yahoo GBP closing prices. This does not buy real securities; virtual fractional shares are used.</p>
@@ -20,10 +20,10 @@
   {% endif %}
 </section>
 <div class="stat-grid">
-  <div class="panel stat-card"><div class="stat-label">Total wealth <span>◈</span></div><div class="stat-value">{% if total is not None %}£{{ total|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Total value of tracked strategies</div></div>
-  <div class="panel stat-card"><div class="stat-label">Net added <span>↳</span></div><div class="stat-value">£{{ net_contributed|floatformat:2 }}</div><div class="stat-help">Deposits minus withdrawals</div></div>
+  <div class="panel stat-card"><div class="stat-label">Real portfolio value <span>◈</span></div><div class="stat-value">{% if total is not None %}£{{ total|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Paper accounts excluded from real capital</div></div>
+  <div class="panel stat-card"><div class="stat-label">Net added <span>↳</span></div><div class="stat-value">£{{ net_contributed|floatformat:2 }}</div><div class="stat-help">Real deposits minus withdrawals (paper excluded)</div></div>
   <div class="panel stat-card"><div class="stat-label">Investment result <span>⌁</span></div><div class="stat-value {% if gain is not None and gain < 0 %}negative{% endif %}">{% if gain is not None %}£{{ gain|floatformat:2 }}{% else %}—{% endif %}</div><div class="stat-help">Wealth minus net money added</div></div>
-  <div class="panel stat-card"><div class="stat-label">Active strategies <span>▤</span></div><div class="stat-value">{{ items|length }}</div><div class="stat-help">Across {{ accounts|length }} account{{ accounts|length|pluralize }}</div></div>
+  <div class="panel stat-card"><div class="stat-label">Active strategies <span>▤</span></div><div class="stat-value">{{ items|length }}</div><div class="stat-help">Paper trial tracked separately below</div></div>
 </div>
 {% if missing %}<div class="alert-warning"><strong>Prices needed for an accurate total.</strong> Add a GBP price on these strategy tabs: {% for item in missing %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}. Until then, the total and return are hidden rather than understated.</div>{% endif %}
 <div class="panel chart-panel">
