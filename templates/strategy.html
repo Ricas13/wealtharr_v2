@@ -10,6 +10,26 @@
   Initial signals require the first completed quarter after its virtual purchase.
 </div>
 {% endif %}
+{% if instrument_profile %}
+<section class="panel padded" style="margin-bottom:16px" id="strategy-instruments">
+  <div class="panel-heading"><div><h2>What to hold for this account</h2>
+    <p>Matched to {{ strategy.preset.name }} · UK {{ strategy.account.get_kind_display }} · Trading 212</p>
+  </div><span class="risk-pill high">High risk · 3× daily leverage</span></div>
+  <div class="split-layout">
+    <div class="hint-box"><h3>{{ instrument_profile.equity.allocation_pct }}% — {{ instrument_profile.equity.broker_ticker }}</h3>
+      <strong>{{ instrument_profile.equity.name }}</strong>
+      <p class="micro-note">Find ISIN {{ instrument_profile.equity.isin }} in Trading 212.<br>Yahoo price ticker: {{ instrument_profile.equity.yahoo_ticker }} (automatic).</p>
+      <a href="{{ instrument_profile.equity.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer details ↗</a>
+    </div>
+    <div class="hint-box"><h3>{{ instrument_profile.safe.allocation_pct }}% — {{ instrument_profile.safe.broker_ticker }}</h3>
+      <strong>{{ instrument_profile.safe.name }}</strong>
+      <p class="micro-note">Find ISIN {{ instrument_profile.safe.isin }} in Trading 212.<br>Yahoo price ticker: {{ instrument_profile.safe.yahoo_ticker }} (automatic).</p>
+      <a href="{{ instrument_profile.safe.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer details ↗</a>
+    </div>
+  </div>
+  <p class="micro-note">{{ instrument_profile.model_warning }} {{ instrument_profile.broker_warning }} Suggested targets do not create holdings; your actual Trading 212 fills determine the recorded portfolio.</p>
+</section>
+{% endif %}
 <div class="strategy-tabbar">
   {% for tab in nav_strategies %}<a href="{% url 'strategy_detail' tab.pk %}" class="tab {% if tab.pk == strategy.pk %}active{% endif %}">{{ tab.name }}</a>{% endfor %}
   <a href="{% url 'new_strategy' %}" class="tab tab-add">＋ New tab</a>
@@ -54,7 +74,7 @@
     <summary style="cursor:pointer;color:#54d8cf">⚙ Configure Yahoo monitoring</summary>
     <form action="{% url 'save_automation' strategy.pk %}" method="post" class="form-stack">{% csrf_token %}
       {% include 'partials/form_fields.html' with form=automation_form %}
-      <p class="micro-note">GBP-denominated exact Yahoo tickers only; GBp is divided by 100. Verify Trading 212 availability and ISA eligibility independently.</p>
+      <p class="micro-note">{% if instrument_profile %}Your issuer-mapped 9Sig tickers are managed automatically. Only market monitoring can be switched on or off here.{% else %}Exact Yahoo GBP tickers are required; GBp is converted to GBP. Do not assume instrument availability or equivalence.{% endif %}</p>
       <button class="btn btn-primary" type="submit">Save monitoring settings</button>
     </form>
   </details>{% endif %}
