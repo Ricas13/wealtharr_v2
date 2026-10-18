@@ -10,8 +10,8 @@ from django.utils import timezone
 from datetime import timedelta
 
 from .market_signals import sync_ticker
-from .models import Account, LedgerEntry, PriceMark, StrategyInstance, StrategyPreset
-from .services import validate_and_record
+from .models import Account, LedgerEntry, PriceMark, StrategyInstance, StrategyPreset, StrategyValueSnapshot
+from .services import validate_and_record, ledger_summary
 
 PAPER_NAME = "9Sig Paper Trial"
 EQUITY = "LQQ3.L"
@@ -99,4 +99,12 @@ def create_paper_trial(owner):
                 strategy=strategy, symbol=ticker,
                 price=price, as_of=day, source="yahoo",
             )
+        summary = ledger_summary(strategy)
+        if summary["value"] is None:
+            raise PaperSetupUnavailable("The new paper account could not be valued")
+        StrategyValueSnapshot.objects.create(
+            strategy=strategy, as_of=day,
+            total_value=summary["value"],
+            net_contributed=summary["net_contributed"],
+        )
         return strategy, True
