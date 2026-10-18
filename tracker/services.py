@@ -77,12 +77,14 @@ def validate_and_record(strategy, entry):
         entry.save()
     return entry
 
-def consolidated(owner):
+def consolidated(owner, *, include_paper=False):
     results = []
     contributed = ZERO
     total = ZERO
     missing = []
     for s in owner.strategies.select_related("account", "preset").all():
+        if s.account.kind == "PAPER" and not include_paper:
+            continue
         summary = ledger_summary(s)
         results.append({"strategy": s, **summary})
         contributed += summary["net_contributed"]
