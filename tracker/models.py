@@ -43,6 +43,9 @@ class StrategyInstance(models.Model):
     preset = models.ForeignKey(StrategyPreset, on_delete=models.PROTECT)
     name = models.CharField(max_length=100)
     monthly_target = models.DecimalField(max_digits=16, decimal_places=2, default=Decimal("0"))
+    equity_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the 3× equity trading line")
+    safe_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the safe asset")
+    market_data_enabled = models.BooleanField(default=False, help_text="Fetch Yahoo closes and enable advisory strategy reviews")
     contribution_alerts = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -89,6 +92,7 @@ class PriceMark(models.Model):
     symbol = models.CharField(max_length=24)
     price = models.DecimalField(max_digits=22, decimal_places=8)
     as_of = models.DateField()
+    source = models.CharField(max_length=10, default="manual", choices=[("manual", "Manual"), ("yahoo", "Yahoo")])
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "symbol"], name="unique_strategy_mark")]
@@ -139,3 +143,33 @@ class NotificationDelivery(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["owner", "channel", "event_key"], name="unique_notification_event")]
+
+
+class MarketObservation(models.Model):
+    symbol = models.CharField(max_length=24)
+    as_of = models.DateField()
+    price = models.DecimalField(max_digits=22, decimal_places=8)
+    currency = models.CharField(max_length=3)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["symbol", "as_of"], name="unique_market_close")]
+        ordering = ["as_of"]
+
+class YahooSync(models.Model):
+    symbol = models.CharField(max_length=24, unique=True)
+    last_attempt = models.DateTimeField(null=True, blank=True)
+    last_success = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=80, blank=True)
+
+class StrategySignal(models.Model):
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE, related_name="signals")
+    signal_key = models.CharField(max_length=80)
+    kind = models.CharField(max_length=20)
+    title = models.CharField(max_length=180)
+    message = models.TextField()
+    actions = models.JSONField(default=list)
+    as_of = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["strategy", "signal_key"], name="unique_strategy_signal")]
+        ordering = ["-created_at"]

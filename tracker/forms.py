@@ -24,7 +24,7 @@ class AccountForm(forms.ModelForm):
 class StrategyForm(forms.ModelForm):
     class Meta:
         model = StrategyInstance
-        fields = ["name", "account", "preset", "monthly_target", "contribution_alerts"]
+        fields = ["name", "account", "preset", "equity_symbol", "safe_symbol", "market_data_enabled", "monthly_target", "contribution_alerts"]
         labels = {"name": "Tab name", "preset": "Strategy", "monthly_target": "Monthly contribution target (£)"}
         help_texts = {"name": "e.g. 9Sig — ISA or 9Sig — Trading account"}
     def __init__(self, *args, owner, **kwargs):
@@ -33,6 +33,19 @@ class StrategyForm(forms.ModelForm):
         self.fields["preset"].queryset = StrategyPreset.objects.filter(active=True)
         self.fields["monthly_target"].min_value = ZERO
         style(self.fields)
+    def clean(self):
+        data = super().clean()
+        enabled = data.get("market_data_enabled")
+        equity = (data.get("equity_symbol") or "").strip().upper()
+        safe = (data.get("safe_symbol") or "").strip().upper()
+        data["equity_symbol"], data["safe_symbol"] = equity, safe
+        if enabled:
+            if not data.get("preset") or data["preset"].slug != "nasdaq-quarterly-target":
+                raise forms.ValidationError("Automated 9Sig reviews are only available for the Nasdaq 3× quarterly model.")
+            pattern = r"[A-Z0-9][A-Z0-9.^=_-]{0,23}"
+            if not re.fullmatch(pattern, equity) or not re.fullmatch(pattern, safe) or equity == safe:
+                raise forms.ValidationError("Enter two distinct exact Yahoo tickers for the equity and safe holdings.")
+        return data
 
 class LedgerForm(forms.ModelForm):
     class Meta:
