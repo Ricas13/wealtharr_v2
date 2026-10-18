@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Sign in{% endblock %}
+{% block extrahead %}{% if turnstile_required %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="panel auth-panel">
+    <span class="eyebrow">OWNER ACCESS</span>
+    <h1>Welcome back.</h1><p class="muted">Sign in to view and update your investments.</p>
+    <form method="post" class="form-stack">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="form-field"><label for="{{ form.username.id_for_label }}">Username</label>{{ form.username }}{{ form.username.errors }}</div>
+      <div class="form-field"><label for="{{ form.password.id_for_label }}">Password</label>{{ form.password }}{{ form.password.errors }}</div>
+      {% if turnstile_required %}<div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>{% endif %}
+      <button class="btn btn-primary btn-block" type="submit">Sign in →</button>
+    </form>
+    <div class="auth-foot">Owner accounts are created by the administrator. Public registration is disabled.</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Your wealth, clearly{% endblock %}
+{% block content %}
+<section class="hero-wrap">
+  <div class="hero-copy">
+    <div class="eyebrow"><span class="status-pip"></span> BUILT FOR ONE INVESTOR. READY TO GROW.</div>
+    <h1>Every strategy.<br><span class="gradient-text">One clear picture.</span></h1>
+    <p>Track your investments across accounts, see what you own and how your wealth changes. Simple enough to use every day, detailed enough to trust.</p>
+    <a class="btn btn-primary hero-cta" href="{% url 'login' %}">Open my dashboard <span>↗</span></a>
+    <p class="hero-note">Private by default · No broker login needed · No invented returns</p>
+  </div>
+  <div class="hero-preview" aria-label="Illustrative dashboard design preview">
+    <div class="preview-top"><span class="window-dots"><i></i><i></i><i></i></span><span>OVERVIEW / MY WEALTH</span><span class="preview-tag">UI preview</span></div>
+    <div class="preview-title">Your wealth at a glance <span class="accent">↗</span></div>
+    <div class="preview-stats"><div><small>ACCOUNTS</small><strong>ISA + Trading</strong></div><div><small>STRATEGY TABS</small><strong>9Sig · 60/40</strong></div></div>
+    <div class="preview-chart">
+      <svg viewBox="0 0 580 180" role="img" aria-label="Illustrative chart, not investment performance" preserveAspectRatio="none">
+        <defs><linearGradient id="preview-fill" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#1fd5d0" stop-opacity=".30"/><stop offset="1" stop-color="#1fd5d0" stop-opacity="0"/></linearGradient></defs>
+        <path d="M0 154L50 140L90 146L140 110L190 126L240 96L285 106L345 64L400 78L450 50L500 66L580 18L580 180L0 180Z" fill="url(#preview-fill)"/>
+        <path d="M0 154L50 140L90 146L140 110L190 126L240 96L285 106L345 64L400 78L450 50L500 66L580 18" fill="none" stroke="#20d4cd" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M0 52H580M0 102H580M0 154H580" stroke="#324257" stroke-dasharray="3 6" opacity=".7"/>
+      </svg>
+    </div>
+    <div class="preview-tabs"><span>▦ Overview</span><span>⌁ ISA · 9Sig</span><span>⌁ Trading · 9Sig</span></div>
+    <div class="preview-disclaimer">Concept illustration only — not financial data.</div>
+  </div>
+</section>
+<div class="home-features">
+  <div><span class="feature-glyph">▤</span><b>Separate accounts</b><p>ISA, GIA and other portfolios tracked without mixing their balances.</p></div>
+  <div><span class="feature-glyph">⌁</span><b>One strategy, many tabs</b><p>Run the same strategy in different accounts, each with its own cash and trades.</p></div>
+  <div><span class="feature-glyph">◈</span><b>Alerts that matter</b><p>Email and Discord reminders, controlled from your private settings.</p></div>
+</div>
+{% endblock %}

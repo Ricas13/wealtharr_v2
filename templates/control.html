@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Admin control{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">OWNER ADMINISTRATION</div><h1>Control centre</h1><p>Manage the delivery channels used by your personal tracker.</p></div><a href="{% url 'admin:index' %}" class="btn btn-subtle">Advanced admin ↗</a></div>
+<div class="stat-grid three">
+  <div class="panel integration-card"><span class="stat-label">SMTP</span><strong>{% if cfg.smtp_host and cfg.smtp_sender %}Configured{% else %}Needs setup{% endif %}</strong><small>Outbound email</small></div>
+  <div class="panel integration-card"><span class="stat-label">DISCORD</span><strong>{% if discord_set %}Configured{% else %}Needs setup{% endif %}</strong><small>Private webhook</small></div>
+  <div class="panel integration-card"><span class="stat-label">CLOUDFLARE TURNSTILE</span><strong>{% if turnstile_set %}Configured{% else %}Not configured{% endif %}</strong><small>{% if turnstile_required %}Required on sign-in{% else %}Disabled in development{% endif %}</small></div>
+</div>
+<div class="split-layout wide-left">
+  <section class="panel padded"><div class="panel-heading"><div><h2>Email and Discord delivery</h2><p>Credentials are encrypted before storage and not shown again.</p></div></div>
+    <form method="post" class="form-stack">{% csrf_token %}{% include 'partials/form_fields.html' with form=form %}<button class="btn btn-primary" type="submit">Save integrations</button></form>
+    <div class="hint-box">Turnstile site/secret keys must be set using server environment variables before starting production. They are deliberately not editable from a public form.</div>
+  </section>
+  <aside class="stack-panels">
+    <section class="panel padded"><h2>Test delivery</h2><p class="muted">Save integrations, then enable the corresponding channel in My settings. Test messages go only to your configured destinations.</p>
+      <div class="button-cluster"><form method="post" action="{% url 'test_notification' 'email' %}">{% csrf_token %}<button class="btn btn-subtle" type="submit">Send test email</button></form><form method="post" action="{% url 'test_notification' 'discord' %}">{% csrf_token %}<button class="btn btn-subtle" type="submit">Test Discord</button></form></div>
+    </section>
+    <section class="panel padded"><h2>More settings</h2><p class="muted">Advanced administration lets you enable or hide strategy models, inspect records and monitor notification deliveries.</p><a class="btn btn-subtle" href="{% url 'admin:index' %}">Open advanced admin →</a></section>
+  </aside>
+</div>
+{% endblock %}

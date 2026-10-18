@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Create strategy{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">MY STRATEGIES</div><h1>Create a strategy tab</h1><p>Choose an investing approach, then the account where you follow it.</p></div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
+<div class="split-layout wide-left">
+  <section class="panel padded">
+    <h2>New tracking tab</h2>
+    <p class="muted">For example: “9Sig — ISA” and “9Sig — Trading” are independent, even though they use the same strategy model.</p>
+    <form method="post" class="form-stack">{% csrf_token %}
+      {% include 'partials/form_fields.html' with form=form %}
+      <div class="hint-box">Trades are performed by you at your broker. Wealtharr will track the records you enter; it will not place orders or calculate 9Sig trading signals in this initial version.</div>
+      <button class="btn btn-primary" type="submit">Create tab →</button>
+    </form>
+    <div class="under-form">Need a new ISA or trading account? <a href="{% url 'accounts' %}">Add an account first →</a></div>
+  </section>
+  <aside class="panel padded">
+    <h2>Available models</h2>
+    <p class="muted">Risk descriptions are illustrative categories, not personal advice or audited performance data.</p>
+    {% for preset in presets %}
+    <div class="preset-row"><span class="risk-pill {{ preset.risk|lower }}">{{ preset.get_risk_display }}</span><b>{{ preset.name }}</b><small>{{ preset.summary }}</small></div>
+    {% empty %}<p>No active models. Enable one in the advanced admin.</p>{% endfor %}
+  </aside>
+</div>
+{% endblock %}

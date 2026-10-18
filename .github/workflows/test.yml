@@ -1,0 +1,31 @@
+name: Application checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DEBUG: "1"
+      SECRET_KEY: "github-actions-development-only-secret"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Verify app configuration
+        run: python manage.py check
+      - name: Verify migrations match models
+        run: python manage.py makemigrations --check --dry-run
+      - name: Apply schema migrations
+        run: python manage.py migrate --noinput
+      - name: Run tests
+        run: python manage.py test tracker --verbosity 2
+      - name: Compile assets
+        run: python manage.py collectstatic --noinput
