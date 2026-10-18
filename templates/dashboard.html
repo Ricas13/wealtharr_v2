@@ -2,6 +2,23 @@
 {% block title %}Overview{% endblock %}
 {% block content %}
 <div class="page-heading"><div><div class="eyebrow">MY PORTFOLIO</div><h1>Overview</h1><p>One clear view across all your investment strategies.</p></div><a class="btn btn-primary" href="{% url 'new_strategy' %}">＋ Add strategy</a></div>
+<section class="panel padded" style="margin-bottom:16px;border:1px solid #2b8992">
+  <div class="panel-heading">
+    <div><h2>9Sig paper tracker</h2>
+      <p>Real closing prices and quarterly alerts. Virtual holdings only; no Trading 212 connection and no order execution.</p></div>
+    <span class="risk-pill high">LIVE TRIAL</span>
+  </div>
+  {% if paper_trial %}
+    <p class="muted">Your £1,000 virtual 60/40 starting allocation is tracked separately from ISA and general investment accounts. Review all suggestions before acting.</p>
+    <a class="btn btn-primary btn-sm" href="{% url 'strategy_detail' paper_trial.pk %}">Open my 9Sig paper trial →</a>
+  {% else %}
+    <p class="muted">Start with £1,000 virtual capital, £500/month planned contributions, 60% LQQ3.L and 40% ERNS.L at verified Yahoo GBP closing prices. This does not buy real securities; virtual fractional shares are used.</p>
+    <form method="post" action="{% url 'start_paper_trial' %}">
+      {% csrf_token %}<input type="hidden" name="confirm_paper" value="PAPER_ONLY">
+      <button class="btn btn-primary" type="submit">Start isolated 9Sig paper trial →</button>
+    </form>
+  {% endif %}
+</section>
 <div class="stat-grid">
   <div class="panel stat-card"><div class="stat-label">Total wealth <span>◈</span></div><div class="stat-value">{% if total is not None %}£{{ total|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Total value of tracked strategies</div></div>
   <div class="panel stat-card"><div class="stat-label">Net added <span>↳</span></div><div class="stat-value">£{{ net_contributed|floatformat:2 }}</div><div class="stat-help">Deposits minus withdrawals</div></div>
