@@ -1,0 +1,23 @@
+{
+  "name": "wealtharr-v2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0",
+    "test": "node --test tests/*.test.js",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:bootstrap": "node scripts/bootstrap.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "next": "^15.5.0",
+    "nodemailer": "^6.10.1",
+    "postgres": "^3.4.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {}
+}
