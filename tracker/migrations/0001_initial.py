@@ -20,7 +20,7 @@ def seed(apps, schema_editor):
     ]:
         P.objects.get_or_create(slug=slug, defaults={"name":name,"risk":risk,"summary":summary,"methodology":method})
 
-ID = ("id", models.BigAutoField(primary_key=True, serialize=False))
+
 def fk(to, related_name=None, protect=False):
     kw = {"on_delete": deletion.PROTECT if protect else deletion.CASCADE, "to": to}
     if related_name: kw["related_name"] = related_name
@@ -35,12 +35,12 @@ class Migration(migrations.Migration):
     dependencies = [migrations.swappable_dependency(settings.AUTH_USER_MODEL)]
     operations = [
         migrations.CreateModel("StrategyPreset", [
-            ID, ("slug",models.SlugField(unique=True)), ("name",models.CharField(max_length=100)),
+            ("id", models.BigAutoField(primary_key=True, serialize=False)), ("slug",models.SlugField(unique=True)), ("name",models.CharField(max_length=100)),
             ("summary",models.TextField()), ("risk",models.CharField(max_length=10,choices=[("LOW","Low"),("MEDIUM","Medium"),("HIGH","High")])),
             ("methodology",models.TextField(blank=True)), ("active",models.BooleanField(default=True))
         ], options={"ordering":["risk","name"]}),
         migrations.CreateModel("SystemIntegration", [
-            ID, ("smtp_host",models.CharField(max_length=255,blank=True)),
+            ("id", models.BigAutoField(primary_key=True, serialize=False)), ("smtp_host",models.CharField(max_length=255,blank=True)),
             ("smtp_port",models.PositiveIntegerField(default=587)),
             ("smtp_username",models.CharField(max_length=255,blank=True)),
             ("smtp_password_ciphertext",models.TextField(blank=True)),
@@ -49,7 +49,7 @@ class Migration(migrations.Migration):
             ("discord_url_ciphertext",models.TextField(blank=True)),
         ]),
         migrations.CreateModel("Account", [
-            ID, ("name",models.CharField(max_length=90)),
+            ("id", models.BigAutoField(primary_key=True, serialize=False)), ("name",models.CharField(max_length=90)),
             ("kind",models.CharField(max_length=12,default="ISA",choices=[
                 ("ISA","Stocks & Shares ISA"),("GIA","General investment account"),
                 ("SIPP","SIPP / pension"),("OTHER","Other account")])),
@@ -58,14 +58,14 @@ class Migration(migrations.Migration):
             ("owner",fk(settings.AUTH_USER_MODEL,"investment_accounts")),
         ], options={"ordering":["name"]}),
         migrations.CreateModel("StrategyInstance", [
-            ID, ("name",models.CharField(max_length=100)),
+            ("id", models.BigAutoField(primary_key=True, serialize=False)), ("name",models.CharField(max_length=100)),
             ("monthly_target",dec(2,16,Decimal("0"))),("contribution_alerts",models.BooleanField(default=True)),
             ("created_at",models.DateTimeField(auto_now_add=True)),
             ("owner",fk(settings.AUTH_USER_MODEL,"strategies")),
             ("account",fk("tracker.account","strategies",True)),("preset",fk("tracker.strategypreset",protect=True)),
         ], options={"ordering":["created_at","pk"]}),
         migrations.CreateModel("LedgerEntry", [
-            ID, ("kind",models.CharField(max_length=12,choices=[
+            ("id", models.BigAutoField(primary_key=True, serialize=False)), ("kind",models.CharField(max_length=12,choices=[
                 ("DEPOSIT","Add money"),("WITHDRAW","Withdraw money"),("BUY","Buy"),("SELL","Sell"),
                 ("DIVIDEND","Dividend"),("FEE","Other fee")])),
             ("occurred_on",models.DateField()),("symbol",models.CharField(max_length=24,blank=True)),
@@ -76,23 +76,23 @@ class Migration(migrations.Migration):
             ("strategy",fk("tracker.strategyinstance","ledger")),
         ],options={"ordering":["occurred_on","pk"]}),
         migrations.CreateModel("PriceMark", [
-            ID,("symbol",models.CharField(max_length=24)),("price",dec(8,22)),
+            ("id", models.BigAutoField(primary_key=True, serialize=False)),("symbol",models.CharField(max_length=24)),("price",dec(8,22)),
             ("as_of",models.DateField()),("strategy",fk("tracker.strategyinstance","prices")),
         ]),
         migrations.CreateModel("WealthSnapshot", [
-            ID,("as_of",models.DateField()),("total_value",dec(2,24)),
+            ("id", models.BigAutoField(primary_key=True, serialize=False)),("as_of",models.DateField()),("total_value",dec(2,24)),
             ("net_contributed",dec(2,24)),("captured_at",models.DateTimeField(auto_now_add=True)),
             ("owner",fk(settings.AUTH_USER_MODEL,"wealth_snapshots")),
         ],options={"ordering":["as_of"]}),
         migrations.CreateModel("NotificationPreference", [
-            ID,("destination_email",models.EmailField(blank=True)),
+            ("id", models.BigAutoField(primary_key=True, serialize=False)),("destination_email",models.EmailField(blank=True)),
             ("email_enabled",models.BooleanField(default=False)),
             ("discord_enabled",models.BooleanField(default=False)),
             ("monthly_reminders",models.BooleanField(default=True)),
             ("owner",models.OneToOneField(to=settings.AUTH_USER_MODEL,on_delete=deletion.CASCADE,related_name="notification_preference")),
         ]),
         migrations.CreateModel("NotificationDelivery", [
-            ID,("channel",models.CharField(max_length=12)),("event_key",models.CharField(max_length=160)),
+            ("id", models.BigAutoField(primary_key=True, serialize=False)),("channel",models.CharField(max_length=12)),("event_key",models.CharField(max_length=160)),
             ("status",models.CharField(max_length=12,default="PENDING")),
             ("created_at",models.DateTimeField(auto_now_add=True)),
             ("error",models.CharField(max_length=200,blank=True)),
