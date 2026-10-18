@@ -94,3 +94,28 @@ Failed email/Discord deliveries persist the redacted status and retry up to thre
 ### Manual 60/40 reset and subsequent 9Sig cycles
 
 When the quarterly rule proposes a 60/40 reset, **Mark reviewed** does not execute or confirm it. Trade manually at the broker, record the real executed fills with fees, and refresh both GBP Yahoo marks. Then choose **Confirm executed reset and start next 9Sig cycle** from that acknowledged notice. Wealtharr validates that trades happened after the notice, the latest prices are recent, no unmodelled positions are present and recorded equity is within 5 percentage points of 60% of the actual account value. It writes an immutable baseline with the confirmed shares/cash, preventing future targets from incorrectly compounding the *pre-reset* initial balance. Without a confirmed new baseline, later quarter signals pause rather than guessing that the recommendation was executed.
+
+
+## Live owner paper-tracking mode (no Trading 212 connection)
+
+On Overview or Create Strategy, choose **Start isolated 9Sig paper trial**. This creates a separate PAPER account with **£1,000 virtual capital**, buying £600 of LQQ3.L and £400 of ERNS.L at a common verified GBP Yahoo daily close. Fractional shares are fictional: NO real purchases, transfers or trades are made. The setting is opt-in; it never changes any existing ISA or GIA holdings. Clicking it twice returns to the existing paper trial instead of double funding.
+
+The monthly contribution target is £500, **planned only**. Neither virtual nor real monthly contributions happen automatically. Record manual paper-only deposits to model additional contributions. Monthly contribution reminders for this paper tab start disabled.
+
+The trial gets its own growth chart. The regular Overview real-money total and consolidated net deposits EXCLUDE virtual paper assets. The scheduled hourly checker refreshes prices and records a strategy valuation only when all quoted GBP closes are sufficiently recent and no transaction is newer than the close. No fictitious backtest, dividends or corporate actions are generated.
+
+Quarterly 9Sig signals begin after the first completed quarter after the paper entry; a trial beginning October 2026 will not generate a new Q4 target alert until market data for the quarter ending 31 December 2026 becomes available. Notifications remain review-only and may differ from every exceptional branch in the spreadsheet. False positives can be acknowledged in-app without placing orders or changing actual holdings.
+
+If the Yahoo feed is down, mismatched in currency or provides different closing dates for the two UK lines, startup fails safely without creating a half-funded account.
+
+## Owner-only production deployment to Oracle
+
+The separate GitHub Actions workflow **Deploy Wealtharr owner tracker** is intentionally gated. It will deploy only after you configure the Oracle server and explicitly enable it. Successful repository tests or market-source checks do NOT mean your actual Oracle app is running.
+
+1. On your Oracle host, install Docker Engine, Docker Compose, git and curl. Create directory HOME/wealtharr_v2 with private files .env (POSTGRES_PASSWORD) and .env.production (DEBUG=0, stable 50+ character SECRET_KEY, ALLOWED_HOSTS=wealtharr.vpn4u.cc, CSRF_TRUSTED_ORIGINS=https://wealtharr.vpn4u.cc, TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY). Restrict file permissions to 0600. Your account must be able to run Docker. Production sign-in fails closed without valid Turnstile keys.
+2. In GitHub Repository Settings > Secrets and variables > Actions, securely configure secrets: WEALTHARR_DEPLOY_HOST (Oracle address), WEALTHARR_DEPLOY_USER (normal SSH deploy user), WEALTHARR_DEPLOY_SSH_KEY (private key), WEALTHARR_DEPLOY_KNOWN_HOSTS (verified pinned SSH host-key record). Optional variable WEALTHARR_DEPLOY_PORT defaults to 22. NEVER paste passwords or deployment keys into a PR, GitHub issue or ChatGPT.
+3. Confirm Traefik can route HTTPS traffic for wealtharr.vpn4u.cc to host TCP port 8088 (and that it is not already used by a different app). A Traefik container cannot reach host 127.0.0.1 without explicitly configured host-gateway/network connectivity.
+4. Set GitHub Actions repository variable WEALTHARR_DEPLOY_ENABLED=true, then run Actions > Deploy Wealtharr owner tracker > Run workflow, selecting main. When enabled, future main pushes deploy automatically. The workflow checks the GitHub commit, Compose config, internal app health and public HTTPS health.
+5. From the deployed project on Oracle, run: docker compose exec web python manage.py createsuperuser. Sign in, select Start isolated 9Sig paper trial, and monitor. Configure optional email and Discord in Admin control, enable channels in My settings, and use Test delivery. Read logs with docker compose logs --tail=100 reminders. Backup service keeps private PostgreSQL dump archives and should be backed up off-host.
+
+Do not repoint a live Wealtharr v1 Traefik route until you explicitly confirm the migration. The deploy workflow will not create Oracle infrastructure, change Traefik settings, set private secrets or connect Trading 212 for you. Without a configured and reachable Oracle SSH target, remote deployment is not verifiable.

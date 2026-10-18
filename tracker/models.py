@@ -5,7 +5,7 @@ from django.db import models
 
 ACCOUNT_TYPES = [
     ("ISA", "Stocks & Shares ISA"), ("GIA", "General investment account"),
-    ("SIPP", "SIPP / pension"), ("OTHER", "Other account"),
+    ("SIPP", "SIPP / pension"), ("PAPER", "Paper tracking (virtual only)"), ("OTHER", "Other account"),
 ]
 RISK_TYPES = [("LOW", "Low"), ("MEDIUM", "Medium"), ("HIGH", "High")]
 
@@ -175,6 +175,15 @@ class StrategySignal(models.Model):
     as_of = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True)
+    review_outcome = models.CharField(
+        max_length=16, blank=True, default="",
+        choices=[
+            ("CONFIRMED", "Confirmed after review"),
+            ("FALSE_POSITIVE", "False signal"),
+            ("NOT_APPLICABLE", "Not applicable"),
+        ],
+    )
+    review_note = models.TextField(blank=True, default="")
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "signal_key"], name="unique_strategy_signal")]
         ordering = ["-created_at"]
@@ -200,4 +209,21 @@ class StrategyBaseline(models.Model):
         ordering = ["as_of", "id"]
         constraints = [
             models.UniqueConstraint(fields=["strategy", "as_of"], name="unique_strategy_baseline")
+        ]
+
+
+class StrategyValueSnapshot(models.Model):
+    """Historic values are isolated by strategy and account, including PAPER."""
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE,
+                                 related_name="value_snapshots")
+    as_of = models.DateField()
+    total_value = models.DecimalField(max_digits=24, decimal_places=2)
+    net_contributed = models.DecimalField(max_digits=24, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["as_of"]
+        constraints = [
+            models.UniqueConstraint(fields=["strategy", "as_of"],
+                                    name="unique_strategy_value_date")
         ]

@@ -2,6 +2,14 @@
 {% block title %}Create strategy{% endblock %}
 {% block content %}
 <div class="page-heading"><div><div class="eyebrow">MY STRATEGIES</div><h1>Create a strategy tab</h1><p>Choose an investing approach, then the account where you follow it.</p></div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
+<section class="panel padded" style="margin-bottom:16px;border:1px solid #2b8992">
+  <h2>Want to try 9Sig without real investments?</h2>
+  <p class="muted">Start a standalone £1,000 paper tracker with real Yahoo GBP closing prices and review-only alerts. No brokerage access required.</p>
+  <form method="post" action="{% url 'start_paper_trial' %}">{% csrf_token %}
+    <input type="hidden" name="confirm_paper" value="PAPER_ONLY">
+    <button class="btn btn-primary" type="submit">Start virtual 9Sig trial →</button>
+  </form>
+</section>
 <div class="split-layout wide-left">
   <section class="panel padded">
     <h2>New tracking tab</h2>

@@ -2,10 +2,25 @@
 {% block title %}{{ strategy.name }}{% endblock %}
 {% block content %}
 <div class="page-heading"><div><div class="eyebrow">STRATEGY / {{ strategy.account.name|upper }}</div><h1>{{ strategy.name }}</h1><p>{{ strategy.preset.name }} · {{ strategy.account.get_kind_display }} · GBP</p></div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
+{% if strategy.account.kind == "PAPER" %}
+<div class="alert-warning"><strong>VIRTUAL PAPER ACCOUNT — NO REAL ASSETS.</strong>
+  This account was funded with simulated £1,000 and virtual fractional positions.
+  Yahoo closes update estimates; recommendations are review-only and never execute orders.
+  The £500 monthly contribution is a plan, not an actual transfer.
+  Initial signals require the first completed quarter after its virtual purchase.
+</div>
+{% endif %}
 <div class="strategy-tabbar">
   {% for tab in nav_strategies %}<a href="{% url 'strategy_detail' tab.pk %}" class="tab {% if tab.pk == strategy.pk %}active{% endif %}">{{ tab.name }}</a>{% endfor %}
   <a href="{% url 'new_strategy' %}" class="tab tab-add">＋ New tab</a>
 </div>
+<section class="panel chart-panel">
+  <div class="panel-heading"><div><h2>Strategy growth</h2>
+    <p>Actual recorded strategy valuations. Paper-mode values are virtual, not broker holdings.</p></div></div>
+  <div id="strategy-chart" class="wealth-chart" role="img" aria-label="Dated valuation chart for this strategy"></div>
+  {{ chart_points|json_script:"strategy-chart-points" }}
+  <p class="chart-caption">Yahoo marks are recorded by trading day. The first observation is seeded when a paper trial starts. No backtest or future trade is invented.</p>
+</section>
 <div class="stat-grid three">
   <div class="panel stat-card"><div class="stat-label">Current value</div><div class="stat-value">{% if report.value is not None %}£{{ report.value|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Cash + marked positions</div></div>
   <div class="panel stat-card"><div class="stat-label">Available cash</div><div class="stat-value">£{{ report.cash|floatformat:2 }}</div><div class="stat-help">For trades within this tab</div></div>
@@ -13,7 +28,7 @@
 </div>
 {% if report.missing %}<div class="alert-warning">Price needed for: {% for symbol in report.missing %}<b>{{ symbol }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}. Set the latest GBP unit price below to complete this strategy's valuation.</div>{% endif %}
 <section class="panel padded" id="strategy-signals">
-  <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Yahoo closing prices and advisory signals. Never an automatic trade.</p></div>
+  <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Hourly server-side checks when the scheduler is running; refresh now to check manually. Quarterly actions are emitted only after a quarter closes.</p></div>
   {% if strategy.market_data_enabled %}
   <form method="post" action="{% url 'refresh_market' strategy.pk %}">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">⟳ Check Yahoo prices</button></form>
   {% else %}<span class="risk-pill">Monitoring off</span>{% endif %}
@@ -27,7 +42,8 @@
       <button class="btn btn-primary" type="submit">Save monitoring settings</button>
     </form>
   </details>{% endif %}
-  {% if strategy.market_data_enabled %}<p class="micro-note">Equity: {{ strategy.equity_symbol }} · Safe asset: {{ strategy.safe_symbol }} · US drawdown reference: TQQQ. GBP-denominated Yahoo quotes only. 9Sig recommendations are preliminary and not workbook-equivalent.</p>
+  {% if strategy.market_data_enabled %}<p class="micro-note"><strong>{{ monitoring_status.message }}</strong></p>
+  <p class="micro-note">Equity: {{ strategy.equity_symbol }} · Safe asset: {{ strategy.safe_symbol }} · US drawdown reference: TQQQ. GBP-denominated Yahoo quotes only. 9Sig recommendations are preliminary and not workbook-equivalent.</p>
   {% else %}<p class="micro-note">To enable automatic quote checks, create a 9Sig strategy tab with exact Yahoo equity/safe tickers and the monitoring option. Manual tracking still works.</p>{% endif %}
   {% for signal in signals %}
   <div class="signal-review">
@@ -41,7 +57,27 @@
         <button class="btn btn-subtle btn-sm" type="submit">Confirm executed reset and start next 9Sig cycle</button>
       </form>
     {% endif %}
-    {% if not signal.acknowledged_at %}<form method="post" action="{% url 'acknowledge_signal' strategy.pk signal.pk %}">{% csrf_token %}<button class="btn btn-subtle btn-sm" type="submit">Mark reviewed</button></form>{% endif %}
+    {% if signal.review_outcome %}
+      <p class="micro-note"><strong>Review result: {{ signal.get_review_outcome_display }}</strong>
+        {% if signal.review_note %} — {{ signal.review_note }}{% endif %}</p>
+    {% endif %}
+    <details class="monitor-settings" style="margin:12px 0;padding:12px;border:1px solid #294a60;border-radius:8px">
+      <summary style="cursor:pointer;color:#57d7d1">{% if signal.review_outcome %}Update review{% else %}Verify or correct this signal{% endif %}</summary>
+      <form method="post" action="{% url 'review_signal' strategy.pk signal.pk %}" class="form-stack">{% csrf_token %}
+        <label class="form-field">Your review
+          <select class="field" name="outcome" required>
+            <option value="CONFIRMED" {% if signal.review_outcome == "CONFIRMED" %}selected{% endif %}>Seems correct after checking</option>
+            <option value="FALSE_POSITIVE" {% if signal.review_outcome == "FALSE_POSITIVE" %}selected{% endif %}>False signal / incorrect calculation</option>
+            <option value="NOT_APPLICABLE" {% if signal.review_outcome == "NOT_APPLICABLE" %}selected{% endif %}>Not applicable to my portfolio</option>
+          </select>
+        </label>
+        <label class="form-field">Correction or explanation (required for false signals)
+          <textarea class="field" name="review_note" maxlength="2000" rows="3" placeholder="e.g. 30-Down condition is not active according to workbook">{{ signal.review_note }}</textarea>
+        </label>
+        <button class="btn btn-subtle btn-sm" type="submit">Save signal review</button>
+      </form>
+    </details>
+    {% if not signal.acknowledged_at %}<form method="post" action="{% url 'acknowledge_signal' strategy.pk signal.pk %}">{% csrf_token %}<button class="btn btn-subtle btn-sm" type="submit">Mark reviewed without a correction</button></form>{% endif %}
   </div>
   {% empty %}<p class="muted">No automated recommendations yet. Your review history will appear here after a verified market check and qualifying event.</p>{% endfor %}
 </section>
