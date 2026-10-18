@@ -101,3 +101,9 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 INSERT INTO app_settings(key,value) VALUES ('nine_sig_enabled','true')
   ON CONFLICT(key) DO NOTHING;
+CREATE TABLE IF NOT EXISTS market_daily (
+  symbol text NOT NULL,
+  as_of date NOT NULL,
+  price numeric(22,8) NOT NULL CHECK(price>0),
+  PRIMARY KEY(symbol,as_of)
+);
