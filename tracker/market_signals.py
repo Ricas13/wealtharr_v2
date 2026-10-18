@@ -334,8 +334,18 @@ def review_strategy(strategy):
     if not first_buy:
         return {"status": "waiting for equity purchase"}
     quarter_end = quarter_end_before(now)
-    if quarter_number(quarter_end) < quarter_number(first_buy.occurred_on):
+    baseline = strategy.baselines.order_by("-as_of", "-pk").first()
+    start_date = baseline.as_of if baseline else first_buy.occurred_on
+    if quarter_number(quarter_end) < quarter_number(start_date):
         return {"status": "waiting for first completed quarter"}
+    # A 60/40 reset is a suggestion, never proof that the owner traded.
+    # Future cycles are paused until their actual positions are re-anchored.
+    pending_reset = strategy.signals.filter(
+        kind="QUARTERLY", as_of__lt=quarter_end,
+        message__icontains="review a reset to 60%"
+    ).order_by("-as_of").first()
+    if pending_reset and (baseline is None or baseline.as_of <= pending_reset.as_of):
+        return {"status": "manual reset must be confirmed as a new strategy baseline"}
     closing = {symbol: settlement_close(symbol, quarter_end) for symbol in tickers}
     if (any(x is None for x in closing.values()) or
             closing[strategy.equity_symbol].currency != "GBP" or
@@ -350,7 +360,7 @@ def review_strategy(strategy):
         qty = positions.get(entry.symbol, ZERO)
         if entry.kind == LedgerEntry.DEPOSIT:
             cash += entry.amount
-            if entry.occurred_on > first_buy.occurred_on:
+            if entry.occurred_on > start_date:
                 injected.append((entry.occurred_on, entry.amount))
         elif entry.kind == LedgerEntry.WITHDRAW:
             cash -= entry.amount
@@ -372,25 +382,27 @@ def review_strategy(strategy):
         return {"status": "historical holdings cannot support an advisory review"}
     ref_tqqq = list(MarketObservation.objects.filter(
         symbol="TQQQ", as_of__lte=quarter_end,
-        as_of__gte=first_buy.occurred_on - timedelta(days=100),
+        as_of__gte=start_date - timedelta(days=100),
     ).order_by("as_of").values_list("as_of", "price"))
     ref_spy = list(MarketObservation.objects.filter(
         symbol="SPY", as_of__lte=quarter_end,
         as_of__gte=quarter_end - timedelta(days=760),
     ).order_by("as_of").values_list("as_of", "price"))
     old = list(strategy.signals.filter(
-        kind="QUARTERLY", as_of__lt=quarter_end).order_by("as_of"))
+        kind="QUARTERLY", as_of__lt=quarter_end,
+        as_of__gte=start_date).order_by("as_of"))
     prior_down = strategy.signals.filter(
         kind="THIRTY_DOWN", as_of__lt=quarter_end,
-        as_of__gte=quarter_end - timedelta(days=760)).exists()
+        as_of__gte=max(start_date, quarter_end - timedelta(days=760))).exists()
     skipped = sum(
         any(a.get("side") == "HOLD" for a in row.actions)
         for row in old[-8:])
     last_sell = strategy.ledger.filter(
         kind=LedgerEntry.SELL, symbol=strategy.equity_symbol,
-        occurred_on__lte=quarter_end).order_by("-occurred_on").first()
+        occurred_on__lte=quarter_end,
+        occurred_on__gte=start_date).order_by("-occurred_on").first()
     no_sell = (quarter_number(quarter_end) - quarter_number(last_sell.occurred_on)
-               if last_sell else quarter_number(quarter_end) - quarter_number(first_buy.occurred_on))
+               if last_sell else quarter_number(quarter_end) - quarter_number(start_date))
     if len(_quarterly_closes(ref_spy, quarter_end)) < 2:
         return {"status": "insufficient SPY quarter-end reference history"}
     if len(_quarterly_closes(ref_tqqq, quarter_end)) < 2:
@@ -400,7 +412,7 @@ def review_strategy(strategy):
     first_quarter_last_month = ((first_buy.occurred_on.month - 1) // 3 + 1) * 3
     initial_end = date(first_buy.occurred_on.year, first_quarter_last_month,
                        monthrange(first_buy.occurred_on.year, first_quarter_last_month)[1])
-    initial_equity_cost = sum(
+    initial_equity_cost = baseline.equity_value if baseline else sum(
         (t.quantity * t.unit_price for t in strategy.ledger.filter(
             symbol=strategy.equity_symbol, kind=LedgerEntry.BUY,
             occurred_on__gte=first_buy.occurred_on, occurred_on__lte=initial_end)),
@@ -408,7 +420,7 @@ def review_strategy(strategy):
     if initial_equity_cost <= ZERO:
         return {"status": "missing initial equity investment"}
     alerts = advice_for_holdings(
-        start_date=first_buy.occurred_on, as_of=quarter_end,
+        start_date=start_date, as_of=quarter_end,
         currency=strategy.account.currency,
         equity_symbol=strategy.equity_symbol,
         safe_symbol=strategy.safe_symbol,
