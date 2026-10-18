@@ -8,7 +8,14 @@
     <p class="muted">For example: “9Sig — ISA” and “9Sig — Trading” are independent, even though they use the same strategy model.</p>
     <form method="post" class="form-stack">{% csrf_token %}
       {% include 'partials/form_fields.html' with form=form %}
-      <div class="hint-box">Trades are performed by you at your broker. Wealtharr will track the records you enter; verified Yahoo GBP prices and preliminary 9Sig alerts are optional. No automatic orders are placed. Exact workbook parity is not yet claimed.</div>
+      <div class="hint-box" style="margin-bottom:14px">
+      <strong>UK example ticker research (not a preselected trade)</strong><br>
+      Equity: <b>LQQ3.L</b> — WisdomTree Nasdaq 100 3× Daily Leveraged, LSE GBp line.
+      Safe sleeve: <b>ERNS.L</b> — iShares GBP Ultrashort Bond (GBP). Both issuers indicate UK ISA eligibility, but confirm the specific securities are available in your Trading 212 account. Neither exactly matches the US TQQQ/AGG pair.<br>
+      <a href="https://www.wisdomtree.com/gb/products/equities/wisdomtree-nasdaq-100-3x-daily-leveraged" target="_blank" rel="noopener noreferrer">WisdomTree issuer evidence ↗</a>
+      · <a href="https://www.ishares.com/uk/individual/en/products/258120/ishares-ultrashort-bond-ucits-etf" target="_blank" rel="noopener noreferrer">iShares issuer evidence ↗</a>
+    </div>
+    <div class="hint-box">Trades are performed by you at your broker. Wealtharr will track the records you enter; verified Yahoo GBP prices and preliminary 9Sig alerts are optional. No automatic orders are placed. Exact workbook parity is not yet claimed.</div>
       <button class="btn btn-primary" type="submit">Create tab →</button>
     </form>
     <div class="under-form">Need a new ISA or trading account? <a href="{% url 'accounts' %}">Add an account first →</a></div>
