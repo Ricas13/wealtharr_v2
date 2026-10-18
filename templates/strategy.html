@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}{{ strategy.name }}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">STRATEGY / {{ strategy.account.name|upper }}</div><h1>{{ strategy.name }}</h1><p>{{ strategy.preset.name }} · {{ strategy.account.get_kind_display }} · GBP</p></div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
+<div class="strategy-tabbar">
+  {% for tab in nav_strategies %}<a href="{% url 'strategy_detail' tab.pk %}" class="tab {% if tab.pk == strategy.pk %}active{% endif %}">{{ tab.name }}</a>{% endfor %}
+  <a href="{% url 'new_strategy' %}" class="tab tab-add">＋ New tab</a>
+</div>
+<div class="stat-grid three">
+  <div class="panel stat-card"><div class="stat-label">Current value</div><div class="stat-value">{% if report.value is not None %}£{{ report.value|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Cash + marked positions</div></div>
+  <div class="panel stat-card"><div class="stat-label">Available cash</div><div class="stat-value">£{{ report.cash|floatformat:2 }}</div><div class="stat-help">For trades within this tab</div></div>
+  <div class="panel stat-card"><div class="stat-label">Investment result</div><div class="stat-value">{% if report.profit is not None %}£{{ report.profit|floatformat:2 }}{% else %}—{% endif %}</div><div class="stat-help">Value less net contributions</div></div>
+</div>
+{% if report.missing %}<div class="alert-warning">Price needed for: {% for symbol in report.missing %}<b>{{ symbol }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}. Set the latest GBP unit price below to complete this strategy's valuation.</div>{% endif %}
+<div class="split-layout strategy-work">
+  <div class="stack-panels">
+    <section class="panel padded"><div class="panel-heading"><div><h2>Holdings</h2><p>Your current positions and manually entered prices.</p></div></div>
+    <div class="table-scroll"><table class="data-table"><thead><tr><th>Instrument</th><th class="num">Units</th><th class="num">GBP/unit</th><th class="num">Value</th></tr></thead><tbody>
+    {% for h in holdings %}<tr><td><b>{{ h.symbol }}</b></td><td class="num">{{ h.quantity|floatformat:6 }}</td><td class="num">{% if h.mark %}£{{ h.mark.price|floatformat:4 }}<small class="table-sub">{{ h.mark.as_of|date:"d M Y" }}</small>{% else %}<span class="missing-price">Missing</span>{% endif %}</td><td class="num">{% if h.value is not None %}£{{ h.value|floatformat:2 }}{% else %}—{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty-cell">No investments bought yet. Record a deposit, then a buy.</td></tr>{% endfor %}
+    </tbody></table></div>
+    </section>
+    <section class="panel padded"><div class="panel-heading"><div><h2>Activity history</h2><p>Append-only entries keep your ledger accountable.</p></div></div>
+    <div class="table-scroll"><table class="data-table"><thead><tr><th>Date</th><th>Action</th><th>Ticker</th><th class="num">Units</th><th class="num">Cash / price</th></tr></thead><tbody>
+    {% for entry in entries %}<tr><td>{{ entry.occurred_on|date:"d M Y" }}</td><td>{{ entry.get_kind_display }}</td><td>{{ entry.symbol|default:"—" }}</td><td class="num">{% if entry.symbol %}{{ entry.quantity|floatformat:6 }}{% else %}—{% endif %}</td><td class="num">{% if entry.symbol %}£{{ entry.unit_price|floatformat:4 }}{% else %}£{{ entry.amount|floatformat:2 }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5" class="empty-cell">No activity yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+    </section>
+  </div>
+  <div class="stack-panels">
+    <section class="panel padded"><div class="panel-heading"><div><h2>Record activity</h2><p>First add cash, then record actual trades.</p></div></div>
+      <form method="post" action="{% url 'record_entry' strategy.pk %}" class="form-stack" id="ledger-form">{% csrf_token %}
+        {% include 'partials/form_fields.html' with form=entry_form %}
+        <p class="micro-note">Prices and cash amounts must be in GBP. Foreign-currency trading and automatic FX are not supported yet. Enter trades by actual execution date in order.</p>
+        <button class="btn btn-primary btn-block" type="submit">Save transaction →</button>
+      </form>
+    </section>
+    <section class="panel padded"><div class="panel-heading"><div><h2>Mark a holding price</h2><p>Update a holding to calculate its value. Not a live quote.</p></div></div>
+      <form method="post" action="{% url 'record_price' strategy.pk %}" class="form-stack">{% csrf_token %}
+        {% include 'partials/form_fields.html' with form=price_form %}
+        <button class="btn btn-subtle btn-block" type="submit">Save price mark</button>
+      </form>
+    </section>
+    <section class="panel padded"><h2>About this model</h2><span class="risk-pill {{ strategy.preset.risk|lower }}">{{ strategy.preset.get_risk_display }} risk</span><p class="muted">{{ strategy.preset.summary }}</p><p class="muted">{{ strategy.preset.methodology }}</p><div class="detail-row"><span>Monthly target</span><strong>£{{ strategy.monthly_target|floatformat:2 }}</strong></div><p class="micro-note">Tracking is not trading advice. This foundation does not issue 9Sig signals automatically.</p></section>
+  </div>
+</div>
+{% endblock %}

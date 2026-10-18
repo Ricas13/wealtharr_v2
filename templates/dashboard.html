@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">MY PORTFOLIO</div><h1>Overview</h1><p>One clear view across all your investment strategies.</p></div><a class="btn btn-primary" href="{% url 'new_strategy' %}">＋ Add strategy</a></div>
+<div class="stat-grid">
+  <div class="panel stat-card"><div class="stat-label">Total wealth <span>◈</span></div><div class="stat-value">{% if total is not None %}£{{ total|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Total value of tracked strategies</div></div>
+  <div class="panel stat-card"><div class="stat-label">Net added <span>↳</span></div><div class="stat-value">£{{ net_contributed|floatformat:2 }}</div><div class="stat-help">Deposits minus withdrawals</div></div>
+  <div class="panel stat-card"><div class="stat-label">Investment result <span>⌁</span></div><div class="stat-value {% if gain is not None and gain < 0 %}negative{% endif %}">{% if gain is not None %}£{{ gain|floatformat:2 }}{% else %}—{% endif %}</div><div class="stat-help">Wealth minus net money added</div></div>
+  <div class="panel stat-card"><div class="stat-label">Active strategies <span>▤</span></div><div class="stat-value">{{ items|length }}</div><div class="stat-help">Across {{ accounts|length }} account{{ accounts|length|pluralize }}</div></div>
+</div>
+{% if missing %}<div class="alert-warning"><strong>Prices needed for an accurate total.</strong> Add a GBP price on these strategy tabs: {% for item in missing %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}. Until then, the total and return are hidden rather than understated.</div>{% endif %}
+<div class="panel chart-panel">
+  <div class="panel-heading"><div><h2>Wealth growth</h2><p>Saved portfolio values over time · £ GBP</p></div><div class="chart-controls"><button type="button" class="chip" data-range="1m">1m</button><button type="button" class="chip" data-range="3m">3m</button><button type="button" class="chip" data-range="1y">1y</button><button type="button" class="chip selected" data-range="all">All</button></div></div>
+  <div id="wealth-chart" class="wealth-chart" role="img" aria-label="Chart of saved wealth snapshots"></div>
+  {{ chart|json_script:"wealth-chart-points" }}
+  <div class="chart-bottom"><span><i class="legend-dot"></i>Portfolio value</span><span><i class="legend-dot secondary"></i>Net contributions</span><form action="{% url 'capture_snapshot' %}" method="post">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">◷ Save today's valuation</button></form></div>
+  <div class="chart-caption">A point is recorded only when you save a valuation. Prices are entered by you; this chart does not imply live broker or market data.</div>
+</div>
+<div class="section-title"><h2>My strategies</h2><span>{{ items|length }} tracked</span></div>
+<div class="strategy-grid">
+  {% for item in items %}
+  <a href="{% url 'strategy_detail' item.strategy.pk %}" class="panel strategy-tile">
+    <div class="tile-top"><span class="risk-pill {{ item.strategy.preset.risk|lower }}">{{ item.strategy.preset.get_risk_display }} risk</span><span>↗</span></div>
+    <h3>{{ item.strategy.name }}</h3><p class="tile-sub">{{ item.strategy.account.name }} · {{ item.strategy.preset.name }}</p>
+    <div class="tile-value">{% if item.value is not None %}£{{ item.value|floatformat:2 }}{% else %}Add prices{% endif %}</div>
+    <div class="tile-foot"><span>Cash: £{{ item.cash|floatformat:2 }}</span><span>View details →</span></div>
+  </a>
+  {% empty %}
+  <div class="panel empty-strategies"><div class="empty-symbol">＋</div><h3>Your first strategy starts here</h3><p>Create an account and a strategy tab. Add your actual starting cash and trades — no subscription or plan required.</p><a class="btn btn-primary" href="{% url 'new_strategy' %}">Create first strategy →</a></div>
+  {% endfor %}
+  {% if items %}<a class="panel add-tile" href="{% url 'new_strategy' %}"><span>＋</span><b>New strategy tab</b><small>Same model, different account? No problem.</small></a>{% endif %}
+</div>
+{% endblock %}
