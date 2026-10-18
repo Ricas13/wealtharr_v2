@@ -54,7 +54,16 @@ class NotificationPreferenceAdmin(admin.ModelAdmin):
 
 @admin.register(NotificationDelivery)
 class NotificationDeliveryAdmin(admin.ModelAdmin):
-    list_display = ("owner", "channel", "status", "created_at")
+    list_display = ("owner", "channel", "status", "attempts", "next_retry_at", "created_at")
+    list_filter = ("status", "channel")
+    actions = ["requeue_failed_deliveries"]
+
+    @admin.action(description="Requeue selected failed notifications")
+    def requeue_failed_deliveries(self, request, queryset):
+        # Manual recovery after repairing credentials. No direct send in admin.
+        count = queryset.filter(status="FAILED").update(
+            status="PENDING", attempts=0, next_retry_at=None, error="")
+        self.message_user(request, f"{count} delivery(s) queued for the scheduler.")
     readonly_fields = [f.name for f in NotificationDelivery._meta.fields]
     def has_add_permission(self, request): return False
     def has_change_permission(self, request, obj=None): return False
