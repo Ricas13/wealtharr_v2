@@ -1,5 +1,27 @@
 {% extends 'base.html' %}
-{% block title %}Choose your 9Sig instruments{% endblock %}
+{% block title %}Choose your 9Sig instruments<script>
+(function () {
+  var broker = document.getElementById("id_broker");
+  var account = document.getElementById("id_account_kind");
+  var strategy = document.getElementById("id_strategy_slug");
+  var box = document.getElementById("recommendation");
+  var notice = document.getElementById("unsupported-instrument-combination");
+  var button = document.querySelector('button[type="submit"]');
+  function refresh() {
+    var supported = broker && broker.value === "TRADING212"
+      && account && (account.value === "ISA" || account.value === "GIA")
+      && strategy && strategy.value === "nasdaq-quarterly-target";
+    if (box) box.hidden = !supported;
+    if (notice) notice.hidden = !!supported;
+    if (button) button.disabled = !supported;
+  }
+  [broker, account, strategy].forEach(function (field) {
+    if (field) field.addEventListener("change", refresh);
+  });
+  refresh();
+})();
+</script>
+{% endblock %}
 {% block content %}
 <div class="page-heading"><div>
   <div class="eyebrow">STRATEGY / ACCOUNT / INSTRUMENTS</div>
@@ -7,6 +29,9 @@
   <p>Pick a strategy and account. Wealtharr chooses the supported trading lines; you never need to know their Yahoo ticker symbols.</p>
 </div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
 
+<div class="alert-warning" id="unsupported-instrument-combination" hidden>
+  No reviewed 9Sig ticker mapping is available for this broker or account combination yet. Wealtharr will not guess or create a portfolio.
+</div>
 <section class="panel padded" style="margin-bottom:16px" id="recommendation">
   <div class="panel-heading"><div><h2>What Wealtharr suggests holding</h2>
     <p>United Kingdom · Trading 212 · Stocks ISA or general investment account · 9Sig model</p>
