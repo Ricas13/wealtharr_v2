@@ -333,8 +333,9 @@ def confirm_strategy_reset(request, pk):
         StrategyInstance.objects.select_related("account", "preset"),
         pk=pk, owner=request.user)
     reset_notice = strategy.signals.filter(
-        kind="QUARTERLY", message__icontains="review a reset to 60%"
-    ).order_by("-as_of", "-pk").first()
+        kind__in=("QUARTERLY", "SPIKE_WATCH"),
+        message__icontains="review a reset to 60%"
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of", "-pk").first()
     if request.POST.get("confirm") != "RESET":
         messages.error(request, "Confirmation required: no strategy baseline changed.")
         return redirect("strategy_detail", pk=pk)
