@@ -47,6 +47,28 @@ class StrategyForm(forms.ModelForm):
                 raise forms.ValidationError("Enter two distinct exact Yahoo tickers for the equity and safe holdings.")
         return data
 
+class AutomationForm(forms.ModelForm):
+    class Meta:
+        model = StrategyInstance
+        fields = ["equity_symbol", "safe_symbol", "market_data_enabled"]
+        labels = {"equity_symbol": "GBP Yahoo equity ticker", "safe_symbol": "GBP Yahoo safe-asset ticker",
+                  "market_data_enabled": "Enable automatic Yahoo closes and advisory 9Sig reviews"}
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        style(self.fields)
+    def clean(self):
+        data = super().clean()
+        eq = (data.get("equity_symbol") or "").strip().upper()
+        safe = (data.get("safe_symbol") or "").strip().upper()
+        data.update(equity_symbol=eq, safe_symbol=safe)
+        if data.get("market_data_enabled") and (
+            self.instance.preset.slug != "nasdaq-quarterly-target" or
+            not re.fullmatch(r"[A-Z0-9][A-Z0-9.^=_-]{0,23}", eq) or
+            not re.fullmatch(r"[A-Z0-9][A-Z0-9.^=_-]{0,23}", safe) or eq == safe
+        ):
+            raise forms.ValidationError("Enter two distinct valid Yahoo tickers for Nasdaq 3× monitoring.")
+        return data
+
 class LedgerForm(forms.ModelForm):
     class Meta:
         model = LedgerEntry

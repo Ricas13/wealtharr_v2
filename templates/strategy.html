@@ -18,6 +18,15 @@
   <form method="post" action="{% url 'refresh_market' strategy.pk %}">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">⟳ Check Yahoo prices</button></form>
   {% else %}<span class="risk-pill">Monitoring off</span>{% endif %}
   </div>
+  {% if strategy.preset.slug == "nasdaq-quarterly-target" %}
+  <details style="border:1px solid #294a60;border-radius:8px;padding:12px;margin:12px 0">
+    <summary style="cursor:pointer;color:#54d8cf">⚙ Configure Yahoo monitoring</summary>
+    <form action="{% url 'save_automation' strategy.pk %}" method="post" class="form-stack">{% csrf_token %}
+      {% include 'partials/form_fields.html' with form=automation_form %}
+      <p class="micro-note">GBP-denominated exact Yahoo tickers only; GBp is divided by 100. Verify Trading 212 availability and ISA eligibility independently.</p>
+      <button class="btn btn-primary" type="submit">Save monitoring settings</button>
+    </form>
+  </details>{% endif %}
   {% if strategy.market_data_enabled %}<p class="micro-note">Equity: {{ strategy.equity_symbol }} · Safe asset: {{ strategy.safe_symbol }} · US drawdown reference: TQQQ. GBP-denominated Yahoo quotes only. 9Sig recommendations are preliminary and not workbook-equivalent.</p>
   {% else %}<p class="micro-note">To enable automatic quote checks, create a 9Sig strategy tab with exact Yahoo equity/safe tickers and the monitoring option. Manual tracking still works.</p>{% endif %}
   {% for signal in signals %}

@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from django.utils import timezone
-from .forms import AccountForm, IntegrationForm, LedgerForm, NotificationForm, PriceForm, StrategyForm
+from .forms import AccountForm, AutomationForm, IntegrationForm, LedgerForm, NotificationForm, PriceForm, StrategyForm
 from .models import Account, LedgerEntry, NotificationPreference, PriceMark, StrategyInstance, StrategyPreset, StrategySignal, SystemIntegration, WealthSnapshot
 from .services import consolidated, dispatch, ledger_summary, validate_and_record
 from .market_signals import review_strategy
@@ -115,6 +115,7 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
         "strategy": strategy, "report": report, "holdings": holdings,
         "entries": entries, "signals": strategy.signals.all()[:12],
         "entry_form": entry_form or LedgerForm(), "price_form": price_form or PriceForm(),
+        "automation_form": AutomationForm(instance=strategy),
     })
 
 @login_required
@@ -136,6 +137,19 @@ def record_entry(request, pk):
         except ValidationError as exc:
             form.add_error(None, exc)
     return render_strategy(request, strategy, entry_form=form)
+
+
+@login_required
+@require_POST
+def save_automation(request, pk):
+    strategy = get_object_or_404(StrategyInstance.objects.select_related("preset"), pk=pk, owner=request.user)
+    form = AutomationForm(request.POST, instance=strategy)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Monitoring settings saved. Check Yahoo prices to verify your tickers.")
+    else:
+        messages.error(request, "Invalid settings. Use two distinct exact Yahoo tickers and enable only on 9Sig.")
+    return redirect("strategy_detail", pk=pk)
 
 
 @login_required
