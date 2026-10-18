@@ -93,6 +93,8 @@ def dashboard(request):
                 account__kind="PAPER", account__name=PAPER_NAME).first(),
                 accounts=Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies")),
                 open_signals=StrategySignal.objects.filter(strategy__owner=request.user, acknowledged_at__isnull=True).select_related("strategy").order_by("-created_at")[:8])
+    if data["paper_trial"]:
+        data["paper_summary"] = ledger_summary(data["paper_trial"])
     return render(request, "dashboard.html", data)
 
 @login_required
@@ -153,8 +155,13 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
         mark = report["marks"].get(symbol)
         holdings.append({"symbol": symbol, "quantity": qty, "mark": mark, "value": (qty * mark.price) if mark else None})
     entries = strategy.ledger.all().order_by("-occurred_on", "-pk")[:60]
+    chart_points = [{"date": snap.as_of.isoformat(),
+                     "value": float(snap.total_value),
+                     "contributed": float(snap.net_contributed)}
+                    for snap in strategy.value_snapshots.order_by("as_of")]
     return render(request, "strategy.html", {
         "strategy": strategy, "report": report, "holdings": holdings,
+        "chart_points": chart_points,
         "monitoring_status": _monitoring_status(strategy),
         "entries": entries, "signals": strategy.signals.all()[:12],
         "entry_form": entry_form or LedgerForm(), "price_form": price_form or PriceForm(),
