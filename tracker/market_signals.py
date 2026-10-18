@@ -35,13 +35,28 @@ def fetch_chart(symbol, since):
         "period2": int(timezone.now().timestamp()) + 86400,
         "interval": "1d",
     })
-    endpoint = "https://query1.finance.yahoo.com/v8/finance/chart/" + quote(symbol, safe="") + "?" + params
-    req = Request(endpoint, headers={"User-Agent": "WealtharrOwnerTracker/0.2", "Accept": "application/json"})
-    with urlopen(req, timeout=14) as response:
-        if response.status != 200:
-            raise ValueError("Yahoo chart rejected the request")
-        obj = json.loads(response.read(4_000_000))
-    chart = (obj.get("chart", {}).get("result") or [None])[0]
+    last_error = None
+    chart = None
+    for host in ("query1.finance.yahoo.com", "query2.finance.yahoo.com"):
+        endpoint = "https://" + host + "/v8/finance/chart/" + quote(symbol, safe="") + "?" + params
+        req = Request(endpoint, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; WealtharrOwnerTracker/0.2)",
+            "Accept": "application/json",
+        })
+        try:
+            with urlopen(req, timeout=14) as response:
+                if response.status != 200:
+                    raise ValueError("Yahoo chart returned a non-200 status")
+                payload = json.loads(response.read(4_000_000))
+            chart = (payload.get("chart", {}).get("result") or [None])[0]
+            if chart:
+                break
+        except (OSError, ValueError) as exc:
+            last_error = exc
+        # Alternate official Yahoo chart host is a best-effort fallback, not
+        # a market-data SLA or a licence to redistribute historical quotes.
+    if chart is None and last_error is not None:
+        raise last_error
     if not chart:
         raise ValueError("Yahoo supplied no chart data")
     raw_currency = chart.get("meta", {}).get("currency")
@@ -73,7 +88,8 @@ def sync_ticker(symbol, *, force=False):
         raise ValueError("Invalid Yahoo symbol")
     state, _ = YahooSync.objects.get_or_create(symbol=symbol)
     now = timezone.now()
-    if not force and state.last_attempt and state.last_attempt > now - timedelta(hours=12):
+    if (not force and state.last_attempt and state.last_attempt > now -
+            (timedelta(minutes=30) if state.last_error else timedelta(hours=12))):
         return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
     first = not MarketObservation.objects.filter(symbol=symbol).exists()
     since = date(2010, 1, 1) if first else timezone.localdate() - timedelta(days=18)
