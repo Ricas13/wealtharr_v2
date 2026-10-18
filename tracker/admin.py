@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (Account, LedgerEntry, NotificationDelivery, NotificationPreference,
-                     PriceMark, StrategyInstance, StrategyPreset, SystemIntegration, WealthSnapshot)
+                     PriceMark, StrategyInstance, StrategyPreset, StrategyBaseline, SystemIntegration, WealthSnapshot)
 
 admin.site.site_header = "Wealtharr | Advanced administration"
 admin.site.site_title = "Wealtharr admin"
@@ -34,6 +34,18 @@ class LedgerEntryAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(StrategyBaseline)
+class StrategyBaselineAdmin(admin.ModelAdmin):
+    list_display = ("strategy", "as_of", "equity_value", "safe_value", "cash_value", "created_at")
+    readonly_fields = [f.name for f in StrategyBaseline._meta.fields]
+    def has_add_permission(self, request):
+        return False
+    def has_change_permission(self, request, obj=None):
+        return False
+    def has_delete_permission(self, request, obj=None):
         return False
 
 @admin.register(PriceMark)
