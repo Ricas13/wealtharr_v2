@@ -41,8 +41,8 @@
     updateFields();
   }
 
-  var host = document.getElementById("wealth-chart");
-  var pointsSource = document.getElementById("wealth-chart-points");
+  var host = document.getElementById("wealth-chart") || document.getElementById("strategy-chart");
+  var pointsSource = document.getElementById("wealth-chart-points") || document.getElementById("strategy-chart-points");
   if (!host || !pointsSource) return;
   var all = [];
   try { all = JSON.parse(pointsSource.textContent || "[]"); } catch (_) { all = []; }
@@ -67,7 +67,7 @@
     var values = active === "all" ? all : all.filter(function (p) { return new Date(p.date + "T12:00:00") >= cutoff; });
     if (!values.length) {
       empty(all.length ? "No valuations in this period" : "Your wealth chart starts here",
-        all.length ? "Choose All to see earlier valuations." : "Record a deposit and any trades, mark your holding prices, then save today's valuation.");
+        all.length ? "Choose All to see earlier valuations." : "Your first verified quote-day valuation will appear after the next market sync.");
       return;
     }
     var w = 1000, h = 285, l = 77, r = 25, t = 18, b = 30;
