@@ -9,9 +9,9 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from tracker.models import Account, LedgerEntry, StrategyInstance
+from tracker.models import Account, LedgerEntry, StrategyInstance, StrategyValueSnapshot
 from tracker.paper import EQUITY, SAFE, PAPER_NAME, PaperSetupUnavailable
-from tracker.services import ledger_summary
+from tracker.services import ledger_summary, consolidated
 
 
 class PaperTrialTests(TestCase):
@@ -63,9 +63,14 @@ class PaperTrialTests(TestCase):
         self.assertEqual(report["cash"], Decimal("0.00"))
         self.assertEqual(report["value"], Decimal("1000.00"))
         self.assertEqual(set(report["positions"]), {EQUITY, SAFE})
+        self.assertEqual(StrategyValueSnapshot.objects.filter(strategy=strategy).count(), 1)
         self.assertEqual(strategy.prices.count(), 2)
         self.assertTrue(all(x.source == "yahoo" for x in strategy.prices.all()))
         self.assertEqual(sync.call_count, 2)
+        real = consolidated(self.owner)
+        self.assertEqual(real["total"], Decimal("0.00"))
+        self.assertEqual(real["net_contributed"], Decimal("0.00"))
+        self.assertEqual(len(real["items"]), 0)
 
     @patch("tracker.paper.sync_ticker")
     def test_unavailable_quote_does_not_create_partial_virtual_portfolio(self, sync):
@@ -97,3 +102,25 @@ class PaperTrialTests(TestCase):
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(reverse("strategy_detail", args=[first.pk])).status_code, 404)
         self.assertEqual(StrategyInstance.objects.filter(owner=self.other).count(), 0)
+
+    @patch("tracker.paper.sync_ticker")
+    def test_hourly_quotes_extend_only_virtual_strategy_chart(self, sync):
+        from django.core.management import call_command
+        from tracker.models import PriceMark, WealthSnapshot
+        sync.side_effect = self.quote
+        self.client.force_login(self.owner)
+        self.client.post(self.url, self.payload)
+        strategy = StrategyInstance.objects.get(owner=self.owner)
+        today = timezone.localdate()
+        PriceMark.objects.filter(strategy=strategy).update(as_of=today)
+        PriceMark.objects.filter(strategy=strategy, symbol=EQUITY).update(
+            price=Decimal("13.50"))
+        with patch("tracker.management.commands.sync_market_and_signals.review_strategy",
+                   return_value={"status": "waiting for first completed quarter"}):
+            call_command("sync_market_and_signals", verbosity=0)
+        rows = list(StrategyValueSnapshot.objects.filter(strategy=strategy))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0].as_of, self.day)
+        self.assertEqual(rows[1].as_of, today)
+        self.assertGreater(rows[1].total_value, rows[0].total_value)
+        self.assertFalse(WealthSnapshot.objects.filter(owner=self.owner).exists())
