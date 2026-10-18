@@ -3,6 +3,15 @@
 {% block content %}
 <div class="page-heading"><div><div class="eyebrow">MY PORTFOLIO</div><h1>Overview</h1><p>One clear view across all your investment strategies.</p></div><a class="btn btn-primary" href="{% url 'new_strategy' %}">＋ Add strategy</a></div>
 <section class="panel padded" style="margin-bottom:16px;border:1px solid #2b8992">
+  <div class="panel-heading"><div><h2>Track a real 9Sig account</h2>
+    <p>Start with your actual GBP deposit, enter manual fills, and receive quarterly rebalance alerts.</p></div>
+    <a class="btn btn-primary btn-sm" href="{% url 'start_real_9sig' %}">Track my real 9Sig →</a>
+  </div>
+  <p class="micro-note">No Trading 212 connection or automatic trades. Your actual ISA/GIA portfolio is kept separate from virtual paper accounts.</p>
+</section>
+<details style="margin-bottom:16px">
+  <summary class="micro-note" style="cursor:pointer">Optional: virtual paper trial (not real investments)</summary>
+<section class="panel padded" style="margin-bottom:16px;border:1px solid #2b8992">
   <div class="panel-heading">
     <div><h2>9Sig paper tracker</h2>
       <p>Real closing prices and quarterly alerts. Virtual holdings only; no Trading 212 connection and no order execution.</p></div>
@@ -19,6 +28,7 @@
     </form>
   {% endif %}
 </section>
+</details>
 <div class="stat-grid">
   <div class="panel stat-card"><div class="stat-label">Real portfolio value <span>◈</span></div><div class="stat-value">{% if total is not None %}£{{ total|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Paper accounts excluded from real capital</div></div>
   <div class="panel stat-card"><div class="stat-label">Net added <span>↳</span></div><div class="stat-value">£{{ net_contributed|floatformat:2 }}</div><div class="stat-help">Real deposits minus withdrawals (paper excluded)</div></div>
