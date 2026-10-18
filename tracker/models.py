@@ -178,3 +178,26 @@ class StrategySignal(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "signal_key"], name="unique_strategy_signal")]
         ordering = ["-created_at"]
+
+
+class StrategyBaseline(models.Model):
+    """Immutable, owner-confirmed re-anchor after an actual 9Sig reset fill.
+
+    A reset suggestion is not a trade. The next cycle must be based on actual
+    confirmed holdings, not a fictitious 60/40 rebalance.
+    """
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE,
+                                 related_name="baselines")
+    reset_signal = models.ForeignKey(StrategySignal, on_delete=models.PROTECT)
+    as_of = models.DateField()
+    equity_value = models.DecimalField(max_digits=22, decimal_places=2)
+    equity_quantity = models.DecimalField(max_digits=22, decimal_places=8)
+    safe_value = models.DecimalField(max_digits=22, decimal_places=2)
+    cash_value = models.DecimalField(max_digits=22, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["as_of", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["strategy", "as_of"], name="unique_strategy_baseline")
+        ]
