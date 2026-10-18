@@ -140,6 +140,11 @@ class NotificationDelivery(models.Model):
     status = models.CharField(max_length=12, default="PENDING")
     created_at = models.DateTimeField(auto_now_add=True)
     error = models.CharField(max_length=200, blank=True)
+    subject = models.CharField(max_length=200, blank=True)
+    message = models.TextField(blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    next_retry_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["owner", "channel", "event_key"], name="unique_notification_event")]
