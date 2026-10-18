@@ -57,12 +57,23 @@ class AutomationForm(forms.ModelForm):
                   "market_data_enabled": "Enable automatic Yahoo closes and advisory 9Sig reviews"}
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from .instrument_mapping import for_strategy
+        self.instrument_profile = for_strategy(self.instance)
+        if self.instrument_profile:
+            # Instrument selection is owned by the account mapping, not by
+            # a free-text field or an altered POST payload.
+            del self.fields["equity_symbol"]
+            del self.fields["safe_symbol"]
         style(self.fields)
     def clean(self):
         data = super().clean()
-        eq = (data.get("equity_symbol") or "").strip().upper()
-        safe = (data.get("safe_symbol") or "").strip().upper()
-        data.update(equity_symbol=eq, safe_symbol=safe)
+        if self.instrument_profile:
+            eq = self.instrument_profile.equity.yahoo_ticker
+            safe = self.instrument_profile.safe.yahoo_ticker
+        else:
+            eq = (data.get("equity_symbol") or "").strip().upper()
+            safe = (data.get("safe_symbol") or "").strip().upper()
+            data.update(equity_symbol=eq, safe_symbol=safe)
         if data.get("market_data_enabled") and (
             self.instance.preset.slug != "nasdaq-quarterly-target" or
             not re.fullmatch(r"[A-Z0-9][A-Z0-9.^=_-]{0,23}", eq) or
@@ -83,11 +94,23 @@ class LedgerForm(forms.ModelForm):
             "fee": "Trade fee (£)",
             "symbol": "Ticker / instrument",
         }
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, strategy=None, **kwargs):
         super().__init__(*args, **kwargs)
+        from .instrument_mapping import for_strategy
+        self.instrument_profile = for_strategy(strategy) if strategy else None
         self.fields["occurred_on"].initial = timezone.localdate()
         for name in ("amount", "quantity", "unit_price", "fee", "symbol"):
             self.fields[name].required = False
+        if self.instrument_profile:
+            self.fields["symbol"].widget = forms.Select(choices=[
+                ("", "Select the instrument for a buy/sell"),
+                (self.instrument_profile.equity.yahoo_ticker,
+                 "LQQ3 — 3x Nasdaq-100 equity"),
+                (self.instrument_profile.safe.yahoo_ticker,
+                 "ERNS — defensive bond sleeve"),
+            ])
+            self.fields["symbol"].help_text = (
+                "Wealtharr records the correct Yahoo trading-line symbol for you.")
         style(self.fields)
     def clean(self):
         data = super().clean()
@@ -107,6 +130,12 @@ class LedgerForm(forms.ModelForm):
         if kind in (LedgerEntry.BUY, LedgerEntry.SELL):
             if not re.fullmatch(r"[A-Z0-9][A-Z0-9._-]{0,23}", symbol):
                 raise forms.ValidationError("Enter a valid ticker (for example LQQ3 or VWRP.L).")
+            if self.instrument_profile and symbol not in (
+                self.instrument_profile.equity.yahoo_ticker,
+                self.instrument_profile.safe.yahoo_ticker,
+            ):
+                raise forms.ValidationError(
+                    "Select one of the two 9Sig instruments Wealtharr mapped to your account.")
             if qty <= ZERO or price <= ZERO:
                 raise forms.ValidationError("Buys and sells need positive units and a positive execution price.")
             if amount != ZERO:
@@ -183,13 +212,20 @@ class IntegrationForm(forms.ModelForm):
 
 
 class RealNineSigSetupForm(forms.Form):
-    """Explicit real-account onboarding. Never simulates a broker execution."""
-    account_name = forms.CharField(
-        max_length=90, initial="Trading 212 ISA",
-        label="Investment account name")
+    """Select a strategy and wrapper; the server resolves actual instruments."""
+    strategy_slug = forms.ChoiceField(
+        choices=(), label="Strategy")
+    country = forms.ChoiceField(
+        choices=[("GB", "United Kingdom")], initial="GB", label="Country")
+    broker = forms.ChoiceField(
+        choices=[("TRADING212", "Trading 212"), ("OTHER", "Other broker (not yet supported)")],
+        initial="TRADING212", label="Broker")
     account_kind = forms.ChoiceField(
         choices=[("ISA", "Stocks & Shares ISA"), ("GIA", "General investment account")],
         initial="ISA", label="Account type")
+    account_name = forms.CharField(
+        max_length=90, initial="Trading 212 ISA",
+        label="Investment account name")
     strategy_name = forms.CharField(
         max_length=100, initial="9Sig — Trading 212",
         label="Strategy tab name")
@@ -202,34 +238,47 @@ class RealNineSigSetupForm(forms.Form):
     monthly_target = forms.DecimalField(
         max_digits=16, decimal_places=2, min_value=ZERO,
         initial=Decimal("500.00"), label="Planned monthly contribution (£)")
-    equity_symbol = forms.CharField(
-        max_length=24, label="Exact Yahoo ticker of your GBP 3× Nasdaq product",
-        help_text="E.g. LQQ3.L; confirm which instrument you actually own in Trading 212.")
-    safe_symbol = forms.CharField(
-        max_length=24, label="Exact Yahoo ticker of your GBP safe asset",
-        help_text="E.g. ERNS.L; it is not interchangeable with US AGG.")
+    confirmed_broker_availability = forms.BooleanField(
+        required=True,
+        label="I checked the listed ISINs in my own Trading 212 account and understand that availability and complex-product access are not guaranteed.")
 
     def __init__(self, *args, owner, **kwargs):
         super().__init__(*args, **kwargs)
         self.owner = owner
+        supported = StrategyPreset.objects.filter(
+            active=True, slug="nasdaq-quarterly-target")
+        self.fields["strategy_slug"].choices = [
+            (preset.slug, preset.name) for preset in supported
+        ]
+        if not self.is_bound:
+            self.fields["strategy_slug"].initial = "nasdaq-quarterly-target"
         self.fields["start_date"].initial = timezone.localdate()
+        self.instrument_profile = None
         style(self.fields)
 
     def clean(self):
+        from .instrument_mapping import (
+            resolve_instruments, InstrumentMappingUnavailable)
         values = super().clean()
-        date = values.get("start_date")
-        if date and date > timezone.localdate():
+        day = values.get("start_date")
+        if day and day > timezone.localdate():
             self.add_error("start_date", "You cannot record a future cash deposit.")
-        for name in ("equity_symbol", "safe_symbol"):
-            ticker = (values.get(name) or "").strip().upper()
-            if ticker and not re.fullmatch(r"[A-Z0-9][A-Z0-9.^=_-]{0,23}", ticker):
-                self.add_error(name, "Enter an exact Yahoo ticker, e.g. LQQ3.L.")
-            values[name] = ticker
-        if values.get("equity_symbol") and values.get("equity_symbol") == values.get("safe_symbol"):
-            self.add_error("safe_symbol", "Equity and safe tickers must be different.")
+        for key in ("strategy_slug", "country", "broker", "account_kind"):
+            if key not in values:
+                return values
+        try:
+            self.instrument_profile = resolve_instruments(
+                values["strategy_slug"], values["country"],
+                values["account_kind"], values["broker"])
+        except InstrumentMappingUnavailable as exc:
+            raise forms.ValidationError(str(exc))
         if values.get("account_name"):
             existing = Account.objects.filter(
                 owner=self.owner, name=values["account_name"]).first()
-            if existing and existing.kind != values.get("account_kind"):
-                self.add_error("account_name", "That account already exists with a different type.")
+            if existing and (existing.kind != values["account_kind"] or
+                             existing.country != values["country"] or
+                             existing.broker not in ("UNKNOWN", values["broker"])):
+                self.add_error(
+                    "account_name",
+                    "That name already belongs to a different account type, country or broker.")
         return values

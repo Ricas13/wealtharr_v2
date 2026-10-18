@@ -26,8 +26,10 @@ class RealNineSigSetupTests(TestCase):
             "start_date": str(timezone.localdate() - timedelta(days=10)),
             "starting_cash": "1000.00",
             "monthly_target": "500.00",
-            "equity_symbol": " lqq3.l ",
-            "safe_symbol": " erns.l ",
+            "strategy_slug": "nasdaq-quarterly-target",
+            "country": "GB",
+            "broker": "TRADING212",
+            "confirmed_broker_availability": "on",
         }
 
     def test_owner_must_sign_in(self):
@@ -42,6 +44,8 @@ class RealNineSigSetupTests(TestCase):
         strategy = StrategyInstance.objects.get(owner=self.owner)
         self.assertEqual(strategy.account.kind, "ISA")
         self.assertEqual(strategy.account.name, "Trading 212 ISA")
+        self.assertEqual(strategy.account.country, "GB")
+        self.assertEqual(strategy.account.broker, "TRADING212")
         self.assertTrue(strategy.market_data_enabled)
         self.assertEqual(strategy.equity_symbol, "LQQ3.L")
         self.assertEqual(strategy.safe_symbol, "ERNS.L")
@@ -55,7 +59,11 @@ class RealNineSigSetupTests(TestCase):
         self.assertEqual(consolidated(self.owner)["total"], D("1000.00"))
         self.assertEqual(strategy.ledger.filter(kind=LedgerEntry.BUY).count(), 0)
         self.assertEqual(StrategyInstance.objects.filter(owner=self.other).count(), 0)
-        self.assertEqual(self.client.get(reverse("strategy_detail", args=[strategy.pk])).status_code, 200)
+        detail = self.client.get(reverse("strategy_detail", args=[strategy.pk]))
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "What to hold for this account")
+        self.assertContains(detail, "IE00BLRPRL42")
+        self.assertContains(detail, "IE00BCRY6441")
 
     def test_duplicate_strategy_name_does_not_duplicate_cash_deposits(self):
         self.client.force_login(self.owner)
@@ -65,11 +73,11 @@ class RealNineSigSetupTests(TestCase):
         self.assertEqual(StrategyInstance.objects.count(), 1)
         self.assertEqual(LedgerEntry.objects.count(), 1)
 
-    def test_form_cannot_use_future_date_or_same_symbol(self):
+    def test_form_cannot_use_future_date_or_unsupported_broker(self):
         self.client.force_login(self.owner)
         bad = self.data.copy()
         bad["start_date"] = str(timezone.localdate()+timedelta(days=2))
-        bad["safe_symbol"] = "LQQ3.L"
+        bad["broker"] = "OTHER"
         response = self.client.post(self.url, bad)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "future cash deposit")
@@ -92,3 +100,48 @@ class RealNineSigSetupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(StrategyInstance.objects.exists())
         self.assertFalse(Account.objects.exists())
+
+    def test_get_shows_a_selection_before_owner_knows_any_tickers(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.url)
+        self.assertContains(response, "LQQ3")
+        self.assertContains(response, "ERNS")
+        self.assertContains(response, "60%")
+        self.assertContains(response, "40%")
+        self.assertNotContains(response, 'name="equity_symbol"')
+        self.assertNotContains(response, 'name="safe_symbol"')
+
+    def test_malicious_ticker_overrides_are_ignored(self):
+        self.client.force_login(self.owner)
+        data = {**self.data, "equity_symbol": "3QQQ.DE",
+                "safe_symbol": "TQQQ"}
+        self.client.post(self.url, data)
+        strategy = StrategyInstance.objects.get(owner=self.owner)
+        self.assertEqual(strategy.equity_symbol, "LQQ3.L")
+        self.assertEqual(strategy.safe_symbol, "ERNS.L")
+
+    def test_requires_owner_to_confirm_broker_access(self):
+        self.client.force_login(self.owner)
+        data = self.data.copy()
+        data.pop("confirmed_broker_availability")
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(StrategyInstance.objects.exists())
+
+    def test_unsupported_country_and_broker_do_not_create_anything(self):
+        self.client.force_login(self.owner)
+        for choice in ({"country": "US"}, {"broker": "OTHER"},
+                       {"account_kind": "SIPP"}, {"strategy_slug": "other"}):
+            response = self.client.post(self.url, {**self.data, **choice})
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(Account.objects.exists())
+
+    def test_broker_listing_does_not_equal_isa_approval(self):
+        from tracker.instrument_mapping import resolve_instruments
+        pair = resolve_instruments(
+            "nasdaq-quarterly-target", "GB", "ISA", "TRADING212")
+        self.assertEqual(pair.equity.broker_ticker, "LQQ3")
+        self.assertEqual(pair.equity.yahoo_ticker, "LQQ3.L")
+        self.assertEqual(pair.equity.isin, "IE00BLRPRL42")
+        self.assertEqual(pair.safe.isin, "IE00BCRY6441")
+        self.assertIn("specific Stocks & Shares ISA", pair.broker_warning)
