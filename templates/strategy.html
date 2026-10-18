@@ -27,6 +27,22 @@
   <div class="panel stat-card"><div class="stat-label">Investment result</div><div class="stat-value">{% if report.profit is not None %}£{{ report.profit|floatformat:2 }}{% else %}—{% endif %}</div><div class="stat-help">Value less net contributions</div></div>
 </div>
 {% if report.missing %}<div class="alert-warning">Price needed for: {% for symbol in report.missing %}<b>{{ symbol }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}. Set the latest GBP unit price below to complete this strategy's valuation.</div>{% endif %}
+{% if strategy.preset.slug == "nasdaq-quarterly-target" and strategy.account.kind != "PAPER" %}
+<section class="panel padded" style="margin-bottom:16px">
+  <h2>Your live 9Sig tracking checklist</h2>
+  <p class="muted">Next calendar quarter closes <strong>{{ next_quarter_end|date:"d M Y" }}</strong>. Rebalance advice is calculated after verified quarter-end closes are available.</p>
+  {% if report.positions %}
+    <p class="micro-note">Actual buy/sell holdings are recorded. Review your ticker mapping, cash and fees below.</p>
+  {% else %}
+    <div class="alert-warning">Starting cash is recorded, but no BUY fill exists yet. Enter your actual Trading 212 buys, with execution dates, share quantities and fees, before Wealtharr can calculate 9Sig reviews.</div>
+  {% endif %}
+  {% if alert_status.enabled %}
+    <p class="micro-note">Configured alert destinations: {% if alert_status.email %}Email {% endif %}{% if alert_status.discord %}Discord{% endif %}. Use the admin test to verify real deliveries.</p>
+  {% else %}
+    <div class="alert-warning">Rebalance alerts cannot be delivered until email or Discord is configured. Visit <a href="{% url 'user_settings' %}">My settings</a> to enable a destination{% if request.user.is_staff %}, then configure its SMTP/Discord connection in <a href="{% url 'control' %}">Admin control</a>{% endif %}.</div>
+  {% endif %}
+</section>
+{% endif %}
 <section class="panel padded" id="strategy-signals">
   <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Hourly server-side checks when the scheduler is running; refresh now to check manually. Quarterly actions are emitted only after a quarter closes.</p></div>
   {% if strategy.market_data_enabled %}
