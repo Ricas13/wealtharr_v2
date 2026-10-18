@@ -50,7 +50,7 @@ class WorkbookArithmeticTests(SimpleTestCase):
             start_date=date(2026, 1, 10), as_of=date(2026, 9, 30),
             starting_equity_cost=D("600"),
             contributions=[(date(2026, 4, 15), D("500"))])
-        self.assertEqual(actual, D("1051.12"))  # 600*1.09**3 + 250*1.09
+        self.assertEqual(actual, D("1049.52"))  # 600*1.09**3 + 250*1.09
 
     def test_future_cash_must_not_enter_completed_quarter(self):
         self.assertEqual(signal_line_value(
