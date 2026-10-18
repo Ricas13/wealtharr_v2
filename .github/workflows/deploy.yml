@@ -56,11 +56,13 @@ jobs:
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || exit 4
           deploy_dir="$HOME/wealtharr_v2"
           if [ ! -d "$deploy_dir/.git" ]; then
-            if [ -e "$deploy_dir" ]; then
-              echo "The chosen deployment directory already exists but is not a Git repository."
+            mkdir -p "$deploy_dir"
+            if [ -n "$(find "$deploy_dir" -mindepth 1 -maxdepth 1 ! -name '.env' ! -name '.env.production' -print -quit)" ]; then
+              echo "Unmanaged files in the deployment directory; refusing to overwrite."
               exit 5
             fi
-            git clone --quiet --branch main https://github.com/Ricas13/wealtharr_v2.git "$deploy_dir"
+            git -C "$deploy_dir" init --quiet
+            git -C "$deploy_dir" remote add origin https://github.com/Ricas13/wealtharr_v2.git
           fi
           cd "$deploy_dir"
           for required in .env .env.production; do
