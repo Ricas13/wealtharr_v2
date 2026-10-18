@@ -164,17 +164,31 @@ class MarketWorkflowTests(TestCase):
         validate_and_record(self.strategy, LedgerEntry(
             kind="BUY", occurred_on=start, symbol="AGBP.L", quantity=D("5"), unit_price=D("80"),
         ))
-        MarketObservation.objects.create(symbol="TQQQ", as_of=start, price=D("100"), currency="USD")
+        from tracker.market_signals import quarter_end_before
+        end = quarter_end_before(now)
+        previous_end = quarter_end_before(end)
+        MarketObservation.objects.create(
+            symbol="SPY", as_of=previous_end, price=D("100"), currency="USD")
+        MarketObservation.objects.create(
+            symbol="SPY", as_of=end, price=D("65"), currency="USD")
+        MarketObservation.objects.create(
+            symbol="TQQQ", as_of=start, price=D("100"), currency="USD")
+        MarketObservation.objects.create(
+            symbol="TQQQ", as_of=end, price=D("65"), currency="USD")
+        MarketObservation.objects.create(
+            symbol="LQQ3.L", as_of=end, price=D("48"), currency="GBP")
+        MarketObservation.objects.create(
+            symbol="AGBP.L", as_of=end, price=D("81"), currency="GBP")
         reference = MarketObservation.objects.create(
-            symbol="TQQQ", as_of=now, price=D("65"), currency="USD",
-        )
+            symbol="TQQQ", as_of=now, price=D("65"), currency="USD")
+        spy = MarketObservation.objects.create(
+            symbol="SPY", as_of=now, price=D("65"), currency="USD")
         equity = MarketObservation.objects.create(
-            symbol="LQQ3.L", as_of=now, price=D("48"), currency="GBP",
-        )
+            symbol="LQQ3.L", as_of=now, price=D("48"), currency="GBP")
         safe = MarketObservation.objects.create(
-            symbol="AGBP.L", as_of=now, price=D("81"), currency="GBP",
-        )
-        mapped = {"TQQQ": reference, "LQQ3.L": equity, "AGBP.L": safe}
+            symbol="AGBP.L", as_of=now, price=D("81"), currency="GBP")
+        mapped = {"TQQQ": reference, "SPY": spy,
+                  "LQQ3.L": equity, "AGBP.L": safe}
         with patch("tracker.market_signals.sync_ticker", side_effect=lambda symbol: mapped[symbol]), \
              patch("tracker.market_signals.dispatch") as dispatcher:
             first = review_strategy(self.strategy)
