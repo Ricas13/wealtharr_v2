@@ -405,7 +405,7 @@ def review_strategy(strategy):
                 injected.append((entry.occurred_on, entry.amount))
         elif entry.kind == LedgerEntry.WITHDRAW:
             cash -= entry.amount
-            if entry.occurred_on > first_buy.occurred_on:
+            if entry.occurred_on > start_date:
                 injected.append((entry.occurred_on, -entry.amount))
         elif entry.kind == LedgerEntry.DIVIDEND:
             cash += entry.amount
@@ -429,21 +429,24 @@ def review_strategy(strategy):
         symbol="SPY", as_of__lte=quarter_end,
         as_of__gte=quarter_end - timedelta(days=760),
     ).order_by("as_of").values_list("as_of", "price"))
-    old = list(strategy.signals.filter(
-        kind="QUARTERLY", as_of__lt=quarter_end,
-        as_of__gte=start_date).order_by("as_of"))
-    prior_down = strategy.signals.filter(
+    # The 30 Down clock starts with a detected 30 Down notice, not
+    # with a period of no sales. Previous unrelated HOLDs do not count.
+    active_down_signal = strategy.signals.filter(
         kind="THIRTY_DOWN", as_of__lt=quarter_end,
-        as_of__gte=max(start_date, quarter_end - timedelta(days=760))).exists()
-    skipped = sum(
-        any(a.get("side") == "HOLD" for a in row.actions)
-        for row in old[-8:])
-    last_sell = strategy.ledger.filter(
-        kind=LedgerEntry.SELL, symbol=strategy.equity_symbol,
-        occurred_on__lte=quarter_end,
-        occurred_on__gte=start_date).order_by("-occurred_on").first()
-    no_sell = (quarter_number(quarter_end) - quarter_number(last_sell.occurred_on)
-               if last_sell else quarter_number(quarter_end) - quarter_number(start_date))
+        as_of__gte=start_date,
+    ).order_by("-as_of", "-pk").first()
+    down_age = (quarter_number(quarter_end) - quarter_number(active_down_signal.as_of)
+                if active_down_signal else 0)
+    skipped = 0
+    if active_down_signal and down_age <= 8:
+        earlier = strategy.signals.filter(
+            kind="QUARTERLY", as_of__lt=quarter_end,
+            as_of__gte=active_down_signal.as_of,
+        ).order_by("as_of")
+        skipped = sum(
+            any(action.get("side") == "HOLD" for action in row.actions)
+            for row in earlier
+        )
     if len(_quarterly_closes(ref_spy, quarter_end)) < 2:
         return {"status": "insufficient SPY quarter-end reference history"}
     if len(_quarterly_closes(ref_tqqq, quarter_end)) < 2:
@@ -469,8 +472,8 @@ def review_strategy(strategy):
         safe_qty=safe_qty, safe_price=closing[strategy.safe_symbol].price,
         cash=cash, starting_equity_cost=initial_equity_cost,
         contributions=injected, reference=ref_tqqq, spy_reference=ref_spy,
-        prior_skipped_sells=skipped, prior_drawdown=prior_down,
-        no_sell_quarters=no_sell,
+        prior_skipped_sells=skipped, prior_drawdown=bool(active_down_signal),
+        down_age_quarters=down_age,
     )
     created = 0
     for alert in alerts:
@@ -485,8 +488,16 @@ def review_strategy(strategy):
                 "%s %s shares %s (estimated £%s)" %
                 (a["side"], a["quantity"], a["symbol"], a["estimated_gbp"])
                 for a in alert["actions"])
-            dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, signal.signal_key),
-                     "Wealtharr — " + signal.title,
-                     strategy.name + "\n" + signal.message + "\n" + details +
-                     "\nReview this in Wealtharr. No orders have been placed.")
+            # No-action quarterly reviews remain in history without
+            # triggering rebalance alerts or cluttering the Overview.
+            actionable = alert["kind"] == "THIRTY_DOWN" or any(
+                action.get("side") in ("BUY", "SELL") for action in alert["actions"])
+            if actionable:
+                dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, signal.signal_key),
+                         "Wealtharr — " + signal.title,
+                         strategy.name + "\n" + signal.message + "\n" + details +
+                         "\nReview this in Wealtharr. No orders have been placed.")
+            else:
+                signal.acknowledged_at = timezone.now()
+                signal.save(update_fields=["acknowledged_at"])
     return {"status": "ok", "created": created, "as_of": quarter_end.isoformat()}
