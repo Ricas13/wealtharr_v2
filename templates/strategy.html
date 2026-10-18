@@ -14,6 +14,13 @@
   {% for tab in nav_strategies %}<a href="{% url 'strategy_detail' tab.pk %}" class="tab {% if tab.pk == strategy.pk %}active{% endif %}">{{ tab.name }}</a>{% endfor %}
   <a href="{% url 'new_strategy' %}" class="tab tab-add">＋ New tab</a>
 </div>
+<section class="panel chart-panel">
+  <div class="panel-heading"><div><h2>Strategy growth</h2>
+    <p>Actual recorded strategy valuations. Paper-mode values are virtual, not broker holdings.</p></div></div>
+  <div id="strategy-chart" class="wealth-chart" role="img" aria-label="Dated valuation chart for this strategy"></div>
+  {{ chart_points|json_script:"strategy-chart-points" }}
+  <p class="chart-caption">Yahoo marks are recorded by trading day. The first observation is seeded when a paper trial starts. No backtest or future trade is invented.</p>
+</section>
 <div class="stat-grid three">
   <div class="panel stat-card"><div class="stat-label">Current value</div><div class="stat-value">{% if report.value is not None %}£{{ report.value|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Cash + marked positions</div></div>
   <div class="panel stat-card"><div class="stat-label">Available cash</div><div class="stat-value">£{{ report.cash|floatformat:2 }}</div><div class="stat-help">For trades within this tab</div></div>
