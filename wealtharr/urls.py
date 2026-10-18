@@ -14,6 +14,7 @@ urlpatterns = [
     path("app/strategies/<int:pk>/price/", views.record_price, name="record_price"),
     path("app/strategies/<int:pk>/refresh/", views.refresh_market, name="refresh_market"),
     path("app/strategies/<int:pk>/monitor/", views.save_automation, name="save_automation"),
+    path("app/strategies/<int:pk>/rebaseline/", views.confirm_strategy_reset, name="confirm_strategy_reset"),
     path("app/strategies/<int:pk>/signal/<int:signal_pk>/ack/", views.acknowledge_signal, name="acknowledge_signal"),
     path("app/snapshot/", views.capture_snapshot, name="capture_snapshot"),
     path("app/settings/", views.user_settings, name="user_settings"),
