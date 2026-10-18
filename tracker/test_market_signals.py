@@ -172,6 +172,8 @@ class MarketWorkflowTests(TestCase):
         MarketObservation.objects.create(
             symbol="SPY", as_of=end, price=D("65"), currency="USD")
         MarketObservation.objects.create(
+            symbol="TQQQ", as_of=previous_end, price=D("100"), currency="USD")
+        MarketObservation.objects.create(
             symbol="TQQQ", as_of=start, price=D("100"), currency="USD")
         MarketObservation.objects.create(
             symbol="TQQQ", as_of=end, price=D("65"), currency="USD")
