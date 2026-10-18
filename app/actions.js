@@ -81,8 +81,8 @@ export async function acknowledgeSignalAction(fd){
 export async function refreshPortfolioAction(fd){
  const user=await requireUser(),id=str(fd,"portfolio_id"),p=await ownedPortfolio(user,id);
  if(!p)redirect("/app");
- try{await syncOne(p);redirect("/app/portfolios/"+p.id+"?synced=1");}
- catch{return failure("/app/portfolios/"+p.id,"Unable to refresh: market quotes unavailable or currency mismatch");}
+ try{await syncOne(p);}catch{return failure("/app/portfolios/"+p.id,"Unable to refresh: market quotes unavailable or currency mismatch");}
+ redirect("/app/portfolios/"+p.id+"?synced=1");
 }
 export async function savePreferencesAction(fd){
  const user=await requireUser(),sql=db();
