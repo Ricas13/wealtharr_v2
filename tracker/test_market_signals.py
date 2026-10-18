@@ -105,6 +105,24 @@ class YahooParsing(SimpleTestCase):
         self.assertEqual(currency, "GBP")
         self.assertEqual(rows[0][1], D("12.34000000"))
 
+    @patch("tracker.market_signals.urlopen")
+    def test_secondary_yahoo_chart_host_recovers_from_primary_outage(self, open_url):
+        epoch = 1577923200
+        content = json.dumps({"chart": {"result": [{
+            "meta": {"currency": "GBP"},
+            "timestamp": [epoch],
+            "indicators": {"quote": [{"close": [50.5]}]},
+        }]}}).encode("utf-8")
+        response = MagicMock()
+        response.status = 200
+        response.read.return_value = content
+        response.__enter__.return_value = response
+        open_url.side_effect = [OSError("primary unavailable"), response]
+        currency, rows = fetch_chart("ERNS.L", date(2020, 1, 1))
+        self.assertEqual(open_url.call_count, 2)
+        self.assertEqual(currency, "GBP")
+        self.assertEqual(rows[0][1], D("50.50000000"))
+
     def test_unsafe_ticker_is_rejected_before_any_http_request(self):
         with self.assertRaises(ValueError):
             fetch_chart("https://evil.invalid", date(2020, 1, 1))
