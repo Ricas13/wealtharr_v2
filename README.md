@@ -13,7 +13,7 @@ Private-first personal investment tracking with a responsive dark interface insp
 - Cloudflare Turnstile on production sign-in, secure Django sessions, CSRF protection and zero public registration.
 - PostgreSQL via Docker Compose, test suite, CI and a /health/ endpoint.
 
-**Methodology boundary:** Optional market monitoring now generates preliminary, **review-only 9Sig-style** quarterly target and TQQQ 30%-from-peak notices from Yahoo daily closing prices. This is **not** an independently verified replica of the attached workbook: skipped sell signals, eight-quarter streak, 100%-peak resets, cash-shortage handling and other exception branches remain unfinished. Neither trades nor dividends are invented. No broker orders are placed, automatic foreign-exchange conversion is supported, or UK ISA eligibility asserted. The master chart uses recorded actual valuations, never invented backtests. Yahoo's unofficial endpoint can fail or be delayed and is **not suitable for commercial SaaS without appropriate market-data rights**.
+**Methodology boundary:** Optional market monitoring produces review-only 9Sig quarterly targets and rule notices from verified Yahoo daily closing prices. The core line, 30 Down sell skips, eight-quarter expiry, 100%-up quarter reset and 90% safe-sleeve throttle are tested, but not every discretionary override in the uploaded workbook has been independently reproduced. Neither trades nor dividends are invented. No broker orders are placed, automatic foreign-exchange conversion is supported, or UK ISA eligibility asserted. The master chart uses recorded actual valuations, never invented backtests. Yahoo's unofficial endpoint can fail or be delayed and is **not suitable for commercial SaaS without appropriate market-data rights**.
 
 ## Run locally
 
@@ -108,14 +108,33 @@ Quarterly 9Sig signals begin after the first completed quarter after the paper e
 
 If the Yahoo feed is down, mismatched in currency or provides different closing dates for the two UK lines, startup fails safely without creating a half-funded account.
 
-## Owner-only production deployment to Oracle
+## Manual Oracle deployment after merging a PR
 
-The separate GitHub Actions workflow **Deploy Wealtharr owner tracker** is intentionally gated. It will deploy only after you configure the Oracle server and explicitly enable it. Successful repository tests or market-source checks do NOT mean your actual Oracle app is running.
+You deploy manually on Oracle after deciding a PR is ready. CI never deploys or configures the server.
 
-1. On your Oracle host, install Docker Engine, Docker Compose, git and curl. Create directory HOME/wealtharr_v2 with private files .env (POSTGRES_PASSWORD) and .env.production (DEBUG=0, stable 50+ character SECRET_KEY, ALLOWED_HOSTS=wealtharr.vpn4u.cc, CSRF_TRUSTED_ORIGINS=https://wealtharr.vpn4u.cc, TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY). Restrict file permissions to 0600. Your account must be able to run Docker. Production sign-in fails closed without valid Turnstile keys.
-2. In GitHub Repository Settings > Secrets and variables > Actions, securely configure secrets: WEALTHARR_DEPLOY_HOST (Oracle address), WEALTHARR_DEPLOY_USER (normal SSH deploy user), WEALTHARR_DEPLOY_SSH_KEY (private key), WEALTHARR_DEPLOY_KNOWN_HOSTS (verified pinned SSH host-key record). Optional variable WEALTHARR_DEPLOY_PORT defaults to 22. NEVER paste passwords or deployment keys into a PR, GitHub issue or ChatGPT.
-3. Confirm Traefik can route HTTPS traffic for wealtharr.vpn4u.cc to host TCP port 8088 (and that it is not already used by a different app). A Traefik container cannot reach host 127.0.0.1 without explicitly configured host-gateway/network connectivity.
-4. Set GitHub Actions repository variable WEALTHARR_DEPLOY_ENABLED=true, then run Actions > Deploy Wealtharr owner tracker > Run workflow, selecting main. When enabled, future main pushes deploy automatically. The workflow checks the GitHub commit, Compose config, internal app health and public HTTPS health.
-5. From the deployed project on Oracle, run: docker compose exec web python manage.py createsuperuser. Sign in, select Start isolated 9Sig paper trial, and monitor. Configure optional email and Discord in Admin control, enable channels in My settings, and use Test delivery. Read logs with docker compose logs --tail=100 reminders. Backup service keeps private PostgreSQL dump archives and should be backed up off-host.
+From your existing Oracle deployment checkout, after taking a database backup:
 
-Do not repoint a live Wealtharr v1 Traefik route until you explicitly confirm the migration. The deploy workflow will not create Oracle infrastructure, change Traefik settings, set private secrets or connect Trading 212 for you. Without a configured and reachable Oracle SSH target, remote deployment is not verifiable.
+    git fetch origin
+    git checkout main
+    git pull --ff-only origin main
+    docker compose up -d --build
+    docker compose exec web python manage.py check --deploy
+    docker compose ps
+    curl -fsS https://wealtharr.vpn4u.cc/health/
+
+Maintain your private .env and .env.production on the Oracle server. Production login requires valid Cloudflare Turnstile keys; persistent PostgreSQL storage, SMTP/Discord integrations and the hourly reminders container must already be configured. Verify routing through Traefik to the server's bound port 8088 and check scheduler logs with:
+
+    docker compose logs --tail=100 reminders
+
+Do not restore, overwrite, or migrate a different project without confirming the deployment directory and backup first. Wealtharr does not deploy itself or connect to Trading 212.
+
+
+## Start tracking a real Trading 212 9Sig portfolio
+
+On the Overview dashboard, choose **Track my real 9Sig** (NOT the optional paper trial). Enter your actual UK Stocks & Shares ISA or GIA name, starting cash deposit and deposit date, GBP-denominated Yahoo equity and safe-asset trading-line symbols, and £500 monthly target.
+
+On your new strategy tab, use **Record activity** to enter actual Trading 212 BUY/SELL fills in chronological order: execution date, symbol, quantity, unit GBP price and fees. The first setup step **does not fabricate purchases** or broker balances. If you already owned positions before installing Wealtharr, reconstruct the historical actual deposit and fills before expecting the historical quarterly signal line to match your record. Confirm the LSE ticker spelling and instrument availability in your own broker account; the sample LQQ3.L and ERNS.L listings are research examples, not a claim they replicate TQQQ/AGG.
+
+Use **Check Yahoo prices** to confirm GBP closes and reference data. The scheduler checks markets hourly but sends a rebalance alert only on a completed-quarter BUY/SELL/reset action, or a newly detected 30 Down. No-action routine reviews are preserved in history without pushing notifications. Dates and suggested unit quantities are based on closing prices; your manually recorded fills determine actual cash and future holdings. Email or Discord must be configured in My settings and Admin control, with a working test delivery.
+
+**Workbook correction:** Contributions after the initial equity purchase raise the quarterly line by **half their amount at that quarter's close**, without 9% growth until later quarters. The eight-quarter 60/40 safety reset relates to a running 30 Down window, **not** any eight quarters without an equity sale. The initial equity basis includes only the initial purchase-day equity buys; later buys are not automatically mistaken for initial capital. Exact workbook discretion flags and potential instrument differences still require the owner's judgment.
