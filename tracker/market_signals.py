@@ -1,7 +1,7 @@
-"""Server-only Yahoo chart sync and conservative advisory 9Sig review.
+"""Owner-only Yahoo prices and conservative 9Sig quarterly review.
 
-No auto-trading. This is a disclosed subset of the uploaded spreadsheet methodology;
-cash-shortage, skip-sale and peak-reset exception branches require parity work.
+References: Jason Kelly's published Signal/30 Down explanations and the owner's
+signal strategy simulation v1.07 workbook. Suggestions never place orders.
 """
 import json
 import logging
@@ -190,18 +190,20 @@ def signal_line_value(*, start_date, as_of, starting_equity_cost, contributions=
 
 
 def _drawdown_from_spy(spy, review_q):
-    """30 Down requires falling SPY vs the highest of up to 8 quarter closes."""
-    recent = [spy[q][1] for q in sorted(spy)
-              if review_q - 7 <= q <= review_q]
-    if len(recent) < 2:
-        return False, ZERO
-    previous = spy.get(review_q - 1)
+    """30 Down: current SPY quarter close <=70% of past eight closes' high.
+
+    The fund need not be falling *this* quarter: a partial recovery can still
+    end 30% below the rolling peak. The original test wrongly required a
+    negative quarter-over-quarter return and missed valid triggers.
+    """
     current = spy.get(review_q)
-    if not current or not previous:
+    previous = [spy[q][1] for q in range(review_q - 8, review_q)
+                if q in spy and spy[q][1] > ZERO]
+    if not current or not previous or current[1] <= ZERO:
         return False, ZERO
-    peak = max(recent)
-    decline = (Decimal(1) - current[1] / peak) if peak else ZERO
-    return (decline >= Decimal("0.30") and current[1] < previous[1]), decline
+    high = max(previous)
+    decline = Decimal(1) - current[1] / high
+    return current[1] <= high * Decimal("0.70"), decline
 
 
 def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symbol,
@@ -212,10 +214,10 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
                         down_age_quarters=0):
     """Deterministic owner-review 9Sig action on a completed quarter.
 
-    60/40 baseline, 9% quarterly signal growth, half of period contributions,
-    maximum 90% of safe assets used for regular buys, 30 Down two-sell skip,
-    eight-quarter expiry, 100%-up single-quarter spike, and base reset on
-    >100% safe-sleeve requirement. The owner executes and records all fills.
+    60/40 baseline, 9% per quarter, half of additional contributions, workbook
+    cash-reservoir buying throttle (0.9 x 0.9 only for large buys), 30 Down
+    two-sell skip, eight-quarter expiry, 100%-up TQQQ reset and >100%
+    reservoir-deficit reset. Actual share fills are always owner-entered.
     """
     if (currency != "GBP" or equity_qty <= ZERO or starting_equity_cost <= ZERO or
             equity_price <= ZERO or safe_price <= ZERO or safe_qty < ZERO or cash < ZERO):
@@ -235,13 +237,15 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
     if total <= ZERO:
         return []
     difference = target - equity_value
-    tolerance = max(Decimal("1"), total * Decimal("0.005"))
+    # A 0.5% portfolio-wide deadband was invented by the app. The published
+    # strategy and uploaded workbook have no such rule. Penny rounding
+    # suppresses untradeably small differences instead.
+    tolerance = CENTS
 
     spy = _quarterly_closes(spy_reference or (), as_of)
     down_trigger, decline = _drawdown_from_spy(spy, review_q)
-    # Once triggered, the skip window persists until 2 ignored sells or
-    # eight quarters. Recovery in a later quarter does not silently erase
-    # the two skipped-sell state.
+    # Once triggered, the skip window persists until the third would-be sell
+    # or eight-quarter expiry. A recovery alone does not consume skipped sells.
     active_down = down_trigger or (prior_drawdown and down_age_quarters < 8)
     alerts = []
     if down_trigger and not prior_drawdown:
@@ -307,22 +311,29 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
         if safe_buy > ZERO:
             actions.append(_order("BUY", safe_symbol, safe_buy, safe_price))
     elif difference > tolerance:
+        reserve = cash + safe_value
         if reset_reason:
-            # Explicit reset can use the safe sleeve down to a 40% balance;
-            # the regular 90% throttle does not apply to a forced reset.
-            desired_safe_sale = max(ZERO, difference - cash)
-            safe_sale_budget = min(safe_value, desired_safe_sale)
+            # A 60/40 reset targets the current total, not the old signal
+            # line. The normal large-buy throttle does not apply.
+            budget = min(difference, reserve)
+        elif difference < reserve * Decimal("0.90"):
+            # Workbook BF4: a regular shortfall BELOW 90% of buying
+            # power is funded IN FULL, not arbitrarily capped at 90%.
+            budget = difference
         else:
-            safe_sale_budget = min(
-                safe_value * Decimal("0.90"), max(ZERO, difference - cash))
+            # Workbook BF4 uses buying power (cash + bond value), not
+            # only bond value: reserve * 0.9 * (1 - C11); C11=10%.
+            budget = min(difference, reserve * Decimal("0.81"))
+            note += " 9Sig's large-buy throttle limits this quarter's purchase."
+        safe_sale_budget = min(safe_value, max(ZERO, budget - cash))
         safe_to_sell = min(safe_qty, _floor_qty(safe_sale_budget, safe_price))
         if safe_to_sell > ZERO:
             actions.append(_order("SELL", safe_symbol, safe_to_sell, safe_price))
         available = cash + safe_to_sell * safe_price
-        equity_buy = _floor_qty(min(difference, available), equity_price)
+        equity_buy = _floor_qty(min(budget, available), equity_price)
         if equity_buy > ZERO:
             actions.append(_order("BUY", equity_symbol, equity_buy, equity_price))
-        if available + tolerance < difference:
+        if budget + tolerance < difference:
             note += " Available GBP buying power limits the order size."
 
     label = "%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
@@ -338,6 +349,81 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
         "actions": actions,
     })
     return alerts
+
+
+def count_skipped_equity_sells(quarterly_signals):
+    """A BUY shortfall HOLD is not a skipped SELL under 30 Down.
+
+    Older versions also encoded cash shortages as HOLD. Counting every HOLD
+    as a deferred sale could force an incorrect 60/40 reset on the next sale.
+    """
+    return sum(
+        any(a.get("side") == "HOLD" for a in row.actions) and
+        ("defer this equity sell" in row.message.lower() or
+         "skip this sell" in row.message.lower())
+        for row in quarterly_signals
+    )
+
+
+def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest):
+    """Possible mid-quarter 100%-up rule, using verified daily US closes.
+
+    Exact Kelly spike reference is last executed quarterly rebalance price,
+    not necessarily the calendar-quarter closing price. Until that is known,
+    this is a warning only, never a made-up automatic GBP trading order.
+    """
+    if (tqqq_latest is None or tqqq_latest.currency != "USD" or
+            quarter_number(tqqq_latest.as_of) != quarter_number(now) or
+            tqqq_latest.as_of > now):
+        return
+    last_quarter = quarter_end_before(now)
+    # Do not apply another investor's previous-quarter execution reference to
+    # a portfolio which only entered 9Sig during the current quarter.
+    if first_buy.occurred_on > last_quarter:
+        return
+    if baseline is not None and baseline.as_of > last_quarter:
+        return
+    origin = settlement_close("TQQQ", last_quarter)
+    if not origin or origin.currency != "USD" or origin.price <= ZERO:
+        return
+    crossed = MarketObservation.objects.filter(
+        symbol="TQQQ", currency="USD", as_of__gt=last_quarter,
+        as_of__lte=tqqq_latest.as_of, price__gte=origin.price * 2,
+    ).order_by("as_of").first()
+    if not crossed or first_buy.occurred_on > crossed.as_of:
+        return
+    if baseline is not None and baseline.as_of >= crossed.as_of:
+        return
+    start_date = baseline.as_of if baseline else first_buy.occurred_on
+    down_notice = strategy.signals.filter(
+        kind="THIRTY_DOWN",
+        as_of__gte=max(start_date, last_quarter - timedelta(days=750)),
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of").first()
+    if down_notice and quarter_number(now) - quarter_number(down_notice.as_of) < 8:
+        return
+    if strategy.ledger.filter(occurred_on__gt=crossed.as_of).exists():
+        return
+    q = quarter_number(now)
+    key = "spike:%04d-Q%d" % (q // 4, q % 4 + 1)
+    message = (
+        "TQQQ USD daily close %s on %s reached at least twice the "
+        "preceding calendar-quarter closing reference %s. "
+        "Possible 100%%-up event: review a reset to 60%% equity / 40%% "
+        "safe assets. Jason Kelly's reference may be the actual prior "
+        "quarterly rebalance execution price, which can differ from "
+        "the calendar quarter close. Check that reference, your prior "
+        "allocation and 30 Down status before trading. No GBP orders "
+        "or quantities have been invented."
+    ) % (crossed.price, crossed.as_of, origin.price)
+    signal, created = StrategySignal.objects.get_or_create(
+        strategy=strategy, signal_key=key,
+        defaults={"kind": "SPIKE_WATCH",
+                  "title": "9Sig 100%-up spike: manual reset review",
+                  "message": message, "as_of": crossed.as_of, "actions": []})
+    if created:
+        dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, key),
+                 "Wealtharr — " + signal.title,
+                 strategy.name + "\n" + message + "\nNo orders placed.")
 
 
 def review_strategy(strategy):
@@ -383,11 +469,14 @@ def review_strategy(strategy):
     # A 60/40 reset is a suggestion, never proof that the owner traded.
     # Future cycles are paused until their actual positions are re-anchored.
     pending_reset = strategy.signals.filter(
-        kind="QUARTERLY", as_of__lt=quarter_end,
+        kind__in=("QUARTERLY", "SPIKE_WATCH"), as_of__lt=quarter_end,
         message__icontains="review a reset to 60%"
-    ).order_by("-as_of").first()
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of").first()
     if pending_reset and (baseline is None or baseline.as_of <= pending_reset.as_of):
         return {"status": "manual reset must be confirmed as a new strategy baseline"}
+    _alert_intraperiod_spike(
+        strategy, now=now, first_buy=first_buy, baseline=baseline,
+        tqqq_latest=data.get("TQQQ"))
     closing = {symbol: settlement_close(symbol, quarter_end) for symbol in tickers}
     if (any(x is None for x in closing.values()) or
             closing[strategy.equity_symbol].currency != "GBP" or
@@ -435,7 +524,7 @@ def review_strategy(strategy):
     active_down_signal = strategy.signals.filter(
         kind="THIRTY_DOWN", as_of__lt=quarter_end,
         as_of__gte=start_date,
-    ).order_by("-as_of", "-pk").first()
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of", "-pk").first()
     down_age = (quarter_number(quarter_end) - quarter_number(active_down_signal.as_of)
                 if active_down_signal else 0)
     skipped = 0
@@ -443,11 +532,8 @@ def review_strategy(strategy):
         earlier = strategy.signals.filter(
             kind="QUARTERLY", as_of__lt=quarter_end,
             as_of__gte=active_down_signal.as_of,
-        ).order_by("as_of")
-        skipped = sum(
-            any(action.get("side") == "HOLD" for action in row.actions)
-            for row in earlier
-        )
+        ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("as_of")
+        skipped = count_skipped_equity_sells(earlier)
     if len(_quarterly_closes(ref_spy, quarter_end)) < 2:
         return {"status": "insufficient SPY quarter-end reference history"}
     if len(_quarterly_closes(ref_tqqq, quarter_end)) < 2:

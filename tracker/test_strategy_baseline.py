@@ -75,3 +75,35 @@ class ResetBaselineTests(TestCase):
         self.signal.save(update_fields=["acknowledged_at"])
         self.client.post(self.url, {"confirm": "RESET"})
         self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
+
+    def test_intraquarter_spike_is_valid_reset_anchor_after_real_trades(self):
+        # A spike alert may arrive before quarter end; the same immutable
+        # actual-fills and GBP-prices confirmation safeguards apply.
+        self.trades_and_quotes()
+        spike = StrategySignal.objects.create(
+            strategy=self.strategy, signal_key="spike:2026-Q4",
+            kind="SPIKE_WATCH",
+            title="Possible TQQQ spike",
+            as_of=timezone.localdate() - timedelta(days=4),
+            message="possible 100% spike: review a reset to 60% equity / 40% safe",
+            actions=[], acknowledged_at=timezone.now())
+        response = self.client.post(self.url, {"confirm": "RESET"})
+        self.assertEqual(response.status_code, 302)
+        baseline = StrategyBaseline.objects.get(strategy=self.strategy)
+        self.assertEqual(baseline.reset_signal, spike)
+        self.assertEqual(baseline.equity_value, D("600.00"))
+        self.assertEqual(baseline.safe_value, D("400.00"))
+
+    def test_rejected_spike_cannot_anchor_a_reset(self):
+        self.trades_and_quotes()
+        spike = StrategySignal.objects.create(
+            strategy=self.strategy, signal_key="spike:rejected",
+            kind="SPIKE_WATCH", title="Not correct",
+            as_of=timezone.localdate() - timedelta(days=4),
+            message="possible 100% spike: review a reset to 60% equity",
+            actions=[], acknowledged_at=timezone.now(),
+            review_outcome="FALSE_POSITIVE", review_note="reference was wrong")
+        self.signal.acknowledged_at = None
+        self.signal.save(update_fields=["acknowledged_at"])
+        self.client.post(self.url, {"confirm": "RESET"})
+        self.assertFalse(StrategyBaseline.objects.exists())
