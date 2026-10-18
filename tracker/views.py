@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from django.utils import timezone
-from .forms import AccountForm, AutomationForm, IntegrationForm, LedgerForm, NotificationForm, PriceForm, StrategyForm
+from .forms import AccountForm, AutomationForm, IntegrationForm, LedgerForm, NotificationForm, PriceForm, StrategyForm, RealNineSigSetupForm
 from .models import Account, LedgerEntry, NotificationPreference, PriceMark, StrategyInstance, StrategyPreset, StrategySignal, SystemIntegration, WealthSnapshot
 from .services import consolidated, dispatch, ledger_summary, validate_and_record
 from .market_signals import review_strategy
@@ -61,6 +61,53 @@ def sign_in(request):
 def sign_out(request):
     logout(request)
     return redirect("home")
+
+@login_required
+def start_real_9sig(request):
+    """Create owner-funded 9Sig without inventing broker positions or fills."""
+    from .models import Account
+    form = RealNineSigSetupForm(request.POST or None, owner=request.user)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        try:
+            with transaction.atomic():
+                account, _ = Account.objects.select_for_update().get_or_create(
+                    owner=request.user, name=data["account_name"],
+                    defaults={"kind": data["account_kind"]},
+                )
+                if account.kind != data["account_kind"] or account.kind == "PAPER":
+                    raise ValidationError("Select a real account type.")
+                preset = StrategyPreset.objects.get(
+                    slug="nasdaq-quarterly-target", active=True)
+                strategy = StrategyInstance(
+                    owner=request.user, account=account, preset=preset,
+                    name=data["strategy_name"],
+                    equity_symbol=data["equity_symbol"],
+                    safe_symbol=data["safe_symbol"],
+                    market_data_enabled=True,
+                    contribution_alerts=True,
+                    monthly_target=data["monthly_target"],
+                )
+                strategy.full_clean()
+                strategy.save()
+                validate_and_record(strategy, LedgerEntry(
+                    kind=LedgerEntry.DEPOSIT,
+                    occurred_on=data["start_date"],
+                    amount=data["starting_cash"],
+                    note="Real cash entered by owner — not a broker-synced transaction",
+                ))
+            messages.success(
+                request,
+                "Real 9Sig tracker created with your recorded GBP cash. "
+                "Now add the BUY fills actually executed at Trading 212, "
+                "including their dates, quantities, prices and fees. "
+                "No virtual positions or broker orders were created.",
+            )
+            return redirect("strategy_detail", pk=strategy.pk)
+        except (ValidationError, StrategyPreset.DoesNotExist) as exc:
+            form.add_error(None, exc)
+    return render(request, "start_real_9sig.html", {"form": form})
+
 
 @login_required
 @require_POST
