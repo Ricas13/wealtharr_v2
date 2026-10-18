@@ -14,8 +14,13 @@
   <div id="wealth-chart" class="wealth-chart" role="img" aria-label="Chart of saved wealth snapshots"></div>
   {{ chart|json_script:"wealth-chart-points" }}
   <div class="chart-bottom"><span><i class="legend-dot"></i>Portfolio value</span><span><i class="legend-dot secondary"></i>Net contributions</span><form action="{% url 'capture_snapshot' %}" method="post">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">◷ Save today's valuation</button></form></div>
-  <div class="chart-caption">A point is recorded only when you save a valuation. Prices are entered by you; this chart does not imply live broker or market data.</div>
+  <div class="chart-caption">Valuations can be saved manually or captured by the scheduled Yahoo monitor when all required holdings have fresh marks. No backtests or fabricated quotes.</div>
 </div>
+<section class="panel padded" id="actions-needed">
+  <div class="panel-heading"><div><h2>Interventions needed</h2><p>Open 9Sig advisory notices — review before making any actual trade.</p></div></div>
+  {% for signal in open_signals %}<div class="signal-review"><a href="{% url 'strategy_detail' signal.strategy_id %}#strategy-signals"><strong>{{ signal.title }}</strong> — {{ signal.strategy.name }} →</a><p>{{ signal.message|truncatechars:240 }}</p></div>
+  {% empty %}<p class="muted">Nothing needs review right now. Verified market checks will create notices when applicable.</p>{% endfor %}
+</section>
 <div class="section-title"><h2>My strategies</h2><span>{{ items|length }} tracked</span></div>
 <div class="strategy-grid">
   {% for item in items %}

@@ -12,11 +12,37 @@
   <div class="panel stat-card"><div class="stat-label">Investment result</div><div class="stat-value">{% if report.profit is not None %}£{{ report.profit|floatformat:2 }}{% else %}—{% endif %}</div><div class="stat-help">Value less net contributions</div></div>
 </div>
 {% if report.missing %}<div class="alert-warning">Price needed for: {% for symbol in report.missing %}<b>{{ symbol }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}. Set the latest GBP unit price below to complete this strategy's valuation.</div>{% endif %}
+<section class="panel padded" id="strategy-signals">
+  <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Yahoo closing prices and advisory signals. Never an automatic trade.</p></div>
+  {% if strategy.market_data_enabled %}
+  <form method="post" action="{% url 'refresh_market' strategy.pk %}">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">⟳ Check Yahoo prices</button></form>
+  {% else %}<span class="risk-pill">Monitoring off</span>{% endif %}
+  </div>
+  {% if strategy.preset.slug == "nasdaq-quarterly-target" %}
+  <details style="border:1px solid #294a60;border-radius:8px;padding:12px;margin:12px 0">
+    <summary style="cursor:pointer;color:#54d8cf">⚙ Configure Yahoo monitoring</summary>
+    <form action="{% url 'save_automation' strategy.pk %}" method="post" class="form-stack">{% csrf_token %}
+      {% include 'partials/form_fields.html' with form=automation_form %}
+      <p class="micro-note">GBP-denominated exact Yahoo tickers only; GBp is divided by 100. Verify Trading 212 availability and ISA eligibility independently.</p>
+      <button class="btn btn-primary" type="submit">Save monitoring settings</button>
+    </form>
+  </details>{% endif %}
+  {% if strategy.market_data_enabled %}<p class="micro-note">Equity: {{ strategy.equity_symbol }} · Safe asset: {{ strategy.safe_symbol }} · US drawdown reference: TQQQ. GBP-denominated Yahoo quotes only. 9Sig recommendations are preliminary and not workbook-equivalent.</p>
+  {% else %}<p class="micro-note">To enable automatic quote checks, create a 9Sig strategy tab with exact Yahoo equity/safe tickers and the monitoring option. Manual tracking still works.</p>{% endif %}
+  {% for signal in signals %}
+  <div class="signal-review">
+    <h3>{{ signal.title }} {% if signal.acknowledged_at %}<small>Reviewed</small>{% else %}<small class="value-warning">Action to review</small>{% endif %}</h3>
+    <p>{{ signal.message }}</p>
+    <div class="signal-orders">{% for a in signal.actions %}<div><b>{{ a.side }}</b> {{ a.quantity }} units {{ a.symbol }} — estimated £{{ a.estimated_gbp }}</div>{% empty %}<small>No trade proposed.</small>{% endfor %}</div>
+    {% if not signal.acknowledged_at %}<form method="post" action="{% url 'acknowledge_signal' strategy.pk signal.pk %}">{% csrf_token %}<button class="btn btn-subtle btn-sm" type="submit">Mark reviewed</button></form>{% endif %}
+  </div>
+  {% empty %}<p class="muted">No automated recommendations yet. Your review history will appear here after a verified market check and qualifying event.</p>{% endfor %}
+</section>
 <div class="split-layout strategy-work">
   <div class="stack-panels">
-    <section class="panel padded"><div class="panel-heading"><div><h2>Holdings</h2><p>Your current positions and manually entered prices.</p></div></div>
+    <section class="panel padded"><div class="panel-heading"><div><h2>Holdings</h2><p>Actual holdings with dated GBP closing-price marks (manual or Yahoo).</p></div></div>
     <div class="table-scroll"><table class="data-table"><thead><tr><th>Instrument</th><th class="num">Units</th><th class="num">GBP/unit</th><th class="num">Value</th></tr></thead><tbody>
-    {% for h in holdings %}<tr><td><b>{{ h.symbol }}</b></td><td class="num">{{ h.quantity|floatformat:6 }}</td><td class="num">{% if h.mark %}£{{ h.mark.price|floatformat:4 }}<small class="table-sub">{{ h.mark.as_of|date:"d M Y" }}</small>{% else %}<span class="missing-price">Missing</span>{% endif %}</td><td class="num">{% if h.value is not None %}£{{ h.value|floatformat:2 }}{% else %}—{% endif %}</td></tr>
+    {% for h in holdings %}<tr><td><b>{{ h.symbol }}</b></td><td class="num">{{ h.quantity|floatformat:6 }}</td><td class="num">{% if h.mark %}£{{ h.mark.price|floatformat:4 }}<small class="table-sub">{{ h.mark.as_of|date:"d M Y" }} · {{ h.mark.source }}</small>{% else %}<span class="missing-price">Missing</span>{% endif %}</td><td class="num">{% if h.value is not None %}£{{ h.value|floatformat:2 }}{% else %}—{% endif %}</td></tr>
     {% empty %}<tr><td colspan="4" class="empty-cell">No investments bought yet. Record a deposit, then a buy.</td></tr>{% endfor %}
     </tbody></table></div>
     </section>
@@ -35,13 +61,17 @@
         <button class="btn btn-primary btn-block" type="submit">Save transaction →</button>
       </form>
     </section>
-    <section class="panel padded"><div class="panel-heading"><div><h2>Mark a holding price</h2><p>Update a holding to calculate its value. Not a live quote.</p></div></div>
+    <section class="panel padded"><div class="panel-heading"><div><h2>Mark a holding price</h2><p>Manually override a holding price when needed; quote source and date remain visible.</p></div></div>
       <form method="post" action="{% url 'record_price' strategy.pk %}" class="form-stack">{% csrf_token %}
         {% include 'partials/form_fields.html' with form=price_form %}
         <button class="btn btn-subtle btn-block" type="submit">Save price mark</button>
       </form>
     </section>
-    <section class="panel padded"><h2>About this model</h2><span class="risk-pill {{ strategy.preset.risk|lower }}">{{ strategy.preset.get_risk_display }} risk</span><p class="muted">{{ strategy.preset.summary }}</p><p class="muted">{{ strategy.preset.methodology }}</p><div class="detail-row"><span>Monthly target</span><strong>£{{ strategy.monthly_target|floatformat:2 }}</strong></div><p class="micro-note">Tracking is not trading advice. This foundation does not issue 9Sig signals automatically.</p></section>
+    <section class="panel padded"><h2>About this model</h2><span class="risk-pill {{ strategy.preset.risk|lower }}">{{ strategy.preset.get_risk_display }} risk</span><p class="muted">{{ strategy.preset.summary }}</p><p class="muted">{{ strategy.preset.methodology }}</p><div class="detail-row"><span>Monthly target</span><strong>£{{ strategy.monthly_target|floatformat:2 }}</strong></div><p class="micro-note">Tracking is not trading advice. 9Sig monitoring may suggest reviews, but never executes trades. The model does not yet reproduce all spreadsheet exceptions.</p></section>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>.signal-review{border-top:1px solid #2a3b4e;padding:16px 0}.signal-review p{font-size:13px;margin:8px 0;color:#9bafc7}.signal-review h3{margin:0}.signal-review small{font-size:11px}.signal-orders{background:#0d1b2d;border-radius:7px;padding:9px 12px;font-size:12px;margin-bottom:9px}.signal-orders div{padding:3px}.signal-orders b{color:#42d5c8}</style>
 {% endblock %}

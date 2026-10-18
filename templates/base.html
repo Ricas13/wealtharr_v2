@@ -39,7 +39,16 @@
   {% empty %}<div class="sidebar-hint">No strategies yet.<br><a href="{% url 'new_strategy' %}">Create your first →</a></div>{% endfor %}
   <div class="menu-caption second">SYSTEM</div>
   <a href="{% url 'user_settings' %}" class="nav-item {% if request.resolver_match.url_name == 'user_settings' %}selected{% endif %}"><span class="nav-icon">⚙</span> My settings</a>
-  {% if user.is_staff %}<a href="{% url 'control' %}" class="nav-item {% if request.resolver_match.url_name == 'control' %}selected{% endif %}"><span class="nav-icon">⚒</span> Admin control</a>{% endif %}
+  {% if user.is_staff %}
+  <details class="admin-nav" open>
+    <summary class="nav-item"><span class="nav-icon">⚒</span> Administration</summary>
+    <a href="{% url 'control' %}" class="nav-item sub-nav"><span class="nav-icon">⌘</span> Control centre</a>
+    <a href="{% url 'control' %}#integrations" class="nav-item sub-nav"><span class="nav-icon">✉</span> Email & Discord</a>
+    <a href="{% url 'admin:tracker_strategypreset_changelist' %}" class="nav-item sub-nav"><span class="nav-icon">◇</span> Enabled strategies</a>
+    <a href="{% url 'admin:auth_user_changelist' %}" class="nav-item sub-nav"><span class="nav-icon">☷</span> Users</a>
+    <a href="{% url 'control' %}#stripe" class="nav-item sub-nav"><span class="nav-icon">▣</span> Stripe <small>(later)</small></a>
+  </details>
+  {% endif %}
   <div class="sidebar-bottom"><b>WEALTHARR</b><small>v2 · Owner edition</small></div>
 </aside>
 <div class="nav-shade" id="nav-shade"></div>
