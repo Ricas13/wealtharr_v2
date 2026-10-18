@@ -76,3 +76,16 @@ On the 9Sig strategy tab, expand **Configure Yahoo monitoring**, enter two disti
 - Every review uses the last *completed* quarter's closing date and actual recorded ledger positions no later than that date. It refuses incomplete currency or SPY/TQQQ history, unrelated holdings, negative cash and unknown purchases rather than fabricating an answer.
 - Daily price marks and historical settlement marks are kept separate. The graph's automatic snapshot is recorded at the quote date only when **all** positive holdings have fresh, source-verified prices, matching observation dates and no later transactions. Manual snapshot capture remains available.
 - Remaining spreadsheet-exception branches rely on owner-entered YES/NO flags and have not all been independently transcribed into verifiable stateful logic. Do not treat the suggestions as a certified Excel clone. Use the source workbook for trade approval.
+
+
+## Automated PostgreSQL backup and guarded recovery
+
+The Compose 'backups' service runs pg_dump with PostgreSQL custom-format archives when the database becomes healthy and every 24 hours thereafter. Archives live on the host under ./backups/ with private directory/file permissions and 30-day retention. The Postgres data volume alone is **not** a backup. Keep encrypted **off-host** copies of the archives and the separate SECRET_KEY securely.
+
+Test restore on a disposable installation first. From your deployment directory:
+
+    WEALTHARR_CONFIRM_RESTORE=YES_REPLACE_WEALTHARR bash scripts/restore_backup.sh ./backups/wealtharr-YYYYMMDDTHHMMSSZ.dump
+
+**WARNING:** Restoration replaces the current database. Any entries created after the archived point are lost. The helper stops the app/scheduler/backup service, restores with pg_restore and restarts containers. The scripted commands are not a substitute for a live restore drill on your Oracle machine.
+
+Failed email/Discord deliveries persist the redacted status and retry up to three times, with 5- and 15-minute delays. Admin can requeue a failed delivery after fixing credentials. These alerts are at-least-once; a lost network acknowledgement can rarely cause duplicate alerts, but never automatic trading.
