@@ -1,0 +1,17 @@
+import Link from "next/link";
+import {createPortfolioAction} from "@/app/actions.js";
+export default async function NewPortfolio({searchParams}){
+ const q=await searchParams;
+ return <><div className="page-heading"><div><p className="eyebrow">NEW STRATEGY</p><h1>Create a 9Sig account</h1><p>About two minutes. You can record more holdings later.</p></div><Link href="/app" className="btn btn-outline">← Back</Link></div>
+ {q?.error&&<div className="alert error">{q.error}</div>}
+ <form action={createPortfolioAction} className="form-panel"><div className="step-title"><span>01</span><div><h2>Give this account a name</h2><p>Keep ISA and general investments separate.</p></div></div>
+ <div className="form-grid"><label>Account name<input name="name" required minLength="2" maxLength="80" placeholder="My 9Sig ISA"/></label><label>Account type<select name="account_type" defaultValue="ISA"><option value="ISA">Stocks & Shares ISA</option><option value="GIA">General Investment Account</option><option value="SIPP">SIPP</option><option value="OTHER">Other</option></select></label><label>Trading currency<select name="currency" defaultValue="GBP"><option value="GBP">GBP (£)</option><option value="USD">USD ($)</option></select></label><label>Planned monthly contribution<input name="monthly" type="number" min="0" step="0.01" defaultValue="500"/></label></div>
+ <div className="step-title"><span>02</span><div><h2>Which investments do you hold?</h2><p>Use the exact Yahoo tickers for your broker's trading lines.</p></div></div>
+ <div className="form-grid"><label>3× equity instrument ticker<input name="equity_symbol" required placeholder="e.g. TQQQ or verified UK trading line"/></label><label>Safe / bond instrument ticker<input name="safe_symbol" required placeholder="e.g. AGG or verified UK trading line"/></label></div>
+ <div className="info-box">9Sig uses TQQQ as its US-model 30%-drop reference. Your own ISA holding may be a different UK-listed instrument. Wealtharr does not assert these are interchangeable, ISA-eligible, or available on Trading 212. Both holdings must have Yahoo quotes in the account's currency; GBp quotes are converted to GBP.</div>
+ <div className="step-title"><span>03</span><div><h2>Enter what you have today</h2><p>If starting fresh, leave share quantities at zero and enter your cash.</p></div></div>
+ <div className="form-grid"><label>Available cash<input name="cash" type="number" min="0" step="0.01" defaultValue="1000" required/></label><span className="form-placeholder"/>
+ <label>Equity shares owned<input name="equity_qty" type="number" min="0" step="0.0001" defaultValue="0"/></label><label>Equity average purchase price <small>(in selected currency per share)</small><input name="equity_price" type="number" min="0" step="0.000001" defaultValue="0"/></label>
+ <label>Safe-asset shares owned<input name="safe_qty" type="number" min="0" step="0.0001" defaultValue="0"/></label><label>Safe-asset average purchase price<input name="safe_price" type="number" min="0" step="0.000001" defaultValue="0"/></label></div>
+ <div className="form-footer"><p>We record existing shares as opening holdings, not as new purchases. Manual trades remain under your control.</p><button type="submit" className="btn btn-primary btn-large">Create my strategy →</button></div></form></>;
+}
