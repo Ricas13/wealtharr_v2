@@ -109,52 +109,109 @@ def decrypt_secret(encoded):
     key = base64.urlsafe_b64encode(hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest())
     return Fernet(key).decrypt(encoded.encode("ascii")).decode("utf-8")
 
+def _send_message(channel, owner, cfg, prefs, subject, message):
+    """One outbound attempt. Secrets remain on the server and out of logs."""
+    if channel == "email":
+        if not cfg.smtp_host or not cfg.smtp_sender or not prefs.destination_email:
+            raise ValueError("Email not configured")
+        connection = get_connection(
+            backend="django.core.mail.backends.smtp.EmailBackend",
+            host=cfg.smtp_host, port=cfg.smtp_port,
+            username=cfg.smtp_username or None,
+            password=decrypt_secret(cfg.smtp_password_ciphertext) or None,
+            use_tls=cfg.smtp_use_tls, timeout=10,
+        )
+        EmailMessage(subject, message, cfg.smtp_sender,
+                     [prefs.destination_email], connection=connection).send(fail_silently=False)
+    elif channel == "discord":
+        from urllib.parse import urlsplit
+        url = decrypt_secret(cfg.discord_url_ciphertext)
+        parsed = urlsplit(url)
+        if (parsed.scheme != "https" or
+                parsed.hostname not in ("discord.com", "discordapp.com") or
+                not re.fullmatch(r"/api/webhooks/[0-9]+/[A-Za-z0-9_-]+", parsed.path)):
+            raise ValueError("Discord webhook not configured")
+        payload = json.dumps({
+            "content": (subject + "\n" + message)[:1900],
+            "allowed_mentions": {"parse": []}
+        }).encode("utf-8")
+        request = Request(url, data=payload,
+                          headers={"Content-Type": "application/json",
+                                   "User-Agent": "Wealtharr/2"}, method="POST")
+        with urlopen(request, timeout=10) as response:
+            if response.status not in (200, 204):
+                raise ValueError("Discord rejected notification")
+    else:
+        raise ValueError("Unsupported notification channel")
+
+
 def dispatch(owner, key, subject, message, channels=None):
-    """Idempotent per owner/channel/event. Secrets never included in messages or logs."""
+    """Persist and deliver each alert with bounded, retryable, per-channel status.
+
+    A network acknowledgement can be lost after the remote service accepts a
+    message. Like other at-least-once delivery systems, a retry could duplicate
+    an alert in that rare case. Trade orders are never sent.
+    """
+    from datetime import timedelta
     prefs, _ = NotificationPreference.objects.get_or_create(owner=owner)
     cfg = SystemIntegration.current()
-    channels = channels or ("email", "discord")
+    channels = channels if channels is not None else ("email", "discord")
     outcomes = {}
     for channel in channels:
-        enabled = prefs.email_enabled if channel == "email" else prefs.discord_enabled
-        if not enabled:
+        if channel not in ("email", "discord"):
+            outcomes[channel] = "unsupported"
+            continue
+        if not (prefs.email_enabled if channel == "email" else prefs.discord_enabled):
             outcomes[channel] = "disabled"
             continue
+        now = timezone.now()
         try:
             with transaction.atomic():
-                delivery, fresh = NotificationDelivery.objects.get_or_create(
+                record, _ = NotificationDelivery.objects.select_for_update().get_or_create(
                     owner=owner, channel=channel, event_key=key,
+                    defaults={"subject": subject[:200], "message": message},
                 )
-                if not fresh:
-                    outcomes[channel] = delivery.status.lower()
+                if record.status == "SENT":
+                    outcomes[channel] = "sent"
                     continue
-                # Commit the reservation before doing network IO; never duplicate sends.
-            if channel == "email":
-                if not cfg.smtp_host or not cfg.smtp_sender or not prefs.destination_email:
-                    raise ValueError("Email needs SMTP host, sender and destination")
-                conn = get_connection(
-                    backend="django.core.mail.backends.smtp.EmailBackend",
-                    host=cfg.smtp_host, port=cfg.smtp_port,
-                    username=cfg.smtp_username or None,
-                    password=decrypt_secret(cfg.smtp_password_ciphertext) or None,
-                    use_tls=cfg.smtp_use_tls, timeout=10,
-                )
-                EmailMessage(subject, message, cfg.smtp_sender, [prefs.destination_email], connection=conn).send(fail_silently=False)
-            elif channel == "discord":
-                url = decrypt_secret(cfg.discord_url_ciphertext)
-                if not url.startswith("https://discord.com/api/webhooks/") and not url.startswith("https://discordapp.com/api/webhooks/"):
-                    raise ValueError("Discord webhook has not been configured")
-                payload = json.dumps({"content": (subject + "\n" + message)[:1900]}).encode("utf-8")
-                request = Request(url, data=payload, headers={"Content-Type": "application/json", "User-Agent": "Wealtharr/2"}, method="POST")
-                with urlopen(request, timeout=10) as response:
-                    if response.status not in (200, 204):
-                        raise ValueError("Discord rejected the message")
-            delivery.status = "SENT"
-            outcomes[channel] = "sent"
+                if record.attempts >= 3:
+                    outcomes[channel] = "failed"
+                    continue
+                if record.next_retry_at and record.next_retry_at > now:
+                    outcomes[channel] = "retrying"
+                    continue
+                if (record.status == "SENDING" and record.last_attempt_at and
+                        record.last_attempt_at > now - timedelta(minutes=15)):
+                    outcomes[channel] = "pending"
+                    continue
+                record.subject = subject[:200]
+                record.message = message
+                record.attempts += 1
+                record.last_attempt_at = now
+                record.next_retry_at = None
+                record.error = ""
+                record.status = "SENDING"
+                record.save(update_fields=["subject", "message", "attempts",
+                                           "last_attempt_at", "next_retry_at",
+                                           "status", "error"])
         except Exception:
-            # Hide credentials and remote webhook responses (which may contain secrets).
-            delivery.status = "FAILED"
-            delivery.error = "Delivery failed; verify integration and destination settings"
+            # Database failure must not trigger an untracked, duplicate send.
             outcomes[channel] = "failed"
-        delivery.save(update_fields=["status", "error"])
+            continue
+        try:
+            _send_message(channel, owner, cfg, prefs, subject, message)
+        except Exception:
+            record.status = "FAILED"
+            record.error = "Delivery failed; check integration and destination settings"
+            record.next_retry_at = (
+                timezone.now() + timedelta(minutes=5 * (3 ** (record.attempts - 1)))
+                if record.attempts < 3 else None
+            )
+            outcomes[channel] = "retrying" if record.next_retry_at else "failed"
+        else:
+            record.status = "SENT"
+            record.error = ""
+            record.next_retry_at = None
+            outcomes[channel] = "sent"
+        record.save(update_fields=["status", "error", "next_retry_at"])
     return outcomes
