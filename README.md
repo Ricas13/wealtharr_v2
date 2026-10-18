@@ -8,12 +8,12 @@ Private-first personal investment tracking with a responsive dark interface insp
 - Independent investment accounts (ISA, GIA, SIPP, other) and multiple instances of one strategy in separate tabs.
 - A separate GBP cash and trade ledger for each tab: deposits, withdrawals, buys, sells, dividends and fees.
 - Decimal-based value and invested-capital calculations, validation against unfunded trades and overselling.
-- User-entered GBP price marks for held instruments, and an interactive master chart based on saved actual valuations.
-- SMTP email and Discord notifications. Staff-only settings page with encrypted credentials and test deliveries; planned monthly contribution reminders via a scheduler.
+- Manual GBP price marks and optional automated Yahoo GBP/GBp closing-price marks, plus an interactive chart based on recorded actual valuations.
+- SMTP email and Discord notifications. Staff-only integration settings with encrypted credentials, monthly reminders, and optional hourly 9Sig market checks.
 - Cloudflare Turnstile on production sign-in, secure Django sessions, CSRF protection and zero public registration.
 - PostgreSQL via Docker Compose, test suite, CI and a /health/ endpoint.
 
-**Boundary:** The seeded 9Sig-style strategy is a *tracking template*, not a 9Sig calculation engine. This release does not generate rebalance signals, quarterly targets, TQQQ 30-down alerts or broker orders. It does not download live market prices or convert currencies. Prices are manually entered in GBP. The master chart displays recorded valuations, never backfilled/invented historical performance.
+**Methodology boundary:** Optional market monitoring now generates preliminary, **review-only 9Sig-style** quarterly target and TQQQ 30%-from-peak notices from Yahoo daily closing prices. This is **not** an independently verified replica of the attached workbook: skipped sell signals, eight-quarter streak, 100%-peak resets, cash-shortage handling and other exception branches remain unfinished. Neither trades nor dividends are invented. No broker orders are placed, automatic foreign-exchange conversion is supported, or UK ISA eligibility asserted. The master chart uses recorded actual valuations, never invented backtests. Yahoo's unofficial endpoint can fail or be delayed and is **not suitable for commercial SaaS without appropriate market-data rights**.
 
 ## Run locally
 
@@ -27,7 +27,7 @@ Requires Python 3.12 or newer.
 6. Start: python manage.py runserver
 7. Visit http://127.0.0.1:8000/
 
-Follow the complete personal workflow: sign in → create an ISA or trading account → add a strategy tab → record starting cash and actual buys/sells → mark holding prices in GBP → Overview → Save today's valuation. The same strategy can be tracked independently in two accounts.
+Follow the complete personal workflow: sign in → create an ISA or trading account → add a strategy tab → record starting cash and actual buys/sells → configure optional Yahoo monitoring using your exact GBP equity and safe-asset tickers → Check Yahoo prices → Overview and review pending actions. The same strategy can be tracked independently in two accounts.
 
 For tests, run python manage.py test tracker and python manage.py makemigrations --check --dry-run.
 
@@ -40,15 +40,24 @@ For tests, run python manage.py test tracker and python manage.py makemigrations
 5. Inside Wealtharr, My settings configures notification destinations/preferences. Admin control configures SMTP/Discord webhook; the advanced admin can enable/hide strategy templates.
 6. Validate docker compose exec web python manage.py check --deploy and docker compose exec web python manage.py test tracker.
 
-The reminders container checks missing monthly contribution targets hourly. It does not execute trades. Do not run multiple scheduler replicas. SMTP/Discord credentials are encrypted using a key derived from SECRET_KEY — keep this key on restoration. Make regular PostgreSQL backups using pg_dump and test restoring them; the Compose volume alone is not a backup.
+The reminders container checks missing monthly contribution targets **and configured 9Sig market reviews** hourly. It does not execute trades. Do not run multiple scheduler replicas. SMTP/Discord credentials are encrypted using a key derived from SECRET_KEY — keep this key on restoration. Make regular PostgreSQL backups using pg_dump and test restoring them; the Compose volume alone is not a backup.
 
 ## Accounting and security decisions
 
 - Each strategy instance owns its own cash ledger and transactions, even when two tabs refer to the same account. Record a transfer between tabs as a withdrawal and deposit, never duplicate an external deposit.
-- Position quantity = buys - sells. Current value = cash + all held quantities × latest manual GBP marks. **If any held price is missing, total wealth and gain are hidden** rather than understated.
+- Position quantity = buys - sells. Current value = cash + all held quantities × available GBP marks (manual or Yahoo). **If any held price is missing, total wealth and gain are hidden** rather than understated.
 - Investment result = wealth - (deposits - withdrawals), not a time-weighted return percentage. The wealth chart contains saved value and net contributions as separate series.
 - Entries are append-only through the user interface and must be recorded chronologically. No shorting, debt, negative cash, automatic tax lots, dividend withholding, FX, splits or broker reconciliation in this initial version.
-- A price mark is user-provided, not a verified quote. Update it when needed; stale prices can misstate value.
+- Price marks are labeled by source: manual or Yahoo. Missing quote history, unsupported ticker currencies and stale market data prevent new strategy advisories rather than triggering guessed trades. Old manual marks can still misstate displayed holdings.
 - The owner interface is designed for private use, not public SaaS or regulated investment advice. Trading decisions remain with you.
 
-Next steps after validating the full basic tracking flow: independently tested 9Sig calculation/signal rules, authoritative historical price and FX services, time-weighted return analytics, verified UK instrument eligibility and read-only Trading 212 imports. None is claimed delivered by this initial PR.
+Remaining work before exact strategy reliance or SaaS launch: full independently tested Excel strategy-rule parity, licensed robust price and FX services, time-weighted return analytics, verified UK instrument/Trading 212 ISA eligibility, read-only broker reconciliation, and production operational hardening. Stripe is intentionally not configured.
+
+## Enable 9Sig market monitoring
+
+On the 9Sig strategy tab, expand **Configure Yahoo monitoring**, enter two distinct exact Yahoo GBP tickers (3× Nasdaq equity and the safe-asset line), tick **Enable automatic Yahoo closes and advisory 9Sig reviews**, and save. Use **Check Yahoo prices** to fetch available history and immediately review eligible notices. When configured, the Compose reminders service runs `python manage.py sync_market_and_signals` hourly; it also records an actual GBP valuation snapshot only when every holding across the owner's strategies has a sufficiently recent price mark.
+
+- TQQQ is the **US model reference for drawdowns**. A UK-listed daily-reset leveraged product is not automatically equivalent. Verify the issuer, trading line, instrument currency, leverage/reset mechanism, Trading 212 availability and ISA eligibility yourself.
+- Yahoo `GBp`/GBX quotes are converted from pence to pounds; no USD→GBP conversion takes place. Outdated/mismatched data does not produce a new signal.
+- Instructions are review-only approximations with duplicate suppression and a record of acknowledgement; no trade is booked until **you** enter its actual fill.
+- Other strategy templates remain manual tracking only. Only the Nasdaq 3× strategy has optional signal monitoring. The user-facing admin controls remain separate from Django administration.

@@ -116,7 +116,7 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
     """Pure, deterministic preliminary 9Sig calculations; outputs do not execute trades."""
     if currency != "GBP" or equity_qty <= ZERO or starting_equity_cost <= ZERO:
         return []
-    if equity_price <= ZERO or safe_price <= ZERO or not reference:
+    if equity_price <= ZERO or safe_price <= ZERO:
         return []
     alerts = []
     reference = sorted(
