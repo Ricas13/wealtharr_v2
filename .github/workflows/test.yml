@@ -38,6 +38,9 @@ jobs:
         continue-on-error: true
         run: |
           python - <<'PY'
+          import os, django
+          os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wealtharr.settings")
+          django.setup()
           from datetime import date
           from tracker.market_signals import fetch_chart
           for ticker, expected in [("LQQ3.L", "GBP"), ("ERNS.L", "GBP"), ("TQQQ", "USD"), ("SPY", "USD")]:
