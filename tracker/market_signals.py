@@ -315,7 +315,7 @@ def review_strategy(strategy):
     if not first_buy:
         return {"status": "waiting for equity purchase"}
     quarter_end = quarter_end_before(now)
-    if quarter_number(quarter_end) <= quarter_number(first_buy.occurred_on):
+    if quarter_number(quarter_end) < quarter_number(first_buy.occurred_on):
         return {"status": "waiting for first completed quarter"}
     closing = {symbol: settlement_close(symbol, quarter_end) for symbol in tickers}
     if (any(x is None for x in closing.values()) or
