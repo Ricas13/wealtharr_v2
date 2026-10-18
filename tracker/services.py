@@ -37,10 +37,10 @@ def ledger_summary(strategy):
         elif e.kind == LedgerEntry.FEE:
             cash -= e.amount
         elif e.kind == LedgerEntry.BUY:
-            cash -= e.quantity * e.unit_price + e.fee
+            cash -= money(e.quantity * e.unit_price) + e.fee
             positions[e.symbol] += e.quantity
         elif e.kind == LedgerEntry.SELL:
-            cash += e.quantity * e.unit_price - e.fee
+            cash += money(e.quantity * e.unit_price) - e.fee
             positions[e.symbol] -= e.quantity
     positions = {symbol: qty for symbol, qty in positions.items() if qty != ZERO}
     prices = {p.symbol: p for p in strategy.prices.all()}
@@ -67,11 +67,11 @@ def validate_and_record(strategy, entry):
             raise ValidationError("This withdrawal exceeds available strategy cash.")
         if entry.kind == LedgerEntry.FEE and entry.amount > cash:
             raise ValidationError("This fee exceeds available strategy cash.")
-        if entry.kind == LedgerEntry.BUY and money(entry.quantity * entry.unit_price + entry.fee) > cash:
+        if entry.kind == LedgerEntry.BUY and money(entry.quantity * entry.unit_price) + entry.fee > cash:
             raise ValidationError("Not enough strategy cash. Record a deposit first.")
         if entry.kind == LedgerEntry.SELL and entry.quantity > qty:
             raise ValidationError("Cannot sell more units than this strategy owns.")
-        if entry.kind == LedgerEntry.SELL and entry.quantity * entry.unit_price < entry.fee:
+        if entry.kind == LedgerEntry.SELL and money(entry.quantity * entry.unit_price) < entry.fee:
             raise ValidationError("Selling fees exceed the sale proceeds.")
         entry.strategy = locked
         entry.save()
