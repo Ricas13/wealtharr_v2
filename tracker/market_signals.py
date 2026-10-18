@@ -296,6 +296,9 @@ def review_strategy(strategy):
     report = ledger_summary(strategy)
     if not report["positions"]:
         return {"status": "waiting for first purchase"}
+    if any(symbol not in (strategy.equity_symbol, strategy.safe_symbol)
+           for symbol, qty in report["positions"].items() if qty > ZERO):
+        return {"status": "holdings outside the two configured strategy sleeves"}
     tickers = {strategy.equity_symbol, strategy.safe_symbol, "TQQQ", "SPY"}
     data = {symbol: sync_ticker(symbol) for symbol in tickers}
     now = timezone.localdate()
@@ -372,6 +375,22 @@ def review_strategy(strategy):
         occurred_on__lte=quarter_end).order_by("-occurred_on").first()
     no_sell = (quarter_number(quarter_end) - quarter_number(last_sell.occurred_on)
                if last_sell else quarter_number(quarter_end) - quarter_number(first_buy.occurred_on))
+    if len(_quarterly_closes(ref_spy, quarter_end)) < 2:
+        return {"status": "insufficient SPY quarter-end reference history"}
+    if len(_quarterly_closes(ref_tqqq, quarter_end)) < 2:
+        return {"status": "insufficient TQQQ quarter-end reference history"}
+    # Initial holdings may be split into several orders in the first quarter.
+    from calendar import monthrange
+    first_quarter_last_month = ((first_buy.occurred_on.month - 1) // 3 + 1) * 3
+    initial_end = date(first_buy.occurred_on.year, first_quarter_last_month,
+                       monthrange(first_buy.occurred_on.year, first_quarter_last_month)[1])
+    initial_equity_cost = sum(
+        (t.quantity * t.unit_price for t in strategy.ledger.filter(
+            symbol=strategy.equity_symbol, kind=LedgerEntry.BUY,
+            occurred_on__gte=first_buy.occurred_on, occurred_on__lte=initial_end)),
+        ZERO)
+    if initial_equity_cost <= ZERO:
+        return {"status": "missing initial equity investment"}
     alerts = advice_for_holdings(
         start_date=first_buy.occurred_on, as_of=quarter_end,
         currency=strategy.account.currency,
@@ -379,7 +398,7 @@ def review_strategy(strategy):
         safe_symbol=strategy.safe_symbol,
         equity_qty=stock_qty, equity_price=closing[strategy.equity_symbol].price,
         safe_qty=safe_qty, safe_price=closing[strategy.safe_symbol].price,
-        cash=cash, starting_equity_cost=first_buy.quantity * first_buy.unit_price,
+        cash=cash, starting_equity_cost=initial_equity_cost,
         contributions=injected, reference=ref_tqqq, spy_reference=ref_spy,
         prior_skipped_sells=skipped, prior_drawdown=prior_down,
         no_sell_quarters=no_sell,
