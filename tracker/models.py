@@ -82,7 +82,7 @@ class LedgerEntry(models.Model):
 
     class Meta:
         ordering = ["occurred_on", "pk"]
-        indexes = [models.Index(fields=["strategy", "occurred_on"])]
+        indexes = [models.Index(fields=["strategy", "occurred_on"], name="tracker_led_strategy_2026_idx")]
 
 class PriceMark(models.Model):
     strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE, related_name="prices")
