@@ -48,7 +48,13 @@
     <div class="tile-foot"><span>Cash: £{{ item.cash|floatformat:2 }}</span><span>View details →</span></div>
   </a>
   {% empty %}
-  <div class="panel empty-strategies"><div class="empty-symbol">＋</div><h3>Your first strategy starts here</h3><p>Create an account and a strategy tab. Add your actual starting cash and trades — no subscription or plan required.</p><a class="btn btn-primary" href="{% url 'new_strategy' %}">Create first strategy →</a></div>
+  <div class="panel empty-strategies"><div class="empty-symbol">＋</div>
+  {% if paper_trial %}<h3>Paper trial active — real accounts separate</h3>
+  <p>Your virtual 9Sig strategy appears above. Add a real ISA/GIA only when you choose; paper balances are not real wealth.</p>
+  {% else %}<h3>Your first strategy starts here</h3>
+  <p>Create an account and a strategy tab, or try the paper-only option above. No brokerage connection required.</p>{% endif %}
+  <a class="btn btn-primary" href="{% url 'new_strategy' %}">Create a strategy →</a>
+</div>
   {% endfor %}
   {% if items %}<a class="panel add-tile" href="{% url 'new_strategy' %}"><span>＋</span><b>New strategy tab</b><small>Same model, different account? No problem.</small></a>{% endif %}
 </div>
