@@ -85,3 +85,17 @@ class InstrumentMappingWorkflowTests(TestCase):
         self.account.broker = "UNKNOWN"
         self.account.save(update_fields=["broker"])
         self.assertIsNone(for_strategy(self.strategy))
+
+    def test_legacy_nonmapped_strategy_is_not_reinterpreted(self):
+        self.strategy.equity_symbol = "3QQQ.DE"
+        self.strategy.save(update_fields=["equity_symbol"])
+        self.assertIsNone(for_strategy(self.strategy))
+
+    def test_gia_owner_uses_same_verified_gbp_line_without_entering_tickers(self):
+        from tracker.instrument_mapping import resolve_instruments
+        gia = resolve_instruments(
+            "nasdaq-quarterly-target", "GB", "GIA", "TRADING212")
+        self.assertEqual(gia.equity.broker_ticker, "LQQ3")
+        self.assertEqual(gia.safe.broker_ticker, "ERNS")
+        self.assertEqual(gia.equity.currency, "GBP")
+        self.assertEqual(gia.safe.currency, "GBP")
