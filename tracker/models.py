@@ -5,7 +5,7 @@ from django.db import models
 
 ACCOUNT_TYPES = [
     ("ISA", "Stocks & Shares ISA"), ("GIA", "General investment account"),
-    ("SIPP", "SIPP / pension"), ("OTHER", "Other account"),
+    ("SIPP", "SIPP / pension"), ("PAPER", "Paper tracking (virtual only)"), ("OTHER", "Other account"),
 ]
 RISK_TYPES = [("LOW", "Low"), ("MEDIUM", "Medium"), ("HIGH", "High")]
 
