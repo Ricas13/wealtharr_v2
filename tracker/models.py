@@ -14,6 +14,8 @@ class Account(models.Model):
     name = models.CharField(max_length=90)
     kind = models.CharField(max_length=12, choices=ACCOUNT_TYPES, default="ISA")
     currency = models.CharField(max_length=3, default="GBP", editable=False)
+    country = models.CharField(max_length=2, default="GB")
+    broker = models.CharField(max_length=32, default="UNKNOWN")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
