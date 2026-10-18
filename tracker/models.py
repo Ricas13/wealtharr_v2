@@ -140,6 +140,11 @@ class NotificationDelivery(models.Model):
     status = models.CharField(max_length=12, default="PENDING")
     created_at = models.DateTimeField(auto_now_add=True)
     error = models.CharField(max_length=200, blank=True)
+    subject = models.CharField(max_length=200, blank=True)
+    message = models.TextField(blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    next_retry_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["owner", "channel", "event_key"], name="unique_notification_event")]
@@ -173,3 +178,26 @@ class StrategySignal(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "signal_key"], name="unique_strategy_signal")]
         ordering = ["-created_at"]
+
+
+class StrategyBaseline(models.Model):
+    """Immutable, owner-confirmed re-anchor after an actual 9Sig reset fill.
+
+    A reset suggestion is not a trade. The next cycle must be based on actual
+    confirmed holdings, not a fictitious 60/40 rebalance.
+    """
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE,
+                                 related_name="baselines")
+    reset_signal = models.ForeignKey(StrategySignal, on_delete=models.PROTECT)
+    as_of = models.DateField()
+    equity_value = models.DecimalField(max_digits=22, decimal_places=2)
+    equity_quantity = models.DecimalField(max_digits=22, decimal_places=8)
+    safe_value = models.DecimalField(max_digits=22, decimal_places=2)
+    cash_value = models.DecimalField(max_digits=22, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["as_of", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["strategy", "as_of"], name="unique_strategy_baseline")
+        ]

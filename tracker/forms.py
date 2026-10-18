@@ -32,6 +32,8 @@ class StrategyForm(forms.ModelForm):
         self.fields["account"].queryset = Account.objects.filter(owner=owner)
         self.fields["preset"].queryset = StrategyPreset.objects.filter(active=True)
         self.fields["monthly_target"].min_value = ZERO
+        if not self.is_bound:
+            self.fields["monthly_target"].initial = Decimal("500")
         style(self.fields)
     def clean(self):
         data = super().clean()

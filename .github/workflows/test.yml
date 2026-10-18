@@ -29,3 +29,23 @@ jobs:
         run: python manage.py test tracker --verbosity 2
       - name: Compile assets
         run: python manage.py collectstatic --noinput
+      - name: Validate Compose and restore helper
+        run: |
+          bash -n scripts/restore_backup.sh
+          cp .env.example .env.production
+          POSTGRES_PASSWORD=github-ci-placeholder docker compose config --quiet
+      - name: Public Yahoo chart endpoint smoke (non-gating)
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import os, django
+          os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wealtharr.settings")
+          django.setup()
+          from datetime import date
+          from tracker.market_signals import fetch_chart
+          for ticker, expected in [("LQQ3.L", "GBP"), ("ERNS.L", "GBP"), ("TQQQ", "USD"), ("SPY", "USD")]:
+              currency, rows = fetch_chart(ticker, date(2026, 10, 1))
+              if currency != expected:
+                  raise RuntimeError(f"{ticker}: expected {expected}, got {currency}")
+              print(f"Yahoo {ticker}: {currency} as of {rows[-1][0]}, {len(rows)} closes")
+          PY

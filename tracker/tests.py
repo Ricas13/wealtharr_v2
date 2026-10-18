@@ -119,6 +119,32 @@ class NotificationTests(TestCase):
             self.assertEqual(dispatch(self.owner,"event-1","Test","Hello",channels=("email",))["email"],"sent")
             self.assertEqual(dispatch(self.owner,"event-1","Test","Hello",channels=("email",))["email"],"sent")
             self.assertEqual(sender.call_count,1)
+    def test_failed_delivery_retries_after_backoff_without_duplicate_send(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from tracker.models import NotificationDelivery
+        with patch("tracker.services.EmailMessage.send", side_effect=OSError("transport down")) as failed:
+            self.assertEqual(dispatch(self.owner, "retry-1", "Test", "Hello",
+                                      channels=("email",))["email"], "retrying")
+            self.assertEqual(dispatch(self.owner, "retry-1", "Test", "Hello",
+                                      channels=("email",))["email"], "retrying")
+            self.assertEqual(failed.call_count, 1)
+        delivery = NotificationDelivery.objects.get(owner=self.owner, channel="email",
+                                                     event_key="retry-1")
+        self.assertEqual(delivery.attempts, 1)
+        delivery.next_retry_at = timezone.now() - timedelta(minutes=1)
+        delivery.save(update_fields=["next_retry_at"])
+        with patch("tracker.services.EmailMessage.send", return_value=1) as sender:
+            from django.core.management import call_command
+            call_command("retry_notifications", verbosity=0)
+            self.assertEqual(sender.call_count, 1)
+            self.assertEqual(dispatch(self.owner, "retry-1", "Test", "Hello",
+                                      channels=("email",))["email"], "sent")
+            self.assertEqual(sender.call_count, 1)
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.attempts, 2)
+        self.assertEqual(delivery.status, "SENT")
+
     def test_discord_delivery_payload_does_not_leak_webhook(self):
         class Response:
             status=204

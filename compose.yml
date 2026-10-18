@@ -34,5 +34,36 @@ services:
     depends_on:
       db:
         condition: service_healthy
+  backups:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
+    volumes:
+      - ./backups:/backups
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        mkdir -p /backups
+        chmod 700 /backups
+        while true; do
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          pending="/backups/wealtharr-$stamp.dump.tmp"
+          completed="/backups/wealtharr-$stamp.dump"
+          if pg_dump -h db -U wealtharr -d wealtharr -Fc -f "$pending"; then
+            mv "$pending" "$completed"
+            find /backups -type f -name 'wealtharr-*.dump' -mtime +30 -delete
+            echo "Wealtharr PostgreSQL backup created: $stamp"
+          else
+            rm -f "$pending"
+            echo "Wealtharr PostgreSQL backup failed" >&2
+          fi
+          sleep 86400
+        done
+    depends_on:
+      db:
+        condition: service_healthy
 volumes:
   wealtharr_db:
