@@ -7,14 +7,14 @@ from django.test import SimpleTestCase
 
 from tracker.market_signals import advice_for_holdings, fetch_chart, quarter_number, prior_quarter_name
 
-def evaluate(*, as_of=date(2026, 4, 2), reference=(), cash=D("100"), safe=D("5"),
+def evaluate(*, as_of=date(2026, 4, 2), reference=(), spy_reference=(), cash=D("100"), safe=D("5"),
              equity_price=D("40"), equity_qty=D("10"), starting=D("500")):
     return advice_for_holdings(
         start_date=date(2026, 1, 12), as_of=as_of, currency="GBP",
         equity_symbol="LQQ3.L", safe_symbol="AGBP.L",
         equity_qty=equity_qty, equity_price=equity_price,
         safe_qty=safe, safe_price=D("100"), cash=cash,
-        starting_equity_cost=starting, reference=list(reference),
+        starting_equity_cost=starting, reference=list(reference), spy_reference=list(spy_reference),
     )
 
 class NineSigCalculations(SimpleTestCase):
@@ -31,17 +31,50 @@ class NineSigCalculations(SimpleTestCase):
         self.assertEqual(quarterly["key"], "quarter:2026-Q1")
         self.assertTrue(any(a["side"] == "BUY" for a in quarterly["actions"]))
 
-    def test_30_down_sells_half_once_per_observed_peak(self):
-        history = [(date(2026, 1, 13), D("100")), (date(2026, 3, 4), D("69"))]
-        signals = evaluate(as_of=date(2026, 3, 4), reference=history)
+    def test_30_down_warns_without_instructing_a_half_sale(self):
+        spy = [(date(2025, 12, 31), D("100")), (date(2026, 3, 31), D("65"))]
+        signals = evaluate(as_of=date(2026, 3, 31), spy_reference=spy,
+                           equity_price=D("70"))
         warning = next(s for s in signals if s["kind"] == "THIRTY_DOWN")
-        self.assertEqual(warning["key"], "30down:2026-01-13")
-        self.assertEqual(warning["actions"][0]["quantity"], "5.0000")
+        self.assertEqual(warning["actions"], [])
+        quarterly = next(s for s in signals if s["kind"] == "QUARTERLY")
+        self.assertEqual(quarterly["actions"][0]["side"], "HOLD")
 
-    def test_drop_of_just_under_30_percent_does_not_warn(self):
-        history = [(date(2026, 1, 13), D("100")), (date(2026, 3, 4), D("70.01"))]
-        self.assertFalse(any(x["kind"] == "THIRTY_DOWN"
-                             for x in evaluate(as_of=date(2026, 3, 4), reference=history)))
+    def test_drop_just_under_threshold_does_not_warn(self):
+        spy = [(date(2025, 12, 31), D("100")), (date(2026, 3, 31), D("70.01"))]
+        self.assertFalse(any(x["kind"] == "THIRTY_DOWN" for x in evaluate(
+            as_of=date(2026, 3, 31), spy_reference=spy)))
+
+    def test_workbook_first_quarter_target_is_nine_percent_not_annual(self):
+        # DEMO 2010++: AV3 60000; AV4 65400 = 60000 * 1.09.
+        signals = advice_for_holdings(
+            start_date=date(2026, 1, 1), as_of=date(2026, 3, 31),
+            currency="GBP", equity_symbol="LQQ3.L", safe_symbol="AGBP.L",
+            equity_qty=D("150000"), equity_price=D("0.29"),
+            safe_qty=D("382"), safe_price=D("104.2"), cash=D("69.54"),
+            starting_equity_cost=D("60000"), reference=[])
+        quarter = next(x for x in signals if x["kind"] == "QUARTERLY")
+        self.assertIn("£65400.00", quarter["message"])
+        self.assertTrue(any(x["side"] == "BUY" and x["symbol"] == "LQQ3.L"
+                            for x in quarter["actions"]))
+
+    def test_spike_reset_requires_two_verified_quarter_closes(self):
+        refs = [(date(2025, 12, 31), D("50")), (date(2026, 3, 31), D("100"))]
+        out = evaluate(as_of=date(2026, 3, 31), reference=refs)
+        self.assertIn("doubled", next(x["message"] for x in out if x["kind"] == "QUARTERLY"))
+
+    def test_30_down_two_skipped_sells_requires_reset_review(self):
+        spy = [(date(2025, 12, 31), D("100")), (date(2026, 3, 31), D("60"))]
+        out = advice_for_holdings(start_date=date(2026, 1, 12),
+            as_of=date(2026, 3, 31), currency="GBP",
+            equity_symbol="LQQ3.L", safe_symbol="AGBP.L",
+            equity_qty=D("10"), equity_price=D("100"), safe_qty=D("5"),
+            safe_price=D("100"), cash=D("100"),
+            starting_equity_cost=D("500"), spy_reference=spy,
+            reference=[], prior_skipped_sells=2, prior_drawdown=True)
+        q = next(x for x in out if x["kind"] == "QUARTERLY")
+        self.assertIn("Two sell signals", q["message"])
+        self.assertFalse(any(x["side"] == "HOLD" for x in q["actions"]))
 
     def test_safe_asset_cash_reserve_limits_proposed_buy(self):
         signals = evaluate(cash=D("0"), safe=D("2"), equity_price=D("30"), starting=D("1000"))
