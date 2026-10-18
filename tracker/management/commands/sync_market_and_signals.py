@@ -2,9 +2,39 @@
 from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from tracker.models import PriceMark, StrategyInstance, WealthSnapshot
+from tracker.models import StrategyInstance, StrategyValueSnapshot, WealthSnapshot
 from tracker.market_signals import review_strategy
-from tracker.services import consolidated
+from tracker.services import consolidated, ledger_summary
+
+
+def save_verified_strategy_snapshot(strategy):
+    """Capture source-verified quote-day growth without inventing a historical fill."""
+    summary = ledger_summary(strategy)
+    if summary["value"] is None or not summary["positions"]:
+        return None
+    dates = []
+    for symbol, qty in summary["positions"].items():
+        if qty <= 0:
+            continue
+        mark = summary["marks"].get(symbol)
+        if (mark is None or mark.source != "yahoo" or
+                mark.as_of < timezone.localdate() - timedelta(days=8)):
+            return None
+        dates.append(mark.as_of)
+    if not dates:
+        return None
+    date_to_record = min(dates)
+    if (max(dates) - date_to_record).days > 1:
+        return None
+    if strategy.ledger.filter(occurred_on__gt=date_to_record).exists():
+        return None
+    StrategyValueSnapshot.objects.update_or_create(
+        strategy=strategy, as_of=date_to_record,
+        defaults={"total_value": summary["value"],
+                  "net_contributed": summary["net_contributed"]},
+    )
+    return date_to_record
+
 
 class Command(BaseCommand):
     help = "Synchronise GBP Yahoo quotes, capture verified daily valuations and issue advisory notices"
@@ -18,6 +48,7 @@ class Command(BaseCommand):
             owners.add(strategy.owner)
             try:
                 result = review_strategy(strategy)
+                save_verified_strategy_snapshot(strategy)
                 if result["status"] == "ok":
                     ok += 1
                 else:
