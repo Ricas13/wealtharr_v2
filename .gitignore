@@ -10,3 +10,6 @@ staticfiles/
 .coverage
 .idea/
 .DS_Store
+
+# Never commit personal portfolio database archives
+/backups/
