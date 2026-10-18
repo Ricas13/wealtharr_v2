@@ -211,7 +211,7 @@ def confirm_strategy_reset(request, pk):
         messages.error(request, "Refresh both GBP Yahoo price marks before confirming the reset.")
         return redirect("strategy_detail", pk=pk)
     as_of = min(mark.as_of for mark in marks)
-    if (max(mark.as_of for mark in marks) - as_of).days > 1 or
+    if ((max(mark.as_of for mark in marks) - as_of).days > 1 or
             latest_fill.occurred_on > as_of or
             as_of <= reset_notice.as_of):
         messages.error(request, "The confirmed fills require a later, matching settlement quote.")
