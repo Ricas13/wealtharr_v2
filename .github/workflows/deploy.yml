@@ -76,7 +76,7 @@ jobs:
             exit 7
           fi
           git fetch --quiet origin main
-          git checkout --quiet -f main
+          git checkout --quiet -B main FETCH_HEAD
           git reset --hard "$sha" >/dev/null
           docker compose config --quiet
           docker compose up -d --build
