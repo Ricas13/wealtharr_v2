@@ -71,19 +71,30 @@ def start_real_9sig(request):
         data = form.cleaned_data
         try:
             with transaction.atomic():
+                # The recommended securities are resolved on the server,
+                # not accepted from user-submitted ticker fields.
+                profile = form.instrument_profile
                 account, _ = Account.objects.select_for_update().get_or_create(
                     owner=request.user, name=data["account_name"],
-                    defaults={"kind": data["account_kind"]},
+                    defaults={"kind": data["account_kind"],
+                              "country": data["country"],
+                              "broker": data["broker"]},
                 )
-                if account.kind != data["account_kind"] or account.kind == "PAPER":
-                    raise ValidationError("Select a real account type.")
+                if (account.kind != data["account_kind"] or
+                        account.kind == "PAPER" or
+                        account.country != data["country"] or
+                        account.broker not in ("UNKNOWN", data["broker"])):
+                    raise ValidationError("Select a matching real account.")
+                if account.broker == "UNKNOWN":
+                    account.broker = data["broker"]
+                    account.save(update_fields=["broker"])
                 preset = StrategyPreset.objects.get(
-                    slug="nasdaq-quarterly-target", active=True)
+                    slug=data["strategy_slug"], active=True)
                 strategy = StrategyInstance(
                     owner=request.user, account=account, preset=preset,
                     name=data["strategy_name"],
-                    equity_symbol=data["equity_symbol"],
-                    safe_symbol=data["safe_symbol"],
+                    equity_symbol=profile.equity.yahoo_ticker,
+                    safe_symbol=profile.safe.yahoo_ticker,
                     market_data_enabled=True,
                     contribution_alerts=True,
                     monthly_target=data["monthly_target"],
@@ -98,7 +109,8 @@ def start_real_9sig(request):
                 ))
             messages.success(
                 request,
-                "Real 9Sig tracker created with your recorded GBP cash. "
+                "Your 9Sig instrument mapping is set: LQQ3 (60% target) and "
+                "ERNS (40% target), with their Yahoo price symbols configured. "
                 "Now add the BUY fills actually executed at Trading 212, "
                 "including their dates, quantities, prices and fees. "
                 "No virtual positions or broker orders were created.",
@@ -106,7 +118,17 @@ def start_real_9sig(request):
             return redirect("strategy_detail", pk=strategy.pk)
         except (ValidationError, StrategyPreset.DoesNotExist) as exc:
             form.add_error(None, exc)
-    return render(request, "start_real_9sig.html", {"form": form})
+    from .instrument_mapping import resolve_instruments
+    # Show the recommendation immediately, before the owner enters tickers.
+    selected_kind = (request.POST.get("account_kind") if request.method == "POST"
+                     else request.GET.get("account_kind", "ISA"))
+    if selected_kind not in ("ISA", "GIA"):
+        selected_kind = "ISA"
+    recommendation = resolve_instruments(
+        "nasdaq-quarterly-target", "GB", selected_kind, "TRADING212")
+    return render(request, "start_real_9sig.html", {
+        "form": form, "recommendation": recommendation,
+    })
 
 
 @login_required
