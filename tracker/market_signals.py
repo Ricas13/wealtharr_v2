@@ -351,6 +351,61 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
     return alerts
 
 
+def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest):
+    """Possible mid-quarter 100%-up rule, using verified daily US closes.
+
+    Exact Kelly spike reference is last executed quarterly rebalance price,
+    not necessarily the calendar-quarter closing price. Until that is known,
+    this is a warning only, never a made-up automatic GBP trading order.
+    """
+    if (tqqq_latest is None or tqqq_latest.currency != "USD" or
+            quarter_number(tqqq_latest.as_of) != quarter_number(now) or
+            tqqq_latest.as_of > now):
+        return
+    last_quarter = quarter_end_before(now)
+    origin = settlement_close("TQQQ", last_quarter)
+    if not origin or origin.currency != "USD" or origin.price <= ZERO:
+        return
+    crossed = MarketObservation.objects.filter(
+        symbol="TQQQ", currency="USD", as_of__gt=last_quarter,
+        as_of__lte=tqqq_latest.as_of, price__gte=origin.price * 2,
+    ).order_by("as_of").first()
+    if not crossed or first_buy.occurred_on > crossed.as_of:
+        return
+    if baseline is not None and baseline.as_of >= crossed.as_of:
+        return
+    start_date = baseline.as_of if baseline else first_buy.occurred_on
+    down_notice = strategy.signals.filter(
+        kind="THIRTY_DOWN",
+        as_of__gte=max(start_date, last_quarter - timedelta(days=750)),
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of").first()
+    if down_notice and quarter_number(now) - quarter_number(down_notice.as_of) < 8:
+        return
+    if strategy.ledger.filter(occurred_on__gt=crossed.as_of).exists():
+        return
+    q = quarter_number(now)
+    key = "spike:%04d-Q%d" % (q // 4, q % 4 + 1)
+    message = (
+        "TQQQ USD daily close %s on %s reached at least twice the "
+        "preceding calendar-quarter closing reference %s. "
+        "Possible 100%%-up event: review a reset to 60%% equity / 40%% "
+        "safe assets. Jason Kelly's reference may be the actual prior "
+        "quarterly rebalance execution price, which can differ from "
+        "the calendar quarter close. Check that reference, your prior "
+        "allocation and 30 Down status before trading. No GBP orders "
+        "or quantities have been invented."
+    ) % (crossed.price, crossed.as_of, origin.price)
+    signal, created = StrategySignal.objects.get_or_create(
+        strategy=strategy, signal_key=key,
+        defaults={"kind": "SPIKE_WATCH",
+                  "title": "9Sig 100%-up spike: manual reset review",
+                  "message": message, "as_of": crossed.as_of, "actions": []})
+    if created:
+        dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, key),
+                 "Wealtharr — " + signal.title,
+                 strategy.name + "\n" + message + "\nNo orders placed.")
+
+
 def review_strategy(strategy):
     """Use actual *completed-quarter* prices and ledger holdings, not today's value."""
     if not strategy.market_data_enabled or not strategy.preset.active:
@@ -394,11 +449,14 @@ def review_strategy(strategy):
     # A 60/40 reset is a suggestion, never proof that the owner traded.
     # Future cycles are paused until their actual positions are re-anchored.
     pending_reset = strategy.signals.filter(
-        kind="QUARTERLY", as_of__lt=quarter_end,
+        kind__in=("QUARTERLY", "SPIKE_WATCH"), as_of__lt=quarter_end,
         message__icontains="review a reset to 60%"
-    ).order_by("-as_of").first()
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of").first()
     if pending_reset and (baseline is None or baseline.as_of <= pending_reset.as_of):
         return {"status": "manual reset must be confirmed as a new strategy baseline"}
+    _alert_intraperiod_spike(
+        strategy, now=now, first_buy=first_buy, baseline=baseline,
+        tqqq_latest=data.get("TQQQ"))
     closing = {symbol: settlement_close(symbol, quarter_end) for symbol in tickers}
     if (any(x is None for x in closing.values()) or
             closing[strategy.equity_symbol].currency != "GBP" or
@@ -446,7 +504,7 @@ def review_strategy(strategy):
     active_down_signal = strategy.signals.filter(
         kind="THIRTY_DOWN", as_of__lt=quarter_end,
         as_of__gte=start_date,
-    ).order_by("-as_of", "-pk").first()
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of", "-pk").first()
     down_age = (quarter_number(quarter_end) - quarter_number(active_down_signal.as_of)
                 if active_down_signal else 0)
     skipped = 0
@@ -454,7 +512,7 @@ def review_strategy(strategy):
         earlier = strategy.signals.filter(
             kind="QUARTERLY", as_of__lt=quarter_end,
             as_of__gte=active_down_signal.as_of,
-        ).order_by("as_of")
+        ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("as_of")
         skipped = sum(
             any(action.get("side") == "HOLD" for action in row.actions)
             for row in earlier
