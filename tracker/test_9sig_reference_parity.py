@@ -111,3 +111,25 @@ class WorkbookAndKellyParity(SimpleTestCase):
         signals = quarterly(equity_price=D("10"), safe_qty=D("0.1"))
         q = next(s for s in signals if s["kind"] == "QUARTERLY")
         self.assertIn("reset to 60%", q["message"])
+
+
+from types import SimpleNamespace
+from tracker.market_signals import count_skipped_equity_sells
+
+
+class ThirtyDownStateAccounting(SimpleTestCase):
+    def test_only_equity_sell_defer_consumes_one_of_two_skips(self):
+        hold = [{"side": "HOLD", "symbol": "LQQ3.L",
+                 "quantity": "0", "estimated_gbp": "0.00"}]
+        history = [
+            SimpleNamespace(actions=hold,
+                message="30 Down active: safe-asset shortage. Review before committing money."),
+            SimpleNamespace(actions=hold,
+                message="30 Down active: defer this equity sell signal; do not rebalance."),
+            SimpleNamespace(actions=[],
+                message="Equity close to target; no change"),
+            SimpleNamespace(actions=hold,
+                message="30 Down active: skip this sell signal. No shares should be sold."),
+        ]
+        self.assertEqual(count_skipped_equity_sells(history), 2)
+        self.assertEqual(count_skipped_equity_sells(history[:1]), 0)
