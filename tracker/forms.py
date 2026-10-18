@@ -57,12 +57,23 @@ class AutomationForm(forms.ModelForm):
                   "market_data_enabled": "Enable automatic Yahoo closes and advisory 9Sig reviews"}
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from .instrument_mapping import for_strategy
+        self.instrument_profile = for_strategy(self.instance)
+        if self.instrument_profile:
+            # Instrument selection is owned by the account mapping, not by
+            # a free-text field or an altered POST payload.
+            del self.fields["equity_symbol"]
+            del self.fields["safe_symbol"]
         style(self.fields)
     def clean(self):
         data = super().clean()
-        eq = (data.get("equity_symbol") or "").strip().upper()
-        safe = (data.get("safe_symbol") or "").strip().upper()
-        data.update(equity_symbol=eq, safe_symbol=safe)
+        if self.instrument_profile:
+            eq = self.instrument_profile.equity.yahoo_ticker
+            safe = self.instrument_profile.safe.yahoo_ticker
+        else:
+            eq = (data.get("equity_symbol") or "").strip().upper()
+            safe = (data.get("safe_symbol") or "").strip().upper()
+            data.update(equity_symbol=eq, safe_symbol=safe)
         if data.get("market_data_enabled") and (
             self.instance.preset.slug != "nasdaq-quarterly-target" or
             not re.fullmatch(r"[A-Z0-9][A-Z0-9.^=_-]{0,23}", eq) or
@@ -83,11 +94,23 @@ class LedgerForm(forms.ModelForm):
             "fee": "Trade fee (£)",
             "symbol": "Ticker / instrument",
         }
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, strategy=None, **kwargs):
         super().__init__(*args, **kwargs)
+        from .instrument_mapping import for_strategy
+        self.instrument_profile = for_strategy(strategy) if strategy else None
         self.fields["occurred_on"].initial = timezone.localdate()
         for name in ("amount", "quantity", "unit_price", "fee", "symbol"):
             self.fields[name].required = False
+        if self.instrument_profile:
+            self.fields["symbol"].widget = forms.Select(choices=[
+                ("", "Select the instrument for a buy/sell"),
+                (self.instrument_profile.equity.yahoo_ticker,
+                 "LQQ3 — 3x Nasdaq-100 equity"),
+                (self.instrument_profile.safe.yahoo_ticker,
+                 "ERNS — defensive bond sleeve"),
+            ])
+            self.fields["symbol"].help_text = (
+                "Wealtharr records the correct Yahoo trading-line symbol for you.")
         style(self.fields)
     def clean(self):
         data = super().clean()
@@ -107,6 +130,12 @@ class LedgerForm(forms.ModelForm):
         if kind in (LedgerEntry.BUY, LedgerEntry.SELL):
             if not re.fullmatch(r"[A-Z0-9][A-Z0-9._-]{0,23}", symbol):
                 raise forms.ValidationError("Enter a valid ticker (for example LQQ3 or VWRP.L).")
+            if self.instrument_profile and symbol not in (
+                self.instrument_profile.equity.yahoo_ticker,
+                self.instrument_profile.safe.yahoo_ticker,
+            ):
+                raise forms.ValidationError(
+                    "Select one of the two 9Sig instruments Wealtharr mapped to your account.")
             if qty <= ZERO or price <= ZERO:
                 raise forms.ValidationError("Buys and sells need positive units and a positive execution price.")
             if amount != ZERO:
