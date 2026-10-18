@@ -1,6 +1,7 @@
 """Run hourly or daily from a single scheduler instance. Only sends reminders, never trades."""
 from decimal import Decimal
 from django.core.management.base import BaseCommand
+from django.core.management import call_command
 from django.utils import timezone
 from tracker.models import LedgerEntry, NotificationPreference, StrategyInstance
 from tracker.services import dispatch
@@ -30,3 +31,4 @@ class Command(BaseCommand):
             result = dispatch(strategy.owner, key, subject, content)
             count += sum(1 for status in result.values() if status == "sent")
         self.stdout.write("Notifications sent: %d" % count)
+        call_command("retry_notifications")
