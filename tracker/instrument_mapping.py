@@ -105,8 +105,14 @@ def resolve_instruments(strategy_slug, country, account_type, broker):
 def for_strategy(strategy):
     """No guesswork for older accounts without recorded broker metadata."""
     try:
-        return resolve_instruments(
+        profile = resolve_instruments(
             strategy.preset.slug, strategy.account.country,
             strategy.account.kind, strategy.account.broker)
     except InstrumentMappingUnavailable:
         return None
+    # Do not reinterpret previously recorded, unmapped user holdings merely
+    # because a shared legacy account later received a broker profile.
+    if (strategy.equity_symbol != profile.equity.yahoo_ticker or
+            strategy.safe_symbol != profile.safe.yahoo_ticker):
+        return None
+    return profile
