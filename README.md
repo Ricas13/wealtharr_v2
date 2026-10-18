@@ -57,7 +57,22 @@ Remaining work before exact strategy reliance or SaaS launch: full independently
 
 On the 9Sig strategy tab, expand **Configure Yahoo monitoring**, enter two distinct exact Yahoo GBP tickers (3× Nasdaq equity and the safe-asset line), tick **Enable automatic Yahoo closes and advisory 9Sig reviews**, and save. Use **Check Yahoo prices** to fetch available history and immediately review eligible notices. When configured, the Compose reminders service runs `python manage.py sync_market_and_signals` hourly; it also records an actual GBP valuation snapshot only when every holding across the owner's strategies has a sufficiently recent price mark.
 
-- TQQQ is the **US model reference for drawdowns**. A UK-listed daily-reset leveraged product is not automatically equivalent. Verify the issuer, trading line, instrument currency, leverage/reset mechanism, Trading 212 availability and ISA eligibility yourself.
+- The workbook grows the stock-fund signal line **9% every quarter**, not 9% annually. The 30-Down trigger uses **SPY** (a rolling eight-quarter high); **TQQQ** provides the 100%-up reference. A 30-Down event **skips sell signals**, rather than ordering an immediate half-position sale. The app uses verified quarter-end closing observations, not an arbitrary mid-quarter quote.
+- TQQQ is the **US model reference for the spike rule**. A UK-listed daily-reset leveraged product is not automatically equivalent. Verify the issuer, trading line, instrument currency, leverage/reset mechanism, Trading 212 availability and ISA eligibility yourself.
 - Yahoo `GBp`/GBX quotes are converted from pence to pounds; no USD→GBP conversion takes place. Outdated/mismatched data does not produce a new signal.
 - Instructions are review-only approximations with duplicate suppression and a record of acknowledgement; no trade is booked until **you** enter its actual fill.
 - Other strategy templates remain manual tracking only. Only the Nasdaq 3× strategy has optional signal monitoring. The user-facing admin controls remain separate from Django administration.
+
+
+### Evidence for UK instruments (not a broker-equivalence promise)
+
+- **LQQ3.L**, LSE GBp line of WisdomTree Nasdaq 100 3x Daily Leveraged, ISIN **IE00BLRPRL42**. Issuer: [WisdomTree product and trading-line list](https://www.wisdomtree.com/gb/products/equities/wisdomtree-nasdaq-100-3x-daily-leveraged). WisdomTree lists the ETP as **ISA eligible** and labels it daily-reset, fully-collateralised swap exposure. It is **not** mechanically identical to US TQQQ through quarterly periods; compare fees, currency, counterparty exposure and reset mechanisms.
+- **ERNS.L**, LSE GBP line of iShares GBP Ultrashort Bond UCITS ETF, ISIN **IE00BCRY6441**. Issuer: [iShares ERNS product/listing](https://www.ishares.com/uk/individual/en/products/258120/ishares-ultrashort-bond-ucits-etf). iShares lists ISA eligibility. It is a GBP corporate/quasi-government ultrashort bond fund, **not** the same exposures as AGG.
+- Neither issuer page confirms availability in **your particular Trading 212 ISA or GIA account**. Confirm in the broker's instrument screen before entering ticker quantities or acting on a proposed change.
+- Ticketers above are optional research candidates, **not hardcoded purchases**. User chooses their actual held instrument and Yahoo mapping. Dividends/distributions, spreads, trade fees and FX cash flows must be entered as actual ledger events; no equivalent US return is invented.
+
+### Automation guardrails
+
+- Every review uses the last *completed* quarter's closing date and actual recorded ledger positions no later than that date. It refuses incomplete currency or SPY/TQQQ history, unrelated holdings, negative cash and unknown purchases rather than fabricating an answer.
+- Daily price marks and historical settlement marks are kept separate. The graph's automatic snapshot is recorded at the quote date only when **all** positive holdings have fresh, source-verified prices, matching observation dates and no later transactions. Manual snapshot capture remains available.
+- Remaining spreadsheet-exception branches rely on owner-entered YES/NO flags and have not all been independently transcribed into verifiable stateful logic. Do not treat the suggestions as a certified Excel clone. Use the source workbook for trade approval.
