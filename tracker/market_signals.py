@@ -351,6 +351,20 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
     return alerts
 
 
+def count_skipped_equity_sells(quarterly_signals):
+    """A BUY shortfall HOLD is not a skipped SELL under 30 Down.
+
+    Older versions also encoded cash shortages as HOLD. Counting every HOLD
+    as a deferred sale could force an incorrect 60/40 reset on the next sale.
+    """
+    return sum(
+        any(a.get("side") == "HOLD" for a in row.actions) and
+        ("defer this equity sell" in row.message.lower() or
+         "skip this sell" in row.message.lower())
+        for row in quarterly_signals
+    )
+
+
 def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest):
     """Possible mid-quarter 100%-up rule, using verified daily US closes.
 
@@ -519,10 +533,7 @@ def review_strategy(strategy):
             kind="QUARTERLY", as_of__lt=quarter_end,
             as_of__gte=active_down_signal.as_of,
         ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("as_of")
-        skipped = sum(
-            any(action.get("side") == "HOLD" for action in row.actions)
-            for row in earlier
-        )
+        skipped = count_skipped_equity_sells(earlier)
     if len(_quarterly_closes(ref_spy, quarter_end)) < 2:
         return {"status": "insufficient SPY quarter-end reference history"}
     if len(_quarterly_closes(ref_tqqq, quarter_end)) < 2:
