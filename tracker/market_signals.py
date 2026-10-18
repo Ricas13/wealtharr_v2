@@ -168,130 +168,171 @@ def _floor_qty(amount, price):
     return (amount / price).quantize(PRECISION, rounding=ROUND_DOWN)
 
 
+def signal_line_value(*, start_date, as_of, starting_equity_cost, contributions=()):
+    """Reproduce the workbook AV recurrence without advancing deposits early.
+
+    Each completed quarter grows the line 9%; half of contributions deposited
+    *during* that quarter enter only after that growth, per
+    AV4 = AV3 * (1 + C9) + BV4/2. Earlier deposits grow in later quarters.
+    """
+    from calendar import monthrange
+    at_close = as_of.month % 3 == 0 and as_of.day == monthrange(as_of.year, as_of.month)[1]
+    review_quarter = quarter_number(as_of) if at_close else quarter_number(as_of) - 1
+    first_quarter = quarter_number(start_date)
+    if review_quarter < first_quarter:
+        return None
+    target = Decimal(starting_equity_cost) * Decimal("1.09") ** (review_quarter - first_quarter + 1)
+    for day, amount in contributions:
+        day_q = quarter_number(day)
+        if start_date < day <= as_of and first_quarter <= day_q <= review_quarter:
+            target += (Decimal(amount) / 2) * Decimal("1.09") ** (review_quarter - day_q)
+    return target.quantize(CENTS)
+
+
+def _drawdown_from_spy(spy, review_q):
+    """30 Down requires falling SPY vs the highest of up to 8 quarter closes."""
+    recent = [spy[q][1] for q in sorted(spy)
+              if review_q - 7 <= q <= review_q]
+    if len(recent) < 2:
+        return False, ZERO
+    previous = spy.get(review_q - 1)
+    current = spy.get(review_q)
+    if not current or not previous:
+        return False, ZERO
+    peak = max(recent)
+    decline = (Decimal(1) - current[1] / peak) if peak else ZERO
+    return (decline >= Decimal("0.30") and current[1] < previous[1]), decline
+
+
 def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symbol,
                         equity_qty, equity_price, safe_qty, safe_price, cash,
                         starting_equity_cost, reference,
                         spy_reference=None, contributions=(), prior_skipped_sells=0,
-                        no_sell_quarters=0, prior_drawdown=False):
-    """Deterministic, advisory 9Sig-style quarterly decision.
+                        no_sell_quarters=0, prior_drawdown=False,
+                        down_age_quarters=0):
+    """Deterministic owner-review 9Sig action on a completed quarter.
 
-    Workbook AV4: previous signal line * (1 + C9), with C9=0.09 per QUARTER.
-    Workbook BV4/2: add half of new contributions to the signal line.
-    The other workbook instructions use owner-entered YES/NO flags. When a
-    branch cannot be established we do NOT invent a trade.
+    60/40 baseline, 9% quarterly signal growth, half of period contributions,
+    maximum 90% of safe assets used for regular buys, 30 Down two-sell skip,
+    eight-quarter expiry, 100%-up single-quarter spike, and base reset on
+    >100% safe-sleeve requirement. The owner executes and records all fills.
     """
     if (currency != "GBP" or equity_qty <= ZERO or starting_equity_cost <= ZERO or
             equity_price <= ZERO or safe_price <= ZERO or safe_qty < ZERO or cash < ZERO):
         return []
-    # A quarter's 9% increase applies at its close. For callers passing
-    # the first day of the next quarter, use the last completed quarter.
     from calendar import monthrange
     at_close = as_of.month % 3 == 0 and as_of.day == monthrange(as_of.year, as_of.month)[1]
-    steps = quarter_number(as_of) - quarter_number(start_date) + (1 if at_close else 0)
-    if steps <= 0:
+    review_q = quarter_number(as_of) if at_close else quarter_number(as_of) - 1
+    target = signal_line_value(
+        start_date=start_date, as_of=as_of,
+        starting_equity_cost=starting_equity_cost, contributions=contributions)
+    if target is None:
         return []
-    target = starting_equity_cost * (Decimal("1.09") ** steps)
-    # Each later period's net cash injections add 50% to the signal line, then
-    # participate in subsequent quarterly 9% compounding.
-    for day, contribution in contributions:
-        offset = quarter_number(day) - quarter_number(start_date)
-        if 0 < offset <= steps:
-            target += (Decimal(contribution) / 2) * (Decimal("1.09") ** (steps - offset))
-    target = target.quantize(CENTS)
+
     equity_value = equity_qty * equity_price
     safe_value = safe_qty * safe_price
     total = equity_value + safe_value + cash
     if total <= ZERO:
         return []
-    # 30 Down does NOT sell half of equity. It suspends SELL signals.
-    # SPY is the published reference; TQQQ is inspected for 100%-up resets.
+    difference = target - equity_value
+    tolerance = max(Decimal("1"), total * Decimal("0.005"))
+
     spy = _quarterly_closes(spy_reference or (), as_of)
-    recent = [spy[q] for q in sorted(spy) if
-              quarter_number(as_of) - 7 <= q <= quarter_number(as_of)]
-    down = False
-    decline = ZERO
-    if len(recent) >= 2:
-        latest_day, latest = recent[-1]
-        peak = max(x[1] for x in recent)
-        decline = (Decimal(1) - latest / peak)
-        down = decline >= Decimal("0.30") and latest < recent[-2][1]
-    active_down = down or (prior_drawdown and bool(recent) and recent[-1][1] < max(x[1] for x in recent) * Decimal("0.70"))
+    down_trigger, decline = _drawdown_from_spy(spy, review_q)
+    # Once triggered, the skip window persists until 2 ignored sells or
+    # eight quarters. Recovery in a later quarter does not silently erase
+    # the two skipped-sell state.
+    active_down = down_trigger or (prior_drawdown and down_age_quarters < 8)
     alerts = []
-    if down and not prior_drawdown:
+    if down_trigger and not prior_drawdown:
         alerts.append({
             "kind": "THIRTY_DOWN",
-            "key": "30down:" + str(quarter_number(as_of)),
-            "title": "30 Down: suspend the next sell signals",
+            "key": "30down:" + str(review_q),
+            "title": "9Sig 30 Down: next two sell signals are deferred",
             "message": (
-                "SPY has fallen %.2f%% from its last-eight-quarter closing peak. "
-                "The 30 Down rule postpones up to two sell signals; it does not "
-                "instruct an immediate half-position sale. Review the workbook "
-                "flags before trading."
+                "SPY fell %.2f%% from its rolling eight-quarter closing peak. "
+                "The next two equity sell signals are skipped; buy signals "
+                "continue, with the third would-be sell requiring a 60/40 reset. "
+                "The window expires after eight quarters. No trade was placed."
             ) % float(decline * 100),
             "actions": [],
         })
-    raw_difference = target - equity_value
-    tolerance = max(Decimal("1"), total * Decimal("0.005"))
-    reset_reason = None
-    if no_sell_quarters >= 8 and not active_down:
-        reset_reason = "Eight consecutive quarters without a confirmed equity sale"
+
     tqqq = _quarterly_closes(reference, as_of)
-    current = tqqq.get(quarter_number(as_of))
-    previous = tqqq.get(quarter_number(as_of) - 1)
-    if (not active_down and previous and current and
-            previous[1] > ZERO and current[1] >= 2 * previous[1]):
-        reset_reason = "The TQQQ reference doubled in a quarter"
-    actions = []
-    if active_down and raw_difference < -tolerance:
+    current = tqqq.get(review_q)
+    previous = tqqq.get(review_q - 1)
+    spike = (previous is not None and current is not None and previous[1] > ZERO
+             and current[1] >= 2 * previous[1])
+    reset_reason = None
+    note = ""
+    if prior_drawdown and down_age_quarters >= 8:
+        reset_reason = "Eight-quarter 30 Down safety window expired"
+        active_down = False
+    elif active_down and difference < -tolerance:
         if prior_skipped_sells >= 2:
-            reset_reason = "Two sell signals have already been skipped during 30 Down"
+            reset_reason = "Two equity sells were already skipped under 30 Down"
         else:
-            note = ("30 Down active: skip this sell signal. No shares should be "
-                    "sold solely to follow the normal target this quarter.")
-            actions = [{"side": "HOLD", "symbol": equity_symbol,
-                        "quantity": "0", "estimated_gbp": "0.00"}]
+            note = "30 Down active: defer this equity sell signal; do not rebalance."
+    elif spike and not active_down:
+        reset_reason = "TQQQ reference gained at least 100% in the completed quarter"
+    elif difference > cash + safe_value + tolerance and not active_down:
+        reset_reason = "The equity buy would require selling more than 100% of safe assets"
+    elif active_down and difference > cash + safe_value + tolerance:
+        note = "30 Down active: safe-asset shortage. Review before committing money."
+
+    if not note:
+        note = ("Equity below quarterly signal line."
+                if difference > tolerance else
+                "Equity above quarterly signal line."
+                if difference < -tolerance else
+                "Equity matches the quarterly signal line; no rebalance needed.")
+
     if reset_reason:
-        goal = total * Decimal("0.60")
-        raw_difference = goal - equity_value
         note = reset_reason + ": review a reset to 60% equity / 40% safe and cash."
-    elif not (active_down and raw_difference < -tolerance):
-        note = ("Equity below the 9%-per-quarter signal line."
-                if raw_difference > tolerance else
-                "Equity above the 9%-per-quarter signal line."
-                if raw_difference < -tolerance else
-                "Equity close to the signal line; no change suggested.")
-    if not (active_down and raw_difference < -tolerance and not reset_reason):
-        if raw_difference < -tolerance:
-            sell_qty = min(equity_qty, _floor_qty(-raw_difference, equity_price))
-            if sell_qty > ZERO:
-                actions.append(_order("SELL", equity_symbol, sell_qty, equity_price))
-                safe_buy = _floor_qty(cash + sell_qty * equity_price, safe_price)
-                if safe_buy > ZERO:
-                    actions.append(_order("BUY", safe_symbol, safe_buy, safe_price))
-        elif raw_difference > tolerance:
-            available_safe = safe_value * Decimal("0.90")
-            requested = min(raw_difference, cash + available_safe)
-            safe_sell_needed = max(ZERO, requested - cash)
-            if safe_sell_needed > ZERO:
-                safe_qty_to_sell = min(safe_qty, _floor_qty(safe_sell_needed, safe_price))
-                if safe_qty_to_sell > ZERO:
-                    actions.append(_order("SELL", safe_symbol, safe_qty_to_sell, safe_price))
-            budget = cash + sum(Decimal(x["estimated_gbp"]) for x in actions if x["side"] == "SELL")
-            buy_qty = _floor_qty(min(raw_difference, budget), equity_price)
-            if buy_qty > ZERO:
-                actions.append(_order("BUY", equity_symbol, buy_qty, equity_price))
-            if budget < raw_difference:
-                note += " Buying power is limited; record a cash shortage for manual review."
-    signal_quarter = quarter_number(as_of) if at_close else quarter_number(as_of) - 1
-    label = "%04d-Q%d" % (signal_quarter // 4, signal_quarter % 4 + 1)
+        difference = total * Decimal("0.60") - equity_value
+
+    actions = []
+    if active_down and difference < -tolerance and not reset_reason:
+        actions.append({"side": "HOLD", "symbol": equity_symbol,
+                        "quantity": "0", "estimated_gbp": "0.00"})
+    elif difference < -tolerance:
+        equity_sell = min(equity_qty, _floor_qty(-difference, equity_price))
+        if equity_sell > ZERO:
+            actions.append(_order("SELL", equity_symbol, equity_sell, equity_price))
+        # All proceeds plus existing cash can fund safe purchases. The cash
+        # remainder from rounding stays in the strategy account.
+        safe_budget = cash + equity_sell * equity_price
+        safe_buy = _floor_qty(safe_budget, safe_price)
+        if safe_buy > ZERO:
+            actions.append(_order("BUY", safe_symbol, safe_buy, safe_price))
+    elif difference > tolerance:
+        if reset_reason:
+            # Explicit reset can use the safe sleeve down to a 40% balance;
+            # the regular 90% throttle does not apply to a forced reset.
+            desired_safe_sale = max(ZERO, difference - cash)
+            safe_sale_budget = min(safe_value, desired_safe_sale)
+        else:
+            safe_sale_budget = min(
+                safe_value * Decimal("0.90"), max(ZERO, difference - cash))
+        safe_to_sell = min(safe_qty, _floor_qty(safe_sale_budget, safe_price))
+        if safe_to_sell > ZERO:
+            actions.append(_order("SELL", safe_symbol, safe_to_sell, safe_price))
+        available = cash + safe_to_sell * safe_price
+        equity_buy = _floor_qty(min(difference, available), equity_price)
+        if equity_buy > ZERO:
+            actions.append(_order("BUY", equity_symbol, equity_buy, equity_price))
+        if available + tolerance < difference:
+            note += " Available GBP buying power limits the order size."
+
+    label = "%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
     alerts.append({
         "kind": "QUARTERLY", "key": "quarter:" + label,
         "title": "9Sig quarterly review — " + label,
         "message": (
-            "%s Signal line £%s = 9%% compounded each QUARTER from the "
-            "initial equity sleeve, plus half of later contributions. "
-            "Actual fills, trading costs, corporate actions and workbook "
-            "exception flags must be confirmed manually. No orders placed."
+            "%s Signal line £%s = a 9%% rise each completed quarter "
+            "plus half of deposits in that quarter. GBP prices and proposed "
+            "unit quantities are estimates based on closing quotes. "
+            "Review before trading; no orders have been placed."
         ) % (note, target),
         "actions": actions,
     })
