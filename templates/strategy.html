@@ -64,7 +64,7 @@
 </section>
 {% endif %}
 <section class="panel padded" id="strategy-signals">
-  <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Hourly server-side checks when the scheduler is running; refresh now to check manually. Quarterly actions are emitted only after a quarter closes.</p></div>
+  <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Hourly quote checks when the scheduler is running. Ordinary rebalances follow completed quarters; possible 100%-up TQQQ spike events can be flagged mid-quarter for manual review.</p></div>
   {% if strategy.market_data_enabled %}
   <form method="post" action="{% url 'refresh_market' strategy.pk %}">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">⟳ Check Yahoo prices</button></form>
   {% else %}<span class="risk-pill">Monitoring off</span>{% endif %}
@@ -79,7 +79,7 @@
     </form>
   </details>{% endif %}
   {% if strategy.market_data_enabled %}<p class="micro-note"><strong>{{ monitoring_status.message }}</strong></p>
-  <p class="micro-note">Equity: {{ strategy.equity_symbol }} · Safe asset: {{ strategy.safe_symbol }} · US drawdown reference: TQQQ. GBP-denominated Yahoo quotes only. 9Sig recommendations are preliminary and not workbook-equivalent.</p>
+  <p class="micro-note">Actual GBP holdings: {{ strategy.equity_symbol }} + {{ strategy.safe_symbol }}. 9Sig US rule references: <strong>SPY for 30 Down</strong>; <strong>TQQQ for 100%-up spikes</strong>. Quarter-end trades are calculated from verified GBP quotes. Urgent mid-quarter spike notices use a provisional US reference and must be checked against your prior rebalance execution before acting. No orders are placed by Wealtharr.</p>
   {% else %}<p class="micro-note">To enable automatic quote checks, create a 9Sig strategy tab with exact Yahoo equity/safe tickers and the monitoring option. Manual tracking still works.</p>{% endif %}
   {% for signal in signals %}
   <div class="signal-review">
