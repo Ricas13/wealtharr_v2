@@ -1,7 +1,7 @@
-"""Server-only Yahoo chart sync and conservative advisory 9Sig review.
+"""Owner-only Yahoo prices and conservative 9Sig quarterly review.
 
-No auto-trading. This is a disclosed subset of the uploaded spreadsheet methodology;
-cash-shortage, skip-sale and peak-reset exception branches require parity work.
+References: Jason Kelly's published Signal/30 Down explanations and the owner's
+signal strategy simulation v1.07 workbook. Suggestions never place orders.
 """
 import json
 import logging
@@ -190,18 +190,20 @@ def signal_line_value(*, start_date, as_of, starting_equity_cost, contributions=
 
 
 def _drawdown_from_spy(spy, review_q):
-    """30 Down requires falling SPY vs the highest of up to 8 quarter closes."""
-    recent = [spy[q][1] for q in sorted(spy)
-              if review_q - 7 <= q <= review_q]
-    if len(recent) < 2:
-        return False, ZERO
-    previous = spy.get(review_q - 1)
+    """30 Down: current SPY quarter close <=70% of past eight closes' high.
+
+    The fund need not be falling *this* quarter: a partial recovery can still
+    end 30% below the rolling peak. The original test wrongly required a
+    negative quarter-over-quarter return and missed valid triggers.
+    """
     current = spy.get(review_q)
-    if not current or not previous:
+    previous = [spy[q][1] for q in range(review_q - 8, review_q)
+                if q in spy and spy[q][1] > ZERO]
+    if not current or not previous or current[1] <= ZERO:
         return False, ZERO
-    peak = max(recent)
-    decline = (Decimal(1) - current[1] / peak) if peak else ZERO
-    return (decline >= Decimal("0.30") and current[1] < previous[1]), decline
+    high = max(previous)
+    decline = Decimal(1) - current[1] / high
+    return current[1] <= high * Decimal("0.70"), decline
 
 
 def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symbol,
@@ -212,10 +214,10 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
                         down_age_quarters=0):
     """Deterministic owner-review 9Sig action on a completed quarter.
 
-    60/40 baseline, 9% quarterly signal growth, half of period contributions,
-    maximum 90% of safe assets used for regular buys, 30 Down two-sell skip,
-    eight-quarter expiry, 100%-up single-quarter spike, and base reset on
-    >100% safe-sleeve requirement. The owner executes and records all fills.
+    60/40 baseline, 9% per quarter, half of additional contributions, workbook
+    cash-reservoir buying throttle (0.9 x 0.9 only for large buys), 30 Down
+    two-sell skip, eight-quarter expiry, 100%-up TQQQ reset and >100%
+    reservoir-deficit reset. Actual share fills are always owner-entered.
     """
     if (currency != "GBP" or equity_qty <= ZERO or starting_equity_cost <= ZERO or
             equity_price <= ZERO or safe_price <= ZERO or safe_qty < ZERO or cash < ZERO):
@@ -235,13 +237,15 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
     if total <= ZERO:
         return []
     difference = target - equity_value
-    tolerance = max(Decimal("1"), total * Decimal("0.005"))
+    # A 0.5% portfolio-wide deadband was invented by the app. The published
+    # strategy and uploaded workbook have no such rule. Penny rounding
+    # suppresses untradeably small differences instead.
+    tolerance = CENTS
 
     spy = _quarterly_closes(spy_reference or (), as_of)
     down_trigger, decline = _drawdown_from_spy(spy, review_q)
-    # Once triggered, the skip window persists until 2 ignored sells or
-    # eight quarters. Recovery in a later quarter does not silently erase
-    # the two skipped-sell state.
+    # Once triggered, the skip window persists until the third would-be sell
+    # or eight-quarter expiry. A recovery alone does not consume skipped sells.
     active_down = down_trigger or (prior_drawdown and down_age_quarters < 8)
     alerts = []
     if down_trigger and not prior_drawdown:
@@ -307,22 +311,29 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
         if safe_buy > ZERO:
             actions.append(_order("BUY", safe_symbol, safe_buy, safe_price))
     elif difference > tolerance:
+        reserve = cash + safe_value
         if reset_reason:
-            # Explicit reset can use the safe sleeve down to a 40% balance;
-            # the regular 90% throttle does not apply to a forced reset.
-            desired_safe_sale = max(ZERO, difference - cash)
-            safe_sale_budget = min(safe_value, desired_safe_sale)
+            # A 60/40 reset targets the current total, not the old signal
+            # line. The normal large-buy throttle does not apply.
+            budget = min(difference, reserve)
+        elif difference < reserve * Decimal("0.90"):
+            # Workbook BF4: a regular shortfall BELOW 90% of buying
+            # power is funded IN FULL, not arbitrarily capped at 90%.
+            budget = difference
         else:
-            safe_sale_budget = min(
-                safe_value * Decimal("0.90"), max(ZERO, difference - cash))
+            # Workbook BF4 uses buying power (cash + bond value), not
+            # only bond value: reserve * 0.9 * (1 - C11); C11=10%.
+            budget = min(difference, reserve * Decimal("0.81"))
+            note += " 9Sig's large-buy throttle limits this quarter's purchase."
+        safe_sale_budget = min(safe_value, max(ZERO, budget - cash))
         safe_to_sell = min(safe_qty, _floor_qty(safe_sale_budget, safe_price))
         if safe_to_sell > ZERO:
             actions.append(_order("SELL", safe_symbol, safe_to_sell, safe_price))
         available = cash + safe_to_sell * safe_price
-        equity_buy = _floor_qty(min(difference, available), equity_price)
+        equity_buy = _floor_qty(min(budget, available), equity_price)
         if equity_buy > ZERO:
             actions.append(_order("BUY", equity_symbol, equity_buy, equity_price))
-        if available + tolerance < difference:
+        if budget + tolerance < difference:
             note += " Available GBP buying power limits the order size."
 
     label = "%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
