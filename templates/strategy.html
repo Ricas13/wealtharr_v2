@@ -34,6 +34,13 @@
     <h3>{{ signal.title }} {% if signal.acknowledged_at %}<small>Reviewed</small>{% else %}<small class="value-warning">Action to review</small>{% endif %}</h3>
     <p>{{ signal.message }}</p>
     <div class="signal-orders">{% for a in signal.actions %}<div><b>{{ a.side }}</b> {{ a.quantity }} units {{ a.symbol }} — estimated £{{ a.estimated_gbp }}</div>{% empty %}<small>No trade proposed.</small>{% endfor %}</div>
+    {% if signal.acknowledged_at and "review a reset to 60%" in signal.message %}
+      <form method="post" action="{% url 'confirm_strategy_reset' strategy.pk %}" class="form-stack">{% csrf_token %}
+        <input name="confirm" type="hidden" value="RESET">
+        <p class="micro-note">Only click after recording actual broker reset trades. Both Yahoo GBP prices must be fresh and holdings near 60% equity.</p>
+        <button class="btn btn-subtle btn-sm" type="submit">Confirm executed reset and start next 9Sig cycle</button>
+      </form>
+    {% endif %}
     {% if not signal.acknowledged_at %}<form method="post" action="{% url 'acknowledge_signal' strategy.pk signal.pk %}">{% csrf_token %}<button class="btn btn-subtle btn-sm" type="submit">Mark reviewed</button></form>{% endif %}
   </div>
   {% empty %}<p class="muted">No automated recommendations yet. Your review history will appear here after a verified market check and qualifying event.</p>{% endfor %}
