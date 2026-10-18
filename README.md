@@ -89,3 +89,8 @@ Test restore on a disposable installation first. From your deployment directory:
 **WARNING:** Restoration replaces the current database. Any entries created after the archived point are lost. The helper stops the app/scheduler/backup service, restores with pg_restore and restarts containers. The scripted commands are not a substitute for a live restore drill on your Oracle machine.
 
 Failed email/Discord deliveries persist the redacted status and retry up to three times, with 5- and 15-minute delays. Admin can requeue a failed delivery after fixing credentials. These alerts are at-least-once; a lost network acknowledgement can rarely cause duplicate alerts, but never automatic trading.
+
+
+### Manual 60/40 reset and subsequent 9Sig cycles
+
+When the quarterly rule proposes a 60/40 reset, **Mark reviewed** does not execute or confirm it. Trade manually at the broker, record the real executed fills with fees, and refresh both GBP Yahoo marks. Then choose **Confirm executed reset and start next 9Sig cycle** from that acknowledged notice. Wealtharr validates that trades happened after the notice, the latest prices are recent, no unmodelled positions are present and recorded equity is within 5 percentage points of 60% of the actual account value. It writes an immutable baseline with the confirmed shares/cash, preventing future targets from incorrectly compounding the *pre-reset* initial balance. Without a confirmed new baseline, later quarter signals pause rather than guessing that the recommendation was executed.
