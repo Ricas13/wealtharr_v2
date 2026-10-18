@@ -363,6 +363,12 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
             tqqq_latest.as_of > now):
         return
     last_quarter = quarter_end_before(now)
+    # Do not apply another investor's previous-quarter execution reference to
+    # a portfolio which only entered 9Sig during the current quarter.
+    if first_buy.occurred_on > last_quarter:
+        return
+    if baseline is not None and baseline.as_of > last_quarter:
+        return
     origin = settlement_close("TQQQ", last_quarter)
     if not origin or origin.currency != "USD" or origin.price <= ZERO:
         return
