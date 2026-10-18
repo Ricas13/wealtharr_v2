@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Start real 9Sig{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">REAL INVESTMENT TRACKING / 9SIG</div><h1>Track my real 9Sig account</h1><p>Record your cash and actual Trading 212 trades. Wealtharr never places orders.</p></div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
+<div class="split-layout wide-left">
+  <section class="panel padded">
+    <h2>Start tracking</h2>
+    <p class="muted">Enter real cash already paid into your account, not simulated money. For existing investments, enter the historical deposit date and add actual purchases chronologically afterwards.</p>
+    <form method="post" class="form-stack">{% csrf_token %}
+      {% include 'partials/form_fields.html' with form=form %}
+      <div class="hint-box">Confirm your exact GBP Trading 212 instruments. LQQ3.L and ERNS.L are UK-listed examples only; they are not automatically equivalent to US TQQQ and AGG.</div>
+      <button class="btn btn-primary" type="submit">Create real 9Sig tracker →</button>
+    </form>
+  </section>
+  <aside class="panel padded">
+    <h2>After setup</h2>
+    <p class="muted">1. Your actual initial GBP cash appears in the separate account ledger.</p>
+    <p class="muted">2. You record real buy/sell fills with quantities, prices and fees.</p>
+    <p class="muted">3. Verified Yahoo closes value the holdings and the next quarterly 9Sig rules run automatically.</p>
+    <p class="muted">4. Rebalance notices tell you what to review; only you execute trades.</p>
+    <div class="hint-box">£500 per month is a reminder target, not an automatic transfer. No brokerage connection, paper capital or fabricated buys.</div>
+  </aside>
+</div>
+{% endblock %}
