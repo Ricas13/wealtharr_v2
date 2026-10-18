@@ -61,3 +61,13 @@ class NotificationDeliveryAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None): return False
 
 # Edit credentials through /control/, not Django admin, to keep encrypted fields out of admin forms.
+
+# Production authentication must always pass the Turnstile-gated app login.
+# Default Django admin login would otherwise provide an unchallenged sign-in path.
+from django.shortcuts import redirect
+_original_admin_login = admin.site.login
+def _secure_admin_login(request, extra_context=None):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return redirect("login")
+    return _original_admin_login(request, extra_context=extra_context)
+admin.site.login = _secure_admin_login
