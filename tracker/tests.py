@@ -1,3 +1,7 @@
+from unittest.mock import patch
+from .models import NotificationPreference, SystemIntegration
+from .services import dispatch, encrypt_secret, decrypt_secret
+
 from datetime import date, timedelta
 from decimal import Decimal as D
 from django.contrib.auth import get_user_model
@@ -94,3 +98,59 @@ class SiteTests(TestCase):
         self.assertEqual(ledger_summary(s)["cash"],D("1000"))
         self.client.post(reverse("capture_snapshot"))
         self.assertEqual(WealthSnapshot.objects.get(owner=self.user).total_value,D("1000"))
+
+
+class NotificationTests(TestCase):
+    def setUp(self):
+        self.owner=get_user_model().objects.create_user("alertowner","owner@example.com","a-very-long-test-password")
+        self.prefs=NotificationPreference.objects.create(
+            owner=self.owner,destination_email="owner@example.com",email_enabled=True,discord_enabled=True)
+        self.config=SystemIntegration.current()
+        self.config.smtp_host="smtp.example.test"
+        self.config.smtp_sender="alerts@example.test"
+        self.config.smtp_password_ciphertext=encrypt_secret("smtp-secret-not-for-logs")
+        self.config.discord_url_ciphertext=encrypt_secret("https://discord.com/api/webhooks/123456/test-secret")
+        self.config.save()
+    def test_encryption_roundtrip(self):
+        self.assertNotIn("smtp-secret-not-for-logs", self.config.smtp_password_ciphertext)
+        self.assertEqual(decrypt_secret(self.config.smtp_password_ciphertext),"smtp-secret-not-for-logs")
+    def test_idempotent_email_delivery(self):
+        with patch("tracker.services.EmailMessage.send",return_value=1) as sender:
+            self.assertEqual(dispatch(self.owner,"event-1","Test","Hello",channels=("email",))["email"],"sent")
+            self.assertEqual(dispatch(self.owner,"event-1","Test","Hello",channels=("email",))["email"],"sent")
+            self.assertEqual(sender.call_count,1)
+    def test_discord_delivery_payload_does_not_leak_webhook(self):
+        class Response:
+            status=204
+            def __enter__(self): return self
+            def __exit__(self,*args): pass
+        with patch("tracker.services.urlopen",return_value=Response()) as send:
+            self.assertEqual(dispatch(self.owner,"event-2","Test","Hello",channels=("discord",))["discord"],"sent")
+            data=send.call_args.args[0].data.decode()
+            self.assertIn("Hello",data)
+            self.assertNotIn("test-secret",data)
+
+class TemplateAndSecurityTests(TestCase):
+    def setUp(self):
+        self.owner=get_user_model().objects.create_superuser("viewowner","owner@example.com","a-very-long-test-password")
+        self.account=Account.objects.create(owner=self.owner,name="Personal ISA")
+        self.strategy=StrategyInstance.objects.create(
+            owner=self.owner,account=self.account,preset=StrategyPreset.objects.first(),name="9Sig ISA")
+    def test_admin_login_redirects_to_challenged_login(self):
+        response=self.client.get(reverse("admin:login"))
+        self.assertEqual(response.status_code,302)
+        self.assertTrue(response.url.startswith(reverse("login")))
+    def test_all_owner_pages_render(self):
+        self.client.force_login(self.owner)
+        for url in (reverse("dashboard"),reverse("accounts"),reverse("new_strategy"),
+                    reverse("strategy_detail",args=[self.strategy.pk]),reverse("user_settings"),
+                    reverse("change_password"),reverse("control")):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code,200)
+    def test_snapshot_is_not_saved_when_price_is_missing(self):
+        self.client.force_login(self.owner)
+        validate_and_record(self.strategy,LedgerEntry(kind="DEPOSIT",amount=D("200"),occurred_on=timezone.localdate()))
+        validate_and_record(self.strategy,LedgerEntry(kind="BUY",symbol="LQQ3",quantity=D("1"),
+                                                     unit_price=D("50"),occurred_on=timezone.localdate()))
+        self.client.post(reverse("capture_snapshot"))
+        self.assertFalse(WealthSnapshot.objects.filter(owner=self.owner).exists())
