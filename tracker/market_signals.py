@@ -452,15 +452,13 @@ def review_strategy(strategy):
         return {"status": "insufficient SPY quarter-end reference history"}
     if len(_quarterly_closes(ref_tqqq, quarter_end)) < 2:
         return {"status": "insufficient TQQQ quarter-end reference history"}
-    # Initial holdings may be split into several orders in the first quarter.
-    from calendar import monthrange
-    first_quarter_last_month = ((first_buy.occurred_on.month - 1) // 3 + 1) * 3
-    initial_end = date(first_buy.occurred_on.year, first_quarter_last_month,
-                       monthrange(first_buy.occurred_on.year, first_quarter_last_month)[1])
+    # Initial equity baseline includes the first purchase date only.
+    # Subsequent buys in the first calendar quarter must not silently
+    # inflate the baseline and double-count their funding contributions.
     initial_equity_cost = baseline.equity_value if baseline else sum(
         (t.quantity * t.unit_price for t in strategy.ledger.filter(
             symbol=strategy.equity_symbol, kind=LedgerEntry.BUY,
-            occurred_on__gte=first_buy.occurred_on, occurred_on__lte=initial_end)),
+            occurred_on=first_buy.occurred_on)),
         ZERO)
     if initial_equity_cost <= ZERO:
         return {"status": "missing initial equity investment"}
