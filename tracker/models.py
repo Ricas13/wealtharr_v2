@@ -201,3 +201,20 @@ class StrategyBaseline(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["strategy", "as_of"], name="unique_strategy_baseline")
         ]
+
+
+class StrategyValueSnapshot(models.Model):
+    """Historic values are isolated by strategy and account, including PAPER."""
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE,
+                                 related_name="value_snapshots")
+    as_of = models.DateField()
+    total_value = models.DecimalField(max_digits=24, decimal_places=2)
+    net_contributed = models.DecimalField(max_digits=24, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["as_of"]
+        constraints = [
+            models.UniqueConstraint(fields=["strategy", "as_of"],
+                                    name="unique_strategy_value_date")
+        ]
