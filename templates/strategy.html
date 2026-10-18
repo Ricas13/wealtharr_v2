@@ -57,7 +57,27 @@
         <button class="btn btn-subtle btn-sm" type="submit">Confirm executed reset and start next 9Sig cycle</button>
       </form>
     {% endif %}
-    {% if not signal.acknowledged_at %}<form method="post" action="{% url 'acknowledge_signal' strategy.pk signal.pk %}">{% csrf_token %}<button class="btn btn-subtle btn-sm" type="submit">Mark reviewed</button></form>{% endif %}
+    {% if signal.review_outcome %}
+      <p class="micro-note"><strong>Review result: {{ signal.get_review_outcome_display }}</strong>
+        {% if signal.review_note %} — {{ signal.review_note }}{% endif %}</p>
+    {% endif %}
+    <details class="monitor-settings" style="margin:12px 0;padding:12px;border:1px solid #294a60;border-radius:8px">
+      <summary style="cursor:pointer;color:#57d7d1">{% if signal.review_outcome %}Update review{% else %}Verify or correct this signal{% endif %}</summary>
+      <form method="post" action="{% url 'review_signal' strategy.pk signal.pk %}" class="form-stack">{% csrf_token %}
+        <label class="form-field">Your review
+          <select class="field" name="outcome" required>
+            <option value="CONFIRMED" {% if signal.review_outcome == "CONFIRMED" %}selected{% endif %}>Seems correct after checking</option>
+            <option value="FALSE_POSITIVE" {% if signal.review_outcome == "FALSE_POSITIVE" %}selected{% endif %}>False signal / incorrect calculation</option>
+            <option value="NOT_APPLICABLE" {% if signal.review_outcome == "NOT_APPLICABLE" %}selected{% endif %}>Not applicable to my portfolio</option>
+          </select>
+        </label>
+        <label class="form-field">Correction or explanation (required for false signals)
+          <textarea class="field" name="review_note" maxlength="2000" rows="3" placeholder="e.g. 30-Down condition is not active according to workbook">{{ signal.review_note }}</textarea>
+        </label>
+        <button class="btn btn-subtle btn-sm" type="submit">Save signal review</button>
+      </form>
+    </details>
+    {% if not signal.acknowledged_at %}<form method="post" action="{% url 'acknowledge_signal' strategy.pk signal.pk %}">{% csrf_token %}<button class="btn btn-subtle btn-sm" type="submit">Mark reviewed without a correction</button></form>{% endif %}
   </div>
   {% empty %}<p class="muted">No automated recommendations yet. Your review history will appear here after a verified market check and qualifying event.</p>{% endfor %}
 </section>
