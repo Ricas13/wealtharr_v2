@@ -167,7 +167,11 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
     if (currency != "GBP" or equity_qty <= ZERO or starting_equity_cost <= ZERO or
             equity_price <= ZERO or safe_price <= ZERO or safe_qty < ZERO or cash < ZERO):
         return []
-    steps = quarter_number(as_of) - quarter_number(start_date)
+    # A quarter's 9% increase applies at its close. For callers passing
+    # the first day of the next quarter, use the last completed quarter.
+    from calendar import monthrange
+    at_close = as_of.month % 3 == 0 and as_of.day == monthrange(as_of.year, as_of.month)[1]
+    steps = quarter_number(as_of) - quarter_number(start_date) + (1 if at_close else 0)
     if steps <= 0:
         return []
     target = starting_equity_cost * (Decimal("1.09") ** steps)
@@ -195,7 +199,7 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
         peak = max(x[1] for x in recent)
         decline = (Decimal(1) - latest / peak)
         down = decline >= Decimal("0.30") and latest < recent[-2][1]
-    active_down = down or prior_drawdown
+    active_down = down or (prior_drawdown and bool(recent) and recent[-1][1] < max(x[1] for x in recent) * Decimal("0.70"))
     alerts = []
     if down and not prior_drawdown:
         alerts.append({
@@ -262,7 +266,8 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
                 actions.append(_order("BUY", equity_symbol, buy_qty, equity_price))
             if budget < raw_difference:
                 note += " Buying power is limited; record a cash shortage for manual review."
-    label = "%04d-Q%d" % (as_of.year, (as_of.month - 1) // 3 + 1)
+    signal_quarter = quarter_number(as_of) if at_close else quarter_number(as_of) - 1
+    label = "%04d-Q%d" % (signal_quarter // 4, signal_quarter % 4 + 1)
     alerts.append({
         "kind": "QUARTERLY", "key": "quarter:" + label,
         "title": "9Sig quarterly review — " + label,
