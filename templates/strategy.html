@@ -2,6 +2,14 @@
 {% block title %}{{ strategy.name }}{% endblock %}
 {% block content %}
 <div class="page-heading"><div><div class="eyebrow">STRATEGY / {{ strategy.account.name|upper }}</div><h1>{{ strategy.name }}</h1><p>{{ strategy.preset.name }} · {{ strategy.account.get_kind_display }} · GBP</p></div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
+{% if strategy.account.kind == "PAPER" %}
+<div class="alert-warning"><strong>VIRTUAL PAPER ACCOUNT — NO REAL ASSETS.</strong>
+  This account was funded with simulated £1,000 and virtual fractional positions.
+  Yahoo closes update estimates; recommendations are review-only and never execute orders.
+  The £500 monthly contribution is a plan, not an actual transfer.
+  Initial signals require the first completed quarter after its virtual purchase.
+</div>
+{% endif %}
 <div class="strategy-tabbar">
   {% for tab in nav_strategies %}<a href="{% url 'strategy_detail' tab.pk %}" class="tab {% if tab.pk == strategy.pk %}active{% endif %}">{{ tab.name }}</a>{% endfor %}
   <a href="{% url 'new_strategy' %}" class="tab tab-add">＋ New tab</a>
@@ -13,7 +21,7 @@
 </div>
 {% if report.missing %}<div class="alert-warning">Price needed for: {% for symbol in report.missing %}<b>{{ symbol }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}. Set the latest GBP unit price below to complete this strategy's valuation.</div>{% endif %}
 <section class="panel padded" id="strategy-signals">
-  <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Yahoo closing prices and advisory signals. Never an automatic trade.</p></div>
+  <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Hourly server-side checks when the scheduler is running; refresh now to check manually. Quarterly actions are emitted only after a quarter closes.</p></div>
   {% if strategy.market_data_enabled %}
   <form method="post" action="{% url 'refresh_market' strategy.pk %}">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">⟳ Check Yahoo prices</button></form>
   {% else %}<span class="risk-pill">Monitoring off</span>{% endif %}
@@ -27,7 +35,8 @@
       <button class="btn btn-primary" type="submit">Save monitoring settings</button>
     </form>
   </details>{% endif %}
-  {% if strategy.market_data_enabled %}<p class="micro-note">Equity: {{ strategy.equity_symbol }} · Safe asset: {{ strategy.safe_symbol }} · US drawdown reference: TQQQ. GBP-denominated Yahoo quotes only. 9Sig recommendations are preliminary and not workbook-equivalent.</p>
+  {% if strategy.market_data_enabled %}<p class="micro-note"><strong>{{ monitoring_status.message }}</strong></p>
+  <p class="micro-note">Equity: {{ strategy.equity_symbol }} · Safe asset: {{ strategy.safe_symbol }} · US drawdown reference: TQQQ. GBP-denominated Yahoo quotes only. 9Sig recommendations are preliminary and not workbook-equivalent.</p>
   {% else %}<p class="micro-note">To enable automatic quote checks, create a 9Sig strategy tab with exact Yahoo equity/safe tickers and the monitoring option. Manual tracking still works.</p>{% endif %}
   {% for signal in signals %}
   <div class="signal-review">
