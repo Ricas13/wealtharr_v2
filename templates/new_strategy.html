@@ -8,7 +8,7 @@
     <p class="muted">For example: “9Sig — ISA” and “9Sig — Trading” are independent, even though they use the same strategy model.</p>
     <form method="post" class="form-stack">{% csrf_token %}
       {% include 'partials/form_fields.html' with form=form %}
-      <div class="hint-box">Trades are performed by you at your broker. Wealtharr will track the records you enter; it will not place orders or calculate 9Sig trading signals in this initial version.</div>
+      <div class="hint-box">Trades are performed by you at your broker. Wealtharr will track the records you enter; verified Yahoo GBP prices and preliminary 9Sig alerts are optional. No automatic orders are placed. Exact workbook parity is not yet claimed.</div>
       <button class="btn btn-primary" type="submit">Create tab →</button>
     </form>
     <div class="under-form">Need a new ISA or trading account? <a href="{% url 'accounts' %}">Add an account first →</a></div>

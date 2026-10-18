@@ -16,8 +16,9 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from django.utils import timezone
 from .forms import AccountForm, IntegrationForm, LedgerForm, NotificationForm, PriceForm, StrategyForm
-from .models import Account, LedgerEntry, NotificationPreference, PriceMark, StrategyInstance, StrategyPreset, SystemIntegration, WealthSnapshot
+from .models import Account, LedgerEntry, NotificationPreference, PriceMark, StrategyInstance, StrategyPreset, StrategySignal, SystemIntegration, WealthSnapshot
 from .services import consolidated, dispatch, ledger_summary, validate_and_record
+from .market_signals import review_strategy
 
 @require_GET
 def home(request):
@@ -66,7 +67,8 @@ def dashboard(request):
     snapshots = WealthSnapshot.objects.filter(owner=request.user).order_by("as_of")
     chart = [{"date": s.as_of.isoformat(), "value": float(s.total_value),
               "contributed": float(s.net_contributed)} for s in snapshots]
-    data.update(chart=chart, accounts=Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies")))
+    data.update(chart=chart, accounts=Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies")),
+                open_signals=StrategySignal.objects.filter(strategy__owner=request.user, acknowledged_at__isnull=True).select_related("strategy").order_by("-created_at")[:8])
     return render(request, "dashboard.html", data)
 
 @login_required
@@ -111,7 +113,7 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
     entries = strategy.ledger.all().order_by("-occurred_on", "-pk")[:60]
     return render(request, "strategy.html", {
         "strategy": strategy, "report": report, "holdings": holdings,
-        "entries": entries,
+        "entries": entries, "signals": strategy.signals.all()[:12],
         "entry_form": entry_form or LedgerForm(), "price_form": price_form or PriceForm(),
     })
 
@@ -135,6 +137,36 @@ def record_entry(request, pk):
             form.add_error(None, exc)
     return render_strategy(request, strategy, entry_form=form)
 
+
+@login_required
+@require_POST
+def refresh_market(request, pk):
+    strategy = get_object_or_404(StrategyInstance.objects.select_related("preset", "account"), pk=pk, owner=request.user)
+    if not strategy.market_data_enabled:
+        messages.warning(request, "Enable Yahoo monitoring and add exact tickers to the strategy first.")
+    else:
+        try:
+            result = review_strategy(strategy)
+            if result["status"] == "ok":
+                messages.success(request, "Checked Yahoo daily prices and 9Sig review rules. Any new action appears below.")
+            else:
+                messages.warning(request, "Market update unavailable: " + result["status"])
+        except Exception:
+            messages.error(request, "Price check could not complete. No estimates or trading instructions were invented.")
+    return redirect("strategy_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def acknowledge_signal(request, pk, signal_pk):
+    strategy = get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
+    signal = get_object_or_404(StrategySignal, pk=signal_pk, strategy=strategy)
+    if signal.acknowledged_at is None:
+        signal.acknowledged_at = timezone.now()
+        signal.save(update_fields=["acknowledged_at"])
+    return redirect("strategy_detail", pk=pk)
+
+
 @login_required
 @require_POST
 def record_price(request, pk):
@@ -151,7 +183,7 @@ def record_price(request, pk):
                 form.add_error("as_of", "Use a price date on or after the existing mark.")
             else:
                 PriceMark.objects.update_or_create(strategy=strategy, symbol=symbol, defaults={
-                    "price": form.cleaned_data["price"], "as_of": form.cleaned_data["as_of"],
+                    "price": form.cleaned_data["price"], "as_of": form.cleaned_data["as_of"], "source": "manual",
                 })
                 messages.success(request, "Price saved. Record a wealth snapshot on the overview to add a chart point.")
                 return redirect("strategy_detail", pk=pk)
