@@ -33,7 +33,11 @@ jobs:
         run: |
           bash -n scripts/restore_backup.sh
           cp .env.example .env.production
-          POSTGRES_PASSWORD=github-ci-placeholder docker compose config --quiet
+          POSTGRES_PASSWORD=github-ci-placeholder docker compose config --quiet 2> /tmp/compose-warnings
+          if grep -q 'variable is not set' /tmp/compose-warnings; then
+            cat /tmp/compose-warnings
+            exit 1
+          fi
       - name: Public Yahoo chart endpoint smoke (non-gating)
         continue-on-error: true
         run: |
