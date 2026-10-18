@@ -270,11 +270,11 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
         active_down = False
     elif active_down and difference < -tolerance:
         if prior_skipped_sells >= 2:
-            reset_reason = "Two equity sells were already skipped under 30 Down"
+            reset_reason = "Two sell signals have already been skipped under 30 Down"
         else:
             note = "30 Down active: defer this equity sell signal; do not rebalance."
     elif spike and not active_down:
-        reset_reason = "TQQQ reference gained at least 100% in the completed quarter"
+        reset_reason = "The TQQQ reference doubled (gained at least 100%) in a quarter"
     elif difference > cash + safe_value + tolerance and not active_down:
         reset_reason = "The equity buy would require selling more than 100% of safe assets"
     elif active_down and difference > cash + safe_value + tolerance:
@@ -292,7 +292,8 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
         difference = total * Decimal("0.60") - equity_value
 
     actions = []
-    if active_down and difference < -tolerance and not reset_reason:
+    if active_down and not reset_reason and (
+            difference < -tolerance or difference > cash + safe_value + tolerance):
         actions.append({"side": "HOLD", "symbol": equity_symbol,
                         "quantity": "0", "estimated_gbp": "0.00"})
     elif difference < -tolerance:
