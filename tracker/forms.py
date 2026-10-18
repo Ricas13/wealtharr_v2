@@ -180,3 +180,56 @@ class IntegrationForm(forms.ModelForm):
         if commit:
             obj.save()
         return obj
+
+
+class RealNineSigSetupForm(forms.Form):
+    """Explicit real-account onboarding. Never simulates a broker execution."""
+    account_name = forms.CharField(
+        max_length=90, initial="Trading 212 ISA",
+        label="Investment account name")
+    account_kind = forms.ChoiceField(
+        choices=[("ISA", "Stocks & Shares ISA"), ("GIA", "General investment account")],
+        initial="ISA", label="Account type")
+    strategy_name = forms.CharField(
+        max_length=100, initial="9Sig — Trading 212",
+        label="Strategy tab name")
+    start_date = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Date you added the initial cash")
+    starting_cash = forms.DecimalField(
+        max_digits=16, decimal_places=2, min_value=Decimal("0.01"),
+        initial=Decimal("1000.00"), label="Actual starting cash deposited (£)")
+    monthly_target = forms.DecimalField(
+        max_digits=16, decimal_places=2, min_value=ZERO,
+        initial=Decimal("500.00"), label="Planned monthly contribution (£)")
+    equity_symbol = forms.CharField(
+        max_length=24, label="Exact Yahoo ticker of your GBP 3× Nasdaq product",
+        help_text="E.g. LQQ3.L; confirm which instrument you actually own in Trading 212.")
+    safe_symbol = forms.CharField(
+        max_length=24, label="Exact Yahoo ticker of your GBP safe asset",
+        help_text="E.g. ERNS.L; it is not interchangeable with US AGG.")
+
+    def __init__(self, *args, owner, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.owner = owner
+        self.fields["start_date"].initial = timezone.localdate()
+        style(self.fields)
+
+    def clean(self):
+        values = super().clean()
+        date = values.get("start_date")
+        if date and date > timezone.localdate():
+            self.add_error("start_date", "You cannot record a future cash deposit.")
+        for name in ("equity_symbol", "safe_symbol"):
+            ticker = (values.get(name) or "").strip().upper()
+            if ticker and not re.fullmatch(r"[A-Z0-9][A-Z0-9.^=_-]{0,23}", ticker):
+                self.add_error(name, "Enter an exact Yahoo ticker, e.g. LQQ3.L.")
+            values[name] = ticker
+        if values.get("equity_symbol") and values.get("equity_symbol") == values.get("safe_symbol"):
+            self.add_error("safe_symbol", "Equity and safe tickers must be different.")
+        if values.get("account_name"):
+            existing = Account.objects.filter(
+                owner=self.owner, name=values["account_name"]).first()
+            if existing and existing.kind != values.get("account_kind"):
+                self.add_error("account_name", "That account already exists with a different type.")
+        return values
