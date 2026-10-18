@@ -28,16 +28,34 @@ class Command(BaseCommand):
             report = consolidated(owner)
             if report["total"] is None or not report["items"]:
                 continue
-            fresh = True
+            # All included positions must have *automated*, GBP-verified closes;
+            # a stale manual mark cannot silently become a daily market snapshot.
+            observed_days = []
+            valid = True
             for item in report["items"]:
-                for symbol in item["positions"]:
+                for symbol, qty in item["positions"].items():
+                    if qty <= 0:
+                        continue
                     mark = item["marks"].get(symbol)
-                    if not mark or mark.as_of < timezone.localdate() - timedelta(days=8):
-                        fresh = False
-            if fresh:
-                WealthSnapshot.objects.update_or_create(
-                    owner=owner, as_of=timezone.localdate(),
-                    defaults={"total_value": report["total"],
-                              "net_contributed": report["net_contributed"]},
-                )
+                    if (not mark or mark.source != "yahoo" or
+                            mark.as_of < timezone.localdate() - timedelta(days=8)):
+                        valid = False
+                        break
+                    observed_days.append(mark.as_of)
+                if not valid:
+                    break
+            if not valid or not observed_days:
+                continue
+            date_to_record = min(observed_days)
+            # Do not combine shares purchased AFTER a quote with an old quote.
+            if (max(observed_days) - date_to_record).days > 1:
+                continue
+            if any(item["strategy"].ledger.filter(occurred_on__gt=date_to_record).exists()
+                   for item in report["items"]):
+                continue
+            WealthSnapshot.objects.update_or_create(
+                owner=owner, as_of=date_to_record,
+                defaults={"total_value": report["total"],
+                          "net_contributed": report["net_contributed"]},
+            )
         self.stdout.write("Yahoo monitoring: %d verified, %d awaiting usable data" % (ok, fail))
