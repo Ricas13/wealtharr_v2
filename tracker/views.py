@@ -257,14 +257,17 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
                      "value": float(snap.total_value),
                      "contributed": float(snap.net_contributed)}
                     for snap in strategy.value_snapshots.order_by("as_of")]
+    from .instrument_mapping import for_strategy
+    instrument_profile = for_strategy(strategy)
     return render(request, "strategy.html", {
         "strategy": strategy, "report": report, "holdings": holdings,
+        "instrument_profile": instrument_profile,
         "chart_points": chart_points,
         "monitoring_status": _monitoring_status(strategy),
         "alert_status": _alert_settings_status(request.user),
         "next_quarter_end": _next_quarter_settlement(timezone.localdate()),
         "entries": entries, "signals": strategy.signals.all()[:12],
-        "entry_form": entry_form or LedgerForm(), "price_form": price_form or PriceForm(),
+        "entry_form": entry_form or LedgerForm(strategy=strategy), "price_form": price_form or PriceForm(),
         "automation_form": AutomationForm(instance=strategy),
     })
 
@@ -277,7 +280,7 @@ def strategy_detail(request, pk):
 @require_POST
 def record_entry(request, pk):
     strategy = get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
-    form = LedgerForm(request.POST)
+    form = LedgerForm(request.POST, strategy=strategy)
     if form.is_valid():
         entry = form.save(commit=False)
         try:
