@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}Strategy{% endblock %}
+{% block content %}
+<div class="cockpit ck-v2">
+  <header class="ck-top">
+    <div>
+      <p class="ck-overline">READ-ONLY STRATEGY GUIDE</p>
+      <h1>{{ strategy.preset.name }}</h1>
+      <p class="ck-muted">{{ strategy.account.name }} · {{ strategy.account.get_kind_display }} · {{ strategy.account.currency }}</p>
+    </div>
+    <a class="btn btn-subtle btn-sm" href="{% url 'cockpit_today' %}">Back to Today</a>
+  </header>
+
+  <section class="panel ck-card">
+    <h2>What you are following</h2>
+    <p>{{ strategy.preset.summary|default:'A source-controlled investment strategy. All investment decisions and trades remain yours.' }}</p>
+    {% if strategy.preset.methodology %}
+      <details class="ck-disclosure-inline"><summary>Read the strategy rules</summary>
+        <div class="ck-prose">{{ strategy.preset.methodology|linebreaks }}</div>
+      </details>
+    {% endif %}
+    <p class="ck-muted">Wealtharr tracks your recorded holdings and reviews the model. It does not connect to a broker, buy investments, or automatically rebalance.</p>
+  </section>
+
+  <section class="panel ck-card" aria-labelledby="instrument-title">
+    <div class="ck-section-head">
+      <h2 id="instrument-title">Instruments used in your account</h2>
+      <span class="ck-chip {% if profile %}ck-attention{% else %}ck-blocked{% endif %}">{{ mapping_status }}</span>
+    </div>
+    {% if instruments %}
+      <div class="ck-instrument-grid">
+        {% for item in instruments %}
+          <article class="ck-instrument">
+            <p class="ck-overline">{{ item.role }} role · {{ item.instrument.allocation_pct }}% initial reference</p>
+            <h3>{{ item.instrument.broker_ticker }} · {{ item.instrument.name }}</h3>
+            <dl class="ck-facts">
+              <div><dt>Security identifier</dt><dd>{{ item.instrument.isin }}</dd></div>
+              <div><dt>Actual trading line</dt><dd>{{ item.instrument.trading_line }}</dd></div>
+              <div><dt>Tracked quote</dt><dd>{{ item.instrument.yahoo_ticker }}</dd></div>
+              <div><dt>Raw quote unit</dt><dd>{{ item.instrument.raw_quote_unit }} → GBP{% if item.instrument.raw_quote_unit == 'GBX' %} (pence ÷ 100){% endif %}</dd></div>
+              <div><dt>Exposure</dt><dd>{{ item.instrument.exposure }}</dd></div>
+            </dl>
+            <p class="ck-muted">Issuer and Trading 212 Invest catalogue evidence are not proof of availability in your own Stocks &amp; Shares ISA.</p>
+            <div class="ck-link-row">
+              <a href="{{ item.instrument.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer information <span aria-hidden="true">↗</span></a>
+              <a href="{{ item.instrument.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">Broker Invest listing <span aria-hidden="true">↗</span></a>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ck-block-message" role="status">
+        <strong>Exact broker instruments are not mapped for this account.</strong>
+        <p>This page will not infer a replacement ticker or claim that an unknown product is eligible.</p>
+      </div>
+    {% endif %}
+  </section>
+  {% if profile %}
+    <section class="panel ck-card">
+      <h2>Important differences and limitations</h2>
+      <p>{{ profile.model_warning }}</p>
+      <p>{{ profile.broker_warning }}</p>
+      <details class="ck-disclosure-inline">
+        <summary>Read source and eligibility limitations</summary>
+        <p>UK-listed daily leveraged growth products can compound differently from US reference funds. Quote units, distribution policies, broker restrictions and fills matter. Manual trades must be verified against your own broker records.</p>
+        {% for item in instruments %}<h3>{{ item.instrument.broker_ticker }}</h3>
+          <p>{{ item.instrument.evidence_note }}</p>
+        {% endfor %}
+        <p>Signal histories are advisory snapshots. A reset recommendation is not proof that you completed a reset.</p>
+      </details>
+    </section>
+  {% else %}
+    <p class="ck-muted">The selected account cannot be treated as a reviewed instrument combination.</p>
+  {% endif %}
+  <div class="ck-bottom-links">
+    <a href="{% url 'cockpit_history' %}" class="btn btn-subtle">View recorded performance</a>
+    <a href="{% url 'cockpit_ledger' %}" class="btn btn-subtle">View actual transactions</a>
+  </div>
+</div>
+{% endblock %}
