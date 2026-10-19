@@ -174,3 +174,13 @@ select.field{color-scheme:inherit}
 @media(max-width:620px){.ws-page-head,.ws-section-heading{align-items:flex-start;flex-wrap:wrap}.ws-page-head .btn{width:100%}.ws-strategy-grid{grid-template-columns:1fr}.ws-stat-grid{gap:10px}.ws-stat{padding:16px;min-height:126px}.ws-chart-panel,.ws-action-panel{padding:15px}.ws-theme-label{display:none}.ws-view-tabs a{padding:10px 13px}.ws-main-grid{gap:12px}.ws-stack>.panel{padding:15px}}
 @media(max-width:380px){.ws-stat-grid{grid-template-columns:1fr}.ws-stat{min-height:102px}.ws-stat-number{font-size:1.9rem}.ws-section-heading{gap:8px}.chart-controls{width:100%;justify-content:space-between}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Supporting components share tokens with the main financial surfaces. */
+.ws-sparkline{display:block;width:112px;height:32px;margin-top:0;overflow:visible;flex:none}
+.ws-sparkline path{stroke:var(--teal);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.ws-spark-empty{color:var(--subtle);font-size:.73rem}
+.ws-instrument-disclosure{margin-top:18px;padding:15px;border:1px solid var(--stroke);border-radius:var(--radius-lg);background:var(--panel)}
+.ws-instrument-disclosure summary{color:var(--cyan);font-weight:680;cursor:pointer;padding:6px}
+.ws-instrument-disclosure .panel{margin:16px 0 0}
+.ws-view-tabs + section > .stat-grid{margin-top:0}
+.ws-strategy-card:focus-visible{border-color:var(--cyan)}
