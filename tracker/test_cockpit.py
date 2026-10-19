@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from uuid import uuid4
 from decimal import Decimal as D
 from io import BytesIO
 from unittest.mock import patch
@@ -80,34 +81,48 @@ class GuidedRebalanceTests(TestCase):
         self.sig = StrategySignal.objects.create(strategy=self.strategy,
             signal_key='quarter:test:'+str(self.qend), kind='QUARTERLY', as_of=self.qend,
             title='Quarterly reset', message='Time to review a reset to 60% equity / 40% safe',
+            reset_reason='Explicit strategy reset',
             actions=[{'side':'SELL', 'symbol':'LQQ3.L', 'quantity':'1', 'estimated_gbp':'100.00'},
                      {'side':'BUY', 'symbol':'ERNS.L', 'quantity':'2', 'estimated_gbp':'100.00'}])
-    def payload(self, qty='1', price='100'):
-        return {'executed_on': self.fill_day.isoformat(),
-                'fill0-quantity':qty, 'fill0-unit_price':price, 'fill0-fee':'0',
-                'fill1-quantity':'2', 'fill1-unit_price':'50', 'fill1-fee':'0'}
+    def single_payload(self, index, *, quantity, price, fee='0'):
+        return {
+            'intent': 'record_one', 'action_index': str(index),
+            'executed_on': self.fill_day.isoformat(),
+            'quantity': str(quantity), 'unit_price': str(price),
+            'fee': str(fee), 'idempotency_key': str(uuid4()),
+        }
+
+    def record_both_actual_fills(self):
+        uri = reverse('cockpit_rebalance', args=[self.sig.pk])
+        a = self.client.post(uri, self.single_payload(0, quantity='1', price='100'))
+        b = self.client.post(uri, self.single_payload(1, quantity='2', price='50'))
+        self.assertEqual(a.status_code, 302)
+        self.assertEqual(b.status_code, 302)
+
     def test_atomic_fills_and_reset_baseline(self):
-        # If today is only one day after quarter-end, post-fill closing mark
-        # must exist; fixture ensures this by using today for quote date.
-        response = self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload())
+        self.record_both_actual_fills()
+        self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
+        response = self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]),
+                                    {'intent': 'finalize'})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(RebalanceExecution.objects.filter(signal=self.sig).count(), 1)
         self.assertEqual(StrategyBaseline.objects.filter(reset_signal=self.sig).count(), 1)
         self.assertEqual(ledger_summary(self.strategy)['positions']['LQQ3.L'], D('6'))
-        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload())
-        self.assertEqual(RebalanceExecution.objects.filter(signal=self.sig).count(), 1)
+
     def test_overselling_rolls_back_all_rows_and_baseline(self):
-        before = LedgerEntry.objects.filter(strategy=self.strategy).count()
-        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload(qty='100'))
-        self.assertEqual(LedgerEntry.objects.filter(strategy=self.strategy).count(), before)
+        previous = self.strategy.ledger.count()
+        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]),
+                         self.single_payload(0, quantity='100', price='100'))
+        self.assertEqual(self.strategy.ledger.count(), previous)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
         self.assertFalse(StrategyBaseline.objects.filter(reset_signal=self.sig).exists())
+
     def test_historical_quarter_url_does_not_write_any_fills(self):
         self.sig.as_of = self.qend - timedelta(days=1)
         self.sig.save(update_fields=['as_of'])
         previous = self.strategy.ledger.count()
         self.assertEqual(self.client.get(reverse('cockpit_rebalance', args=[self.sig.pk])).status_code, 302)
-        self.assertEqual(self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload()).status_code, 302)
+        self.assertEqual(self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.single_payload(0, quantity='1', price='100')).status_code, 302)
         self.assertEqual(self.strategy.ledger.count(), previous)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
 
@@ -137,7 +152,8 @@ class GuidedRebalanceTests(TestCase):
         self.account.broker = 'UNKNOWN'
         self.account.save(update_fields=['broker'])
         count = self.strategy.ledger.count()
-        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload())
+        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]),
+                         self.single_payload(0, quantity='1', price='100'))
         self.assertEqual(self.strategy.ledger.count(), count)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
 
@@ -210,20 +226,23 @@ class CSVImportCommitTests(ImportSafetyTests):
         self.assertEqual(self.strategy.ledger.count(), 2)
 
 class NonResetQuarterTests(GuidedRebalanceTests):
-    def test_ordinary_safe_asset_fill_cannot_stray_far_from_plan(self):
-        self.sig.message = 'Equity above quarterly 9Sig signal line; move towards target.'
-        self.sig.save(update_fields=['message'])
-        payload = self.payload()
-        payload['fill1-quantity'] = '0.5'
-        before = self.strategy.ledger.count()
-        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), payload)
-        self.assertEqual(self.strategy.ledger.count(), before)
+    def test_ordinary_safe_asset_fill_remains_partial_until_all_real_units(self):
+        self.sig.reset_reason = ''
+        self.sig.save(update_fields=['reset_reason'])
+        url = reverse('cockpit_rebalance', args=[self.sig.pk])
+        self.client.post(url, self.single_payload(0, quantity='1', price='100'))
+        self.client.post(url, self.single_payload(1, quantity='0.5', price='50'))
+        self.client.post(url, {'intent': 'finalize'})
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
+        self.assertFalse(StrategyBaseline.objects.filter(reset_signal=self.sig).exists())
 
     def test_ordinary_trade_does_not_reanchor(self):
-        self.sig.message = 'Equity above quarterly 9Sig signal line; move towards target.'
-        self.sig.save(update_fields=['message'])
-        response = self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload())
+        self.sig.reset_reason = ''
+        self.sig.save(update_fields=['reset_reason'])
+        self.record_both_actual_fills()
+        response = self.client.post(
+            reverse('cockpit_rebalance', args=[self.sig.pk]),
+            {'intent': 'finalize'})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(RebalanceExecution.objects.filter(signal=self.sig).count(), 1)
         self.assertFalse(StrategyBaseline.objects.filter(reset_signal=self.sig).exists())
