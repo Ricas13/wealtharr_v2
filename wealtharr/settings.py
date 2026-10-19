@@ -76,8 +76,12 @@ LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"
 USE_I18N = True
 USE_TZ = True
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Project-owned CSS/JS lives in BASE_DIR/static, outside installed apps.
+# Without this, collectstatic only copies Django admin assets and production
+# manifest lookups for css/site.css and js/site.js cause HTTP 500.
+STATICFILES_DIRS = [BASE_DIR / "static"]
 STORAGES = {"staticfiles": {"BACKEND": (
     "django.contrib.staticfiles.storage.StaticFilesStorage" if DEBUG
     else "whitenoise.storage.CompressedManifestStaticFilesStorage"
