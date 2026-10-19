@@ -73,6 +73,30 @@ jobs:
           rm -f secrets/postgres_password secrets/django_secret_key .env.production
           rmdir secrets
 
+      - name: Exercise disposable PostgreSQL backup recovery (synthetic data)
+        run: |
+          set -eu
+          mkdir -p backups
+          docker run -d --name wealtharr-ci-restore-source \
+            -e POSTGRES_PASSWORD=ci-only-not-a-real-secret \
+            -e POSTGRES_DB=ci_restore_source postgres:16-alpine >/dev/null
+          trap 'docker rm -f wealtharr-ci-restore-source >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 45); do
+            if docker exec wealtharr-ci-restore-source \
+              pg_isready -U postgres -d ci_restore_source >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec wealtharr-ci-restore-source \
+            psql -v ON_ERROR_STOP=1 -U postgres -d ci_restore_source \
+            -c "CREATE TABLE django_migrations (id bigint primary key, app text not null, name text not null); INSERT INTO django_migrations VALUES (1, 'tracker', 'synthetic_ci');"
+          docker exec wealtharr-ci-restore-source \
+            pg_dump -U postgres -d ci_restore_source -Fc > backups/wealtharr-ci.dump
+          (cd backups && sha256sum wealtharr-ci.dump > wealtharr-ci.dump.sha256)
+          bash scripts/verify_backup.sh backups/wealtharr-ci.dump
+          rm -f backups/wealtharr-ci.dump backups/wealtharr-ci.dump.sha256
+
       - name: Public Yahoo chart endpoint smoke (non-gating)
         continue-on-error: true
         run: |
