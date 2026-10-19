@@ -9,6 +9,11 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name="strategyinstance",
+            name="strategy_version",
+            field=models.CharField(blank=True, default="", editable=False, max_length=48),
+        ),
+        migrations.AddField(
+            model_name="strategyinstance",
             name="mapping_version",
             field=models.CharField(blank=True, default="", editable=False, max_length=40),
         ),
