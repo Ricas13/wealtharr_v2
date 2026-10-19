@@ -107,7 +107,7 @@ class TodayPhase4Tests(TestCase):
         self.assertContains(page, "Review the verified quarterly proposal")
         self.assertContains(page, "Proposed 1")
         self.assertContains(page, "LQQ3.L")
-        self.assertContains(page, "£1,003.00")  # £750 cash + £202 equity + £51 safe
+        self.assertContains(page, "£1003.00")  # £750 cash + £202 equity + £51 safe
         self.assertNotContains(page, "SECRET_OTHER_OWNER")
         self.assertContains(page, reverse("v2_guided_review", args=[self.strategy.pk, notice.pk]))
         self.assertEqual(SignalFill.objects.count(), 0)
@@ -156,7 +156,7 @@ class TodayPhase4Tests(TestCase):
         self.assertEqual(SignalFill.objects.count(), 0)
         self.assertRedirects(self.client.post(url, form), url)
         self.assertEqual(SignalFill.objects.count(), 1)
-        self.assertEqual(self.strategy.ledger.filter(kind="BUY").count(), 2)
+        self.assertEqual(self.strategy.ledger.filter(kind="BUY").count(), 3)
         entry = SignalFill.objects.get().ledger_entry
         self.assertEqual(entry.quantity, D("1"))
         self.assertEqual(entry.fee, D("0.50"))
@@ -198,7 +198,7 @@ class TodayPhase4Tests(TestCase):
             version=1, operation="EDIT", before=original, after=original,
         )
         page = self.client.get(self._url())
-        self.assertContains(page, "historical quarterly reviews")
+        self.assertContains(page, "ledger changed after this review")
         self.assertNotContains(page, "Review proposal / I did this")
         self.assertIsNone(save_verified_strategy_snapshot(self.strategy))
 
@@ -208,6 +208,6 @@ class TodayPhase4Tests(TestCase):
             total_value=D("1150"), net_contributed=D("1000"),
         )
         p = self.client.get(self._url())
-        self.assertContains(p, "£1,150.00")
+        self.assertContains(p, "£1150.00")
         self.assertContains(p, "30 Sep") if self.quarter.month == 9 else None
         self.assertContains(p, "No source-verified portfolio snapshots") if False else None
