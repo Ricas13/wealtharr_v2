@@ -1,5 +1,7 @@
 # Wealtharr v2
 
+**Private owner install / update / server migration:** [Portable deployment](docs/PORTABLE_DEPLOYMENT.md) — `bash wealtharr.sh setup`, `start`, `update`, `export` and `restore-fresh`. This supersedes the older example commands below.
+
 Private-first personal investment tracking with a responsive dark interface inspired by Infinidysk and Radarr.
 
 ## Current private-owner cockpit (PR #11)
