@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from tracker.market_signals import quarter_end_before, review_strategy
+from tracker.cockpit_notifications import send_due_cockpit_notices
 from tracker.models import (
     Account, LedgerEntry, MarketObservation, StrategyInstance,
     StrategyPreset, StrategySignal)
@@ -78,7 +79,13 @@ class RealQuarterlySignalTests(TestCase):
             strategy=self.strategy, kind="QUARTERLY")
         self.assertIn("£904.00", alert.message)
         self.assertTrue(any(x["side"] == "BUY" for x in alert.actions))
-        self.assertEqual(dispatch.call_count, 1)
+        # No instant duplicate quarterly alert; the reconciled instruction
+        # is sent once by the scheduled digest instead.
+        dispatch.assert_not_called()
+        with patch('tracker.cockpit_notifications.dispatch') as digest_dispatch:
+            send_due_cockpit_notices()
+        self.assertEqual(digest_dispatch.call_count, 1)
+        self.assertIn('quarterly-digest:', digest_dispatch.call_args.args[1])
 
     def test_no_action_quarter_is_saved_without_sending_a_rebalance_alert(self):
         self.save(LedgerEntry.DEPOSIT, self.begin, amount=D("1000"))
