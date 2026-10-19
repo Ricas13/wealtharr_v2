@@ -74,8 +74,8 @@
 <div class="w2-two-columns"><div class="w2-column">
   <section class="w2-panel w2-action">
     <span class="w2-badge w2-warning">Cannot compute yet</span>
-    <h2 class="w2-card-title">No trade instruction available in this shell</h2>
-    <p class="w2-muted">Strategy evaluation and verified data will be connected in Phase 4. This screen does not infer prices or recommend trades.</p>
+    <h2 class="w2-card-title">{% if selected_instance.tracking_only %}Tracking only · verification pending{% else %}No trade instruction available in this shell{% endif %}</h2>
+    <p class="w2-muted">{% if selected_instance.tracking_only %}The fixed instrument mapping still needs evidence of account-level dealing permission and verified quotes. No trade recommendation is available. {% endif %}Strategy evaluation and verified data will be connected in Phase 4. This screen never guesses prices or recommends trades.</p>
   </section>
   <section class="w2-panel"><h2>Quarter by quarter</h2>
     <div class="w2-empty">Reviews will appear from recorded evaluations only.</div></section>
@@ -104,8 +104,17 @@
   <p class="w2-muted">Fixed strategy rules and version information will be displayed here, read-only.</p>
   {% if selected_instance.strategy_version %}<p class="w2-note">Recorded strategy version: {{ selected_instance.strategy_version }}</p>{% endif %}
 </section>
+{% if selected_instance.onboarding_mode == 'hold' %}
+<section class="w2-panel w2-space-top"><h2>Owner-reported opening holdings</h2>
+  <p class="w2-muted">Recorded as a snapshot, NOT as purchases or verified current valuations. Reconcile these against the ledger in Phase 3.</p>
+  {% if selected_instance.opening_snapshot %}
+    <p class="w2-note">Opening cash: £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:2 }} · as reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }}.</p>
+  {% endif %}
+</section>
+{% endif %}
 <section class="w2-panel w2-space-top"><h2>Instruments</h2>
-  <div class="w2-empty">A versioned, evidence-aware instrument catalogue will be connected in Phase 2.</div>
+  <p class="w2-muted">Instrument mapping version: {{ selected_instance.mapping_version|default:"Legacy mapping not pinned" }}.</p>
+  <p><a href="{% url 'v2_catalogue' %}">View the fixed read-only catalogue →</a></p>
 </section>
 <section class="w2-panel w2-space-top"><h2>Alerts for this strategy</h2>
   <div class="w2-empty">Routing is configured in Phase 7.</div></section>
@@ -121,10 +130,7 @@
 {% endif %}
 
 {% elif page_key == 'catalogue' %}
-<section class="w2-panel w2-space-top"><h2>Instrument catalogue</h2>
-  <p class="w2-muted">Mappings are maintained in code, not edited by users. Unverified lines never produce trade instructions.</p>
-  <div class="w2-empty">Versioned catalogue and account-type filters arrive in Phase 2.</div>
-</section>
+{% include 'v2/catalogue.html' %}
 
 {% elif page_key == 'settings' %}
 <div class="w2-two-columns w2-space-top">
@@ -143,9 +149,6 @@
 </div>
 
 {% else %}
-<section class="w2-panel w2-space-top"><h2>Add strategy</h2>
-  <div class="w2-empty">The five-step, catalogue-backed onboarding wizard will be introduced in Phase 2.
-    No account or holdings have been created.</div>
-</section>
+{% include 'v2/onboarding.html' %}
 {% endif %}
 {% endblock %}
