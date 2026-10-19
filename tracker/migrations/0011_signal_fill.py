@@ -11,6 +11,18 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AddField(
+            model_name="strategybaseline", name="strategy_version",
+            field=models.CharField(blank=True, default="", editable=False, max_length=48),
+        ),
+        migrations.AddField(
+            model_name="strategybaseline", name="mapping_version",
+            field=models.CharField(blank=True, default="", editable=False, max_length=40),
+        ),
+        migrations.AddField(
+            model_name="strategybaseline", name="quote_evidence",
+            field=models.JSONField(blank=True, default=dict, editable=False),
+        ),
         migrations.CreateModel(
             name="SignalFill",
             fields=[
