@@ -190,6 +190,16 @@ class CSVImportCommitTests(ImportSafetyTests):
         self.assertEqual(self.strategy.ledger.count(), 2)
 
 class NonResetQuarterTests(GuidedRebalanceTests):
+    def test_ordinary_safe_asset_fill_cannot_stray_far_from_plan(self):
+        self.sig.message = 'Equity above quarterly 9Sig signal line; move towards target.'
+        self.sig.save(update_fields=['message'])
+        payload = self.payload()
+        payload['fill1-quantity'] = '0.5'
+        before = self.strategy.ledger.count()
+        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), payload)
+        self.assertEqual(self.strategy.ledger.count(), before)
+        self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
+
     def test_ordinary_trade_does_not_reanchor(self):
         self.sig.message = 'Equity above quarterly 9Sig signal line; move towards target.'
         self.sig.save(update_fields=['message'])
