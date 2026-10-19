@@ -7,7 +7,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ## IMPORTANT: LETTERED PRODUCT REDESIGN — resume checkpoint 2026-10-19
 
-**Current milestone: Sections A–F implemented as scoped branch deliverables. The next section is G only when the owner says “next”.** Section F implemented single-screen UK Trading 212 Stocks ISA enrolment, real-only opening cash/contributions, evidence-labelled per-portfolio pinned strategy/instrument versions, and an explicit conservative Trading 212 preview/import journey. No broker connection, invented funding, or automatic orders.
+**Current milestone: Sections A–G committed as scoped branch deliverables. The next section is H only when the owner says “next”.** Section G implements one actual owner-confirmed transaction per request, separately linked append-only fill receipts, resumable partial progress, explicit completion, and source-backed post-fill reset evidence. No broker connectivity or automatic trading.
 
 - **Same active branch:** `feature/owner-9sig-cockpit-resumable` (PR **#11**). No competing branch, no restart. Before edits, fetch current PR HEAD and check concurrent commits.
 - **Section B artefacts:** `docs/instrument-research.md`, `tracker/instrument_mapping.py` (immutable `CURATED_ISA_ROLE_MAP`, `MAPPING_VERSION=2026-10-19.1`, reviewed issuer/Invest evidence with explicit pending owner ISA permission and Yahoo feed flags), `tracker/test_instrument_catalogue.py`, updated `CLAUDE.md`, `docs/architecture.md` and superseded old broker-API proposal.
@@ -20,7 +20,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ### Paste this in a NEW ChatGPT chat to resume
 
-> Continue Wealtharr v2 on the existing **PR #11** and `feature/owner-9sig-cockpit-resumable` branch. Read `docs/RESUME.md` **first**, then `docs/architecture.md`, `tracker/cockpit.py`, `tracker/models.py`, `tracker/strategies/registry.py` and Section F files. **Sections A–F are implemented on this branch. Do ONLY Section G:** safe owner-confirmed single-transaction fill capture, partial and complete execution handling, and immutable *actual* post-fill baseline / reset semantics. Preserve Django/vanilla JS, exact pinned UK ISA lines, historical source dates and ledger safety; never connect a broker or place a trade. Do not revisit completed cockpit/import/notification hardening or redo Sections A–F. Owner evidence is already itemized once in `docs/OWNER_TODO.md` and does not stop building. Commit to the **same PR and branch**, update this handoff at the end, then stop until “next”.
+> Continue Wealtharr v2 on existing **PR #11** / `feature/owner-9sig-cockpit-resumable`. **Read `docs/RESUME.md` first** and inspect current branch head; preserve all Section A–G commits. Do **ONLY Section H**: owner notification route and alert matrix, idempotent quarterly digest, urgent/data-problem/contribution delivery preferences, scheduler state/diagnostics and safe retries. No brokerage APIs, broker orders, synthetic prices, further onboarding redesign or financial strategy rewrites. Existing owner external evidence is requested only in `docs/OWNER_TODO.md` and must not block building. Commit to the same PR/branch; update the handoff once at the end; stop until the owner says “next”.
 ## Objective
 
 Make Wealtharr a strategy-agnostic **tracking and notification** platform for a private owner, with fixed 9Sig as its first (and only currently implemented) strategy. Today shows performance and one next action; the owner manually makes and confirms any broker trades. The product never places orders, never connects to brokers (including read-only APIs), and never invents prices, trades or backtests. Preserve the append-only ledger, immutable confirmed reset baselines and financial refusal rules throughout the refactor.
@@ -33,11 +33,11 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [x] **D** pure `tracker/core/metrics.py` v1 universal portfolio returns, verified GBP endpoints, signed irregular external flows, pre/post cash-flow unitisation, exact-period cash gain and XIRR, time-weighted return, annualisation, sampled unit NAV drawdown, role drift and CSV-ready metric audit; Django owner cockpit money-weighted adapter and focused tests.
 - [x] **E** strategy-neutral read-only strategy registry and presentation models; redesigned Today / History / Ledger / Strategy pages, one-next-action framing, provenance/disclosures, source-grounded metrics, real transactions with ledger filtering/export, responsive styling and focused owner-isolated UI tests.
 - [x] **F** new one-screen UK ISA-only setup, recorded actual starting GBP cash only, per-owner version/issuer identity snapshot in migration 0010, £500 optional monthly reminder target, true-date contribution shortcut in Ledger, conservative T212 CSV three-stage preview and confirmation, legacy GIA entrypoint redirect, and focused tests.
-- [ ] **G** safe single-transaction owner-confirmed fills and actual-baseline handling.
+- [x] **G** one actual manual fill per POST, source-ledger-linked partial execution receipts and idempotent retries, explicit completed review only after original quantities and verified post-fill GBP closes; structured signal reset reason, source/strategy-version pinned immutable reset baseline, old text-only shortcut retired, Today/History partial status and focused tests.
 - [ ] **H** owner destination/alert matrix, idempotent digest, scheduler diagnostics.
 - [ ] **I** secure Traefik deployment, optional TOTP, backups/restore.
 - [ ] **J** CI/Playwright and incremental ship plan.
-- **Instruction:** user wants **one lettered section per turn**. Stop after F now; proceed with G **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
+- **Instruction:** user wants **one lettered section per turn**. Stop after G now; proceed with H **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
 - **Architecture decision:** no broker/API integration of any kind, no editable preset/ticker/rule UI, no paper account, no billing or public signup. Fixed code-defined strategy versions; role-based evidence-backed exact lines pinned at enrolment. See `docs/architecture.md` and `CLAUDE.md`.
 - **Outstanding verification remains outstanding:** workbook parity, ISA/broker eligibility, real CSV, CI/migrations/browser checks, and deployment. Section A did not test or deploy runtime changes.
 
@@ -109,6 +109,17 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - **CI evidence:** [run #536](https://github.com/Ricas13/wealtharr_v2/actions/runs/39296778471) **passed** for commit `97bb4cdcf76a518701b0c8603affaa6105ebe84e` (Django tests, migrations check/application, static assets and production-mode smoke), including Section F allowance tests, pinned mapping, onboarding paths, CSV holds and legacy regression updates. Later `docs/onboarding-import.md` and this resume-only commit trigger separate CI; verify live HEAD before claiming those runs succeeded. Section C's real workbook parity remains intentionally skipped due to missing owner inputs.
 - [ ] Next scope: **Section G only** (single-transaction manual fills, partial executions and verified actual reset baselines). Do not rebuild imports, performance metrics or redesign.
 
+## Section G delivery — 2026-10-19
+
+- [x] `tracker/cockpit_execution.py` atomically records exactly **one owner-asserted actual BUY/SELL fill** at a time (broker execution date, mapped symbol/action, Decimal quantity, actual GBP unit price and fee). Each `SignalFill` is linked one-to-one to its append-only `LedgerEntry`, original immutable signal/action index, owner and UUID idempotency token. Existing capital/positions replay remains authoritative; double-submit does not double-buy/sell.
+- [x] Proposed action quantities are reconciled against **all real partial fills per action**. `rebalance.html` saves each execution independently, shows remaining quantities and linked ledger receipts, and presents a separate completion action. Pending/partial fills are resumable from Today and clearly labelled in History. An invalid/current-quarter signal or unrelated post-review ledger change cannot be silently treated as the same instruction.
+- [x] Completion cannot happen while any proposed action is outstanding. It requires actual ledger cash/positions, same-day UK GBP `MarketObservation`-backed Yahoo marks **strictly after the last actual fill**, plus the previously reviewed result checks. The completed `RebalanceExecution` is one-to-one with its signal; once confirmed, retries cannot add another execution/baseline.
+- [x] Reset detection is based on the explicit `StrategySignal.reset_reason` populated by the versioned rules, **never on free-text signal messages**. Only genuinely completed approved reset trades create `StrategyBaseline`, with actual equity quantity, actual GBP equity/safe/cash amounts, strategy/mapping version, dated source quote values and persisted observation IDs. Ordinary quarterly fills never re-anchor. Provisional spikes remain warnings. Legacy arbitrary text-only reset shortcut is retired for safety.
+- [x] Additive migrations `0011_signal_fill.py` and `0012_signal_reset_reason.py` preserve existing rows; newly added baseline evidence/version fields default empty for **legacy** resets and are not backfilled with fabricated quotes. No destructive migration.
+- [x] `tracker/test_g_single_fill.py` and updated `tracker/test_cockpit.py` / `tracker/test_strategy_baseline.py` exercise partial entries, idempotency, oversell rejection, other-activity refusal, owner isolation, matching post-fill quote requirements, ordinary no-reset completion and structured reset identity. All work remains owner-only and has **no broker link or execution authority**.
+- **CI status (single observation):** run **#579** at commit `39fa32cd3889bf52f042c1ae2c47fcb0d8ac20ca` was queued. Subsequent commits may trigger other runs; **do not claim current HEAD green without checking on the next turn**. The local container could not clone GitHub (DNS unavailable); GitHub CI is the runtime verification path.
+- [ ] Section **H** next. Do not redo completed G work; external reconciliation input stays only in `docs/OWNER_TODO.md`.
+
 ## State / checkpoints
 
 - [x] Dedicated new branch created; `main` deliberately untouched.
@@ -146,10 +157,10 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## First commands in a NEW CHAT
 
-1. Read this file first and inspect the latest PR #11 branch head to avoid overwriting concurrent work.
-2. Follow **Section G only**: trustworthy recorded manual fills and verified post-fill baseline/reset handling; source/permission and execution semantics never bypassed.
-3. Preserve the new Section F owner ISA-only enrolment, deterministic mapping snapshot, existing import preview, ledger and unitised metrics. Owner evidence is requested in `docs/OWNER_TODO.md`, not here.
-4. Commit to this SAME branch/PR, update the handoff once at the end, then await "next".
+1. Read this handoff and inspect latest PR #11 branch head; concurrent edits exist, so do not overwrite existing Section G.
+2. Implement **Section H only**: owner-specific destinations/alert matrix, idempotent quarterly digest and independently useful urgent/data/reminder notice routing, scheduler status and retry diagnostics.
+3. Preserve append-only ledger, partial execution receipts, typed reset reason, verified post-fill reset baseline and the existing no-broker/no-auto-trade boundary.
+4. Request real owner evidence only via `docs/OWNER_TODO.md`, commit on the **same** branch and PR, update this handoff once and wait for "next".
 
 ## Critical financial semantics
 
@@ -162,4 +173,4 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## User prompt for a new chat
 
-**Use the Section G-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
+**Use the Section H-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
