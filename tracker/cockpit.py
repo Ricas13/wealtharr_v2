@@ -478,9 +478,18 @@ def setup(request):
             with transaction.atomic():
                 # No user-selected brokerage, currency, ticker, account type or
                 # strategy rules. The owner alone chooses real funding dates.
-                account = Account.objects.create(
-                    owner=request.user, name='Trading 212 ISA', kind='ISA',
-                    country='GB', broker='TRADING212')
+                account, created = Account.objects.select_for_update().get_or_create(
+                    owner=request.user, name='Trading 212 ISA',
+                    defaults={'kind': 'ISA', 'country': 'GB',
+                              'broker': 'TRADING212', 'currency': 'GBP'})
+                if not created and (
+                        account.kind != 'ISA' or account.country != 'GB' or
+                        account.broker != 'TRADING212' or
+                        account.currency != 'GBP' or
+                        account.strategies.exists()):
+                    raise ValidationError(
+                        'An account with this name already exists with another '
+                        'profile or investments. Resolve it before starting 9Sig.')
                 strategy = StrategyInstance.objects.create(
                     owner=request.user, account=account,
                     preset=StrategyPreset.objects.get(
@@ -513,6 +522,17 @@ def setup(request):
             if d['destination'] == 'DISCORD':
                 messages.info(request,
                     'Set your Discord destination in Settings and send a test before relying on alerts.')
+            if d['position_mode'] == 'FRESH' and actual_cash is not None:
+                try:
+                    advisory = estimate_allowance(
+                        as_of=d['start_date'],
+                        recorded_deposits=((d['start_date'], actual_cash),))
+                except ValueError:
+                    messages.info(request,
+                        'The ISA subscription limit for this deposit year has not been verified; check HMRC.')
+                else:
+                    if advisory.status in ('approaching', 'limit_reached'):
+                        messages.warning(request, advisory.warning)
             if d.get('starting_cash') is None:
                 messages.info(request,
                     'No deposit was recorded. Record money only once it has actually reached your ISA.')
