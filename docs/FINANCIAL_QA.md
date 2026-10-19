@@ -23,7 +23,7 @@
 2. Verify private webhook URL/SMTP password never appears in templates, logs or exception messages.
 3. Test alert idempotency on repeated scheduler runs and simulate lost network acknowledgements (at-least-once delivery).
 4. Suppress old immediate quarterly dispatch before enabling the new digest scheduler; continue urgent SPIKE_WATCH and THIRTY_DOWN notices.
-5. Freeze all automatic broker writing: new API key must be **read-only**, API client must expose only GET methods and keep order endpoints inaccessible.
+5. **No broker API connection at all**, including read-only keys; Trading 212 history is provided only by owner-imported CSV or manual transaction confirmation. Test that no broker API credentials, client or trading endpoints have been introduced.
 
 **Known limitations in this reference patch**
 - Existing-holdings onboarding collects the mode but requires a full historical CSV in the following screen; it does not create fictional opening purchases.
