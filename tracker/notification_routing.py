@@ -27,7 +27,7 @@ def selected_channels(pref, category):
                  and (category != "contribution" or pref.monthly_reminders))
 
 
-def route_notice(owner, category, event_key, subject, message):
+def route_notice(owner, category, event_key, subject, message, *, sender=None):
     """Return per-channel status, distinguishing old SENT from new delivery.
 
     No false 'sent' results for muted/unconfigured owner channels. Transport
@@ -40,7 +40,7 @@ def route_notice(owner, category, event_key, subject, message):
     previous = set(NotificationDelivery.objects.filter(
         owner=owner, event_key=event_key, channel__in=channels, status="SENT"
     ).values_list("channel", flat=True))
-    outcomes = dispatch(owner, event_key, subject, message, channels=channels)
+    outcomes = (sender or dispatch)(owner, event_key, subject, message, channels=channels)
     return {channel: ("already_sent" if channel in previous and status == "sent"
                       else status) for channel, status in outcomes.items()}
 
