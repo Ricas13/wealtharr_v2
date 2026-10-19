@@ -110,6 +110,19 @@
         <input class="field" id="deposit-amount" name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Amount deposited" required>
         <label for="deposit-date">Actual deposit date</label>
         <input class="field" id="deposit-date" name="occurred_on" type="date" value="{% now 'Y-m-d' %}" required>
+        <details class="ck-details ck-isa-check">
+          <summary>Optional: check the UK ISA allowance</summary>
+          <label for="other-isa-subscriptions">New subscriptions to your other ISAs this tax year (£)</label>
+          <input class="field" id="other-isa-subscriptions" name="other_isa_subscriptions"
+                 type="number" inputmode="decimal" min="0" step="0.01"
+                 placeholder="Leave blank if unknown">
+          <p class="ck-muted">2026/27: £20,000 overall across your ISAs, from 6 April to 5 April.
+            Wealtharr can only count your recorded deposits here; other accounts,
+            ISA transfers and flexible ISA rules need your own reconciliation.
+            <a href="https://www.gov.uk/individual-savings-accounts" target="_blank"
+               rel="noopener noreferrer">HMRC ISA guidance</a>.
+            The warning is advisory; it does not approve or prevent a real contribution.</p>
+        </details>
         <button type="submit" class="btn">Record actual contribution</button>
       </form>
     </section>
