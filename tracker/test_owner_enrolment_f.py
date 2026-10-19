@@ -150,6 +150,19 @@ class OwnerEnrollmentTests(TestCase):
         self.assertEqual(entry.amount, D("250.75"))
         self.assertEqual(entry.occurred_on, actual_date)
 
+    def test_ledger_cash_shortcut_keeps_the_actual_date_and_returns_to_ledger(self):
+        self.client.post(reverse("cockpit_setup"), self.data())
+        actual_date = self.today - timedelta(days=1)
+        response = self.client.get(reverse("cockpit_ledger"))
+        self.assertContains(response, "Date money arrived")
+        response = self.client.post(reverse("cockpit_deposit"), {
+            "amount": "120.25", "occurred_on": actual_date.isoformat(),
+            "return_to": "ledger"})
+        self.assertRedirects(response, reverse("cockpit_ledger"))
+        entry = StrategyInstance.objects.get(owner=self.owner).ledger.get()
+        self.assertEqual(entry.amount, D("120.25"))
+        self.assertEqual(entry.occurred_on, actual_date)
+
     def test_enrolment_manifest_rejects_unsupported_profile(self):
         with self.assertRaises(InstrumentMappingUnavailable):
             enrolment_manifest(account_type="GIA")
