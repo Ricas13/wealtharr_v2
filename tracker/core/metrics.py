@@ -328,7 +328,10 @@ def allocation_drift(values_gbp: Mapping[str, Decimal],
     Cash must be an explicitly assigned role when it belongs in the mix.
     No unknown holdings, implied 9Sig safe allocation or silent rounding.
     """
-    if not values_gbp or not weights or set(values_gbp) != set(weights):
+    if (not isinstance(values_gbp, Mapping) or
+            not isinstance(weights, Mapping) or
+            not values_gbp or not weights or
+            set(values_gbp) != set(weights)):
         return None
     if any(not isinstance(role, str) or not role.strip() for role in weights):
         return None
