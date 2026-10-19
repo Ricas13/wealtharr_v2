@@ -11,6 +11,8 @@ from django.utils import timezone
 
 from .models import NotificationDelivery, NotificationSchedulerRun
 from .services import dispatch
+from .notification_routing import category_for_event_key, selected_channels
+from .models import NotificationPreference
 from .cockpit_notifications import send_due_cockpit_notices
 
 MAX_RETRY_ROWS = 100
@@ -29,6 +31,12 @@ def retry_due_deliveries(*, as_of=None):
     attempted = 0
     sent = 0
     for row in rows:
+        category = category_for_event_key(row.event_key)
+        if category:
+            pref, _ = NotificationPreference.objects.get_or_create(owner=row.owner)
+            if row.channel not in selected_channels(pref, category):
+                # Muting a category also mutes its existing pending deliveries.
+                continue
         if not row.subject or not row.message:
             continue
         outcome = dispatch(
