@@ -1,13 +1,100 @@
-{% extends 'base.html' %}{% block title %}Import Trading 212{% endblock %}{% block content %}
-<section class="cockpit ck-narrow"><h1>Import Trading 212 history</h1><p>From Trading 212: History → Export → select orders, transactions and dividends. Use the full GBP history for this account.</p>
-<form method="post" enctype="multipart/form-data" class="panel ck-card">{% csrf_token %}
-<label for="csv-file">CSV export</label><input id="csv-file" class="field" name="csv_file" type="file" accept=".csv,text/csv" required>
-<button class="btn" type="submit">Preview only (no changes)</button>
-{% if preview or errors or duplicate_total %}
-<h2>Dry-run result</h2><p>{{ total }} new rows · {{ duplicate_total }} already imported · {{ error_total }} errors</p>
-{% if errors %}<div role="alert"><strong>Nothing can be imported until errors are resolved.</strong><ul>{% for line, error in errors %}<li>Row {{ line }}: {{ error }}</li>{% endfor %}</ul></div>{% endif %}
-<ol>{% for row in preview %}<li>{{ row.summary }}</li>{% endfor %}</ol>
-{% if not errors and total %}<p>To confirm, tick the box and re-select the exact same CSV file; it is re-validated against the live ledger.</p>
-<label><input name="apply" type="checkbox" value="yes"> Import these events after re-validation</label>{% endif %}
-{% endif %}
-</form></section>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Import Trading 212{% endblock %}
+{% block content %}
+<div class="cockpit ck-v2 ck-narrow">
+  <header class="ck-top">
+    <div><p class="ck-overline">{{ strategy.name }} · YOUR ACTUAL TRANSACTIONS</p>
+      <h1>Import Trading 212 history</h1>
+      <p class="ck-muted">A preview never changes your ledger. Import only records supported, verified GBP transactions that actually happened.</p>
+    </div>
+  </header>
+  <section class="panel ck-card">
+    <h2>1. Export your original account history</h2>
+    <p>In Trading 212, open <strong>History → Export</strong>. Select the complete relevant ISA history, including orders, cash transactions, fees and dividends. Keep the original headers and IDs.</p>
+    <p class="ck-muted">Trading 212 exports vary. Foreign currency conversions, missing ISINs, unsupported corporate actions, unverified prices, and ambiguous duplicates will be reported as errors rather than guessed.</p>
+    <form method="post" enctype="multipart/form-data" class="ck-import-form">
+      {% csrf_token %}
+      <div class="ck-form-pair">
+        <label for="t212-preview-file">Select the export (.csv, maximum 4 MB)</label>
+        <input id="t212-preview-file" class="field" name="csv_file" type="file"
+               accept=".csv,text/csv" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Preview without importing</button>
+    </form>
+  </section>
+
+  {% if preview_ran %}
+    <section class="panel ck-card" aria-labelledby="preview-heading">
+      <div class="ck-section-head"><h2 id="preview-heading">2. Review the preview</h2>
+        <span class="ck-chip {% if error_total %}ck-blocked{% else %}ck-ok{% endif %}" role="status">
+          {% if error_total %}Cannot import{% else %}Preview complete{% endif %}
+        </span></div>
+      <p class="ck-muted">File: {{ reviewed_file_name }}. Nothing has been written to your ledger.</p>
+      <div class="ck-import-counts" aria-label="Import preview counts">
+        <div><strong>{{ total }}</strong><span>New transactions</span></div>
+        <div><strong>{{ duplicate_total }}</strong><span>Already imported / repeated</span></div>
+        <div><strong>{{ error_total }}</strong><span>Rows needing attention</span></div>
+      </div>
+
+      {% if error_total %}
+        <div role="alert" class="ck-block-message">
+          <strong>Nothing was imported.</strong>
+          <p>Fix or reconcile every error in your source history before you try again.
+            {% if error_total > 100 %}Showing the first 100 issues of {{ error_total }}.{% endif %}</p>
+          <ol>
+            {% for line, error in errors %}
+              <li>CSV row {{ line }}: {{ error }}</li>
+            {% endfor %}
+          </ol>
+        </div>
+      {% endif %}
+
+      <details class="ck-disclosure-inline" {% if not error_total %}open{% endif %}>
+        <summary>See proposed ledger entries (first 100)</summary>
+        <div class="table-scroll"><table class="data-table ck-import-table">
+          <caption>Actual CSV events identified as candidates. These are not confirmed broker balances.</caption>
+          <thead><tr><th>Date</th><th>Event</th><th>Instrument</th><th>Units</th><th>Unit price (£)</th><th>Cash amount (£)</th><th>Fees (£)</th></tr></thead>
+          <tbody>
+          {% for entry in preview %}
+            <tr><td>{{ entry.occurred_on|date:'j M Y' }}</td>
+              <th scope="row">{{ entry.kind|title }}</th>
+              <td>{{ entry.symbol|default:'—' }}</td>
+              <td>{% if entry.symbol %}{{ entry.quantity }}{% else %}—{% endif %}</td>
+              <td>{% if entry.symbol %}{{ entry.unit_price }}{% else %}—{% endif %}</td>
+              <td>{% if entry.symbol %}—{% else %}{{ entry.amount }}{% endif %}</td>
+              <td>{{ entry.fee }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7">No new eligible events in this file.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table></div>
+        {% if preview_truncated %}<p class="ck-muted">Only the first 100 rows are displayed; all {{ total }} eligible new rows were checked.</p>{% endif %}
+      </details>
+    </section>
+    {% if preview_ready and total %}
+      <section class="panel ck-card ck-import-confirm">
+        <h2>3. Confirm exactly this file</h2>
+        <p>The first preview passed the supported row checks. Re-select the <strong>same original CSV file</strong> and confirm. Wealtharr verifies the file bytes again, replays it against your current ledger, and writes the complete supported batch atomically.</p>
+        <form method="post" enctype="multipart/form-data" class="ck-import-form">
+          {% csrf_token %}
+          <div class="ck-form-pair">
+            <label for="t212-confirm-file">Choose the same CSV again</label>
+            <input id="t212-confirm-file" name="csv_file" class="field" type="file"
+                   accept=".csv,text/csv" required>
+          </div>
+          <button type="submit" name="apply" value="yes" class="btn btn-primary">
+            Confirm actual transactions and import
+          </button>
+        </form>
+        <p class="ck-muted">Wealtharr never logs into Trading 212 or checks live broker balances. After import, compare the ledger cash and share counts with your real account.</p>
+      </section>
+    {% elif preview_ready %}
+      <section class="panel ck-card"><h2>Nothing new to import</h2>
+        <p>No new transactions were found. Existing ledger records remain unchanged.</p>
+        <a href="{% url 'cockpit_ledger' %}" class="btn">See Ledger</a></section>
+    {% endif %}
+  {% endif %}
+  <p class="ck-muted"><a href="{% url 'cockpit_ledger' %}">← Back to your ledger</a></p>
+</div>
+{% endblock %}
