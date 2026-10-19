@@ -252,7 +252,7 @@ def today(request):
         proposed_actions=tuple(actions), price_ready=fresh,
         unavailable_reason=reason if not fresh else '',
         next_review_label=next_review.strftime('%d %b %Y'))
-    held = any(qty > ZERO for qty in report['positions'].values())
+    held = bool(report['positions'])
     profile = for_strategy(strategy)
     description = describe_strategy(strategy.preset.slug)
     roles = ({profile.equity.yahoo_ticker: 'Growth',
