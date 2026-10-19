@@ -327,7 +327,12 @@ def guided_rebalance(request, signal_id):
         proposed_actions,
     )
     actions = proposed_actions(notice)
-    if (not actions or len(actions) > 4 or
+    can_choose_manual_reset = bool(
+        notice.strategy_version == describe_strategy(strategy.preset.slug).version
+        and not notice.reset_reason
+        and 'Your reserve is now empty' in notice.message
+        and not SignalFill.objects.filter(signal=notice).exists())
+    if ((not actions and not can_choose_manual_reset) or len(actions) > 4 or
             RebalanceExecution.objects.filter(signal=notice).exists() or
             notice.review_outcome in ('FALSE_POSITIVE', 'NOT_APPLICABLE') or
             notice.as_of != quarter_end_before(timezone.localdate())):
@@ -337,7 +342,23 @@ def guided_rebalance(request, signal_id):
     posted_form = None
     intent = request.POST.get('intent') if request.method == 'POST' else None
     if request.method == 'POST':
-        if intent == 'record_one':
+        if intent == 'request_manual_reset':
+            if not can_choose_manual_reset:
+                messages.error(request, 'This review is not eligible for a new manual reset.')
+                return redirect('cockpit_today')
+            try:
+                from .cockpit_manual_reset import choose_manual_reserve_reset
+                chosen = choose_manual_reserve_reset(
+                    owner=request.user, strategy_id=strategy.pk,
+                    signal_id=notice.pk)
+            except (ValidationError, IntegrityError) as exc:
+                messages.error(request, '; '.join(exc.messages)
+                               if isinstance(exc, ValidationError) else str(exc))
+            else:
+                messages.success(
+                    request, 'Manual 60/40 review created. No broker trade or reset was executed.')
+                return redirect('cockpit_rebalance', signal_id=chosen.pk)
+        elif intent == 'record_one':
             posted_form = SingleSignalFillForm(request.POST)
             if not posted_form.is_valid():
                 messages.error(request, 'Enter an actual execution date, quantity, GBP unit price and fee.')
@@ -406,6 +427,7 @@ def guided_rebalance(request, signal_id):
         'has_partial_fills': bool(existing),
         'ready_to_finalize': bool(progress) and all(p['complete'] for p in progress),
         'reset': bool(notice.reset_reason),
+        'can_choose_manual_reset': can_choose_manual_reset,
     })
 
 
