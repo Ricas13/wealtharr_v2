@@ -13,6 +13,11 @@ class FillForm(forms.Form):
 class DepositShortcutForm(forms.Form):
     amount = forms.DecimalField(min_value=Decimal('0.01'), max_digits=16, decimal_places=2)
     occurred_on = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
+    # Optional estimate only. Never save this as a deposit or assert it was
+    # broker-verified; it is money deposited into other ISAs in this tax year.
+    other_isa_subscriptions = forms.DecimalField(
+        required=False, min_value=Decimal("0"), max_digits=16,
+        decimal_places=2, label="Other ISA subscriptions this tax year (£)")
     def clean_occurred_on(self):
         when = self.cleaned_data['occurred_on']
         if when > timezone.localdate():
