@@ -20,22 +20,51 @@ class DepositShortcutForm(forms.Form):
         return when
 
 class OneScreenSetupForm(forms.Form):
-    account_kind = forms.ChoiceField(choices=[('ISA', 'Stocks & Shares ISA'), ('GIA', 'Invest / GIA')])
-    starting_cash = forms.DecimalField(min_value=Decimal('0.01'), decimal_places=2, max_digits=16,
-                                       initial=Decimal('1000.00'))
-    start_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
-    position_mode = forms.ChoiceField(choices=[('FRESH', 'Starting fresh'), ('EXISTING', 'I already own investments')])
-    destination = forms.ChoiceField(choices=[('NONE', 'Configure later'), ('EMAIL', 'Email'), ('DISCORD', 'Discord')])
-    email = forms.EmailField(required=False)
-    instrument_confirmed = forms.BooleanField(required=True,
-        label='I checked availability and suitability of the mapped securities in my broker account.')
+    """The only supported new enrolment: GB / Trading 212 / Stocks ISA.
+
+    Optional recorded opening cash is NOT the £1,000 illustrative plan. A
+    blank field creates no ledger event. Existing portfolios must import
+    actual historical activity; never fabricate starting shares or cost.
+    """
+    position_mode = forms.ChoiceField(
+        choices=[("FRESH", "I am starting from cash"),
+                 ("EXISTING", "I already have investments in Trading 212")],
+        initial="FRESH", label="How would you like to start?")
+    starting_cash = forms.DecimalField(
+        required=False, min_value=Decimal("0.01"),
+        max_digits=16, decimal_places=2,
+        label="Cash already deposited (£) — optional",
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0.01",
+                                        "inputmode": "decimal", "placeholder": "Leave blank if not deposited"}))
+    start_date = forms.DateField(required=False, label="Actual deposit date",
+                                 widget=forms.DateInput(attrs={"type": "date"}))
+    monthly_target = forms.DecimalField(
+        required=True, min_value=Decimal("0"), max_digits=16,
+        decimal_places=2, initial=Decimal("500.00"),
+        label="Planned monthly contribution (£)",
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0",
+                                        "inputmode": "decimal"}))
+    destination = forms.ChoiceField(
+        choices=[("NONE", "I'll set up alerts later"), ("EMAIL", "Email"),
+                 ("DISCORD", "Discord (configure in Settings)")],
+        initial="NONE", label="How should I receive alerts?")
+    email = forms.EmailField(required=False, label="Alert email (if selected)",
+                             widget=forms.EmailInput(attrs={"autocomplete": "email"}))
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get('start_date') and cleaned['start_date'] > timezone.localdate():
-            self.add_error('start_date', 'Start date cannot be in the future.')
-        if cleaned.get('destination') == 'EMAIL' and not cleaned.get('email'):
-            self.add_error('email', 'Enter an email destination.')
+        mode = cleaned.get("position_mode")
+        cash = cleaned.get("starting_cash")
+        when = cleaned.get("start_date")
+        if when and when > timezone.localdate():
+            self.add_error("start_date", "A recorded deposit cannot be in the future.")
+        if mode == "EXISTING" and cash is not None:
+            self.add_error("starting_cash",
+                           "Existing holdings must come from actual complete account history; do not add a second opening deposit.")
+        if mode == "FRESH" and cash is not None and not when:
+            self.add_error("start_date", "Enter the date this money actually arrived in Trading 212.")
+        if cleaned.get("destination") == "EMAIL" and not cleaned.get("email"):
+            self.add_error("email", "Enter an alert email address or configure alerts later.")
         return cleaned
 
 class ExecutionDateForm(forms.Form):
