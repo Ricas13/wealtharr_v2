@@ -34,7 +34,7 @@ class OwnerAuthenticatorTests(TestCase):
         return secret
 
     def test_unenrolled_owners_remain_password_only(self):
-        self.assertEqual(self.client.get(reverse("cockpit_today")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 200)
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(reverse("cockpit_today")).status_code, 200)
 
@@ -43,7 +43,7 @@ class OwnerAuthenticatorTests(TestCase):
         factor = OwnerTOTP.objects.get(owner=self.user)
         self.assertNotIn(secret, factor.secret_ciphertext)
         self.assertEqual(factor.last_verified_step, TIME_A // 30)
-        self.assertEqual(self.client.get(reverse("django-admin:index")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
         self.client.logout()
         self.client.force_login(self.user)
         for url in (reverse("cockpit_today"), reverse("dashboard"),
@@ -54,7 +54,7 @@ class OwnerAuthenticatorTests(TestCase):
         with patch("tracker.totp.time.time", return_value=TIME_A + 30):
             res = self.client.post(reverse("totp_challenge"), {
                 "code": current_code(secret)})
-        self.assertRedirects(res, reverse("cockpit_today"))
+        self.assertRedirects(res, reverse("cockpit_today"), fetch_redirect_response=False)
         self.assertEqual(self.client.get(reverse("cockpit_today")).status_code, 200)
         with patch("tracker.totp.time.time", return_value=TIME_A + 30):
             self.assertFalse(verify_account_code(self.user, current_code(secret)))
