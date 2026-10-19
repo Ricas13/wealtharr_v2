@@ -6,6 +6,7 @@ is submitted as *confirmed historical executions* by the owner.
 from datetime import timedelta
 import csv
 from decimal import Decimal, ROUND_DOWN
+from uuid import uuid4
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -15,12 +16,12 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .cockpit_forms import FillForm, DepositShortcutForm, OneScreenSetupForm, ExecutionDateForm
+from .cockpit_forms import FillForm, SingleSignalFillForm, DepositShortcutForm, OneScreenSetupForm, ExecutionDateForm
 from .instrument_mapping import enrolment_manifest, InstrumentMappingUnavailable, for_strategy
 from .market_signals import quarter_end_before, settlement_close, signal_line_value
 from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
                      NotificationPreference, PriceMark, RebalanceExecution,
-                     StrategyBaseline, StrategyInstance, StrategyPreset,
+                     SignalFill, StrategyBaseline, StrategyInstance, StrategyPreset,
                      StrategySignal, StrategyValueSnapshot, YahooSync)
 from .performance import snapshot_twr_ready, annualized_return, max_drawdown
 from .core.metrics import ExternalFlow, VerifiedValuation, evaluate_inception
@@ -308,6 +309,76 @@ def guided_rebalance(request, signal_id):
     if signal.as_of != quarter_end_before(timezone.localdate()):
         messages.error(request, 'This quarterly signal is historical. Do not execute old instructions.')
         return redirect('cockpit_today')
+    # Section G: one actual fill per submission, separately auditable. No
+    # confirmed review or reset is created by a partial fill.
+    from .cockpit_execution import (
+        record_single_fill, finalize_manual_review, completion_rows,
+        proposed_actions,
+    )
+    if request.method == 'POST' and request.POST.get('intent') in ('record_one', 'finalize'):
+        intent = request.POST['intent']
+        try:
+            if intent == 'record_one':
+                fill_form = SingleSignalFillForm(request.POST)
+                if not fill_form.is_valid():
+                    raise ValidationError('Enter the actual fill date, units, GBP price and fee.')
+                data = fill_form.cleaned_data
+                result, receipt = record_single_fill(
+                    owner=request.user, strategy_id=strategy.pk,
+                    signal_id=signal.pk, action_index=data['action_index'],
+                    executed_on=data['executed_on'],
+                    quantity=data['quantity'], unit_price=data['unit_price'],
+                    fee=data['fee'], idempotency_key=data['idempotency_key'])
+                messages.success(request, (
+                    'That exact fill was already recorded; nothing was duplicated.'
+                    if result == 'duplicate' else
+                    'Actual fill recorded. The quarterly review is still PARTIAL until you confirm completion.'))
+            else:
+                finalize_manual_review(owner=request.user, strategy_id=strategy.pk,
+                                       signal_id=signal.pk)
+                messages.success(request,
+                    'Your fully recorded review is confirmed. No broker order was placed.')
+                return redirect('cockpit_today')
+            return redirect('cockpit_rebalance', signal_id=signal.pk)
+        except (ValidationError, IntegrityError, ValueError) as exc:
+            messages.error(request, '; '.join(exc.messages)
+                           if isinstance(exc, ValidationError) else str(exc))
+            # Failed POST is rendered with its current input rather than
+            # erasing the broker fill the owner needs to reconcile.
+            posted_form = SingleSignalFillForm(request.POST) if intent == 'record_one' else None
+        else:
+            posted_form = None
+    else:
+        posted_form = None
+    recorded_fills = list(SignalFill.objects.filter(
+        signal=signal, strategy=strategy).select_related('ledger_entry'))
+    try:
+        progress = completion_rows(signal, recorded_fills)
+    except ValidationError:
+        progress = ()
+    if recorded_fills and request.method == 'POST' and request.POST.get('intent') not in ('record_one', 'finalize'):
+        messages.error(request,
+            'Partial fills already exist; use single-fill recording instead of the legacy all-at-once form.')
+        return redirect('cockpit_rebalance', signal_id=signal.pk)
+    selected_index = None
+    if posted_form and posted_form.is_valid():
+        selected_index = posted_form.cleaned_data['action_index']
+    elif posted_form:
+        try:
+            selected_index = int(request.POST.get('action_index', '-1'))
+        except (TypeError, ValueError):
+            selected_index = None
+    single_rows = []
+    for item in progress:
+        row_form = (posted_form if posted_form and selected_index == item['index']
+                    else SingleSignalFillForm(initial={
+                        'action_index': item['index'],
+                        'executed_on': timezone.localdate(),
+                        'quantity': item['remaining'],
+                        'fee': ZERO,
+                        'idempotency_key': uuid4(),
+                    }))
+        single_rows.append((item, row_form))
     initial = []
     for action in actions:
         q = D(action['quantity'])
@@ -316,7 +387,7 @@ def guided_rebalance(request, signal_id):
                         'fee': ZERO})
     forms = [FillForm(request.POST or None, prefix='fill%s' % i, initial=item)
              for i, item in enumerate(initial)]
-    if request.method == 'POST':
+    if request.method == 'POST' and request.POST.get('intent') not in ('record_one', 'finalize'):
         when_form = ExecutionDateForm({'executed_on': request.POST.get('executed_on', '')})
         ok = when_form.is_valid() and all(f.is_valid() for f in forms)
         if ok:
@@ -406,7 +477,10 @@ def guided_rebalance(request, signal_id):
         else:
             messages.error(request, 'Check the execution date, quantities, prices and fees.')
     return render(request, 'rebalance.html', {'strategy': strategy, 'signal': signal,
-        'rows': list(zip(actions, forms)), 'today': timezone.localdate(),
+        'rows': list(zip(actions, forms)), 'single_rows': single_rows,
+        'has_partial_fills': bool(recorded_fills),
+        'ready_to_finalize': bool(progress) and all(r['complete'] for r in progress),
+        'today': timezone.localdate(),
         'execution_date': request.POST.get('executed_on', timezone.localdate().isoformat()),
         'reset': 'review a reset to 60%' in signal.message.lower()})
 
