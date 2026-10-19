@@ -151,7 +151,7 @@ def sync_ticker(symbol, *, force=False):
 
 
 # Pure, immutable versioned rule implementation (Django-free).
-from .strategies.nine_sig.v1 import (
+from .strategies.nine_sig.v2 import (
     VERSION as NINE_SIG_RULE_VERSION, quarter_number, prior_quarter_name,
     quarter_end_before, _quarterly_closes, _drawdown_from_spy,
     signal_line_value, advice_for_holdings, first_100_up_crossing,
@@ -395,6 +395,7 @@ def review_strategy(strategy):
             defaults={"kind": alert["kind"], "title": alert["title"],
                       "message": alert["message"], "actions": alert["actions"],
                       "reset_reason": alert.get("reset_reason", ""),
+                      "strategy_version": NINE_SIG_RULE_VERSION,
                       "as_of": quarter_end})
         if new:
             created += 1
