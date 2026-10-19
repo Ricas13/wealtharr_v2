@@ -121,7 +121,7 @@ def sync_ticker(symbol, *, force=False):
 from .strategies.nine_sig.v1 import (
     VERSION as NINE_SIG_RULE_VERSION, quarter_number, prior_quarter_name,
     quarter_end_before, _quarterly_closes, _drawdown_from_spy,
-    signal_line_value, advice_for_holdings,
+    signal_line_value, advice_for_holdings, first_100_up_crossing,
 )
 
 def settlement_close(symbol, quarter_end, *, days=6):
@@ -168,10 +168,16 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
     origin = settlement_close("TQQQ", last_quarter)
     if not origin or origin.currency != "USD" or origin.price <= ZERO:
         return
-    crossed = MarketObservation.objects.filter(
+    candidates = list(MarketObservation.objects.filter(
         symbol="TQQQ", currency="USD", as_of__gt=last_quarter,
-        as_of__lte=tqqq_latest.as_of, price__gte=origin.price * 2,
-    ).order_by("as_of").first()
+        as_of__lte=tqqq_latest.as_of,
+    ).order_by("as_of").values_list("as_of", "price"))
+    crossing = first_100_up_crossing(
+        origin_on=last_quarter, origin_usd=origin.price,
+        daily_usd=candidates, until=tqqq_latest.as_of)
+    crossed = (MarketObservation.objects.filter(
+        symbol="TQQQ", currency="USD", as_of=crossing[0]).first()
+        if crossing else None)
     if not crossed or first_buy.occurred_on > crossed.as_of:
         return
     if baseline is not None and baseline.as_of >= crossed.as_of:
