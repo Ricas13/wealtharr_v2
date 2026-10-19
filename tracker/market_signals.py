@@ -18,6 +18,7 @@ from .models import (
     LedgerEntry, MarketObservation, PriceMark, StrategySignal, YahooSync,
 )
 from .services import ledger_summary, dispatch
+from .core.prices import check_price_series
 
 LOG = logging.getLogger(__name__)
 ZERO = Decimal("0")
@@ -60,6 +61,13 @@ def fetch_chart(symbol, since):
     if not chart:
         raise ValueError("Yahoo supplied no chart data")
     raw_currency = chart.get("meta", {}).get("currency")
+    # Exact pinned product/line unit checks. A Yahoo GBX/GBP metadata change
+    # must not create a fictitious 100x portfolio valuation.
+    expected_units = {"LQQ3.L": ("GBp", "GBX"),
+                      "ERNS.L": ("GBP",),
+                      "TQQQ": ("USD",), "SPY": ("USD",)}
+    if symbol in expected_units and raw_currency not in expected_units[symbol]:
+        raise ValueError("PRICE_HOLD:RAW_UNIT_MISMATCH")
     currency = "GBP" if raw_currency in ("GBp", "GBX", "GBP") else raw_currency
     if currency not in ("GBP", "USD"):
         raise ValueError("Unsupported Yahoo quote currency")
@@ -97,6 +105,18 @@ def sync_ticker(symbol, *, force=False):
     state.save(update_fields=["last_attempt"])
     try:
         currency, series = fetch_chart(symbol, since)
+        # Screen the new batch before *any* upsert. A suspicious daily jump
+        # (including an unhandled split/restrike or 100x pence error) stays
+        # on hold; no later signal may use the older mark as though fresh.
+        prior = MarketObservation.objects.filter(symbol=symbol, as_of__lt=series[0][0]).order_by("-as_of").first()
+        checked = check_price_series(
+            symbol, series, as_of=timezone.localdate(),
+            previous=(prior.as_of, prior.price) if prior else None)
+        if checked.status != "APPROVED":
+            state.last_error = ("PRICE_HOLD:" + checked.code)[:80]
+            state.save(update_fields=["last_error"])
+            LOG.warning("Market price on hold for %s (%s)", symbol, checked.code)
+            return None
         observations = [
             MarketObservation(symbol=symbol, as_of=day, price=price, currency=currency)
             for day, price in series
@@ -233,6 +253,11 @@ def review_strategy(strategy):
         return {"status": "holdings outside the two configured strategy sleeves"}
     tickers = {strategy.equity_symbol, strategy.safe_symbol, "TQQQ", "SPY"}
     data = {symbol: sync_ticker(symbol) for symbol in tickers}
+    # Fail closed even if old accepted observations remain in the database.
+    # The health issue must be reviewed rather than silently ignored.
+    if YahooSync.objects.filter(symbol__in=tickers,
+            last_error__startswith="PRICE_HOLD:").exists():
+        return {"status": "cannot_compute", "reason": "Market price on hold for review"}
     now = timezone.localdate()
     # Current price marks are for the portfolio dashboard, never for a past
     # quarter's signal. A failed Yahoo lookup cannot invent a new valuation.
