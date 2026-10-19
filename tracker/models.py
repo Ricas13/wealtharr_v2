@@ -121,6 +121,17 @@ class NotificationPreference(models.Model):
     email_enabled = models.BooleanField(default=False)
     discord_enabled = models.BooleanField(default=False)
     monthly_reminders = models.BooleanField(default=True)
+    # Category-by-channel routing: master destination toggles still apply.
+    quarterly_email = models.BooleanField(default=True)
+    quarterly_discord = models.BooleanField(default=True)
+    urgent_email = models.BooleanField(default=True)
+    urgent_discord = models.BooleanField(default=True)
+    data_email = models.BooleanField(default=True)
+    data_discord = models.BooleanField(default=True)
+    followup_email = models.BooleanField(default=True)
+    followup_discord = models.BooleanField(default=True)
+    contribution_email = models.BooleanField(default=True)
+    contribution_discord = models.BooleanField(default=True)
 
     def __str__(self):
         return "Notifications"
@@ -165,6 +176,23 @@ class MarketObservation(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["symbol", "as_of"], name="unique_market_close")]
         ordering = ["as_of"]
+
+class NotificationSchedulerRun(models.Model):
+    """One diagnostic record per scheduled notice run; never stores credentials."""
+    name = models.CharField(max_length=40, default="owner_notices")
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=12, choices=[
+        ("RUNNING", "Running"), ("SUCCEEDED", "Succeeded"), ("FAILED", "Failed"),
+    ], default="RUNNING")
+    new_deliveries = models.PositiveIntegerField(default=0)
+    attempted_retries = models.PositiveIntegerField(default=0)
+    successful_retries = models.PositiveIntegerField(default=0)
+    error_code = models.CharField(max_length=40, blank=True, default="")
+
+    class Meta:
+        ordering = ["-started_at", "-pk"]
+
 
 class YahooSync(models.Model):
     symbol = models.CharField(max_length=24, unique=True)
