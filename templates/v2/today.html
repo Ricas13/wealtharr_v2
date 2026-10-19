@@ -1,0 +1,102 @@
+<section class="w2-stats" aria-label="Recorded 9Sig strategy figures">
+  <div class="w2-stat"><p class="w2-label">Value</p>
+    <p class="w2-stat-value">{% if today_value is not None %}£{{ today_value|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">{% if today_quote_date %}Verified close {{ today_quote_date|date:"j M" }}{% elif today_value is not None %}Recorded cash only{% else %}Not verified{% endif %}</p></div>
+  <div class="w2-stat"><p class="w2-label">Net contributed</p>
+    <p class="w2-stat-value">£{{ today_contributed|floatformat:2 }}</p>
+    <p class="w2-muted">Actual ledger flows only</p></div>
+  <div class="w2-stat"><p class="w2-label">Gain / loss</p>
+    <p class="w2-stat-value">{% if today_gain is not None %}£{{ today_gain|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">Withheld unless valuation verified</p></div>
+  <div class="w2-stat"><p class="w2-label">Next calendar review</p>
+    <p class="w2-stat-value">{{ today_next_review|date:"j M Y" }}</p>
+    <p class="w2-muted">In {{ today_days_to_review }} day{{ today_days_to_review|pluralize }} · schedule, not an instruction</p></div>
+</section>
+<div class="w2-two-columns">
+  <div class="w2-column">
+    <section class="w2-panel w2-today-action w2-state-{{ today_status }}" aria-label="What to do next">
+      <div class="w2-today-top">
+        <span class="w2-badge {% if today_status == 'blocked' or today_status == 'review' %}w2-warning{% endif %}">
+          {% if today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Partial actual fills
+          {% elif today_status == 'trade' %}Review required{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}
+        </span>
+        {% if today_signal %}<span class="w2-muted">{{ today_signal.as_of|date:"j M Y" }} · {{ today_signal.kind|title }}</span>{% endif %}
+      </div>
+      <h2 class="w2-card-title">{{ today_headline }}</h2>
+      <p class="w2-muted">{{ today_explanation }}</p>
+      {% if today_status == 'trade' or today_status == 'record' %}
+        <div class="w2-action-lines" aria-label="Recorded advice versus owner-confirmed fills">
+          {% for action in today_progress %}
+          <div class="w2-action-line">
+            <strong>{{ action.side }} {{ action.symbol }}</strong>
+            <span>Proposed {{ action.suggested }} · actually recorded {{ action.recorded }} · outstanding {{ action.remaining }} shares</span>
+          </div>
+          {% endfor %}
+        </div>
+        <a class="w2-button w2-button-primary" href="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=today_signal.pk %}">
+          {% if today_status == 'record' %}Continue actual fill record{% else %}Review proposal / I did this{% endif %}</a>
+      {% elif today_status == 'blocked' %}
+        {% if selected_instance.onboarding_mode == 'hold' %}
+          <a class="w2-button" href="{% url 'v2_ledger_import' instance_id=selected_instance.pk %}">Reconcile broker history</a>
+        {% endif %}
+        <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}">Check strategy setup</a>
+      {% elif today_status == 'review' %}
+        <p class="w2-note">This is a manual warning. It is not an instruction to buy or sell.</p>
+      {% endif %}
+      <p class="w2-note">No broker connection. Wealtharr never places an order. All quantities, data quality and suitability must be checked independently before deciding whether to trade.</p>
+    </section>
+    <section class="w2-panel" aria-labelledby="w2-quarter-heading">
+      <h2 id="w2-quarter-heading">Quarter by quarter</h2>
+      <p class="w2-note">Saved reviews only, not a synthetic backtest.</p>
+      <div class="w2-table-wrap">
+        <table class="w2-table">
+          <thead><tr><th>Period</th><th>Review</th><th>Actual execution</th></tr></thead>
+          <tbody>{% for row in today_quarters %}
+          <tr><td>{{ row.signal.as_of|date:"M Y" }}</td>
+              <td>{{ row.signal.title }}</td>
+              <td>{% if row.complete %}<span class="w2-badge">Confirmed</span>
+                  {% elif row.partial_count %}<span class="w2-badge w2-warning">{{ row.partial_count }} actual fill{{ row.partial_count|pluralize }} recorded</span>
+                  {% elif row.has_trades %}<span class="w2-badge">Not recorded</span>
+                  {% else %}<span class="w2-badge">No trade proposed</span>{% endif %}</td>
+          </tr>{% empty %}<tr><td colspan="3"><div class="w2-empty">No verified quarterly reviews saved yet.</div></td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </section>
+    <section class="w2-panel">
+      <h2>Actual holdings</h2>
+      <p class="w2-note">Holdings are reconstructed from recorded transactions. Quotes are shown only with verified matching-date evidence.</p>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Role</th><th>Line</th><th>Units</th><th>Verified value</th></tr></thead>
+        <tbody>{% for holding in today_holdings %}
+          <tr><td>{{ holding.role }}</td><td>{{ holding.symbol }}</td>
+              <td>{{ holding.quantity }}</td><td>{% if holding.value_gbp is not None %}£{{ holding.value_gbp|floatformat:2 }}{% else %}—{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="4"><div class="w2-empty">No bought holdings in the real ledger.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+      <p class="w2-note">Recorded cash: £{{ today_cash|floatformat:2 }}. The original 60/40 is an initial/reset reference, NOT a standing quarterly allocation target.</p>
+    </section>
+  </div>
+  <div class="w2-column">
+    <section class="w2-panel">
+      <h2>Verified portfolio history</h2>
+      <p class="w2-note">{{ today_chart_caution }}</p>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Quote date</th><th>GBP value</th><th>Net cash contributed</th></tr></thead>
+        <tbody>{% for snapshot in today_snapshots %}
+          <tr><td>{{ snapshot.as_of|date:"j M Y" }}</td>
+              <td>£{{ snapshot.total_value|floatformat:2 }}</td>
+              <td>£{{ snapshot.net_contributed|floatformat:2 }}</td></tr>
+        {% empty %}<tr><td colspan="3"><div class="w2-empty">No source-verified portfolio snapshots yet.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+    <section class="w2-panel">
+      <h2>Data and safety checks</h2>
+      <p class="w2-muted">{% if today_ready %}Verified GBP price checks passed for the recorded holdings.{% else %}{{ today_blocking_reason|default:"A current verified valuation is unavailable." }}{% endif %}</p>
+      <div class="w2-today-checks">
+        <div><span>Market price evidence</span><span class="w2-badge {% if not today_ready %}w2-warning{% endif %}">{% if today_ready %}Verified{% else %}Not ready{% endif %}</span></div>
+        <div><span>Owner controls</span><span class="w2-badge">Manual execution only</span></div>
+        <div><span>Price date</span><span>{% if today_quote_date %}{{ today_quote_date|date:"j M Y" }}{% else %}Unavailable{% endif %}</span></div>
+      </div>
+      <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">See calculation breakdown →</a>
+    </section>
+  </div>
+</div>

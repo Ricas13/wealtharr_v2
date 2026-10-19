@@ -60,6 +60,9 @@ def instance_page(request, instance_id, section):
     if section == "ledger":
         from .v2_ledger_views import ledger_page
         return ledger_page(request, instance_id)
+    if section == "today":
+        from .v2_today import today_page
+        return today_page(request, instance_id)
     instance = get_object_or_404(
         StrategyInstance.objects.select_related("account", "preset"),
         pk=instance_id,

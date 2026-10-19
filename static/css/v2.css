@@ -492,3 +492,29 @@ body.v2 {
 .w2-review-grid{grid-template-columns:1fr}
 .w2-table-wrap{max-width:100%;overscroll-behavior-x:contain}
 }
+
+/* Phase 4: Today action card and actual-fill form. */
+.w2-today-action{border-left:3px solid var(--w2-accent);display:grid;gap:13px}
+.w2-today-action.w2-state-blocked{border-left-color:var(--w2-warning)}
+.w2-today-action.w2-state-review{border-left-color:var(--w2-negative)}
+.w2-today-action.w2-state-record{border-left-color:var(--w2-warning)}
+.w2-today-action.w2-state-idle{border-left-color:var(--w2-positive)}
+.w2-today-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.w2-today-action .w2-card-title{margin:0}
+.w2-today-action .w2-button{justify-self:start}
+.w2-action-lines{border:1px solid var(--w2-stroke);border-radius:7px;overflow:hidden;display:grid}
+.w2-action-line{display:grid;gap:3px;padding:10px 12px;border-bottom:1px solid var(--w2-stroke-soft)}
+.w2-action-line:last-child{border-bottom:0}
+.w2-action-line strong{font-size:.89rem}
+.w2-action-line span{color:var(--w2-muted);font-size:.82rem}
+.w2-today-checks{display:grid;gap:9px;padding:12px 0}
+.w2-today-checks>div{display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:.85rem;border-bottom:1px solid var(--w2-stroke-soft);padding-bottom:9px}
+.w2-review-action{border-top:1px solid var(--w2-stroke);margin-top:18px;padding-top:18px}
+.w2-review-action h3{font-size:1rem;margin:0 0 2px}
+.w2-review-form{display:grid;gap:14px;padding-top:14px}
+.w2-review-form button{justify-self:start}
+.w2-review-action .w2-option{width:100%}
+@media(max-width:500px){
+.w2-today-action .w2-button,.w2-review-form button{width:100%;justify-self:stretch}
+.w2-today-checks>div{align-items:flex-start}
+}
