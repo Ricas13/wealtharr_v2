@@ -58,10 +58,13 @@ Three **owner-approved, intentional differences** explain exceptional rows:
 
 1. **SPY-only 30 Down:** use the quarter-end SPY close at or below 70%
    of its highest preceding eight SPY quarter closes. Hand-typed
-   workbook TQQQ-based 30% flags are not adopted. The TQQQ growth
-   reference's drawdown from its running high is visible as
-   **"Information only, doesn't affect the advice."** This does not
-   claim to measure the UK's LQQ3 drawdown. Crash-quarter results that
+   workbook TQQQ-based 30% flags are not adopted. The TQQQ USD
+   reference's running-high drawdown is shown separately from the
+   actual GBP growth instrument (LQQ3.L) drawdown where a verified
+   historical close series exists. Otherwise that actual-instrument
+   value is **unavailable**, not silently inferred from TQQQ.
+   Both are **"Information only, doesn't affect the advice"**.
+   Crash-quarter results that
    relied on handwritten demo flags intentionally differ from SPY-based
    recommendations.
 2. **No sell-half:** P2 (7 May 2010) is a manual mid-quarter
