@@ -209,6 +209,10 @@ class MarketWorkflowTests(TestCase):
             symbol="AGBP.L", as_of=now, price=D("81"), currency="GBP")
         mapped = {"TQQQ": reference, "SPY": spy,
                   "LQQ3.L": equity, "AGBP.L": safe}
+        from tracker.models import NotificationPreference
+        NotificationPreference.objects.update_or_create(
+            owner=self.owner,
+            defaults={"email_enabled": True, "discord_enabled": False})
         with patch("tracker.market_signals.sync_ticker", side_effect=lambda symbol: mapped[symbol]), \
              patch("tracker.market_signals.dispatch") as dispatcher:
             first = review_strategy(self.strategy)
