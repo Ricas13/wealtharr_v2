@@ -132,6 +132,14 @@ class GuidedRebalanceTests(TestCase):
         self.assertIsNone(save_verified_strategy_snapshot(self.strategy))
         self.assertEqual(self.strategy.value_snapshots.count(), 0)
 
+    def test_unmapped_broker_cannot_confirm_quarterly_fills(self):
+        self.account.broker = 'UNKNOWN'
+        self.account.save(update_fields=['broker'])
+        count = self.strategy.ledger.count()
+        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload())
+        self.assertEqual(self.strategy.ledger.count(), count)
+        self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
+
     def test_owner_isolation(self):
         stranger = get_user_model().objects.create_user('stranger', password='strong-password')
         self.client.force_login(stranger)
