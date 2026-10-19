@@ -105,6 +105,14 @@ services:
       db:
         condition: service_healthy
     security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      # A backup is only healthy when the archive/checksum pipeline published
+      # a checksum recently; this does not replace a full isolated restore.
+      test: ["CMD-SHELL", "find /backups -type f -name 'wealtharr-*.dump.sha256' -mmin -2880 -print -quit | grep -q ."]
+      interval: 1h
+      timeout: 10s
+      start_period: 120s
+      retries: 2
 
 secrets:
   postgres_password:
