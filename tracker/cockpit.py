@@ -247,8 +247,10 @@ def today(request):
                 fresh, reason = False, 'Quarterly rules have not produced a verified review yet.'
     perf = _performance(strategy, report)
     actions = [a for a in signal.actions if a.get('side') in ('BUY', 'SELL')] if signal else []
+    # A partial manual record is bookkeeping, NOT permission to act on the old
+    # recommendation or ignore stale/held quotes.
     actionable = bool(signal and signal.kind == 'QUARTERLY' and actions and
-                      (fresh or pending_fills))
+                      fresh and not pending_fills)
     needs_review = bool(signal and signal.kind in ('SPIKE_WATCH', 'THIRTY_DOWN'))
     status = ('Action needed' if actionable or needs_review else
               'Cannot compute instructions' if not fresh else
@@ -263,10 +265,11 @@ def today(request):
         next_review_label=next_review.strftime('%d %b %Y'))
     if pending_fills and signal.kind == 'QUARTERLY':
         step = NextStep(
-            "trade", "Continue your recorded partial fills",
+            "record", "Continue your recorded partial fills",
             "Some actual broker transactions are already in your ledger. "
-            "Continue recording what you did, or finish after the verified "
-            "post-fill close is available. No new broker order is placed.")
+            "Record only what you have actually executed, or finish after "
+            "verified post-fill closes are available. This is not a new "
+            "instruction to trade.")
     held = bool(report['positions'])
     profile = for_strategy(strategy)
     description = describe_strategy(strategy.preset.slug)
