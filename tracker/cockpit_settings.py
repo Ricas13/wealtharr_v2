@@ -4,6 +4,8 @@ One-user deployment: SystemIntegration is still a global singleton. Never
 allow an ordinary user to write/read its transport configuration.
 """
 from uuid import uuid4
+from datetime import timedelta
+from django.utils import timezone
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -44,6 +46,20 @@ def owner_settings(request):
     } for key, title in CATEGORIES)
     history = NotificationDelivery.objects.filter(
         owner=request.user).order_by("-created_at", "-pk")
+    last_scheduler = (NotificationSchedulerRun.objects.order_by(
+        "-started_at", "-pk").first() if request.user.is_staff else None)
+    if not last_scheduler:
+        scheduler_state = "No scheduler run recorded"
+    elif last_scheduler.status == "FAILED":
+        scheduler_state = "Last scheduler run failed"
+    elif last_scheduler.status == "RUNNING" and last_scheduler.started_at < timezone.now() - timedelta(hours=1):
+        scheduler_state = "Scheduler run appears interrupted"
+    elif last_scheduler.started_at < timezone.now() - timedelta(hours=3):
+        scheduler_state = "Scheduler heartbeat is overdue"
+    elif last_scheduler.status == "RUNNING":
+        scheduler_state = "Scheduler is running"
+    else:
+        scheduler_state = "Scheduler recently completed successfully"
     return render(request, "settings_cockpit.html", {
         "pref_form": pref_form, "route_rows": routes,
         "transport_form": transport_form,
@@ -53,6 +69,7 @@ def owner_settings(request):
         "unsent_count": history.filter(status__in=("FAILED", "PENDING", "SENDING")).count(),
         "scheduler_runs": (NotificationSchedulerRun.objects.order_by("-started_at")[:8]
                             if request.user.is_staff else ()),
+        "scheduler_state": scheduler_state if request.user.is_staff else "",
     })
 
 
