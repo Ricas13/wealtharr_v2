@@ -1,10 +1,13 @@
+"""Single owner alert scheduler entrypoint; safe to run hourly."""
 from django.core.management.base import BaseCommand
-from django.core.management import call_command
-from tracker.cockpit_notifications import send_due_cockpit_notices
+from tracker.notification_scheduler import run_notification_scheduler
 
 class Command(BaseCommand):
-    help = 'Send the concise 9Sig quarter-end digest, delayed reminders and monthly target'
+    help = "Run owner alert matrix, quarterly digest, reminders and due retries once"
     def handle(self, *args, **kwargs):
-        count = send_due_cockpit_notices()
-        self.stdout.write('Cockpit notifications delivered: %s' % count)
-        call_command('retry_notifications')
+        result = run_notification_scheduler()
+        self.stdout.write(
+            "Owner notifications: %s newly delivered; %s retries attempted; "
+            "%s retry deliveries; run %s %s" % (
+                result.new_deliveries, result.attempted_retries,
+                result.successful_retries, result.pk, result.status))
