@@ -184,3 +184,17 @@ select.field{color-scheme:inherit}
 .ws-instrument-disclosure .panel{margin:16px 0 0}
 .ws-view-tabs + section > .stat-grid{margin-top:0}
 .ws-strategy-card:focus-visible{border-color:var(--cyan)}
+
+.ws-feature-block,.ws-section-spaced{margin-bottom:16px}
+.ws-feature-block{border-color:var(--teal)}
+.ws-hint-spaced{margin-bottom:14px}
+.ws-control-spaced{margin-top:18px}
+.account-icon{background:var(--panel-hi);color:var(--cyan)}
+.feature-glyph .ui-icon{width:25px;height:25px}
+.preview-tabs .ui-icon{width:14px;height:14px}
+:root[data-theme="light"] .hero-preview{background:var(--panel);border-color:var(--stroke);color:var(--text);box-shadow:var(--elevation-1)}
+:root[data-theme="light"] .preview-title,
+:root[data-theme="light"] .hero-copy h1,
+:root[data-theme="light"] .home-features b{color:var(--text)}
+:root[data-theme="light"] .hero-copy p,
+:root[data-theme="light"] .home-features p{color:var(--muted)}
