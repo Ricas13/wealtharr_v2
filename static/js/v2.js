@@ -104,9 +104,16 @@
     var trade = kind.value === "BUY" || kind.value === "SELL";
     document.querySelectorAll("[data-v2-trade-field]").forEach(function (el) {
       el.hidden = !trade;
+      el.querySelectorAll("input, select").forEach(function (input) {
+        // Hidden number inputs still participate in native form validation.
+        input.disabled = !trade;
+      });
     });
     document.querySelectorAll("[data-v2-cash-field]").forEach(function (el) {
       el.hidden = trade;
+      el.querySelectorAll("input, select").forEach(function (input) {
+        input.disabled = trade;
+      });
     });
   }
   kind.addEventListener("change", switchKind);
