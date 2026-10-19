@@ -3,52 +3,50 @@
 {% block content %}
 <div class="page-heading"><div><div class="eyebrow">STRATEGY / {{ strategy.account.name|upper }}</div><h1>{{ strategy.name }}</h1><p>{{ strategy.preset.name }} · {{ strategy.account.get_kind_display }} · GBP</p></div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
 {% if strategy.account.kind == "PAPER" %}
-<div class="alert-warning"><strong>VIRTUAL PAPER ACCOUNT — NO REAL ASSETS.</strong>
+<div class="ws-paper-banner"><strong>VIRTUAL PAPER ACCOUNT — NO REAL ASSETS.</strong>
   This account was funded with simulated £1,000 and virtual fractional positions.
   Yahoo closes update estimates; recommendations are review-only and never execute orders.
   The £500 monthly contribution is a plan, not an actual transfer.
   Initial signals require the first completed quarter after its virtual purchase.
 </div>
 {% endif %}
-{% if instrument_profile %}
-<section class="panel padded" style="margin-bottom:16px" id="strategy-instruments">
-  <div class="panel-heading"><div><h2>What to hold for this account</h2>
-    <p>Matched to {{ strategy.preset.name }} · UK {{ strategy.account.get_kind_display }} · Trading 212</p>
-  </div><span class="risk-pill high">High risk · 3× daily leverage</span></div>
-  <div class="split-layout">
-    <div class="hint-box"><h3>{{ instrument_profile.equity.allocation_pct }}% — {{ instrument_profile.equity.broker_ticker }}</h3>
-      <strong>{{ instrument_profile.equity.name }}</strong>
-      <p class="micro-note">Find ISIN {{ instrument_profile.equity.isin }} in Trading 212.<br>Yahoo price ticker: {{ instrument_profile.equity.yahoo_ticker }} (automatic).</p>
-      <a href="{{ instrument_profile.equity.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer details ↗</a>
-    </div>
-    <div class="hint-box"><h3>{{ instrument_profile.safe.allocation_pct }}% — {{ instrument_profile.safe.broker_ticker }}</h3>
-      <strong>{{ instrument_profile.safe.name }}</strong>
-      <p class="micro-note">Find ISIN {{ instrument_profile.safe.isin }} in Trading 212.<br>Yahoo price ticker: {{ instrument_profile.safe.yahoo_ticker }} (automatic).</p>
-      <a href="{{ instrument_profile.safe.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer details ↗</a>
-    </div>
-  </div>
-  <p class="micro-note">{{ instrument_profile.model_warning }} {{ instrument_profile.broker_warning }} Suggested targets do not create holdings; your actual Trading 212 fills determine the recorded portfolio.</p>
-</section>
-{% endif %}
-<div class="strategy-tabbar">
-  {% for tab in nav_strategies %}<a href="{% url 'strategy_detail' tab.pk %}" class="tab {% if tab.pk == strategy.pk %}active{% endif %}">{{ tab.name }}</a>{% endfor %}
-  <a href="{% url 'new_strategy' %}" class="tab tab-add">＋ New tab</a>
-</div>
-<section class="panel chart-panel">
-  <div class="panel-heading"><div><h2>Strategy growth</h2>
-    <p>Actual recorded strategy valuations. Paper-mode values are virtual, not broker holdings.</p></div></div>
-  <div id="strategy-chart" class="wealth-chart" role="img" aria-label="Dated valuation chart for this strategy"></div>
-  {{ chart_points|json_script:"strategy-chart-points" }}
-  <p class="chart-caption">Yahoo marks are recorded by trading day. The first observation is seeded when a paper trial starts. No backtest or future trade is invented.</p>
-</section>
-<div class="stat-grid three">
+<nav class="ws-view-tabs" aria-label="Strategy views">
+  <a href="?tab=overview" {% if active_tab == 'overview' %}class="is-active" aria-current="page"{% endif %}>Overview</a>
+  <a href="?tab=signals" {% if active_tab == 'signals' %}class="is-active" aria-current="page"{% endif %}>Signals {% if pending_signals %}<span class="ws-tab-count">{{ pending_signals }}</span>{% endif %}</a>
+  <a href="?tab=ledger" {% if active_tab == 'ledger' %}class="is-active" aria-current="page"{% endif %}>Ledger</a>
+  <a href="?tab=setup" {% if active_tab == 'setup' %}class="is-active" aria-current="page"{% endif %}>Setup</a>
+</nav>
+{% if active_tab == 'overview' %}
+  <section aria-label="Strategy portfolio overview">
+    <div class="stat-grid three">
   <div class="panel stat-card"><div class="stat-label">Current value</div><div class="stat-value">{% if report.value is not None %}£{{ report.value|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Cash + marked positions</div></div>
   <div class="panel stat-card"><div class="stat-label">Available cash</div><div class="stat-value">£{{ report.cash|floatformat:2 }}</div><div class="stat-help">For trades within this tab</div></div>
-  <div class="panel stat-card"><div class="stat-label">Investment result</div><div class="stat-value">{% if report.profit is not None %}£{{ report.profit|floatformat:2 }}{% else %}—{% endif %}</div><div class="stat-help">Value less net contributions</div></div>
+  <div class="panel stat-card"><div class="stat-label">Investment result</div><div class="stat-value {% if report.profit is not None %}{% if report.profit < 0 %}ws-negative{% elif report.profit > 0 %}ws-positive{% endif %}{% endif %}">{% if report.profit is not None %}£{{ report.profit|floatformat:2 }}{% else %}—{% endif %}</div><div class="stat-help">Value less net contributions</div></div>
 </div>
 {% if report.missing %}<div class="alert-warning">Price needed for: {% for symbol in report.missing %}<b>{{ symbol }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}. Set the latest GBP unit price below to complete this strategy's valuation.</div>{% endif %}
-{% if strategy.preset.slug == "nasdaq-quarterly-target" and strategy.account.kind != "PAPER" %}
-<section class="panel padded" style="margin-bottom:16px">
+    {% if result_pct is not None %}<p class="ws-return-note">Simple result-to-deposits ratio: <strong class="{% if result_pct < 0 %}ws-negative{% elif result_pct > 0 %}ws-positive{% endif %}">{{ result_pct|floatformat:1 }}%</strong> — not time-weighted or annualised.</p>{% endif %}
+    <div class="ws-strategy-overview">
+      <div class="ws-stack"><section class="panel chart-panel">
+  <div class="panel-heading"><div><h2>Strategy growth</h2>
+    <p>Actual recorded strategy valuations. Paper-mode values are virtual, not broker holdings.</p></div></div>
+  <div id="strategy-chart" class="wealth-chart" role="group" aria-label="Dated valuation chart for this strategy"></div>
+  {{ chart_points|json_script:"strategy-chart-points" }}
+  <div class="chart-controls" aria-label="Strategy chart date range"><button type="button" class="chip" data-range="1m" aria-pressed="false">1M</button><button type="button" class="chip" data-range="3m" aria-pressed="false">3M</button><button type="button" class="chip" data-range="1y" aria-pressed="false">1Y</button><button type="button" class="chip selected" data-range="all" aria-pressed="true">All</button></div>
+  <p class="chart-caption">Yahoo marks are recorded by trading day. The first observation is seeded when a paper trial starts. No backtest or future trade is invented.</p>
+<details class="ws-chart-table"><summary>View recorded data as a table</summary><div class="table-scroll"><table class="data-table"><thead><tr><th scope="col">Date</th><th scope="col" class="num">Portfolio value</th><th scope="col" class="num">Net contributed</th></tr></thead><tbody>{% for point in chart_points %}<tr><td>{{ point.date }}</td><td class="num">£{{ point.value|floatformat:2 }}</td><td class="num">£{{ point.contributed|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3">No verified snapshots yet.</td></tr>{% endfor %}</tbody></table></div></details></section>    <section class="panel padded"><div class="panel-heading"><div><h2>Holdings</h2><p>Actual holdings with dated GBP closing-price marks (manual or Yahoo).</p></div></div>
+    <div class="table-scroll"><table class="data-table"><thead><tr><th>Instrument</th><th class="num">Units</th><th class="num">GBP/unit</th><th class="num">Value</th></tr></thead><tbody>
+    {% for h in holdings %}<tr><td><b>{{ h.symbol }}</b></td><td class="num">{{ h.quantity|floatformat:6 }}</td><td class="num">{% if h.mark %}£{{ h.mark.price|floatformat:4 }}<small class="table-sub">{{ h.mark.as_of|date:"d M Y" }} · {{ h.mark.source }}</small>{% else %}<span class="missing-price">Missing</span>{% endif %}</td><td class="num">{% if h.value is not None %}£{{ h.value|floatformat:2 }}{% else %}—{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty-cell">No investments bought yet. Record a deposit, then a buy.</td></tr>{% endfor %}
+    </tbody></table></div>
+    </section></div>
+      <div class="ws-stack"><div class="ws-overview-tasks panel padded"><div class="ws-section-heading"><h2>Next review</h2><a href="?tab=signals" class="ws-text-link">View signals →</a></div>
+{% if pending_signals %}<p><strong>{{ pending_signals }} signal{{ pending_signals|pluralize }}</strong> waiting for manual verification.</p>{% else %}<p class="muted">No open signals for this strategy.</p>{% endif %}
+<p class="muted">Next calendar quarter ends {{ next_quarter_end|date:"d M Y" }}. Normal rebalance checks follow verified closing data.</p></div>{% if instrument_profile %}<section class="panel padded ws-allocation"><div class="ws-section-heading"><div><h2>Current versus starting allocation</h2><p class="muted">60% equity / 40% safe is an initial or reset target; regular 9Sig quarters follow the signal line.</p></div></div>
+{% if equity_weight is not None %}<label for="equity-allocation">Current equity allocation: <strong>{{ equity_weight|floatformat:1 }}%</strong></label><progress id="equity-allocation" max="100" value="{{ equity_weight }}"></progress><p class="muted">Reference allocation: 60% equity. Remaining account value includes safe assets and GBP cash.</p>
+{% else %}<p class="muted">Record your actual purchases and obtain both verified GBP holding prices to view the current allocation.</p>{% endif %}</section>{% endif %}</div>
+    </div>
+    {% if strategy.preset.slug == "nasdaq-quarterly-target" and strategy.account.kind != "PAPER" %}
+<section class="panel padded">
   <h2>Your live 9Sig tracking checklist</h2>
   <p class="muted">Next calendar quarter closes <strong>{{ next_quarter_end|date:"d M Y" }}</strong>. Rebalance advice is calculated after verified quarter-end closes are available.</p>
   {% if report.positions %}
@@ -63,26 +61,21 @@
   {% endif %}
 </section>
 {% endif %}
-<section class="panel padded" id="strategy-signals">
+  </section>
+{% elif active_tab == 'signals' %}
+  <header class="ws-section-heading ws-tab-heading"><div><h2>Signal history</h2><p class="muted">Quarterly reviews, 30 Down and spike alerts; newest first.</p></div></header>
+  <section class="panel padded" id="strategy-signals">
   <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Hourly quote checks when the scheduler is running. Ordinary rebalances follow completed quarters; possible 100%-up TQQQ spike events can be flagged mid-quarter for manual review.</p></div>
   {% if strategy.market_data_enabled %}
   <form method="post" action="{% url 'refresh_market' strategy.pk %}">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">⟳ Check Yahoo prices</button></form>
   {% else %}<span class="risk-pill">Monitoring off</span>{% endif %}
   </div>
-  {% if strategy.preset.slug == "nasdaq-quarterly-target" %}
-  <details style="border:1px solid #294a60;border-radius:8px;padding:12px;margin:12px 0">
-    <summary style="cursor:pointer;color:#54d8cf">⚙ Configure Yahoo monitoring</summary>
-    <form action="{% url 'save_automation' strategy.pk %}" method="post" class="form-stack">{% csrf_token %}
-      {% include 'partials/form_fields.html' with form=automation_form %}
-      <p class="micro-note">{% if instrument_profile %}Your issuer-mapped 9Sig tickers are managed automatically. Only market monitoring can be switched on or off here.{% else %}Exact Yahoo GBP tickers are required; GBp is converted to GBP. Do not assume instrument availability or equivalence.{% endif %}</p>
-      <button class="btn btn-primary" type="submit">Save monitoring settings</button>
-    </form>
-  </details>{% endif %}
+
   {% if strategy.market_data_enabled %}<p class="micro-note"><strong>{{ monitoring_status.message }}</strong></p>
   <p class="micro-note">Actual GBP holdings: {{ strategy.equity_symbol }} + {{ strategy.safe_symbol }}. 9Sig US rule references: <strong>SPY for 30 Down</strong>; <strong>TQQQ for 100%-up spikes</strong>. Quarter-end trades are calculated from verified GBP quotes. Urgent mid-quarter spike notices use a provisional US reference and must be checked against your prior rebalance execution before acting. No orders are placed by Wealtharr.</p>
   {% else %}<p class="micro-note">To enable automatic quote checks, create a 9Sig strategy tab with exact Yahoo equity/safe tickers and the monitoring option. Manual tracking still works.</p>{% endif %}
   {% for signal in signals %}
-  <div class="signal-review">
+  <div class="signal-review ws-timeline-entry">
     <h3>{{ signal.title }} {% if signal.acknowledged_at %}<small>Reviewed</small>{% else %}<small class="value-warning">Action to review</small>{% endif %}</h3>
     <p>{{ signal.message }}</p>
     <div class="signal-orders">{% for a in signal.actions %}<div><b>{{ a.side }}</b> {{ a.quantity }} units {{ a.symbol }} — estimated £{{ a.estimated_gbp }}</div>{% empty %}<small>No trade proposed.</small>{% endfor %}</div>
@@ -97,8 +90,8 @@
       <p class="micro-note"><strong>Review result: {{ signal.get_review_outcome_display }}</strong>
         {% if signal.review_note %} — {{ signal.review_note }}{% endif %}</p>
     {% endif %}
-    <details class="monitor-settings" style="margin:12px 0;padding:12px;border:1px solid #294a60;border-radius:8px">
-      <summary style="cursor:pointer;color:#57d7d1">{% if signal.review_outcome %}Update review{% else %}Verify or correct this signal{% endif %}</summary>
+    <details class="monitor-settings">
+      <summary>{% if signal.review_outcome %}Update review{% else %}Verify or correct this signal{% endif %}</summary>
       <form method="post" action="{% url 'review_signal' strategy.pk signal.pk %}" class="form-stack">{% csrf_token %}
         <label class="form-field">Your review
           <select class="field" name="outcome" required>
@@ -117,40 +110,58 @@
   </div>
   {% empty %}<p class="muted">No automated recommendations yet. Your review history will appear here after a verified market check and qualifying event.</p>{% endfor %}
 </section>
-<div class="split-layout strategy-work">
-  <div class="stack-panels">
-    <section class="panel padded"><div class="panel-heading"><div><h2>Holdings</h2><p>Actual holdings with dated GBP closing-price marks (manual or Yahoo).</p></div></div>
-    <div class="table-scroll"><table class="data-table"><thead><tr><th>Instrument</th><th class="num">Units</th><th class="num">GBP/unit</th><th class="num">Value</th></tr></thead><tbody>
-    {% for h in holdings %}<tr><td><b>{{ h.symbol }}</b></td><td class="num">{{ h.quantity|floatformat:6 }}</td><td class="num">{% if h.mark %}£{{ h.mark.price|floatformat:4 }}<small class="table-sub">{{ h.mark.as_of|date:"d M Y" }} · {{ h.mark.source }}</small>{% else %}<span class="missing-price">Missing</span>{% endif %}</td><td class="num">{% if h.value is not None %}£{{ h.value|floatformat:2 }}{% else %}—{% endif %}</td></tr>
-    {% empty %}<tr><td colspan="4" class="empty-cell">No investments bought yet. Record a deposit, then a buy.</td></tr>{% endfor %}
-    </tbody></table></div>
-    </section>
-    <section class="panel padded"><div class="panel-heading"><div><h2>Activity history</h2><p>Append-only entries keep your ledger accountable.</p></div></div>
+  <p class="ws-disclaimer">Signals are advisory. Wealtharr neither places trades nor modifies your real broker holdings. Confirm each review manually.</p>
+{% elif active_tab == 'ledger' %}
+  <header class="ws-section-heading ws-tab-heading"><div><h2>Manual transaction ledger</h2><p class="muted">Actual deposits, broker fills and fees. No linked brokerage or automated trades.</p></div></header>
+  <div class="ws-strategy-overview"><div class="ws-stack">    <section class="panel padded"><div class="panel-heading"><div><h2>Activity history</h2><p>Append-only entries keep your ledger accountable.</p></div></div>
     <div class="table-scroll"><table class="data-table"><thead><tr><th>Date</th><th>Action</th><th>Ticker</th><th class="num">Units</th><th class="num">Cash / price</th></tr></thead><tbody>
     {% for entry in entries %}<tr><td>{{ entry.occurred_on|date:"d M Y" }}</td><td>{{ entry.get_kind_display }}</td><td>{{ entry.symbol|default:"—" }}</td><td class="num">{% if entry.symbol %}{{ entry.quantity|floatformat:6 }}{% else %}—{% endif %}</td><td class="num">{% if entry.symbol %}£{{ entry.unit_price|floatformat:4 }}{% else %}£{{ entry.amount|floatformat:2 }}{% endif %}</td></tr>
     {% empty %}<tr><td colspan="5" class="empty-cell">No activity yet.</td></tr>{% endfor %}
     </tbody></table></div>
-    </section>
-  </div>
-  <div class="stack-panels">
-    <section class="panel padded"><div class="panel-heading"><div><h2>Record activity</h2><p>First add cash, then record actual trades.</p></div></div>
+    </section></div><div class="ws-stack">    <section class="panel padded"><div class="panel-heading"><div><h2>Record activity</h2><p>First add cash, then record actual trades.</p></div></div>
       <form method="post" action="{% url 'record_entry' strategy.pk %}" class="form-stack" id="ledger-form">{% csrf_token %}
         {% include 'partials/form_fields.html' with form=entry_form %}
         <p class="micro-note">Prices and cash amounts must be in GBP. Foreign-currency trading and automatic FX are not supported yet. Enter trades by actual execution date in order.</p>
         <button class="btn btn-primary btn-block" type="submit">Save transaction →</button>
       </form>
-    </section>
-    <section class="panel padded"><div class="panel-heading"><div><h2>Mark a holding price</h2><p>Manually override a holding price when needed; quote source and date remain visible.</p></div></div>
+    </section></div></div>
+{% elif active_tab == 'setup' %}
+  <header class="ws-section-heading ws-tab-heading"><div><h2>Instruments &amp; setup</h2><p class="muted">Account-specific instruments, price marks and monitoring preferences.</p></div></header>
+  {% if instrument_profile %}
+<section class="panel padded" id="strategy-instruments">
+  <div class="panel-heading"><div><h2>What to hold for this account</h2>
+    <p>Matched to {{ strategy.preset.name }} · UK {{ strategy.account.get_kind_display }} · Trading 212</p>
+  </div><span class="risk-pill high">High risk · 3× daily leverage</span></div>
+  <div class="split-layout">
+    <div class="hint-box"><h3>{{ instrument_profile.equity.allocation_pct }}% — {{ instrument_profile.equity.broker_ticker }}</h3>
+      <strong>{{ instrument_profile.equity.name }}</strong>
+      <p class="micro-note">Find ISIN {{ instrument_profile.equity.isin }} in Trading 212.<br>Yahoo price ticker: {{ instrument_profile.equity.yahoo_ticker }} (automatic).</p>
+      <a href="{{ instrument_profile.equity.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer details ↗</a>
+    </div>
+    <div class="hint-box"><h3>{{ instrument_profile.safe.allocation_pct }}% — {{ instrument_profile.safe.broker_ticker }}</h3>
+      <strong>{{ instrument_profile.safe.name }}</strong>
+      <p class="micro-note">Find ISIN {{ instrument_profile.safe.isin }} in Trading 212.<br>Yahoo price ticker: {{ instrument_profile.safe.yahoo_ticker }} (automatic).</p>
+      <a href="{{ instrument_profile.safe.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer details ↗</a>
+    </div>
+  </div>
+  <p class="micro-note">{{ instrument_profile.model_warning }} {{ instrument_profile.broker_warning }} Suggested targets do not create holdings; your actual Trading 212 fills determine the recorded portfolio.</p>
+</section>
+{% endif %}
+  <div class="ws-strategy-overview"><div class="ws-stack"><section class="panel padded" id="ws-monitor-setup"><h2>Yahoo price monitoring</h2><p class="muted">{{ monitoring_status.message }}</p>
+    {% if strategy.preset.slug == "nasdaq-quarterly-target" %}
+  <details>
+    <summary>⚙ Configure Yahoo monitoring</summary>
+    <form action="{% url 'save_automation' strategy.pk %}" method="post" class="form-stack">{% csrf_token %}
+      {% include 'partials/form_fields.html' with form=automation_form %}
+      <p class="micro-note">{% if instrument_profile %}Your issuer-mapped 9Sig tickers are managed automatically. Only market monitoring can be switched on or off here.{% else %}Exact Yahoo GBP tickers are required; GBp is converted to GBP. Do not assume instrument availability or equivalence.{% endif %}</p>
+      <button class="btn btn-primary" type="submit">Save monitoring settings</button>
+    </form>
+  </details>{% endif %}
+  </section>    <section class="panel padded"><h2>About this model</h2><span class="risk-pill {{ strategy.preset.risk|lower }}">{{ strategy.preset.get_risk_display }} risk</span><p class="muted">{{ strategy.preset.summary }}</p><p class="muted">{{ strategy.preset.methodology }}</p><div class="detail-row"><span>Monthly target</span><strong>£{{ strategy.monthly_target|floatformat:2 }}</strong></div><p class="micro-note">Tracking is not trading advice. 9Sig monitoring may suggest reviews, but never executes trades. The model does not yet reproduce all spreadsheet exceptions.</p></section></div><div class="ws-stack">    <section class="panel padded"><div class="panel-heading"><div><h2>Mark a holding price</h2><p>Manually override a holding price when needed; quote source and date remain visible.</p></div></div>
       <form method="post" action="{% url 'record_price' strategy.pk %}" class="form-stack">{% csrf_token %}
         {% include 'partials/form_fields.html' with form=price_form %}
         <button class="btn btn-subtle btn-block" type="submit">Save price mark</button>
       </form>
-    </section>
-    <section class="panel padded"><h2>About this model</h2><span class="risk-pill {{ strategy.preset.risk|lower }}">{{ strategy.preset.get_risk_display }} risk</span><p class="muted">{{ strategy.preset.summary }}</p><p class="muted">{{ strategy.preset.methodology }}</p><div class="detail-row"><span>Monthly target</span><strong>£{{ strategy.monthly_target|floatformat:2 }}</strong></div><p class="micro-note">Tracking is not trading advice. 9Sig monitoring may suggest reviews, but never executes trades. The model does not yet reproduce all spreadsheet exceptions.</p></section>
-  </div>
-</div>
-{% endblock %}
-
-{% block extra_css %}
-<style>.signal-review{border-top:1px solid #2a3b4e;padding:16px 0}.signal-review p{font-size:13px;margin:8px 0;color:#9bafc7}.signal-review h3{margin:0}.signal-review small{font-size:11px}.signal-orders{background:#0d1b2d;border-radius:7px;padding:9px 12px;font-size:12px;margin-bottom:9px}.signal-orders div{padding:3px}.signal-orders b{color:#42d5c8}</style>
+    </section><section class="panel padded"><h2>Notifications</h2><p class="muted">{% if alert_status.enabled %}Delivery preferences are configured. Use the admin test to confirm a real message arrives.{% else %}Email or Discord is not yet configured for alerts.{% endif %}</p><a href="{% url 'user_settings' %}">Open notification settings →</a></section></div></div>
+{% endif %}
 {% endblock %}
