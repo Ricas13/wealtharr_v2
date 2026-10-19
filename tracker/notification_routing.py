@@ -53,5 +53,20 @@ def route_notice(owner, category, event_key, subject, message, *, sender=None):
                       else status) for channel, status in outcomes.items()}
 
 
+def category_for_event_key(key):
+    """Typed routing for persisted legacy and Section H events during retries."""
+    for prefix, category in (
+        ("quarterly-digest:", "quarterly"),
+        ("signal:", "urgent"),
+        ("data:", "data"),
+        ("rebalance-reminder:", "followup"),
+        ("monthly:", "contribution"),
+        ("contrib:", "contribution"),
+    ):
+        if key.startswith(prefix):
+            return category
+    return None
+
+
 def newly_delivered(outcomes):
     return sum(status == "sent" for status in outcomes.values())
