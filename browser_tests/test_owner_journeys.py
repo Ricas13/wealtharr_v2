@@ -145,7 +145,7 @@ class OwnerCockpitBrowserTests(BrowserHarness):
                     ("cockpit_today", "Today"),
                     ("cockpit_history", "History"),
                     ("cockpit_ledger", "Ledger"),
-                    ("cockpit_strategy", "Strategy"),
+                    ("cockpit_strategy", "What you are following"),
                     ("cockpit_settings", "Notifications"),
                 ):
                     self.visit(name)
