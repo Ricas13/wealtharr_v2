@@ -21,7 +21,7 @@ from .market_signals import quarter_end_before, settlement_close, signal_line_va
 from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
                      NotificationPreference, PriceMark, RebalanceExecution,
                      StrategyBaseline, StrategyInstance, StrategyPreset,
-                     StrategySignal, StrategyValueSnapshot)
+                     StrategySignal, StrategyValueSnapshot, YahooSync)
 from .performance import snapshot_twr_ready, annualized_return, max_drawdown
 from .core.metrics import ExternalFlow, VerifiedValuation, evaluate_inception
 from .strategies.registry import describe_strategy
@@ -58,6 +58,10 @@ def _price_status(strategy, report):
         return False, '9Sig monitoring must be enabled for a GBP account before trading.', []
     if for_strategy(strategy) is None:
         return False, 'Your broker/account instruments are not mapped to an exact verified GBP trading line.', []
+    required_symbols = (strategy.equity_symbol, strategy.safe_symbol, 'TQQQ', 'SPY')
+    if YahooSync.objects.filter(symbol__in=required_symbols,
+                                last_error__startswith='PRICE_HOLD:').exists():
+        return False, 'A required market price is on hold for verification. No trade instruction is available.', []
     if any(q < ZERO for q in report['positions'].values()):
         return False, 'A holding is negative. Reconcile the ledger before trading.', []
     if report['cash'] < ZERO:
