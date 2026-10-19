@@ -217,7 +217,7 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
             raise ValidationError("Unmapped holdings cannot start a completed review.")
         actual_equity = before["positions"].get(locked.equity_symbol, ZERO) * marks[0].price
         actual_safe = before["positions"].get(locked.safe_symbol, ZERO) * marks[1].price
-        reset = "review a reset to 60%" in signal.message.lower()
+        reset = bool(signal.reset_reason)
         if reset:
             target_equity = before["value"] * D("0.60")
         else:
