@@ -10,7 +10,11 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 from .forms import NotificationForm, IntegrationForm
-from .models import NotificationPreference, SystemIntegration
+from .models import (
+    NotificationDelivery, NotificationPreference, NotificationSchedulerRun,
+    SystemIntegration,
+)
+from .notification_routing import CATEGORIES
 from .services import dispatch
 
 
@@ -33,10 +37,23 @@ def owner_settings(request):
             transport_form.save()
             messages.success(request, 'Email and Discord transport saved securely.')
             return redirect('cockpit_settings')
-    return render(request,'settings_cockpit.html',{'pref_form':pref_form,
-        'transport_form': transport_form,
-        'discord_configured': bool(integration and integration.discord_url_ciphertext),
-        'smtp_configured': bool(integration and integration.smtp_host and integration.smtp_sender)})
+    routes = tuple({
+        "key": key, "title": title,
+        "email": pref_form[key + "_email"],
+        "discord": pref_form[key + "_discord"],
+    } for key, title in CATEGORIES)
+    history = NotificationDelivery.objects.filter(
+        owner=request.user).order_by("-created_at", "-pk")
+    return render(request, "settings_cockpit.html", {
+        "pref_form": pref_form, "route_rows": routes,
+        "transport_form": transport_form,
+        "discord_configured": bool(integration and integration.discord_url_ciphertext),
+        "smtp_configured": bool(integration and integration.smtp_host and integration.smtp_sender),
+        "recent_deliveries": history[:12],
+        "unsent_count": history.filter(status__in=("FAILED", "PENDING", "SENDING")).count(),
+        "scheduler_runs": (NotificationSchedulerRun.objects.order_by("-started_at")[:8]
+                            if request.user.is_staff else ()),
+    })
 
 
 @staff_member_required
