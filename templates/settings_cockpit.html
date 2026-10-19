@@ -72,6 +72,7 @@
   <details class="panel ck-card ck-disclosure">
     <summary>Scheduler health (administrator only)</summary>
     <div class="ck-details-body">
+      <p role="status"><strong>{{ scheduler_state }}</strong></p>
       <p class="ck-muted">One hourly owner-notification task. Diagnostics show status and counts only; no passwords, webhooks or message bodies.</p>
       <div class="table-scroll"><table class="data-table">
         <thead><tr><th>Started</th><th>Result</th><th>New</th><th>Retried</th><th>Recovered</th><th>Diagnostic</th></tr></thead>
