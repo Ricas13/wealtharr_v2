@@ -189,7 +189,10 @@ def allocation_comparison(report: Mapping, *, instrument_roles: Mapping[str, str
             if role not in actual or mark is None or mark.price <= 0:
                 return None
             actual[role] += quantity * mark.price
-        if sum(actual.values(), Decimal("0")) != total:
+        # The accounting summary rounds the complete GBP portfolio to
+        # pence. Compare the same penny-rounded sum rather than demanding
+        # exact equality of fractional-share price products.
+        if sum(actual.values(), Decimal("0")).quantize(Decimal("0.01")) != total:
             return None
         targets = {**fixed_targets, "Cash": Decimal("0")}
         drift = allocation_drift(actual, targets)
