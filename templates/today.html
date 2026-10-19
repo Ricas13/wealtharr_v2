@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Today{% endblock %}
 {% block content %}
-<div class="cockpit">
+<div class="cockpit ck-v2">
   <header class="ck-top">
     <div>
       <p class="ck-overline">YOUR PORTFOLIO{% if strategy %} · {{ strategy.name }}{% endif %}</p>
@@ -108,7 +108,8 @@
         {% csrf_token %}
         <label for="deposit-amount">Actual deposit (£)</label>
         <input class="field" id="deposit-amount" name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Amount deposited" required>
-        <input type="hidden" name="occurred_on" value="{% now 'Y-m-d' %}">
+        <label for="deposit-date">Actual deposit date</label>
+        <input class="field" id="deposit-date" name="occurred_on" type="date" value="{% now 'Y-m-d' %}" required>
         <button type="submit" class="btn">Record actual contribution</button>
       </form>
     </section>
