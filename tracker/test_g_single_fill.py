@@ -2,6 +2,9 @@
 from datetime import timedelta
 from decimal import Decimal as D
 from uuid import uuid4
+from unittest.mock import patch
+
+from django.db import IntegrityError
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -143,6 +146,19 @@ class ConfirmedSingleFillTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.strategy.ledger.count(), before)
         self.assertFalse(SignalFill.objects.exists())
+
+    def test_link_persistence_failure_rolls_back_real_ledger_entry(self):
+        # No orphan trade is allowed if the SignalFill insert fails after
+        # validate_and_record has appended the accounting event.
+        original = self.strategy.ledger.count()
+        with patch("tracker.cockpit_execution.SignalFill.objects.create",
+                   side_effect=IntegrityError("injected link insert failure")):
+            response = self.client.post(self.url, self.fill(0, "1", "100"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.strategy.ledger.count(), original)
+        self.assertFalse(SignalFill.objects.filter(signal=self.signal).exists())
+        self.assertFalse(RebalanceExecution.objects.filter(signal=self.signal).exists())
+        self.assertFalse(StrategyBaseline.objects.filter(reset_signal=self.signal).exists())
 
     def test_changing_idempotency_payload_refused(self):
         key = uuid4()
