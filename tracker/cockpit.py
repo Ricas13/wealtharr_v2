@@ -24,6 +24,10 @@ from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
 from .performance import snapshot_twr_ready, annualized_return, max_drawdown
 from .core.metrics import ExternalFlow, VerifiedValuation, evaluate_inception
 from .services import ledger_summary, validate_and_record
+from .core.presentation import (
+    account_value, holding_rows, ledger_display_rows, select_next_step,
+    signal_display_rows, visible_performance,
+)
 
 D = Decimal
 ONE = D("1")
@@ -238,14 +242,32 @@ def today(request):
     status = ('Action needed' if actionable or needs_review else
               'Cannot compute instructions' if not fresh else
               'All good — next review ' + next_review.strftime('%d %b'))
-    latest = min((m.as_of for m in marks), default=None)
+    latest = min((m.as_of for m in marks if m is not None), default=None)
+    step = select_next_step(
+        signal_kind=signal.kind if signal else '',
+        signal_title=signal.title if signal else '',
+        signal_message=signal.message if signal else '',
+        proposed_actions=tuple(actions), price_ready=fresh,
+        unavailable_reason=reason if not fresh else '',
+        next_review_label=next_review.strftime('%d %b %Y'))
+    held = any(qty > ZERO for qty in report['positions'].values())
+    profile = for_strategy(strategy)
+    roles = ({profile.equity.yahoo_ticker: 'Growth',
+              profile.safe.yahoo_ticker: 'Defensive'} if profile else {})
+    display_value = account_value(
+        net_cash=report['cash'], portfolio_value=report['value'],
+        prices_verified=fresh, has_holdings=held)
     return render(request, 'today.html', {
         'strategy': strategy, 'report': report, 'perf': perf, 'signal': signal,
         'actions': actions, 'actionable': actionable, 'fresh': fresh,
         'blocking_reason': reason if not fresh else '', 'status': status,
         'next_review': next_review, 'days_left': (next_review - timezone.localdate()).days,
-        'price_date': latest, 'comparison': _line_comparison(strategy, signal) if signal else None,
+        'price_date': latest,
+        'comparison': _line_comparison(strategy, signal) if signal else None,
         'target': strategy.monthly_target,
+        'next_step': step, 'display_value': display_value,
+        'display_gain': perf['gain_gbp'] if fresh else None,
+        'holdings': holding_rows(report, roles=roles, show_quotes=fresh),
     })
 
 
@@ -447,10 +469,15 @@ def history(request):
     if not strategy:
         return redirect('cockpit_today')
     result = _performance(strategy, ledger_summary(strategy))
+    records = list(strategy.signals.order_by('-as_of', '-pk')[:60])
+    snapshots = list(strategy.value_snapshots.order_by('-as_of')[:100])
     return render(request, 'history_cockpit.html', {
         'strategy': strategy, 'performance': result,
-        'signals': strategy.signals.order_by('-as_of', '-pk')[:60],
-        'snapshots': strategy.value_snapshots.order_by('-as_of')[:60]})
+        'metrics': visible_performance(result),
+        'signals': signal_display_rows(records),
+        'snapshots': snapshots,
+    })
+
 
 
 @login_required
@@ -459,9 +486,36 @@ def ledger(request):
     strategy, blocked = _strategy(request.user)
     if not strategy:
         return redirect('cockpit_today')
+    entries = list(strategy.ledger.order_by('-occurred_on', '-pk')[:200])
+    report = ledger_summary(strategy)
     return render(request, 'ledger_cockpit.html', {
-        'strategy': strategy, 'entries': strategy.ledger.order_by('-occurred_on', '-pk')[:200],
-        'report': ledger_summary(strategy)})
+        'strategy': strategy, 'entries': ledger_display_rows(entries),
+        'report': report,
+        'entry_limit_reached': len(entries) == 200,
+    })
+
+
+@login_required
+@require_http_methods(['GET'])
+def strategy_info(request):
+    """Read-only strategy explanation and pinned instrument identities."""
+    strategy, blocked = _strategy(request.user)
+    if not strategy:
+        return redirect('cockpit_today')
+    profile = for_strategy(strategy)
+    instruments = tuple(
+        {'role': title, 'instrument': instrument}
+        for title, instrument in (
+            ('Growth', profile.equity), ('Defensive', profile.safe))
+    ) if profile else ()
+    return render(request, 'strategy_info.html', {
+        'strategy': strategy,
+        'profile': profile,
+        'instruments': instruments,
+        'mapping_status': ('Recorded broker/account mapping' if profile else
+                           'No validated instrument profile for this account'),
+    })
+
 
 @login_required
 @require_POST
