@@ -252,7 +252,10 @@ def today(request):
     # recommendation or ignore stale/held quotes.
     actionable = bool(signal and signal.kind == 'QUARTERLY' and actions and
                       fresh and not pending_fills)
-    needs_review = bool(signal and signal.kind in ('SPIKE_WATCH', 'THIRTY_DOWN'))
+    needs_review = bool(signal and (
+        signal.kind in ('SPIKE_WATCH', 'THIRTY_DOWN') or
+        (signal.kind == 'QUARTERLY' and
+         'Your reserve is now empty' in signal.message and not actions)))
     status = ('Action needed' if actionable or needs_review else
               'Cannot compute instructions' if not fresh else
               'All good — next review ' + next_review.strftime('%d %b'))
