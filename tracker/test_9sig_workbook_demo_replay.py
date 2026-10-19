@@ -163,11 +163,18 @@ class OwnerV2AuditRegression(SimpleTestCase):
                           quote("TQQQ", day, "50", "USD")),
                     spy=tuple(quote("SPY", d, spy_current if d == day else "100", "USD")
                               for d in spy_days),
+                    growth_history=(
+                        quote("LQQ3.L", date(2025, 12, 31), "20", "GBP", "GBX"),
+                        quote("LQQ3.L", day, "10", "GBP", "GBX"),
+                    ),
                 )
                 result = evaluate(history, prices)
                 self.assertEqual(result.status, "action_needed", result.reason)
                 audit = result.audit_row()
                 self.assertEqual(audit["growth_reference_drawdown_pct"], "50.00")
+                self.assertEqual(audit["growth_instrument_drawdown_pct"], "50.00")
+                self.assertIn("LQQ3.L actual GBP", audit["growth_drawdown_label"])
+                self.assertIn("LQQ3.L actual growth-instrument drawdown", result.alerts[-1]["message"])
                 self.assertEqual(audit["growth_drawdown_disclosure"],
                                  "Information only, doesn't affect the advice")
                 self.assertEqual(audit["rule_applied"], "All-in reserve shortage")
@@ -179,3 +186,45 @@ class OwnerV2AuditRegression(SimpleTestCase):
                 self.assertEqual(audit["throttle_81pct"], "False")
                 self.assertEqual(audit["buy_budget"], "100")
                 self.assertEqual(result.strategy_version, VERSION)
+
+    def test_growth_drawdown_history_cannot_change_buy_or_30down(self):
+        # Decision 1: even a 90% collapse of the actual growth instrument
+        # is ONLY a disclosure; SPY remains the sole 30 Down trigger.
+        base = dict(
+            start_date=date(2026, 1, 1), as_of=date(2026, 3, 31),
+            currency="GBP", equity_symbol="LQQ3.L", safe_symbol="ERNS.L",
+            equity_qty=D("1"), equity_price=D("10"), safe_qty=D("1"),
+            safe_price=D("100"), cash=D("0"), starting_equity_cost=D("600"),
+            reference=[(date(2025, 12, 31), D("100")),
+                       (date(2026, 3, 31), D("50"))],
+            spy_reference=[(date(2025, 12, 31), D("100")),
+                           (date(2026, 3, 31), D("100"))],
+        )
+        for peak, expected_drawdown in (
+            (D("10"), "0.00"), (D("100"), "90.00")
+        ):
+            with self.subTest(previous_high=peak):
+                signals = advice_for_holdings(**base, growth_history=(
+                    (date(2025, 12, 31), peak),
+                    (date(2026, 3, 31), D("10")),
+                ))
+                q = next(x for x in signals if x["kind"] == "QUARTERLY")
+                self.assertEqual(q["growth_instrument_drawdown_pct"], expected_drawdown)
+                self.assertEqual(q["reset_reason"], "")
+                self.assertEqual([a["side"] for a in q["actions"]], ["SELL", "BUY"])
+                self.assertNotIn("THIRTY_DOWN", [x["kind"] for x in signals])
+
+    def test_missing_growth_history_is_not_invented(self):
+        # Old/audit-only quotes without historical actual UK prices cannot
+        # be presented as a 0% drawdown by treating today's mark as its high.
+        q = next(x for x in advice_for_holdings(
+            start_date=date(2026, 1, 1), as_of=date(2026, 3, 31),
+            currency="GBP", equity_symbol="LQQ3.L", safe_symbol="ERNS.L",
+            equity_qty=D("1"), equity_price=D("10"), safe_qty=D("1"),
+            safe_price=D("100"), cash=D("0"), starting_equity_cost=D("600"),
+            reference=[(date(2025, 12, 31), D("100")),
+                       (date(2026, 3, 31), D("50"))],
+            growth_history=((date(2026, 3, 31), D("10")),),
+        ) if x["kind"] == "QUARTERLY")
+        self.assertEqual(q["growth_instrument_drawdown_pct"], "")
+        self.assertIn("unavailable without verified history", q["message"])
