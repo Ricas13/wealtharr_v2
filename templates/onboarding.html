@@ -1,8 +1,63 @@
-{% extends 'base.html' %}{% block title %}Start my 9Sig{% endblock %}{% block content %}
-<section class="cockpit ck-narrow"><h1>Start tracking my 9Sig</h1><p class="ck-muted">One real portfolio. Trading 212, GBP, £500 planned monthly contributions. No trades will be placed.</p>
-{% if blocked %}<div role="alert">{{ blocked }}</div>{% else %}
-<form method="post" class="panel ck-card">{% csrf_token %}{{ form.non_field_errors }}
-{% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
-<p class="ck-muted">Existing holdings require your original broker history. Wealtharr cannot invent opening purchases or their costs. You'll import the CSV next.</p>
-<button type="submit" class="btn btn-primary ck-primary">Create my private cockpit</button></form>
-{% endif %}</section>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Start tracking{% endblock %}
+{% block content %}
+<section class="cockpit ck-narrow ck-v2">
+  <header class="ck-top">
+    <div><p class="ck-overline">PRIVATE OWNER SETUP · ONE SCREEN</p>
+      <h1>Start tracking 9Sig</h1>
+      <p class="ck-muted">The strategy and instruments are fixed. You only enter money and investments you really have.</p>
+    </div>
+  </header>
+  {% if blocked %}
+    <section class="panel ck-card" role="alert"><h2>Setup unavailable</h2><p>{{ blocked }}</p>
+      <a class="btn" href="{% url 'cockpit_today' %}">Back to Today</a></section>
+  {% else %}
+    <form method="post" class="panel ck-card ck-setup-form" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="ck-block-message" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+
+      <div class="ck-setup-stage">
+        <p class="ck-overline">01 · YOUR ACCOUNT</p>
+        <h2>UK Trading 212 Stocks &amp; Shares ISA</h2>
+        <p class="ck-muted">Portfolio currency: GBP. This setup does not connect to Trading 212 or place orders. No Invest/GIA, paper account or custom ticker option is offered.</p>
+        <div class="ck-setup-instruments">
+          <div><strong>Growth · {{ manifest.roles.growth.broker_ticker }}</strong><small>{{ manifest.roles.growth.name }} · {{ manifest.roles.growth.isin }}</small></div>
+          <div><strong>Defensive · {{ manifest.roles.safe.broker_ticker }}</strong><small>{{ manifest.roles.safe.name }} · {{ manifest.roles.safe.isin }}</small></div>
+        </div>
+        <p class="ck-muted ck-evidence-note">Issuer eligibility and a Trading 212 <em>Invest</em> listing do not prove you can buy these exact products in your personal ISA. Check your broker's ISA availability and leveraged-product requirements yourself. No substitute security will be selected.</p>
+      </div>
+
+      <div class="ck-setup-stage">
+        <p class="ck-overline">02 · YOUR ACTUAL STARTING POINT</p>
+        <div class="form-field"><label for="{{ form.position_mode.id_for_label }}">How are you starting?</label>
+          {{ form.position_mode }}{{ form.position_mode.errors }}</div>
+        <p class="ck-muted">For an existing portfolio, upload the full original Trading 212 history on the next screen. No shares, purchases or opening balance will be invented.</p>
+        <div class="ck-setup-fresh-fields">
+          <div class="ck-form-pair"><label for="{{ form.starting_cash.id_for_label }}">Cash <em>already deposited</em> (£) · optional</label>
+            {{ form.starting_cash }}{{ form.starting_cash.errors }}</div>
+          <div class="ck-form-pair"><label for="{{ form.start_date.id_for_label }}">Date that actual cash arrived</label>
+            {{ form.start_date }}{{ form.start_date.errors }}</div>
+        </div>
+        <p class="ck-muted">Leave the cash amount empty if £1,000 is only your plan. Planned money must not appear as an actual deposit.</p>
+      </div>
+
+      <div class="ck-setup-stage">
+        <p class="ck-overline">03 · YOUR PLAN</p>
+        <div class="ck-form-pair"><label for="{{ form.monthly_target.id_for_label }}">Monthly reminder amount (£)</label>
+          {{ form.monthly_target }}{{ form.monthly_target.errors }}</div>
+        <p class="ck-muted">Default £500/month is just a reminder target, <strong>not</strong> money added to your portfolio. Set £0 to disable the planned amount.</p>
+        <details class="ck-disclosure-inline">
+          <summary>Optional: choose where alerts should go</summary>
+          <div class="form-field"><label for="{{ form.destination.id_for_label }}">Destination</label>
+            {{ form.destination }}{{ form.destination.errors }}</div>
+          <div class="form-field"><label for="{{ form.email.id_for_label }}">Email (only if chosen)</label>
+            {{ form.email }}{{ form.email.errors }}</div>
+          <p class="ck-muted">Email/Discord transport must also be configured in Settings before delivery can work. Configure later is the default.</p>
+        </details>
+      </div>
+      <button type="submit" class="btn btn-primary ck-primary ck-setup-submit">Create my private portfolio →</button>
+      <p class="ck-muted">You can update your reminder and notification settings later. Actual historical fills always require your records.</p>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}
