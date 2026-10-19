@@ -10,6 +10,31 @@ class FillForm(forms.Form):
     fee = forms.DecimalField(min_value=Decimal('0'), max_digits=20, decimal_places=2,
                              widget=forms.NumberInput(attrs={'step': '0.01', 'class': 'field'}))
 
+
+class SingleSignalFillForm(forms.Form):
+    """One historical execution; selection is only from server-pinned advice."""
+    action_index = forms.IntegerField(min_value=0, max_value=3,
+                                      widget=forms.HiddenInput())
+    executed_on = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "field"}))
+    quantity = forms.DecimalField(
+        min_value=Decimal("0.00000001"), max_digits=22, decimal_places=8,
+        widget=forms.NumberInput(attrs={"step": "any", "class": "field"}))
+    unit_price = forms.DecimalField(
+        min_value=Decimal("0.00000001"), max_digits=22, decimal_places=8,
+        widget=forms.NumberInput(attrs={"step": "any", "class": "field"}))
+    fee = forms.DecimalField(
+        min_value=Decimal("0"), max_digits=20, decimal_places=2,
+        initial=Decimal("0"),
+        widget=forms.NumberInput(attrs={"step": "0.01", "class": "field"}))
+    idempotency_key = forms.UUIDField(widget=forms.HiddenInput())
+
+    def clean_executed_on(self):
+        executed_on = self.cleaned_data["executed_on"]
+        if executed_on > timezone.localdate():
+            raise forms.ValidationError("The broker execution cannot be in the future.")
+        return executed_on
+
 class DepositShortcutForm(forms.Form):
     amount = forms.DecimalField(min_value=Decimal('0.01'), max_digits=16, decimal_places=2)
     occurred_on = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
