@@ -8,7 +8,7 @@ from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 
 from .models import OwnerTOTP
-from .services import encrypt_secret
+from .services import decrypt_secret, encrypt_secret
 from .totp import generate_secret, matching_step, provisioning_uri, verify_account_code
 
 SESSION_FLAG = "wealtharr_totp_verified_uid"
@@ -52,7 +52,11 @@ def configure(request):
             messages.success(request, "Authenticator disabled. Password login remains required.")
             return redirect("totp_setup")
     elif request.method == "POST" and request.POST.get("intent") == "enable":
-        candidate = request.session.get(ENROLL_SECRET)
+        try:
+            candidate = decrypt_secret(request.session.get(ENROLL_SECRET, ""))
+        except Exception:
+            candidate = None
+            request.session.pop(ENROLL_SECRET, None)
         if existing:
             messages.error(request, "An authenticator is already enabled.")
         elif not candidate:
@@ -77,8 +81,18 @@ def configure(request):
         messages.error(request, "Unsupported authenticator action.")
 
     if not existing and ENROLL_SECRET not in request.session:
-        request.session[ENROLL_SECRET] = generate_secret()
-    secret = request.session.get(ENROLL_SECRET) if not existing else None
+        # Session storage is signed, not encrypted by default; encrypt the
+        # short-lived unenrolled seed before persisting it there.
+        request.session[ENROLL_SECRET] = encrypt_secret(generate_secret())
+    if not existing:
+        try:
+            secret = decrypt_secret(request.session[ENROLL_SECRET])
+        except Exception:
+            # A stale session after a key rotation is not a usable seed.
+            secret = generate_secret()
+            request.session[ENROLL_SECRET] = encrypt_secret(secret)
+    else:
+        secret = None
     return render(request, "totp_setup.html", {
         "enabled": existing is not None,
         "setup_secret": secret,
