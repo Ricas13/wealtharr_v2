@@ -57,7 +57,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                 # An older review should not become a fresh executable notice.
                 # Today shows exactly why instructions are unavailable.
                 continue
-            if (orders and sig.created_at.date() <= today - timedelta(days=remind_after_days)
+            if (orders and reconciled and sig.created_at.date() <= today - timedelta(days=remind_after_days)
                     and not RebalanceExecution.objects.filter(signal=sig).exists()):
                 subject = '9Sig review still waiting'
                 body = ('The %s quarterly review has not been confirmed in Wealtharr. '
