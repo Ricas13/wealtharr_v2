@@ -246,6 +246,32 @@ class RebalanceExecution(models.Model):
     baseline = models.ForeignKey(StrategyBaseline, null=True, blank=True, on_delete=models.PROTECT)
 
 
+class SignalFill(models.Model):
+    """One actual owner-recorded execution linked to one immutable proposal.
+
+    Multiple partial fills of a proposal are possible. The ledger remains the
+    authoritative accounting record; this link captures which suggested action
+    the owner was reporting and prevents duplicate request retries.
+    """
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.PROTECT,
+                                 related_name="signal_fills")
+    signal = models.ForeignKey(StrategySignal, on_delete=models.PROTECT,
+                               related_name="confirmed_fills")
+    ledger_entry = models.OneToOneField(LedgerEntry, on_delete=models.PROTECT,
+                                         related_name="confirmed_signal_fill")
+    action_index = models.PositiveSmallIntegerField()
+    idempotency_key = models.CharField(max_length=36)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ledger_entry__occurred_on", "pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["signal", "idempotency_key"],
+                                    name="unique_signal_fill_request"),
+        ]
+
+
 class BrokerImportRow(models.Model):
     """Idempotent identifier for an actual imported broker event."""
     strategy = models.ForeignKey(StrategyInstance, on_delete=models.PROTECT)
