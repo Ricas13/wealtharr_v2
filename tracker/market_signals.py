@@ -391,6 +391,7 @@ def review_strategy(strategy):
             strategy=strategy, signal_key=alert["key"],
             defaults={"kind": alert["kind"], "title": alert["title"],
                       "message": alert["message"], "actions": alert["actions"],
+                      "reset_reason": alert.get("reset_reason", ""),
                       "as_of": quarter_end})
         if new:
             created += 1
