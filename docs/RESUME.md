@@ -7,7 +7,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ## IMPORTANT: LETTERED PRODUCT REDESIGN — resume checkpoint 2026-10-19
 
-**Current milestone: Sections A and B completed as scoped deliverables; do not infer Sections C–J are implemented. The user's instruction is ONE SECTION PER CHAT TURN, wait for "next".** The next section is **C**, not a restart of the old cockpit and not an authorisation to do all future sections. Section A documented the target architecture; Section B researched UK Trading 212 ISA instruments and committed the evidence-aware catalogue.
+**Current milestone: Sections A, B and C have been implemented as scoped branch deliverables. The next section is D only when the owner says “next”.** Existing cockpit runtime still uses the relocated v1 financial primitives; the new typed evaluation and independent reference-provider interface are available for later orchestration without connecting to any broker.
 
 - **Same active branch:** `feature/owner-9sig-cockpit-resumable` (PR **#11**). No competing branch, no restart. Before edits, fetch current PR HEAD and check concurrent commits.
 - **Section B artefacts:** `docs/instrument-research.md`, `tracker/instrument_mapping.py` (immutable `CURATED_ISA_ROLE_MAP`, `MAPPING_VERSION=2026-10-19.1`, reviewed issuer/Invest evidence with explicit pending owner ISA permission and Yahoo feed flags), `tracker/test_instrument_catalogue.py`, updated `CLAUDE.md`, `docs/architecture.md` and superseded old broker-API proposal.
@@ -20,8 +20,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ### Paste this in a NEW ChatGPT chat to resume
 
-> Continue Wealtharr v2 at https://github.com/Ricas13/wealtharr_v2, existing **PR #11** and branch `feature/owner-9sig-cockpit-resumable`. **Read `docs/RESUME.md` first**, then `CLAUDE.md`, `docs/architecture.md`, `docs/instrument-research.md` and `docs/FINANCIAL_QA.md`. Sections **A (architecture/docs) and B (issuer/Invest research + versioned UK ISA role catalogue)** have been committed. Implement **ONLY Section C** of the lettered redesign: extract a pure version-pinned 9Sig evaluation module from `tracker/market_signals.py`, with audit intermediates, irregular contributions, 30 Down/100%-up warning and worksheet parity fixtures; add an independent price fallback and fail-closed sanity/quote-unit checks. Preserve all existing financial safeguards and tests; inspect live PR CI, fix regressions; commit to the **same branch** and update `docs/RESUME.md` with exact completed/remaining status. Do **not** ask me to re-explain the brief, start over, create another branch, connect Trading 212 or place trades. Stop at the end of Section C and wait for my "next".
-
+> Continue Wealtharr v2 on PR #11, same branch `feature/owner-9sig-cockpit-resumable`. Read `docs/RESUME.md` and Section C implementation. Sections A (architecture), B (fixed issuer evidence-aware UK ISA mappings), C (pure pinned 9Sig v1 evaluator, audit, owner parity placeholders and independent USD reference fallback) are implemented. Do ONLY **Section D**: strategy-independent audited metrics and exact flow-boundary valuation semantics. Do not revisit or harden the old cockpit, and do not re-check prior safety work. The owner-only inputs are already itemized once in `docs/OWNER_TODO.md` and do not block Section D. Commit to this same branch; update this handoff once at the end; stop and await “next”.
 ## Objective
 
 Make Wealtharr a strategy-agnostic **tracking and notification** platform for a private owner, with fixed 9Sig as its first (and only currently implemented) strategy. Today shows performance and one next action; the owner manually makes and confirms any broker trades. The product never places orders, never connects to brokers (including read-only APIs), and never invents prices, trades or backtests. Preserve the append-only ledger, immutable confirmed reset baselines and financial refusal rules throughout the refactor.
@@ -30,7 +29,7 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 - [x] **Section A architecture/documentation only:** committed `docs/architecture.md` and root `CLAUDE.md` to this existing branch. These describe a *target*, not running refactored code; current PR #11 cockpit and its tests are still in place.
 - [x] **B** research issuer identities and issuer-reported ISA status, Trading 212 *Invest* listings, explicit unverified actual Stocks ISA access, alternatives and frozen evidence-aware mapping; see `docs/instrument-research.md`. Account permission and Yahoo live metadata remain unverified.
-- [ ] **C** pure version-pinned 9Sig module, spreadsheet parity/irregular contributions, quote providers/quality holds.
+- [x] **C** pure pinned `tracker/strategies/nine_sig/v1.py` engine (v1.0.0), immutable inputs/results and audit trace, irregular dated cashflows, 30 Down/100%-up warning, quote refusal; independent, USD-reference-only Stooq fallback in `tracker/core/prices.py`, plus synthetic unit coverage and deliberately empty six-quarter owner parity fixtures.
 - [ ] **D** audited universal metrics with exact flow-boundary tests.
 - [ ] **E** strategy-independent Today / History / Ledger / Strategy info presentation.
 - [ ] **F** one-screen onboarding, contributions and conservative T212 import.
@@ -38,9 +37,18 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [ ] **H** owner destination/alert matrix, idempotent digest, scheduler diagnostics.
 - [ ] **I** secure Traefik deployment, optional TOTP, backups/restore.
 - [ ] **J** CI/Playwright and incremental ship plan.
-- **Instruction:** user wants **one lettered section per turn**. Stop after B now; proceed with C **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
+- **Instruction:** user wants **one lettered section per turn**. Stop after C now; proceed with D **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
 - **Architecture decision:** no broker/API integration of any kind, no editable preset/ticker/rule UI, no paper account, no billing or public signup. Fixed code-defined strategy versions; role-based evidence-backed exact lines pinned at enrolment. See `docs/architecture.md` and `CLAUDE.md`.
 - **Outstanding verification remains outstanding:** workbook parity, ISA/broker eligibility, real CSV, CI/migrations/browser checks, and deployment. Section A did not test or deploy runtime changes.
+
+## Section C delivery — 2026-10-19
+
+- [x] Fixed v1 Python rules extracted from `tracker/market_signals.py` to `tracker/strategies/nine_sig/v1.py`; existing Django adapter delegates pure quarterly calculations without starting a second strategy implementation.
+- [x] Typed `PortfolioHistory`, `NormalizedQuote`, `ApprovedPriceBundle`, immutable rule parameters and `EvaluationResult`; quarter-by-quarter 9% growth and half-of-actual-irregular-contributions audit, reserve/throttle intermediates, 30 Down state, non-tradable TQQQ 100%-up proxy warning, and defined cannot-compute result.
+- [x] Strict GBP/GBX price-unit/source/date validation and pinned instrument/strategy identity. An optional independent **Stooq USD TQQQ/SPY reference** adapter requires actual overlap with an independently identified Yahoo observation; never substitutes UK execution prices and never silently persists fallback data. The adapter is a new-source interface, not a guarantee that any independent feed is available.
+- [x] Six intentionally empty case rows in `tracker/strategies/nine_sig/fixtures/workbook_parity.csv`; separate quote and external-flow fixtures; automated test compares genuine case data when filled, otherwise explicitly skips only the owner-parity test. Synthetic engine/provider tests added but new CI result not asserted.
+- [x] All five required owner-supplied input types, including exact worksheet columns, dates and fixture formats, live in `docs/OWNER_TODO.md` **once**; not blockers for the next build section.
+- [ ] Section **D** next. No automatic broker trades, no broker integration, no extra cockpit-hardening work in this milestone.
 
 ## State / checkpoints
 
@@ -79,12 +87,10 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## First commands in a NEW CHAT
 
-1. Open PR #11 and the **same** `feature/owner-9sig-cockpit-resumable` branch; inspect the newest commit/CI and reconcile any concurrent writes.
-2. Read `CLAUDE.md`, `docs/architecture.md`, `docs/instrument-research.md`, this file and `docs/FINANCIAL_QA.md`. Do not ask for the product brief again.
-3. Use the **Section C-only prompt at the top** once the user says "next". Do not jump to D–J. All new edits belong on the same branch/PR, without rewriting already-committed work.
-4. Run/check CI including `DEBUG=1 SECRET_KEY=test-only python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py test tracker`, and `python manage.py collectstatic --noinput`. If a Section B regression is found, fix it while advancing the authorised section.
-5. Update this checkpoint with genuine results (no "green" for queued CI, no "ISA verified" for public Invest listings), note remaining work and leave a pasteable next-section prompt.
-6. Do not deploy or alter infrastructure without separate explicit authorisation; keep one scheduler replica and never run both competing notifier commands.
+1. Continue **PR #11** on `feature/owner-9sig-cockpit-resumable`; inspect current files to avoid overwriting concurrent work.
+2. Read this handoff and `docs/architecture.md`; Section C files: `tracker/strategies/nine_sig/v1.py`, `tracker/core/prices.py`, `tracker/test_nine_sig_v1.py` and the workbook fixture directory.
+3. Implement **Section D only**. Use `docs/OWNER_TODO.md` for owner evidence without restating or blocking on it.
+4. Leave one current-branch PR and update the handoff at the end; never claim queued checks passed.
 
 ## Critical financial semantics
 
@@ -97,4 +103,4 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## User prompt for a new chat
 
-**Use the precise Section C-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
+**Use the precise Section D-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
