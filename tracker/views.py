@@ -270,6 +270,11 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
     from .instrument_mapping import for_strategy
     instrument_profile = for_strategy(strategy)
     tab = request.GET.get("tab", "overview")
+    if entry_form is not None:
+        # Invalid manual trades must remain visible, with their form errors.
+        tab = "ledger"
+    elif price_form is not None:
+        tab = "setup"
     if tab not in ("overview", "signals", "ledger", "setup"):
         tab = "overview"
     withdrawals = strategy.ledger.filter(kind=LedgerEntry.WITHDRAW).exists()
