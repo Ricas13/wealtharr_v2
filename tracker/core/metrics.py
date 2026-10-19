@@ -118,6 +118,8 @@ class InceptionMetrics:
     xirr_annual: Decimal | None
     simple_cumulative_return: Decimal | None  # only a SINGLE funding deposit
     cash_flows: tuple[ExternalFlow, ...] = ()
+    # Descriptive ratio; NOT a time- or money-weighted investment return.
+    gain_vs_net_contributions_pct: Decimal | None = None
 
     def audit_rows(self) -> tuple[dict[str, str], ...]:
         return tuple({
@@ -350,7 +352,9 @@ def evaluate_inception(flows: tuple[ExternalFlow, ...],
     simple = (closing.value_gbp / ordered[0].amount_gbp - ONE
               if len(ordered) == 1 and ordered[0].occurred_on < closing.as_of
               else None)
-    return InceptionMetrics("ok", "", contributed, gain, rate, simple, ordered)
+    gain_pct = (gain / contributed * PERCENT if contributed > ZERO else None)
+    return InceptionMetrics("ok", "", contributed, gain, rate, simple, ordered,
+                            gain_pct)
 
 
 def allocation_drift(values_gbp: Mapping[str, Decimal],
