@@ -117,3 +117,22 @@ class PersistedMarketPriceHoldTests(TestCase):
         self.assertEqual(
             YahooSync.objects.get(symbol="ERNS.L").last_error,
             "PRICE_HOLD:STALE_PRICE")
+
+    @patch("tracker.market_signals.fetch_chart")
+    def test_historical_close_cannot_be_rewritten(self, fetch):
+        today = timezone.localdate()
+        MarketObservation.objects.create(
+            symbol="ERNS.L", as_of=today, price=D("100"), currency="GBP")
+        fetch.return_value = ("GBP", [(today, D("101"))])
+        self.assertIsNone(sync_ticker("ERNS.L", force=True))
+        self.assertEqual(MarketObservation.objects.get(
+            symbol="ERNS.L", as_of=today).price, D("100"))
+        self.assertEqual(YahooSync.objects.get(symbol="ERNS.L").last_error,
+                         "PRICE_HOLD:REVISED_HISTORICAL_CLOSE")
+
+    @patch("tracker.market_signals.fetch_chart")
+    def test_vendor_unit_change_creates_persistent_hold(self, fetch):
+        fetch.side_effect = ValueError("PRICE_HOLD:RAW_UNIT_MISMATCH")
+        self.assertIsNone(sync_ticker("LQQ3.L", force=True))
+        self.assertEqual(YahooSync.objects.get(symbol="LQQ3.L").last_error,
+                         "PRICE_HOLD:RAW_UNIT_MISMATCH")
