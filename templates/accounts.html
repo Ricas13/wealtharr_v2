@@ -5,7 +5,7 @@
 <div class="split-layout">
   <section class="panel padded">
     <div class="panel-heading"><div><h2>Your accounts</h2><p>All figures are tracked in GBP in this initial release.</p></div></div>
-    {% for account in accounts %}<div class="account-row"><div class="account-icon">▤</div><div><b>{{ account.name }}</b><small>{{ account.get_kind_display }}</small></div><span class="right-tag">{{ account.strategy_count }} strategies</span></div>
+    {% for account in accounts %}<div class="account-row"><div class="account-icon">{% include 'partials/icon.html' with name='wallet' %}</div><div><b>{{ account.name }}</b><small>{{ account.get_kind_display }}</small></div><span class="right-tag">{{ account.strategy_count }} strategies</span></div>
     {% empty %}<div class="inline-empty">No accounts created yet. Add one using the form.</div>{% endfor %}
   </section>
   <section class="panel padded">
