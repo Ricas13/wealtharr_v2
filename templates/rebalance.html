@@ -26,6 +26,10 @@
   <section class="panel ck-card">
     <h2>2. Enter ONE actual broker fill</h2>
     <p class="ck-muted">After saving, the ledger keeps this fill even if the others have not happened yet. This is marked partial and does not confirm a reset.</p>
+    <p class="ck-muted">Enter the <strong>actual execution price in GBP pounds per share</strong>, not the estimated quarter-end quote.
+      If your LQQ3 execution receipt quotes GBX (pence), divide that quote by 100 first.
+      Include the actual GBP fee separately and use the real execution date.
+      Do not copy the proposal as though it were a completed trade.</p>
     <p class="ck-muted">Enter the <strong>actual executed GBP price in pounds</strong>, not an estimated market quote. If the source price is explicitly in GBX pence, divide by 100 once (for example, 125p = £1.25). Never use TQQQ or SPY USD references as a UK fill.</p>
     {% for row, form in single_rows %}
       <div class="ck-single-fill">
