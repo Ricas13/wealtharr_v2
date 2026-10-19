@@ -550,10 +550,16 @@ def history(request):
     executed = dict(RebalanceExecution.objects.filter(
         strategy=strategy, signal_id__in=[signal.pk for signal in records]
     ).values_list('signal_id', 'executed_on'))
+    partial_counts = {}
+    for signal_id in SignalFill.objects.filter(
+            strategy=strategy, signal_id__in=[signal.pk for signal in records]
+            ).values_list('signal_id', flat=True):
+        partial_counts[signal_id] = partial_counts.get(signal_id, 0) + 1
     return render(request, 'history_cockpit.html', {
         'strategy': strategy, 'performance': result,
         'metrics': visible_performance(result),
-        'signals': signal_display_rows(records, executions=executed),
+        'signals': signal_display_rows(
+            records, executions=executed, partial_counts=partial_counts),
         'snapshots': snapshots,
     })
 
