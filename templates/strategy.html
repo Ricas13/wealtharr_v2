@@ -61,6 +61,26 @@
   {% endif %}
 </section>
 {% endif %}
+    {% if instrument_profile %}<details class="ws-instrument-disclosure"><summary>What to hold for this account · LQQ3 / ERNS</summary>{% if instrument_profile %}
+<section class="panel padded" id="strategy-instruments">
+  <div class="panel-heading"><div><h2>What to hold for this account</h2>
+    <p>Matched to {{ strategy.preset.name }} · UK {{ strategy.account.get_kind_display }} · Trading 212</p>
+  </div><span class="risk-pill high">High risk · 3× daily leverage</span></div>
+  <div class="split-layout">
+    <div class="hint-box"><h3>{{ instrument_profile.equity.allocation_pct }}% — {{ instrument_profile.equity.broker_ticker }}</h3>
+      <strong>{{ instrument_profile.equity.name }}</strong>
+      <p class="micro-note">Find ISIN {{ instrument_profile.equity.isin }} in Trading 212.<br>Yahoo price ticker: {{ instrument_profile.equity.yahoo_ticker }} (automatic).</p>
+      <a href="{{ instrument_profile.equity.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer details ↗</a>
+    </div>
+    <div class="hint-box"><h3>{{ instrument_profile.safe.allocation_pct }}% — {{ instrument_profile.safe.broker_ticker }}</h3>
+      <strong>{{ instrument_profile.safe.name }}</strong>
+      <p class="micro-note">Find ISIN {{ instrument_profile.safe.isin }} in Trading 212.<br>Yahoo price ticker: {{ instrument_profile.safe.yahoo_ticker }} (automatic).</p>
+      <a href="{{ instrument_profile.safe.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer details ↗</a>
+    </div>
+  </div>
+  <p class="micro-note">{{ instrument_profile.model_warning }} {{ instrument_profile.broker_warning }} Suggested targets do not create holdings; your actual Trading 212 fills determine the recorded portfolio.</p>
+</section>
+{% endif %}</details>{% endif %}
   </section>
 {% elif active_tab == 'signals' %}
   <header class="ws-section-heading ws-tab-heading"><div><h2>Signal history</h2><p class="muted">Quarterly reviews, 30 Down and spike alerts; newest first.</p></div></header>
