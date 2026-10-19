@@ -3,6 +3,7 @@ import csv
 from datetime import date
 from decimal import Decimal as D
 from io import StringIO
+from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -130,6 +131,26 @@ class SectionEPageTests(TestCase):
         response = self.client.get(reverse("cockpit_ledger"), {"format": "csv"})
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("345.00", response.content.decode())
+
+    def test_fractional_share_allocation_matches_rounded_ledger_value(self):
+        report = {
+            "cash": D("50.00"), "value": D("150.00"),
+            "positions": {"LQQ3.L": D("3")},
+            "marks": {"LQQ3.L": SimpleNamespace(price=D("33.33333333"))},
+        }
+        allocation = allocation_comparison(
+            report, instrument_roles={"LQQ3.L": "growth", "ERNS.L": "safe"},
+            fixed_targets={"growth": D("0.6"), "safe": D("0.4")},
+            verified=True)
+        self.assertIsNotNone(allocation)
+        self.assertEqual({row.role for row in allocation}, {"growth", "safe", "Cash"})
+        growth = next(row for row in allocation if row.role == "growth")
+        self.assertAlmostEqual(growth.actual_pct, D("66.66666666"),
+                               delta=D("0.0000001"))
+        self.assertIsNone(allocation_comparison(
+            report, instrument_roles={"LQQ3.L": "growth", "ERNS.L": "safe"},
+            fixed_targets={"growth": D("0.6"), "safe": D("0.4")},
+            verified=False))
 
     def test_no_uncertain_allocation_and_manual_warning_never_trade(self):
         not_ready = select_next_step(
