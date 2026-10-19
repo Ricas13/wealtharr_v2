@@ -298,6 +298,8 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
             "actions": [],
         })
 
+    # Preserve this immutable historical series for informational drawdown audit.
+    reference = tuple(reference)
     tqqq = _quarterly_closes(reference, as_of)
     current = tqqq.get(review_q)
     previous = tqqq.get(review_q - 1)
@@ -348,7 +350,7 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
             # A 60/40 reset targets the current total, not the old signal
             # line. The normal large-buy throttle does not apply.
             budget = min(difference, reserve)
-        elif difference > reserve + tolerance:
+        elif difference > reserve:
             # v2 decision 3: exhaust the available reserve even in 30 Down.
             # This is advisory, not a new confirmed 60/40 reset baseline.
             budget = reserve
@@ -554,7 +556,7 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     triggered, decline = _drawdown_from_spy(sq, review_q)
     doubled = tq[review_q][1] >= tq[review_q-1][1] * Decimal("2")
     gap = signal - eq_value
-    reserve_shortage = gap > reserve + CENTS
+    reserve_shortage = gap > reserve
     throttle = (gap > CENTS and not reserve_shortage and
                 gap >= reserve * Decimal("0.90"))
     buy_budget = (reserve if reserve_shortage else
