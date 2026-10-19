@@ -45,15 +45,14 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
     today = today or timezone.localdate()
     count = 0
     for strategy in StrategyInstance.objects.select_related("owner", "account").filter(
-            preset__slug="nasdaq-quarterly-target",
-            market_data_enabled=True).exclude(account__kind="PAPER"):
+            preset__slug="nasdaq-quarterly-target").exclude(account__kind="PAPER"):
         owner = strategy.owner
         pref, _ = NotificationPreference.objects.get_or_create(owner=owner)
         report = ledger_summary(strategy)
         fresh, why, marks = _price_status(strategy, report)
         # A recurring source issue is never converted to a trade instruction.
         # One digest per calendar week and problem identity until resolved.
-        if not fresh and report["positions"]:
+        if strategy.market_data_enabled and not fresh and report["positions"]:
             fingerprint = sha256(why.encode("utf-8")).hexdigest()[:12]
             week = today.isocalendar()
             key = "data:%s:%04d-W%02d:%s" % (
@@ -69,7 +68,8 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
             as_of=quarter_end_before(today)).exclude(
                 review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"),
             ).order_by("-as_of", "-pk").first()
-        if recent and not RebalanceExecution.objects.filter(signal=recent).exists():
+        if (strategy.market_data_enabled and recent and
+                not RebalanceExecution.objects.filter(signal=recent).exists()):
             actions = trade_lines(recent)
             existing = SignalFill.objects.filter(strategy=strategy, signal=recent)
             partial = existing.exists()
