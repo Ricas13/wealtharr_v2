@@ -239,7 +239,7 @@ def _growth_reference_drawdown(reference, as_of):
 
 
 RESERVE_EMPTY_NOTICE = "Your reserve is now empty. Review whether to reset to 60/40."
-INFORMATION_ONLY_NOTICE = "Information only, doesn't affect the advice."
+INFORMATION_ONLY_NOTICE = "Information only, doesn't affect the advice"
 
 
 def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symbol,
@@ -381,7 +381,7 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
         "Rule applied: only SPY's quarter-end close versus the preceding eight "
         "SPY closes triggers 30 Down; manual workbook TQQQ flags and mid-quarter "
         "sell-half overrides do not apply. TQQQ growth-reference drawdown from "
-        "running high: %s%%. %s"
+        "running high: %s%%. %s."
         % (growth_drawdown if growth_drawdown is not None else "unavailable",
            INFORMATION_ONLY_NOTICE))
     label = "%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
