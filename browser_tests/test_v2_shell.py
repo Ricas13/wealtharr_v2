@@ -126,7 +126,7 @@ class V2ShellBrowserTests(BrowserHarness):
                     collapse.click()
                     self.assertEqual(collapse.get_attribute("aria-pressed"), "true")
                     self.page.reload()
-                    expand = self.page.get_by_role("button", name="Expand sidebar")
+                    expand = self.page.locator("#v2-collapse")
                     self.assertEqual(expand.get_attribute("aria-pressed"), "true")
                     expand.click()
                     self.assertEqual(expand.get_attribute("aria-pressed"), "false")
