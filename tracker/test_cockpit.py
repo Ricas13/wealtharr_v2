@@ -14,6 +14,7 @@ from .performance import (xirr, time_weighted_return, max_drawdown, simple_retur
                           annualized_return, cumulative_from_annualized)
 from .services import ledger_summary, validate_and_record
 from .cockpit_import import inspect_csv
+from .cockpit import _performance
 from .market_signals import quarter_end_before
 
 class PerformanceSafetyTests(TestCase):
@@ -99,6 +100,23 @@ class GuidedRebalanceTests(TestCase):
         self.assertEqual(LedgerEntry.objects.filter(strategy=self.strategy).count(), before)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
         self.assertFalse(StrategyBaseline.objects.filter(reset_signal=self.sig).exists())
+    def test_historical_quarter_url_does_not_write_any_fills(self):
+        self.sig.as_of = self.qend - timedelta(days=1)
+        self.sig.save(update_fields=['as_of'])
+        previous = self.strategy.ledger.count()
+        self.assertEqual(self.client.get(reverse('cockpit_rebalance', args=[self.sig.pk])).status_code, 302)
+        self.assertEqual(self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload()).status_code, 302)
+        self.assertEqual(self.strategy.ledger.count(), previous)
+        self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
+
+    def test_xirr_with_mismatched_sleeve_dates_is_unavailable(self):
+        safe_mark = PriceMark.objects.get(strategy=self.strategy, symbol='ERNS.L')
+        safe_mark.as_of = self.mark_day - timedelta(days=1)
+        safe_mark.save(update_fields=['as_of'])
+        MarketObservation.objects.update_or_create(symbol='ERNS.L', as_of=safe_mark.as_of,
+            defaults={'currency': 'GBP', 'price': safe_mark.price})
+        self.assertIsNone(_performance(self.strategy, ledger_summary(self.strategy))['xirr'])
+
     def test_owner_isolation(self):
         stranger = get_user_model().objects.create_user('stranger', password='strong-password')
         self.client.force_login(stranger)
@@ -142,12 +160,16 @@ class CSVImportCommitTests(ImportSafetyTests):
                     'Currency (Price / share),ISIN,ID\n'
                     'Deposit,2026-01-02 12:00:00,1000,,,,,,d1\n'
                     'Market buy,2026-01-03 12:00:00,500,LQQ3,5,100,GBP,IE00BLRPRL42,o1\n')
+        preview = self.client.post(reverse('cockpit_csv'),
+            {'csv_file': self.file(csv_data)})
+        self.assertEqual(preview.status_code, 200)
         first = self.client.post(reverse('cockpit_csv'),
             {'csv_file': self.file(csv_data), 'apply': 'yes'})
         self.assertEqual(first.status_code, 302)
         self.assertEqual(self.strategy.ledger.count(), 2)
         self.assertEqual(BrokerImportRow.objects.count(), 2)
         self.assertEqual(ledger_summary(self.strategy)['cash'], D('500.00'))
+        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(csv_data)})
         self.client.post(reverse('cockpit_csv'),
             {'csv_file': self.file(csv_data), 'apply': 'yes'})
         self.assertEqual(self.strategy.ledger.count(), 2)
@@ -173,6 +195,41 @@ class CashOnlyTodayTests(TestCase):
         response = self.client.get(reverse('cockpit_today'))
         self.assertContains(response, '1,000.00')
         self.assertContains(response, 'Add your actual purchases')
+
+class ImportPreviewGateTests(ImportSafetyTests):
+    def test_direct_apply_without_preview_does_not_write(self):
+        self.client.force_login(self.user)
+        csv_data = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
+        response = self.client.post(reverse('cockpit_csv'),
+            {'csv_file': self.file(csv_data), 'apply': 'yes'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.strategy.ledger.count(), 0)
+
+    def test_changed_file_after_preview_is_rejected(self):
+        self.client.force_login(self.user)
+        a = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
+        b = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,600,d1\n'
+        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(a)})
+        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(b), 'apply': 'yes'})
+        self.assertEqual(self.strategy.ledger.count(), 0)
+
+    def test_manual_overlap_after_preview_aborts_import(self):
+        self.client.force_login(self.user)
+        csv_data = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
+        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(csv_data)})
+        validate_and_record(self.strategy, LedgerEntry(kind='DEPOSIT',
+            occurred_on=date(2026, 1, 2), amount=D('500')))
+        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(csv_data), 'apply': 'yes'})
+        self.assertEqual(self.strategy.ledger.count(), 1)
+        self.assertFalse(BrokerImportRow.objects.exists())
+
+    def test_trade_missing_isin_fails_closed(self):
+        csv_data = ('Action,Time,Ticker,No. of shares,Price / share,'
+                    'Currency (Price / share),ID\n'
+                    'Market buy,2026-01-02 12:00:00,LQQ3,1,100,GBP,o1\n')
+        entries, errors, _ = inspect_csv(self.file(csv_data), self.strategy)
+        self.assertFalse(entries)
+        self.assertIn('ISIN', errors[0][1])
 
 class ImportCorrectionTests(ImportSafetyTests):
     def test_reused_broker_id_with_changed_amount_fails_preview(self):
