@@ -356,6 +356,7 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
     label = "%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
     alerts.append({
         "kind": "QUARTERLY", "key": "quarter:" + label,
+        "reset_reason": reset_reason or "",
         "title": "9Sig quarterly review — " + label,
         "message": (
             "%s Signal line £%s = a 9%% rise each completed quarter "
@@ -417,6 +418,11 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     if history.strategy_version != VERSION or history.mapping_version != "2026-10-19.1":
         return hold("The pinned strategy or instrument mapping version is unavailable",
                     code="UNSUPPORTED_VERSION")
+    # Version alone does not allow substituting a same-currency but distinct
+    # ETP, GBP line or bond fund. The code catalogue pins exact trading lines.
+    if (history.equity_symbol, history.safe_symbol) != ("LQQ3.L", "ERNS.L"):
+        return hold("Recorded instruments are not the pinned 9Sig trading lines",
+                    code="INSTRUMENT_MISMATCH")
     if (history.equity_symbol != "LQQ3.L" or history.safe_symbol != "ERNS.L"):
         return hold("Strategy version does not contain these exact trading lines",
                     code="UNSUPPORTED_MAPPING")
@@ -471,9 +477,26 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     sq = _quarterly_closes(((q.as_of, q.price) for q in spy), day)
     if review_q not in tq or review_q-1 not in tq:
         return hold("TQQQ two-quarter reference missing")
+    # A quote from early in a quarter is not a valid *quarter-end* reference.
+    # Require a proven close within six calendar days before every quarter
+    # boundary. The dates remain the observed trading days, not fabricated
+    # calendar quarter-end prices.
+    from calendar import monthrange
+    def q_end(q):
+        year, index = divmod(q, 4)
+        month = (index + 1) * 3
+        return date(year, month, monthrange(year, month)[1])
+    if any(q_end(q) - tq[q][0] > timedelta(days=6)
+           for q in (review_q - 1, review_q)):
+        return hold("TQQQ reference has an early-quarter rather than quarter-end close",
+                    code="MISSING_HISTORY")
     # A 30 Down cannot be declared clear without its eight-quarter lookback.
     if any(q not in sq for q in range(review_q - 8, review_q + 1)):
         return hold("SPY eight-quarter reference history incomplete")
+    if any(q_end(q) - sq[q][0] > timedelta(days=6)
+           for q in range(review_q - 8, review_q + 1)):
+        return hold("SPY history lacks verified quarter-end closes",
+                    code="MISSING_HISTORY")
     from calendar import monthrange
     for seq in (tqqq, spy):
         for q in seq:
@@ -523,6 +546,8 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
                        "title": "Potential 100%-up: manual reference review",
                        "message": "TQQQ doubled versus previous quarter close; actual prior rebalance fill reference is unconfirmed. No automatic reset instructions.",
                        "actions": []})
+    quarterly_plan = next((a for a in alerts if a["kind"] == "QUARTERLY"), None)
+    reset_reason = quarterly_plan.get("reset_reason", "") if quarterly_plan else ""
     proposed = tuple(TradeProposal(
         "growth" if action["symbol"] == history.equity_symbol else "safe",
         action["symbol"], action["side"], Decimal(action["estimated_gbp"]),
@@ -543,6 +568,15 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
             safe_quote_id=prices.safe.observation_id,
             quarter_recurrence=";".join("%s:%s:%s:%s" % row for row in recurrence),
             buy_budget=buy_budget, throttle_81pct=throttle,
+            reset_reason=reset_reason,
+            proposed_growth_target=(total * PARAMS.reset_equity_fraction
+                                    if reset_reason else signal),
+            proposed_growth_buy_shares=sum((t.approximate_shares for t in proposed
+                if t.role == "growth" and t.side == "BUY"), ZERO),
+            proposed_growth_sell_shares=sum((t.approximate_shares for t in proposed
+                if t.role == "growth" and t.side == "SELL"), ZERO),
+            actually_actionable_gbp=sum((t.estimated_gbp for t in proposed
+                if t.side == "BUY"), ZERO),
             safe_close_date=prices.safe.as_of, initial_equity=history.initial_equity_value,
             contributed_this_review=sum((f.amount for f in history.contributions
                 if quarter_number(f.occurred_on)==review_q),ZERO),
