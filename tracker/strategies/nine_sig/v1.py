@@ -402,7 +402,7 @@ def _price_ok(quote, symbol, currency, as_of, *, expected_raw):
 
 
 def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
-             params: FixedParams = PARAMS) -> EvaluationResult:
+             params: FixedParams = PARAMS, as_of: date | None = None) -> EvaluationResult:
     """Pure advisory only; malformed or unsupported inputs yield an audit HOLD.
 
     The caller owns source verification, quote date normalization, and broker
@@ -421,7 +421,10 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
         return hold("Unsupported holding or unconfirmed previous reset", code="INVALID_HISTORY")
     if params != PARAMS:
         return hold("Unsupported 9Sig parameters/version; no implicit rule changes")
-    day = history.as_of
+    day = history.as_of if as_of is None else as_of
+    if day != history.as_of:
+        return hold("Evaluation date disagrees with the immutable portfolio snapshot",
+                    code="AS_OF_MISMATCH")
     from calendar import monthrange
     if day.month not in (3, 6, 9, 12) or day.day != monthrange(day.year, day.month)[1]:
         return hold("Evaluation date is not a completed quarter end")
