@@ -1,8 +1,77 @@
-{% extends 'base.html' %}{% block title %}History{% endblock %}{% block content %}<section class="cockpit"><h1>History</h1>
-<section class="ck-metrics"><div class="panel ck-card"><p class="ck-label">XIRR annualised</p><p class="ck-number">{% if performance.xirr is not None %}{{ performance.xirr|floatformat:2 }}%{% else %}—{% endif %}</p></div>
-<div class="panel ck-card"><p class="ck-label">Time-weighted return</p><p class="ck-number">{% if performance.twr is not None %}{{ performance.twr|floatformat:2 }}%{% else %}—{% endif %}</p></div>
-<div class="panel ck-card"><p class="ck-label">Max drawdown</p><p class="ck-number">{% if performance.drawdown is not None %}{{ performance.drawdown|floatformat:2 }}%{% else %}—{% endif %}</p></div></section>
-<p class="ck-muted">TWR and drawdown need cash-flow-aligned valuations. We hide them when your actual snapshots cannot support those calculations. Annualised return: {% if performance.annual is not None %}{{ performance.annual|floatformat:2 }}%{% else %}—{% endif %}.</p>
-<section class="panel ck-card"><h2>Verified reviews and warnings</h2><ul class="ck-history">{% for signal in signals %}<li><strong>{{ signal.as_of }} · {{ signal.title }}</strong><p>{{ signal.message }}</p></li>{% empty %}<li>Waiting for first completed quarter.</li>{% endfor %}</ul></section>
-<section class="panel ck-card"><h2>Data and rule limitations</h2><p>Yahoo data is not guaranteed, UK-listed LQQ3 and ERNS are not identical to TQQQ/AGG, and some 9Sig spreadsheet exception branches remain unverified. Wealtharr will not place broker trades.</p></section>
-</section>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}History{% endblock %}
+{% block content %}
+<div class="cockpit ck-v2">
+  <header class="ck-top">
+    <div><p class="ck-overline">{{ strategy.name }} · RECORDED PERFORMANCE</p><h1>History</h1>
+      <p class="ck-muted">Real portfolio records, not a simulated backtest.</p>
+    </div>
+    <a class="btn btn-subtle btn-sm" href="{% url 'cockpit_today' %}">Back to Today</a>
+  </header>
+  <section class="ck-metrics" aria-label="Investment return calculations">
+    {% for metric in metrics %}
+      <article class="panel ck-card">
+        <h2 class="ck-label">{{ metric.title }}</h2>
+        <p class="ck-number">{% if metric.available %}{{ metric.value|floatformat:2 }}{{ metric.suffix }}{% else %}Unavailable{% endif %}</p>
+        <p class="ck-muted">{{ metric.help }}</p>
+      </article>
+    {% endfor %}
+  </section>
+  <section class="panel ck-card ck-detail-summary" aria-labelledby="history-amounts">
+    <h2 id="history-amounts">Money in and investment gain</h2>
+    <div class="ck-stat-pairs">
+      <div><span>Net money added</span><strong>{% if performance.net_contributed_gbp is not None %}£{{ performance.net_contributed_gbp|floatformat:'2g' }}{% else %}Unavailable{% endif %}</strong></div>
+      <div><span>Gain / loss in £</span><strong>{% if performance.gain_gbp is not None %}£{{ performance.gain_gbp|floatformat:'2g' }}{% else %}Unavailable{% endif %}</strong></div>
+      <div><span>Cumulative return</span><strong>{% if performance.cumulative is not None %}{{ performance.cumulative|floatformat:2 }}%{% else %}Unavailable{% endif %}</strong></div>
+      <div><span>Annualised return</span><strong>{% if performance.annual is not None %}{{ performance.annual|floatformat:2 }}%{% else %}Unavailable{% endif %}</strong></div>
+    </div>
+    <p class="ck-muted">
+      {% if performance.annual_basis == 'money_weighted_xirr' %}Annual figure is money-weighted XIRR, not time-weighted performance.{% elif performance.annual_basis == 'verified_snapshot_twr' %}Annual figure uses the flow-free snapshot period, not necessarily your whole investment history.{% else %}An annual return is not available with the recorded valuation evidence.{% endif %}
+      {% if performance.xirr_as_of %} Money-weighted valuation date: {{ performance.xirr_as_of }}.{% endif %}
+    </p>
+    <details class="ck-disclosure-inline">
+      <summary>Why are some returns unavailable?</summary>
+      <p>Money-weighted XIRR needs recorded funding events and an independently supported GBP closing portfolio value. A simple cumulative percentage is only shown for one initial deposit without later external cash flows. Time-weighted returns need verified pre- and post-contribution valuations; daily balances alone cannot prove those returns. Drawdown is only calculated over an eligible, flow-safe return window.</p>
+      <p>{% if performance.twr_window %}TWR period: {{ performance.twr_window.0 }} to {{ performance.twr_window.1 }} (recorded snapshots without intervening deposits or withdrawals).{% else %}Time-weighted return: no eligible complete valuation window is recorded.{% endif %}</p>
+      <p class="ck-muted">GBP gain is an amount, not a percentage return. Quotes and balances are observations, not executable prices.</p>
+    </details>
+  </section>
+  <section class="panel ck-card ck-chart-panel" aria-labelledby="history-chart-title">
+    <div class="ck-section-head"><div><h2 id="history-chart-title">Value and deposits over time</h2>
+      <p class="ck-muted">Recorded valuation snapshots · cash flows can change the plotted portfolio value</p></div>
+      <div class="chart-controls" role="group" aria-label="Chart period">
+        <button type="button" class="chip" data-range="1m" aria-pressed="false">1M</button>
+        <button type="button" class="chip" data-range="3m" aria-pressed="false">3M</button>
+        <button type="button" class="chip" data-range="1y" aria-pressed="false">1Y</button>
+        <button type="button" class="chip selected" data-range="all" aria-pressed="true">All</button>
+      </div>
+    </div>
+    <div id="wealth-chart" class="wealth-chart" role="group" aria-label="Recorded GBP portfolio valuations, not total returns"></div>
+    {{ performance.chart|json_script:'wealth-chart-points' }}
+    <details class="ck-disclosure-inline"><summary>View underlying recorded values</summary>
+      <div class="table-scroll"><table class="data-table"><thead><tr><th>Date</th><th>Portfolio value (£)</th><th>Net money added (£)</th></tr></thead>
+      <tbody>{% for point in performance.chart %}<tr><td>{{ point.date }}</td><td>{{ point.value }}</td><td>{{ point.contributed }}</td></tr>
+      {% empty %}<tr><td colspan="3">No completed valuation snapshots yet. The chart will start after source-backed prices are recorded.</td></tr>{% endfor %}</tbody></table></div>
+    </details>
+  </section>
+  <section class="panel ck-card" aria-labelledby="reviews-title">
+    <div class="ck-section-head"><h2 id="reviews-title">Previous reviews and warnings</h2><span class="ck-muted">Latest 60</span></div>
+    <ol class="ck-history ck-timeline">
+      {% for record in signals %}
+        <li><div class="ck-section-head">
+          <h3>{{ record.title }}</h3>
+          <time datetime="{{ record.date|date:'Y-m-d' }}" class="ck-muted">{{ record.date|date:'j M Y' }}</time></div>
+          <span class="ck-muted">{{ record.outcome }} · {{ record.kind|title }}</span>
+          <details><summary>Read recorded explanation{% if record.has_proposals %} and historical proposal{% endif %}</summary>
+            <p>{{ record.message }}</p>
+            <p class="ck-muted">A historical review is not permission to execute old trade quantities. Use Today for your current action.</p>
+          </details>
+        </li>
+      {% empty %}
+        <li class="ck-muted">No completed reviews are recorded yet.</li>
+      {% endfor %}
+    </ol>
+  </section>
+  <p class="ck-muted">All calculations use only stored evidence. <a href="{% url 'cockpit_strategy' %}">Read strategy and instrument limitations</a>.</p>
+</div>
+{% endblock %}
