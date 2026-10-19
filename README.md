@@ -2,6 +2,22 @@
 
 Private-first personal investment tracking with a responsive dark interface inspired by Infinidysk and Radarr.
 
+## Current private-owner cockpit (PR #11)
+
+The active redesign is documented in [RESUME.md](docs/RESUME.md) and
+[Section J private ship checklist](docs/private-ship-checklist.md).
+It supports **one UK owner tracking a fixed, version-pinned 9Sig strategy in
+a Trading 212 Stocks & Shares ISA**, with actual dated contributions, manual
+owner-confirmed fills, fail-closed GBP market observations and read-only audit
+history. It never connects to Trading 212 (including read-only APIs),
+executes broker trades, invents backtests, or offers public signup/billing.
+The general-purpose account and preset flows below are retained as
+historical foundation documentation, **not** the supported onboarding path.
+
+Local browser test commands and outstanding production/financial acceptance
+gates are in the Section J ship checklist. Production deployment and
+independent workbook parity are **not automatically verified by CI**.
+
 ## Included in this first foundation
 
 - Public homepage, owner-only login, responsive user dashboard, account pages and user settings.
@@ -155,3 +171,10 @@ The ordinary real-account setup now asks for **strategy, country, broker, accoun
 - Neither recommendation nor creating a portfolio **executes a trade** or manufactures holdings. Actual deposits, fills, commissions and existing real positions must still be entered from Trading 212 records. Rebalances remain manual.
 
 **9Sig methodology research, correction rationale and remaining best-guess boundaries:** see [docs/9sig-methodology.md](docs/9sig-methodology.md). Never claim a GBP daily-reset ETP exactly replicates the US TQQQ fund's historical results.
+
+
+## Owner-only 9Sig cockpit (feature branch)
+
+Authenticated users land at **/cockpit/** with Today, History, Ledger and Settings.
+The guided rebalance only saves actual owner-confirmed fills; CSV imports preview before writing; no broker trading API is used. The legacy /app/ screens remain accessible.
+Read **docs/RESUME.md** to continue this branch in another ChatGPT chat, **docs/INSTALL.md** for database/scheduler wiring, and **docs/FINANCIAL_QA.md** before treating any quarterly signal as verified. The strategy implementation has documented Excel-parity gaps and cannot be assumed certified.

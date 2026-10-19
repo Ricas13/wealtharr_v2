@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}Notification settings{% endblock %}
+{% block content %}
+<section class="cockpit ck-v2 ck-narrow">
+  <header class="ck-top"><div><p class="ck-overline">PRIVATE OWNER CONTROLS</p>
+    <h1>Notifications</h1>
+    <p class="ck-muted">Choose what to receive, and where. Alerts never trade or transfer money.</p>
+  </div></header>
+
+  <section class="panel ck-card">
+    <h2>Private account security</h2>
+    <p>Enable an optional six-digit authenticator to protect your private portfolio and admin pages after password sign-in.</p>
+    <p><a href="{% url 'totp_setup' %}" class="btn">Manage authenticator</a></p>
+  </section>
+  <form method="post" class="panel ck-card">
+    {% csrf_token %}<input type="hidden" name="save" value="preferences">
+    <h2>1. My destinations</h2>
+    <div class="ck-form-pair"><label for="{{ pref_form.destination_email.id_for_label }}">Email address</label>
+      {{ pref_form.destination_email }}{{ pref_form.destination_email.errors }}</div>
+    <div class="ck-notify-masters">
+      <label>{{ pref_form.email_enabled }} Enable email delivery</label>
+      <label>{{ pref_form.discord_enabled }} Enable Discord delivery</label>
+    </div>
+    <p class="ck-muted">A delivery channel must be enabled here and its server transport must be configured. The row choices below are additional filters.</p>
+    <h2>2. Which messages?</h2>
+    <div class="table-scroll">
+      <table class="data-table ck-route-table">
+        <caption>Owner alert matrix. A checked box enables the category on that channel, only if the destination above is on.</caption>
+        <thead><tr><th scope="col">Notification</th><th scope="col">Email</th><th scope="col">Discord</th></tr></thead>
+        <tbody>
+          {% for item in route_rows %}
+          <tr><th scope="row">{{ item.title }}</th>
+              <td><label class="ck-visually-labelled"><span class="sr-only">{{ item.title }} by email</span>{{ item.email }}{{ item.email.errors }}</label></td>
+              <td><label class="ck-visually-labelled"><span class="sr-only">{{ item.title }} by Discord</span>{{ item.discord }}{{ item.discord.errors }}</label></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <label class="ck-notify-monthly">{{ pref_form.monthly_reminders }} Enable my planned monthly contribution reminders</label>
+    <p class="ck-muted">The contribution row and this master reminder toggle both need to be enabled. A monthly target is not an actual deposit.</p>
+    <button class="btn btn-primary" type="submit">Save notification choices</button>
+  </form>
+
+  <section class="panel ck-card">
+    <h2>Recent deliveries</h2>
+    <p class="ck-muted">{{ unsent_count }} outstanding, retrying or failed notifications in your own history. Delivery is at least once; a lost remote acknowledgement can occasionally produce a repeat.</p>
+    <div class="table-scroll"><table class="data-table">
+      <thead><tr><th>Created</th><th>Channel</th><th>Status</th><th>Attempts</th><th>Next retry</th></tr></thead>
+      <tbody>{% for item in recent_deliveries %}
+        <tr><td>{{ item.created_at|date:'j M Y H:i' }}</td><td>{{ item.channel|title }}</td>
+          <td>{{ item.status|title }}</td><td>{{ item.attempts }}/3</td>
+          <td>{{ item.next_retry_at|date:'j M Y H:i'|default:'—' }}</td></tr>
+      {% empty %}<tr><td colspan="5">No alerts have been attempted yet.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+
+  {% if transport_form %}
+  <details class="panel ck-card ck-disclosure">
+    <summary>Advanced: configure email and Discord transport</summary>
+    <div class="ck-details-body">
+      <p>SMTP credentials and Discord webhook URLs are secrets. Only administrators can configure them. Never paste these into an email or a screenshot.</p>
+      <form method="post">{% csrf_token %}<input type="hidden" name="save" value="transport">
+        {% for field in transport_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
+        <button class="btn" type="submit">Save secure transport</button></form>
+      <div class="ck-test-row">
+        <form action="{% url 'cockpit_test' 'email' %}" method="post">{% csrf_token %}<button class="btn" type="submit">Send test email</button></form>
+        <form action="{% url 'cockpit_test' 'discord' %}" method="post">{% csrf_token %}<button class="btn" type="submit">Send test Discord message</button></form>
+      </div>
+      <p class="ck-muted">SMTP: {% if smtp_configured %}configured{% else %}not configured{% endif %}.
+      Discord: {% if discord_configured %}configured{% else %}not configured{% endif %}.</p>
+    </div>
+  </details>
+  {% endif %}
+
+  {% if user.is_staff %}
+  <details class="panel ck-card ck-disclosure">
+    <summary>Scheduler health (administrator only)</summary>
+    <div class="ck-details-body">
+      <p role="status"><strong>{{ scheduler_state }}</strong></p>
+      <p class="ck-muted">One hourly owner-notification task. Diagnostics show status and counts only; no passwords, webhooks or message bodies.</p>
+      <div class="table-scroll"><table class="data-table">
+        <thead><tr><th>Started</th><th>Result</th><th>New</th><th>Retried</th><th>Recovered</th><th>Diagnostic</th></tr></thead>
+        <tbody>{% for run in scheduler_runs %}
+          <tr><td>{{ run.started_at|date:'j M Y H:i' }}</td><td>{{ run.status }}</td>
+            <td>{{ run.new_deliveries }}</td><td>{{ run.attempted_retries }}</td>
+            <td>{{ run.successful_retries }}</td><td>{{ run.error_code|default:'—' }}</td></tr>
+        {% empty %}<tr><td colspan="6">The scheduler has not recorded a run yet.</td></tr>{% endfor %}</tbody>
+      </table></div>
+      <p><a href="{% url 'control' %}">Administrator diagnostics</a> · <a href="{% url 'admin:index' %}">Django admin</a></p>
+    </div>
+  </details>
+  {% endif %}
+</section>
+{% endblock %}

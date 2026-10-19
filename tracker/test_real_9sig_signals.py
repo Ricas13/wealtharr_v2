@@ -8,9 +8,10 @@ from django.test import TestCase
 from django.utils import timezone
 
 from tracker.market_signals import quarter_end_before, review_strategy
+from tracker.cockpit_notifications import send_due_cockpit_notices
 from tracker.models import (
-    Account, LedgerEntry, MarketObservation, StrategyInstance,
-    StrategyPreset, StrategySignal)
+    Account, LedgerEntry, MarketObservation, NotificationPreference,
+    StrategyInstance, StrategyPreset, StrategySignal)
 from tracker.services import validate_and_record
 
 
@@ -19,12 +20,15 @@ class RealQuarterlySignalTests(TestCase):
         self.owner = get_user_model().objects.create_user(
             "quarter-owner", password="long-quarter-test-password")
         acc = Account.objects.create(
-            owner=self.owner, name="Real 212 ISA", kind="ISA")
+            owner=self.owner, name="Real 212 ISA", kind="ISA", country="GB", broker="TRADING212")
         self.strategy = StrategyInstance.objects.create(
             owner=self.owner, account=acc,
             preset=StrategyPreset.objects.get(slug="nasdaq-quarterly-target"),
             name="9Sig ISA", equity_symbol="LQQ3.L",
             safe_symbol="ERNS.L", market_data_enabled=True)
+        # Section H routes advisory alerts only to explicitly enabled channels.
+        NotificationPreference.objects.create(
+            owner=self.owner, email_enabled=True, discord_enabled=False)
         self.end = quarter_end_before(timezone.localdate())
         self.begin = date(self.end.year, self.end.month-2, 1)
         self.first_trade = self.begin + timedelta(days=1)
@@ -78,7 +82,13 @@ class RealQuarterlySignalTests(TestCase):
             strategy=self.strategy, kind="QUARTERLY")
         self.assertIn("£904.00", alert.message)
         self.assertTrue(any(x["side"] == "BUY" for x in alert.actions))
-        self.assertEqual(dispatch.call_count, 1)
+        # No instant duplicate quarterly alert; the reconciled instruction
+        # is sent once by the scheduled digest instead.
+        dispatch.assert_not_called()
+        with patch('tracker.cockpit_notifications.dispatch') as digest_dispatch:
+            send_due_cockpit_notices()
+        self.assertEqual(digest_dispatch.call_count, 1)
+        self.assertIn('quarterly-digest:', digest_dispatch.call_args.args[1])
 
     def test_no_action_quarter_is_saved_without_sending_a_rebalance_alert(self):
         self.save(LedgerEntry.DEPOSIT, self.begin, amount=D("1000"))

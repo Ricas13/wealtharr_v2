@@ -57,17 +57,11 @@ class ResetBaselineTests(TestCase):
         self.assertEqual(self.client.post(self.url, {"confirm": "RESET"}).status_code, 404)
         self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
 
-    def test_confirmed_reset_captures_immutable_actual_share_and_cash_values(self):
+    def test_retired_text_only_reset_does_not_create_baseline(self):
         self.trades_and_quotes()
-        self.assertEqual(self.client.post(self.url, {"confirm": "RESET"}).status_code, 302)
-        baseline = StrategyBaseline.objects.get(strategy=self.strategy)
-        self.assertEqual(baseline.equity_value, D("600.00"))
-        self.assertEqual(baseline.safe_value, D("400.00"))
-        self.assertEqual(baseline.cash_value, D("0.00"))
-        self.assertEqual(baseline.equity_quantity, D("6"))
-        self.assertEqual(baseline.reset_signal, self.signal)
-        self.client.post(self.url, {"confirm": "RESET"})
-        self.assertEqual(StrategyBaseline.objects.filter(strategy=self.strategy).count(), 1)
+        response = self.client.post(self.url, {"confirm": "RESET"})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
 
     def test_unreviewed_reset_cannot_be_confirmed(self):
         self.trades_and_quotes()
@@ -76,11 +70,9 @@ class ResetBaselineTests(TestCase):
         self.client.post(self.url, {"confirm": "RESET"})
         self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
 
-    def test_intraquarter_spike_is_valid_reset_anchor_after_real_trades(self):
-        # A spike alert may arrive before quarter end; the same immutable
-        # actual-fills and GBP-prices confirmation safeguards apply.
+    def test_provisional_spike_never_anchors_from_text_or_unlinked_trades(self):
         self.trades_and_quotes()
-        spike = StrategySignal.objects.create(
+        StrategySignal.objects.create(
             strategy=self.strategy, signal_key="spike:2026-Q4",
             kind="SPIKE_WATCH",
             title="Possible TQQQ spike",
@@ -89,10 +81,7 @@ class ResetBaselineTests(TestCase):
             actions=[], acknowledged_at=timezone.now())
         response = self.client.post(self.url, {"confirm": "RESET"})
         self.assertEqual(response.status_code, 302)
-        baseline = StrategyBaseline.objects.get(strategy=self.strategy)
-        self.assertEqual(baseline.reset_signal, spike)
-        self.assertEqual(baseline.equity_value, D("600.00"))
-        self.assertEqual(baseline.safe_value, D("400.00"))
+        self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
 
     def test_rejected_spike_cannot_anchor_a_reset(self):
         self.trades_and_quotes()

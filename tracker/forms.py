@@ -170,12 +170,28 @@ class PriceForm(forms.Form):
 class NotificationForm(forms.ModelForm):
     class Meta:
         model = NotificationPreference
-        fields = ["destination_email", "email_enabled", "discord_enabled", "monthly_reminders"]
+        fields = [
+            "destination_email", "email_enabled", "discord_enabled",
+            "monthly_reminders", "quarterly_email", "quarterly_discord",
+            "urgent_email", "urgent_discord", "data_email", "data_discord",
+            "followup_email", "followup_discord", "contribution_email",
+            "contribution_discord",
+        ]
         labels = {
             "destination_email": "Send emails to",
             "email_enabled": "Enable email notifications",
             "discord_enabled": "Enable Discord notifications",
-            "monthly_reminders": "Remind me of planned monthly contributions",
+            "monthly_reminders": "Enable monthly contribution reminders",
+            "quarterly_email": "Email quarterly digest",
+            "quarterly_discord": "Discord quarterly digest",
+            "urgent_email": "Email urgent warnings",
+            "urgent_discord": "Discord urgent warnings",
+            "data_email": "Email missing-price problems",
+            "data_discord": "Discord missing-price problems",
+            "followup_email": "Email overdue review",
+            "followup_discord": "Discord overdue review",
+            "contribution_email": "Email monthly contribution reminder",
+            "contribution_discord": "Discord monthly contribution reminder",
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

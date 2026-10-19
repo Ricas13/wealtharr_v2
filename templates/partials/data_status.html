@@ -1,0 +1,4 @@
+<span class="ck-chip {% if fresh %}ck-ok{% else %}ck-blocked{% endif %}" role="status">
+  Data: {% if fresh %}verified{% else %}check needed{% endif %}
+  {% if price_date %} · {{ price_date|date:'d M Y' }}{% endif %}
+</span>

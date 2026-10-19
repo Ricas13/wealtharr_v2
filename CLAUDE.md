@@ -1,0 +1,28 @@
+# CLAUDE.md — Wealtharr v2 engineering rules
+
+Read `docs/architecture.md`, `docs/instrument-research.md`, `docs/RESUME.md`, `docs/FINANCIAL_QA.md` and `docs/9sig-methodology.md` before editing. **The architecture document is a target (Section A), not proof the refactor was implemented.**
+
+## Mission
+
+Wealtharr is a private **tracking and notification** application. No broker connection, broker API, order placement, paper trading, fake transactions, invented prices or backtests. Owner enters real deposits and confirms actual trades. One-screen setup and **Today → what to do next → I did this** must require less time than a configured spreadsheet. Start with UK / Trading 212 / Stocks & Shares ISA and fixed 9Sig; keep the core strategy-agnostic.
+
+## Hard boundaries
+
+1. Python code owns fixed immutable, **versioned** strategy definitions (roles, weights, rules, schedule, required series, text). Neither owner nor Django admin can edit their tickers, weights or rules. Changing behaviour requires a new checked-in version and an explicit logged instance upgrade; old strategy code/records remain reproducible.
+2. Exact instruments are in a checked-in, evidence-backed manifest keyed by strategy role, jurisdiction, platform, account type and mapping version. Pin the complete resolved trading line/ISIN and mapping version for each instance. **Never** infer equivalence, silently change tickers or offer an unsupported ISA mapping. Research/verification and alternatives are Section B, not assumptions.
+3. User-owned data and views are always scoped to authenticated `owner`. One person uses the app now; do not build account-global mutable user state, billing or public signup. Server-rendered Django 5.2, PostgreSQL, WhiteNoise, Decimal money, vanilla JS, no Node step.
+4. Only the pure `strategies/<name>/<version>.py::evaluate(ledger, prices, params, as_of)` computes strategy decisions; no DB/network/clock side effects. The core gathers immutable history and approved quotes, calls the strategy, then stores a standard `EvaluationResult`. UI, alerts and guided forms consume only that result; never import `nine_sig` from a generic core view.
+5. Evaluation result status is `ok`, `action_needed`, or `cannot_compute`; proposed trades include pinned instrument, role, side, amount GBP, approximate shares, quote/date and reason. Include explanation, one reason code, next review, urgency, stable CSV intermediates, optional strategy metrics/charts. On cannot-compute: **zero trades** and one plain-English priority reason.
+6. Ledger, signal versions/outcomes, accepted price observations/reviews, reset baselines and version events are append-only with source/date provenance. Correct mistakes by linked reversal/supersession records. Transactions are atomic and tests must simulate rollback. Never set new reset baselines from theoretical signals or before verified post-fill evidence; ordinary quarterly executions do not reset.
+7. A stale/held/mismatched or missing required quote, unknown FX/GBX unit, unsupported corporate action, negative cash, holding outside strategy, unverified history or wrong strategy version **blocks** recommendations. US SPY/TQQQ references are not executable GBP holdings. A provisional spike can be an urgent *review warning*, never an invented trade.
+8. Contributions are actual variable dated events. Reconcile importer dry runs, duplicates (including overlap with manually entered rows), dividends, fees, positions and broker cash. Optional ISA allowance warning is advisory only.
+9. Notifications route by alert type and owner-configured destinations (email, Discord, optional push). Alert content is based on a frozen evaluation result; quarter-end amounts/approx shares and URLs must not present stale signals as current trading instructions. Scheduler must be idempotent and observable.
+10. Keep clear mobile-first dark pages, accessible markup, one next-action card, freshness/rules chips, chart and expandable "How this was calculated" plus CSV export. Never call simple gain a time-weighted return. If historical boundaries are inadequate, say unavailable.
+
+## Working workflow
+
+- Continue the **existing** `feature/owner-9sig-cockpit-resumable` branch and PR #11 unless user explicitly changes it; no parallel replacement branch. Read `docs/RESUME.md` for current checkpoints and update it on implementation progress.
+- Follow the user's lettered sections in order and **stop after the requested section**. A is design/docs; B added the verified-issuer / pending-ISA-access code catalogue, not the full new architecture. Read `docs/RESUME.md` for the current section and do not silently implement later sections.
+- For each change: add tests (pure unit/parity, Django financial invariants, owner permissions; Playwright for critical page flows), run CI, and preserve old safety behaviour until replacements are proven. Refuse to label workbook parity, mapping verification, broker eligibility or deployment complete without evidence.
+- Git history is disposable as far as **unreleased test data/migrations** are concerned, not financial-safety invariants. Never wipe a live database without explicit separate authorisation and backup.
+- Before moving to a next section, describe misinterpretation risks, unverifiable assumptions and what to compare side-by-side with the spreadsheet.

@@ -13,3 +13,9 @@ staticfiles/
 
 # Never commit personal portfolio database archives
 /backups/
+
+# Private file-mounted production key material; never include in git/build
+/secrets/
+/.env.production
+*.dump
+*.dump.sha256

@@ -45,6 +45,10 @@ class IntraperiodSpikeTests(TestCase):
             price=D("101"), currency="USD")
 
     def trigger(self, **overrides):
+        from tracker.models import NotificationPreference
+        NotificationPreference.objects.update_or_create(
+            owner=self.owner,
+            defaults={"email_enabled": True, "discord_enabled": False})
         kwargs = dict(strategy=self.strategy, now=self.now,
                       first_buy=self.first_buy, baseline=None,
                       tqqq_latest=self.latest)

@@ -209,6 +209,10 @@ class MarketWorkflowTests(TestCase):
             symbol="AGBP.L", as_of=now, price=D("81"), currency="GBP")
         mapped = {"TQQQ": reference, "SPY": spy,
                   "LQQ3.L": equity, "AGBP.L": safe}
+        from tracker.models import NotificationPreference
+        NotificationPreference.objects.update_or_create(
+            owner=self.owner,
+            defaults={"email_enabled": True, "discord_enabled": False})
         with patch("tracker.market_signals.sync_ticker", side_effect=lambda symbol: mapped[symbol]), \
              patch("tracker.market_signals.dispatch") as dispatcher:
             first = review_strategy(self.strategy)
@@ -216,7 +220,11 @@ class MarketWorkflowTests(TestCase):
         self.assertEqual(first["status"], "ok")
         self.assertGreaterEqual(first["created"], 1)
         self.assertEqual(second["created"], 0)
-        self.assertEqual(dispatcher.call_count, first["created"])
+        # THIRTY_DOWN is urgent and immediate; QUARTERLY moves to the
+        # scheduled digest so it must NOT trigger a second instant alert.
+        self.assertEqual(first["created"], 2)
+        self.assertEqual(dispatcher.call_count, 1)
+        self.assertIn('30down:', dispatcher.call_args.args[1])
         self.assertEqual(
             StrategySignal.objects.filter(strategy=self.strategy, kind="THIRTY_DOWN").count(), 1
         )

@@ -2,7 +2,7 @@
 from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from tracker.models import StrategyInstance, StrategyValueSnapshot, WealthSnapshot
+from tracker.models import MarketObservation, StrategyInstance, StrategyValueSnapshot, WealthSnapshot
 from tracker.market_signals import review_strategy
 from tracker.services import consolidated, ledger_summary
 
@@ -18,13 +18,15 @@ def save_verified_strategy_snapshot(strategy):
             continue
         mark = summary["marks"].get(symbol)
         if (mark is None or mark.source != "yahoo" or
-                mark.as_of < timezone.localdate() - timedelta(days=8)):
+                mark.as_of < timezone.localdate() - timedelta(days=8) or
+                not MarketObservation.objects.filter(symbol=symbol, as_of=mark.as_of,
+                    currency="GBP", price=mark.price).exists()):
             return None
         dates.append(mark.as_of)
     if not dates:
         return None
     date_to_record = min(dates)
-    if (max(dates) - date_to_record).days > 1:
+    if any(day != date_to_record for day in dates):
         return None
     if strategy.ledger.filter(occurred_on__gt=date_to_record).exists():
         return None
@@ -69,7 +71,9 @@ class Command(BaseCommand):
                         continue
                     mark = item["marks"].get(symbol)
                     if (not mark or mark.source != "yahoo" or
-                            mark.as_of < timezone.localdate() - timedelta(days=8)):
+                            mark.as_of < timezone.localdate() - timedelta(days=8) or
+                            not MarketObservation.objects.filter(symbol=symbol, as_of=mark.as_of,
+                                currency="GBP", price=mark.price).exists()):
                         valid = False
                         break
                     observed_days.append(mark.as_of)
@@ -79,7 +83,7 @@ class Command(BaseCommand):
                 continue
             date_to_record = min(observed_days)
             # Do not combine shares purchased AFTER a quote with an old quote.
-            if (max(observed_days) - date_to_record).days > 1:
+            if any(day != date_to_record for day in observed_days):
                 continue
             if any(item["strategy"].ledger.filter(occurred_on__gt=date_to_record).exists()
                    for item in report["items"]):

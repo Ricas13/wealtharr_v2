@@ -47,6 +47,11 @@ class StrategyInstance(models.Model):
     monthly_target = models.DecimalField(max_digits=16, decimal_places=2, default=Decimal("0"))
     equity_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the 3× equity trading line")
     safe_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the safe asset")
+    # Source-controlled, owner-enrolment instrument manifest; empty for legacy
+    # instances until an explicit, owner-approved migration is implemented.
+    strategy_version = models.CharField(max_length=48, blank=True, default="", editable=False)
+    mapping_version = models.CharField(max_length=40, blank=True, default="", editable=False)
+    resolved_instruments = models.JSONField(blank=True, default=dict, editable=False)
     market_data_enabled = models.BooleanField(default=False, help_text="Fetch Yahoo closes and enable advisory strategy reviews")
     contribution_alerts = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -116,9 +121,34 @@ class NotificationPreference(models.Model):
     email_enabled = models.BooleanField(default=False)
     discord_enabled = models.BooleanField(default=False)
     monthly_reminders = models.BooleanField(default=True)
+    # Category-by-channel routing: master destination toggles still apply.
+    quarterly_email = models.BooleanField(default=True)
+    quarterly_discord = models.BooleanField(default=True)
+    urgent_email = models.BooleanField(default=True)
+    urgent_discord = models.BooleanField(default=True)
+    data_email = models.BooleanField(default=True)
+    data_discord = models.BooleanField(default=True)
+    followup_email = models.BooleanField(default=True)
+    followup_discord = models.BooleanField(default=True)
+    contribution_email = models.BooleanField(default=True)
+    contribution_discord = models.BooleanField(default=True)
 
     def __str__(self):
         return "Notifications"
+
+class OwnerTOTP(models.Model):
+    """Optional per-account authenticator factor; encrypted secret, no recovery bypass."""
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                 related_name="totp_settings")
+    secret_ciphertext = models.TextField()
+    enabled_at = models.DateTimeField()
+    last_verified_step = models.BigIntegerField(default=-1)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return "Authenticator enabled"
+
 
 class SystemIntegration(models.Model):
     # Only one row (pk=1). Secrets stored encrypted at rest.
@@ -138,6 +168,9 @@ class SystemIntegration(models.Model):
 class NotificationDelivery(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     channel = models.CharField(max_length=12)
+    # Fixed-category provenance lets due retries honor changed owner preferences.
+    # Empty for legacy one-off notices which must not be guessed as a category.
+    category = models.CharField(max_length=16, blank=True, default="")
     event_key = models.CharField(max_length=160)
     status = models.CharField(max_length=12, default="PENDING")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -161,6 +194,23 @@ class MarketObservation(models.Model):
         constraints = [models.UniqueConstraint(fields=["symbol", "as_of"], name="unique_market_close")]
         ordering = ["as_of"]
 
+class NotificationSchedulerRun(models.Model):
+    """One diagnostic record per scheduled notice run; never stores credentials."""
+    name = models.CharField(max_length=40, default="owner_notices")
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=12, choices=[
+        ("RUNNING", "Running"), ("SUCCEEDED", "Succeeded"), ("FAILED", "Failed"),
+    ], default="RUNNING")
+    new_deliveries = models.PositiveIntegerField(default=0)
+    attempted_retries = models.PositiveIntegerField(default=0)
+    successful_retries = models.PositiveIntegerField(default=0)
+    error_code = models.CharField(max_length=40, blank=True, default="")
+
+    class Meta:
+        ordering = ["-started_at", "-pk"]
+
+
 class YahooSync(models.Model):
     symbol = models.CharField(max_length=24, unique=True)
     last_attempt = models.DateTimeField(null=True, blank=True)
@@ -174,6 +224,8 @@ class StrategySignal(models.Model):
     title = models.CharField(max_length=180)
     message = models.TextField()
     actions = models.JSONField(default=list)
+    # Explicit rule output; never detect a financial reset from free-text.
+    reset_reason = models.CharField(max_length=240, blank=True, default="")
     as_of = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True)
@@ -205,6 +257,9 @@ class StrategyBaseline(models.Model):
     equity_quantity = models.DecimalField(max_digits=22, decimal_places=8)
     safe_value = models.DecimalField(max_digits=22, decimal_places=2)
     cash_value = models.DecimalField(max_digits=22, decimal_places=2)
+    strategy_version = models.CharField(max_length=48, blank=True, default="", editable=False)
+    mapping_version = models.CharField(max_length=40, blank=True, default="", editable=False)
+    quote_evidence = models.JSONField(blank=True, default=dict, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -229,3 +284,51 @@ class StrategyValueSnapshot(models.Model):
             models.UniqueConstraint(fields=["strategy", "as_of"],
                                     name="unique_strategy_value_date")
         ]
+
+
+
+class RebalanceExecution(models.Model):
+    """A confirmed group of manual broker fills; one execution per signal."""
+    signal = models.OneToOneField(StrategySignal, on_delete=models.PROTECT, related_name="execution")
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.PROTECT)
+    executed_on = models.DateField()
+    completed_at = models.DateTimeField(auto_now_add=True)
+    baseline = models.ForeignKey(StrategyBaseline, null=True, blank=True, on_delete=models.PROTECT)
+
+
+class SignalFill(models.Model):
+    """One actual owner-recorded execution linked to one immutable proposal.
+
+    Multiple partial fills of a proposal are possible. The ledger remains the
+    authoritative accounting record; this link captures which suggested action
+    the owner was reporting and prevents duplicate request retries.
+    """
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.PROTECT,
+                                 related_name="signal_fills")
+    signal = models.ForeignKey(StrategySignal, on_delete=models.PROTECT,
+                               related_name="confirmed_fills")
+    ledger_entry = models.OneToOneField(LedgerEntry, on_delete=models.PROTECT,
+                                         related_name="confirmed_signal_fill")
+    action_index = models.PositiveSmallIntegerField()
+    idempotency_key = models.CharField(max_length=36)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ledger_entry__occurred_on", "pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["signal", "idempotency_key"],
+                                    name="unique_signal_fill_request"),
+        ]
+
+
+class BrokerImportRow(models.Model):
+    """Idempotent identifier for an actual imported broker event."""
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.PROTECT)
+    fingerprint = models.CharField(max_length=64)
+    ledger_entry = models.OneToOneField(LedgerEntry, on_delete=models.PROTECT)
+    source = models.CharField(max_length=24, default="trading212_csv")
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["strategy", "fingerprint"], name="unique_t212_event")]

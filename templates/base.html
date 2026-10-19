@@ -8,7 +8,9 @@
   <title>{% block title %}Wealtharr{% endblock %} · Wealtharr</title>
   <link rel="stylesheet" href="{% static 'css/site.css' %}">
   <link rel="stylesheet" href="{% static 'css/refresh.css' %}">
+  <link rel="stylesheet" href="{% static 'css/cockpit.css' %}">
   <script defer src="{% static 'js/site.js' %}"></script>
+  <script defer src="{% static 'js/cockpit.js' %}"></script>
   <script defer src="{% static 'js/refresh.js' %}"></script>
   {% block extrahead %}{% endblock %}
 </head>
@@ -17,7 +19,7 @@
 <header class="topbar">
   <div class="top-left">
     {% if user.is_authenticated %}<button class="mobile-toggle" type="button" id="nav-toggle" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">{% include 'partials/icon.html' with name='menu' %}</button>{% endif %}
-    <a class="brand" href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'home' %}{% endif %}">
+    <a class="brand" href="{% if user.is_authenticated %}{% url 'cockpit_today' %}{% else %}{% url 'home' %}{% endif %}">
       <span class="brand-icon" aria-hidden="true">W</span>
       <span><strong>Wealtharr</strong><small>The investment strategy tracker</small></span>
     </a>
@@ -26,35 +28,31 @@
     <span class="owner-mode"><span class="status-pip"></span> Private tracker</span>
     <button type="button" class="ws-theme-toggle" data-theme-toggle aria-label="Switch to light theme" aria-pressed="false">{% include 'partials/icon.html' with name='sun' %}<span class="ws-theme-label">Light mode</span></button>
     {% if user.is_authenticated %}
-    <a class="top-link" href="{% url 'user_settings' %}" aria-label="My settings">{% include 'partials/icon.html' with name='settings' %}<span>Settings</span></a>
+    <a class="top-link" href="{% url 'cockpit_settings' %}" aria-label="My settings">{% include 'partials/icon.html' with name='settings' %}<span>Settings</span></a>
     <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="profile-button" title="Sign out" aria-label="Sign out">{% include 'partials/icon.html' with name='logout' %}</button></form>
     {% else %}<a class="btn btn-primary btn-sm" href="{% url 'login' %}">Sign in →</a>{% endif %}
   </div>
 </header>
 <div class="{% if user.is_authenticated %}app-shell{% else %}public-shell{% endif %}">
 {% if user.is_authenticated %}
-<aside class="sidebar" id="sidebar" aria-label="Main navigation"><nav aria-label="Primary">
-  <div class="menu-caption">YOUR WEALTH</div>
-  <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='home' %}</span> Overview</a>
-  <a href="{% url 'accounts' %}" class="nav-item {% if request.resolver_match.url_name == 'accounts' %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='wallet' %}</span> Accounts</a>
-  <div class="menu-caption second">STRATEGIES <a href="{% url 'new_strategy' %}" title="Add a strategy">＋</a></div>
-  {% for tab in nav_strategies %}
-  <a href="{% url 'strategy_detail' tab.pk %}" class="nav-item sub-nav {% if request.resolver_match.url_name == 'strategy_detail' and strategy.pk == tab.pk %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='activity' %}</span><span class="nav-text">{{ tab.name|truncatechars:24 }}<small>{{ tab.account.name|truncatechars:23 }}</small></span></a>
-  {% empty %}<div class="sidebar-hint">No strategies yet.<br><a href="{% url 'new_strategy' %}">Create your first →</a></div>{% endfor %}
-  <div class="menu-caption second">SYSTEM</div>
-  <a href="{% url 'user_settings' %}" class="nav-item {% if request.resolver_match.url_name == 'user_settings' %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='settings' %}</span> My settings</a>
+<aside class="sidebar" id="sidebar" aria-label="Main navigation">
+<nav aria-label="Primary">
+  <div class="menu-caption">MY INVESTMENTS</div>
+  <a href="{% url 'cockpit_today' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_today' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_today' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='home' %}</span> Today</a>
+  <a href="{% url 'cockpit_history' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_history' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_history' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='activity' %}</span> History</a>
+  <a href="{% url 'cockpit_ledger' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_ledger' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_ledger' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='wallet' %}</span> Ledger</a>
+  <a href="{% url 'cockpit_strategy' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_strategy' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_strategy' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='activity' %}</span> Strategy</a>
+  <a href="{% url 'cockpit_settings' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_settings' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_settings' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='settings' %}</span> Settings</a>
   {% if user.is_staff %}
-  <details class="admin-nav" open>
-    <summary class="nav-item"><span class="nav-icon">{% include 'partials/icon.html' with name='shield' %}</span> Administration</summary>
-    <a href="{% url 'control' %}" class="nav-item sub-nav"><span class="nav-icon">{% include 'partials/icon.html' with name='shield' %}</span> Control centre</a>
-    <a href="{% url 'control' %}#integrations" class="nav-item sub-nav"><span class="nav-icon">{% include 'partials/icon.html' with name='bell' %}</span> Email & Discord</a>
-    <a href="{% url 'admin:tracker_strategypreset_changelist' %}" class="nav-item sub-nav"><span class="nav-icon">{% include 'partials/icon.html' with name='activity' %}</span> Enabled strategies</a>
-    <a href="{% url 'admin:auth_user_changelist' %}" class="nav-item sub-nav"><span class="nav-icon">{% include 'partials/icon.html' with name='wallet' %}</span> Users</a>
-    <a href="{% url 'control' %}#stripe" class="nav-item sub-nav"><span class="nav-icon">{% include 'partials/icon.html' with name='settings' %}</span> Stripe <small>(later)</small></a>
-  </details>
+    <details class="admin-nav"><summary class="nav-item"><span class="nav-icon">{% include 'partials/icon.html' with name='shield' %}</span> Advanced</summary>
+      <a href="{% url 'control' %}" class="nav-item sub-nav">Admin control</a>
+      <a href="{% url 'accounts' %}" class="nav-item sub-nav">Legacy accounts</a>
+      <a href="{% url 'dashboard' %}" class="nav-item sub-nav">Legacy overview</a>
+      <a href="{% url 'admin:index' %}" class="nav-item sub-nav">Django admin</a>
+    </details>
   {% endif %}
-  </nav>
-  <div class="sidebar-bottom"><b>WEALTHARR</b><small>v2 · Owner edition</small></div>
+</nav>
+<div class="sidebar-bottom"><b>WEALTHARR</b><small>Private owner cockpit</small></div>
 </aside>
 <div class="nav-shade" id="nav-shade"></div>
 {% endif %}

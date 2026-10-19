@@ -50,15 +50,59 @@ jobs:
               print(path, response.status_code)
               assert response.status_code == 200, (path, response.status_code)
           PY
-      - name: Validate Compose and restore helper
+      - name: Validate private deployment and recovery configuration
         run: |
+          set -eu
           bash -n scripts/restore_backup.sh
+          bash -n scripts/verify_backup.sh
           cp .env.example .env.production
-          POSTGRES_PASSWORD=github-ci-placeholder docker compose config --quiet 2> /tmp/compose-warnings
-          if grep -q 'variable is not set' /tmp/compose-warnings; then
-            cat /tmp/compose-warnings
-            exit 1
+          umask 077
+          mkdir -p secrets
+          printf 'ci-test-db-only-not-real-secret' > secrets/postgres_password
+          printf 'ci-test-django-key-only-not-real-secret' > secrets/django_secret_key
+          docker compose config --quiet
+          WEALTHARR_HOST=wealtharr.vpn4u.cc \
+          TRAEFIK_DOCKER_NETWORK=ci_private_proxy \
+          TRAEFIK_CERT_RESOLVER=ci_resolver \
+          WEALTHARR_ALLOWLIST_CIDRS=10.0.0.0/8 \
+          docker compose -f compose.yml -f compose.traefik.yml config --quiet
+          # Neither Compose path must accidentally publish the database.
+          if docker compose config | grep -E '^    ports:' -A 2 | grep -q '5432:'; then
+            echo 'PostgreSQL must never be published'; exit 1
           fi
+          rm -f secrets/postgres_password secrets/django_secret_key .env.production
+          rmdir secrets
+
+      - name: Exercise disposable PostgreSQL backup recovery (synthetic data)
+        run: |
+          set -eu
+          mkdir -p backups
+          docker run -d --name wealtharr-ci-restore-source \
+            -e POSTGRES_PASSWORD=ci-only-not-a-real-secret \
+            -e POSTGRES_DB=ci_restore_source postgres:16-alpine >/dev/null
+          trap 'docker rm -f wealtharr-ci-restore-source >/dev/null 2>&1 || true' EXIT
+          # Ignore the temporary bootstrap daemon, which cleanly shuts
+          # down before the persistent PostgreSQL server comes up.
+          initialized=0
+          for attempt in $(seq 1 60); do
+            if docker logs wealtharr-ci-restore-source 2>&1 | grep -q 'PostgreSQL init process complete' &&
+               docker exec wealtharr-ci-restore-source \
+                 psql -U postgres -d ci_restore_source -Atqc 'SELECT 1' >/dev/null 2>&1; then
+              initialized=1
+              break
+            fi
+            sleep 1
+          done
+          test "$initialized" = 1 || { echo 'Disposable PostgreSQL failed to start' >&2; exit 1; }
+          docker exec wealtharr-ci-restore-source \
+            psql -v ON_ERROR_STOP=1 -U postgres -d ci_restore_source \
+            -c "CREATE TABLE django_migrations (id bigint primary key, app text not null, name text not null); INSERT INTO django_migrations VALUES (1, 'tracker', 'synthetic_ci');"
+          docker exec wealtharr-ci-restore-source \
+            pg_dump -U postgres -d ci_restore_source -Fc > backups/wealtharr-ci.dump
+          (cd backups && sha256sum wealtharr-ci.dump > wealtharr-ci.dump.sha256)
+          bash scripts/verify_backup.sh backups/wealtharr-ci.dump
+          rm -f backups/wealtharr-ci.dump backups/wealtharr-ci.dump.sha256
+
       - name: Public Yahoo chart endpoint smoke (non-gating)
         continue-on-error: true
         run: |
@@ -74,3 +118,27 @@ jobs:
                   raise RuntimeError(f"{ticker}: expected {expected}, got {currency}")
               print(f"Yahoo {ticker}: {currency} as of {rows[-1][0]}, {len(rows)} closes")
           PY
+
+  browser:
+    name: Real browser owner journeys (360px and desktop)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DEBUG: "1"
+      SECRET_KEY: "github-actions-browser-synthetic-only"
+      # Playwright sync starts an event loop in this synthetic test process.
+      # Never set this on Gunicorn, reminders, or production.
+      DJANGO_ALLOW_ASYNC_UNSAFE: "true"
+      WEALTHARR_BROWSER_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install application and pinned Playwright
+        run: python -m pip install -r requirements.txt -r requirements-browser.txt
+      - name: Install headless Chromium system dependencies
+        run: python -m playwright install --with-deps chromium
+      - name: Test real owner journeys in Chromium
+        run: python manage.py test browser_tests tracker.test_browser_e2e --verbosity 2

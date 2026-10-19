@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}History{% endblock %}
+{% block content %}
+<div class="cockpit ck-v2">
+  <header class="ck-top">
+    <div><p class="ck-overline">{{ strategy.name }} · RECORDED PERFORMANCE</p><h1>History</h1>
+      <p class="ck-muted">Real portfolio records, not a simulated backtest.</p>
+    </div>
+    <a class="btn btn-subtle btn-sm" href="{% url 'cockpit_today' %}">Back to Today</a>
+  </header>
+  <section class="ck-metrics" aria-label="Investment return calculations">
+    {% for metric in metrics %}
+      <article class="panel ck-card">
+        <h2 class="ck-label">{{ metric.title }}</h2>
+        <p class="ck-number">{% if metric.available %}{{ metric.value|floatformat:2 }}{{ metric.suffix }}{% else %}Unavailable{% endif %}</p>
+        <p class="ck-muted">{{ metric.help }}</p>
+      </article>
+    {% endfor %}
+  </section>
+  <section class="panel ck-card ck-detail-summary" aria-labelledby="history-amounts">
+    <h2 id="history-amounts">Money in and investment gain</h2>
+    <div class="ck-stat-pairs">
+      <div><span>Net money added</span><strong>{% if performance.net_contributed_gbp is not None %}£{{ performance.net_contributed_gbp|floatformat:'2g' }}{% else %}Unavailable{% endif %}</strong></div>
+      <div><span>Gain / loss in £</span><strong>{% if performance.gain_gbp is not None %}£{{ performance.gain_gbp|floatformat:'2g' }}{% else %}Unavailable{% endif %}</strong></div>
+      <div><span>Single-funding return</span><strong>{% if performance.cumulative is not None %}{{ performance.cumulative|floatformat:2 }}%{% else %}Unavailable{% endif %}</strong></div>
+      <div><span>Annualised return</span><strong>{% if performance.annual is not None %}{{ performance.annual|floatformat:2 }}%{% else %}Unavailable{% endif %}</strong></div>
+    </div>
+    <p class="ck-muted">
+      {% if performance.annual_basis == 'money_weighted_xirr' %}Annual figure is money-weighted XIRR, not time-weighted performance.{% elif performance.annual_basis == 'verified_snapshot_twr' %}Annual figure uses the flow-free snapshot period, not necessarily your whole investment history.{% else %}An annual return is not available with the recorded valuation evidence.{% endif %}
+      {% if performance.xirr_as_of %} Money-weighted valuation date: {{ performance.xirr_as_of }}.{% endif %}
+    </p>
+    <details class="ck-disclosure-inline">
+      <summary>Why are some returns unavailable?</summary>
+      <p>Money-weighted XIRR needs recorded funding events and an independently supported GBP closing portfolio value. A simple cumulative percentage is only shown for one initial deposit without later external cash flows. Time-weighted returns need verified pre- and post-contribution valuations; daily balances alone cannot prove those returns. Drawdown is only calculated over an eligible, flow-safe return window.</p>
+      <p>{% if performance.twr_window %}TWR period: {{ performance.twr_window.0 }} to {{ performance.twr_window.1 }} (recorded snapshots without intervening deposits or withdrawals).{% else %}Time-weighted return: no eligible complete valuation window is recorded.{% endif %}</p>
+      <p class="ck-muted">GBP gain is an amount, not a percentage return. Quotes and balances are observations, not executable prices.</p>
+    </details>
+  </section>
+  {% include 'partials/performance_chart.html' with chart_points=performance.chart %}
+  <section class="panel ck-card" aria-labelledby="reviews-title">
+    <div class="ck-section-head"><h2 id="reviews-title">Previous reviews and warnings</h2><span class="ck-muted">Latest 60</span></div>
+    <ol class="ck-history ck-timeline">
+      {% for record in signals %}
+        <li><div class="ck-section-head">
+          <h3>{{ record.title }}</h3>
+          <time datetime="{{ record.date|date:'Y-m-d' }}" class="ck-muted">{{ record.date|date:'j M Y' }}</time></div>
+          <span class="ck-muted">{{ record.outcome }} · {{ record.kind|title }}</span>
+          {% if record.executed_on %}
+            <p class="ck-history-confirmed">Actual fills recorded on {{ record.executed_on|date:'j M Y' }}.
+              <a href="{% url 'cockpit_ledger' %}">See ledger for actual quantities, prices and fees</a>.
+              Old recommendations are never current instructions.</p>
+          {% endif %}
+          <details><summary>Read recorded explanation{% if record.has_proposals %} and historical proposal{% endif %}</summary>
+            <p>{{ record.message }}</p>
+            <p class="ck-muted">A historical review is not permission to execute old trade quantities. Use Today for your current action.</p>
+          </details>
+        </li>
+      {% empty %}
+        <li class="ck-muted">No completed reviews are recorded yet.</li>
+      {% endfor %}
+    </ol>
+  </section>
+  <p class="ck-muted">All calculations use only stored evidence. <a href="{% url 'cockpit_strategy' %}">Read strategy and instrument limitations</a>.</p>
+</div>
+{% endblock %}

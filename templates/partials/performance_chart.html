@@ -1,0 +1,32 @@
+<section class="panel ck-card ck-chart-panel" aria-labelledby="growth-title">
+  <div class="ck-section-head">
+    <div>
+      <h2 id="growth-title">Portfolio value over time</h2>
+      <p class="ck-muted">Recorded valuation snapshots and net contributions. These are not backtested returns.</p>
+    </div>
+    <div class="chart-controls" role="group" aria-label="Portfolio chart date range">
+      <button type="button" class="chip" data-range="1m" aria-pressed="false">1M</button>
+      <button type="button" class="chip" data-range="3m" aria-pressed="false">3M</button>
+      <button type="button" class="chip" data-range="1y" aria-pressed="false">1Y</button>
+      <button type="button" class="chip selected" data-range="all" aria-pressed="true">All</button>
+    </div>
+  </div>
+  <div id="wealth-chart" class="wealth-chart" role="group" aria-label="Dated actual portfolio valuation chart"></div>
+  {{ chart_points|json_script:'wealth-chart-points' }}
+  <details class="ck-chart-table">
+    <summary>View accessible chart data table</summary>
+    <div class="table-scroll">
+      <table class="data-table">
+        <caption>Saved portfolio valuations and net contributions by date</caption>
+        <thead><tr><th scope="col">Date</th><th scope="col">Value</th><th scope="col">Net contributions</th></tr></thead>
+        <tbody>
+        {% for point in chart_points %}
+          <tr><td>{{ point.date }}</td><td>£{{ point.value }}</td><td>£{{ point.contributed }}</td></tr>
+        {% empty %}
+          <tr><td colspan="3">No verified valuation snapshots yet. A chart will appear when actual source-backed valuations exist.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>

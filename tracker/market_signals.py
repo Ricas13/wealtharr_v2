@@ -18,6 +18,8 @@ from .models import (
     LedgerEntry, MarketObservation, PriceMark, StrategySignal, YahooSync,
 )
 from .services import ledger_summary, dispatch
+from .notification_routing import route_notice
+from .core.prices import check_price_series
 
 LOG = logging.getLogger(__name__)
 ZERO = Decimal("0")
@@ -60,6 +62,13 @@ def fetch_chart(symbol, since):
     if not chart:
         raise ValueError("Yahoo supplied no chart data")
     raw_currency = chart.get("meta", {}).get("currency")
+    # Exact pinned product/line unit checks. A Yahoo GBX/GBP metadata change
+    # must not create a fictitious 100x portfolio valuation.
+    expected_units = {"LQQ3.L": ("GBp", "GBX"),
+                      "ERNS.L": ("GBP",),
+                      "TQQQ": ("USD",), "SPY": ("USD",)}
+    if symbol in expected_units and raw_currency not in expected_units[symbol]:
+        raise ValueError("PRICE_HOLD:RAW_UNIT_MISMATCH")
     currency = "GBP" if raw_currency in ("GBp", "GBX", "GBP") else raw_currency
     if currency not in ("GBP", "USD"):
         raise ValueError("Unsupported Yahoo quote currency")
@@ -97,45 +106,56 @@ def sync_ticker(symbol, *, force=False):
     state.save(update_fields=["last_attempt"])
     try:
         currency, series = fetch_chart(symbol, since)
+        # Screen the new batch before *any* upsert. A suspicious daily jump
+        # (including an unhandled split/restrike or 100x pence error) stays
+        # on hold; no later signal may use the older mark as though fresh.
+        prior = MarketObservation.objects.filter(symbol=symbol, as_of__lt=series[0][0]).order_by("-as_of").first()
+        checked = check_price_series(
+            symbol, series, as_of=timezone.localdate(),
+            previous=(prior.as_of, prior.price) if prior else None)
+        if checked.status != "APPROVED":
+            state.last_error = ("PRICE_HOLD:" + checked.code)[:80]
+            state.save(update_fields=["last_error"])
+            LOG.warning("Market price on hold for %s (%s)", symbol, checked.code)
+            return None
+        # A revised feed close may indicate a split, wrong units or source
+        # restatement. Never silently overwrite accepted history.
+        previous_values = dict(MarketObservation.objects.filter(
+            symbol=symbol, as_of__in=[day for day, _ in series]
+        ).values_list("as_of", "price"))
+        if any(previous_values[day] != price for day, price in series
+               if day in previous_values):
+            state.last_error = "PRICE_HOLD:REVISED_HISTORICAL_CLOSE"
+            state.save(update_fields=["last_error"])
+            LOG.warning("Market price revision on hold for %s", symbol)
+            return None
         observations = [
             MarketObservation(symbol=symbol, as_of=day, price=price, currency=currency)
             for day, price in series
         ]
         MarketObservation.objects.bulk_create(
-            observations, batch_size=250, update_conflicts=True,
-            update_fields=["price", "currency"], unique_fields=["symbol", "as_of"],
+            observations, batch_size=250, ignore_conflicts=True,
         )
         state.last_success = timezone.now()
         state.last_error = ""
         state.save(update_fields=["last_success", "last_error"])
     except Exception as exc:
         # Network errors are surfaced as a status, never replaced with invented data.
-        state.last_error = type(exc).__name__[:80]
+        detail = str(exc)
+        state.last_error = (detail[:80] if detail.startswith("PRICE_HOLD:")
+                            else type(exc).__name__[:80])
         state.save(update_fields=["last_error"])
         LOG.warning("Yahoo quote unavailable for %s (%s)", symbol, type(exc).__name__)
         return None
     return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
 
 
-def quarter_number(day):
-    return day.year * 4 + (day.month - 1) // 3
-
-
-def prior_quarter_name(day):
-    index = quarter_number(day) - 1
-    return "%04d-Q%d" % (index // 4, index % 4 + 1)
-
-
-def quarter_end_before(day):
-    """Last completed calendar quarter; no mid-quarter valuation used for a signal."""
-    if day.month <= 3:
-        return date(day.year - 1, 12, 31)
-    if day.month <= 6:
-        return date(day.year, 3, 31)
-    if day.month <= 9:
-        return date(day.year, 6, 30)
-    return date(day.year, 9, 30)
-
+# Pure, immutable versioned rule implementation (Django-free).
+from .strategies.nine_sig.v1 import (
+    VERSION as NINE_SIG_RULE_VERSION, quarter_number, prior_quarter_name,
+    quarter_end_before, _quarterly_closes, _drawdown_from_spy,
+    signal_line_value, advice_for_holdings, first_100_up_crossing,
+)
 
 def settlement_close(symbol, quarter_end, *, days=6):
     """Use last verified daily close on/before quarter end, never later data."""
@@ -144,211 +164,6 @@ def settlement_close(symbol, quarter_end, *, days=6):
         as_of__gte=quarter_end - timedelta(days=days),
     ).order_by("-as_of").first()
 
-
-def _quarterly_closes(reference, until):
-    closes = {}
-    for day, price in sorted(reference):
-        if day <= until and price > ZERO:
-            closes[quarter_number(day)] = (day, price)
-    return closes
-
-
-def _amount(quantity, price):
-    return str((quantity * price).quantize(CENTS))
-
-
-def _order(side, symbol, qty, price):
-    return {"side": side, "symbol": symbol, "quantity": str(qty),
-            "estimated_gbp": _amount(qty, price)}
-
-
-def _floor_qty(amount, price):
-    if amount <= ZERO or price <= ZERO:
-        return ZERO
-    return (amount / price).quantize(PRECISION, rounding=ROUND_DOWN)
-
-
-def signal_line_value(*, start_date, as_of, starting_equity_cost, contributions=()):
-    """Reproduce the workbook AV recurrence without advancing deposits early.
-
-    Each completed quarter grows the line 9%; half of contributions deposited
-    *during* that quarter enter only after that growth, per
-    AV4 = AV3 * (1 + C9) + BV4/2. Earlier deposits grow in later quarters.
-    """
-    from calendar import monthrange
-    at_close = as_of.month % 3 == 0 and as_of.day == monthrange(as_of.year, as_of.month)[1]
-    review_quarter = quarter_number(as_of) if at_close else quarter_number(as_of) - 1
-    first_quarter = quarter_number(start_date)
-    if review_quarter < first_quarter:
-        return None
-    target = Decimal(starting_equity_cost) * Decimal("1.09") ** (review_quarter - first_quarter + 1)
-    for day, amount in contributions:
-        day_q = quarter_number(day)
-        if start_date < day <= as_of and first_quarter <= day_q <= review_quarter:
-            target += (Decimal(amount) / 2) * Decimal("1.09") ** (review_quarter - day_q)
-    return target.quantize(CENTS)
-
-
-def _drawdown_from_spy(spy, review_q):
-    """30 Down: current SPY quarter close <=70% of past eight closes' high.
-
-    The fund need not be falling *this* quarter: a partial recovery can still
-    end 30% below the rolling peak. The original test wrongly required a
-    negative quarter-over-quarter return and missed valid triggers.
-    """
-    current = spy.get(review_q)
-    previous = [spy[q][1] for q in range(review_q - 8, review_q)
-                if q in spy and spy[q][1] > ZERO]
-    if not current or not previous or current[1] <= ZERO:
-        return False, ZERO
-    high = max(previous)
-    decline = Decimal(1) - current[1] / high
-    return current[1] <= high * Decimal("0.70"), decline
-
-
-def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symbol,
-                        equity_qty, equity_price, safe_qty, safe_price, cash,
-                        starting_equity_cost, reference,
-                        spy_reference=None, contributions=(), prior_skipped_sells=0,
-                        no_sell_quarters=0, prior_drawdown=False,
-                        down_age_quarters=0):
-    """Deterministic owner-review 9Sig action on a completed quarter.
-
-    60/40 baseline, 9% per quarter, half of additional contributions, workbook
-    cash-reservoir buying throttle (0.9 x 0.9 only for large buys), 30 Down
-    two-sell skip, eight-quarter expiry, 100%-up TQQQ reset and >100%
-    reservoir-deficit reset. Actual share fills are always owner-entered.
-    """
-    if (currency != "GBP" or equity_qty <= ZERO or starting_equity_cost <= ZERO or
-            equity_price <= ZERO or safe_price <= ZERO or safe_qty < ZERO or cash < ZERO):
-        return []
-    from calendar import monthrange
-    at_close = as_of.month % 3 == 0 and as_of.day == monthrange(as_of.year, as_of.month)[1]
-    review_q = quarter_number(as_of) if at_close else quarter_number(as_of) - 1
-    target = signal_line_value(
-        start_date=start_date, as_of=as_of,
-        starting_equity_cost=starting_equity_cost, contributions=contributions)
-    if target is None:
-        return []
-
-    equity_value = equity_qty * equity_price
-    safe_value = safe_qty * safe_price
-    total = equity_value + safe_value + cash
-    if total <= ZERO:
-        return []
-    difference = target - equity_value
-    # A 0.5% portfolio-wide deadband was invented by the app. The published
-    # strategy and uploaded workbook have no such rule. Penny rounding
-    # suppresses untradeably small differences instead.
-    tolerance = CENTS
-
-    spy = _quarterly_closes(spy_reference or (), as_of)
-    down_trigger, decline = _drawdown_from_spy(spy, review_q)
-    # Once triggered, the skip window persists until the third would-be sell
-    # or eight-quarter expiry. A recovery alone does not consume skipped sells.
-    active_down = down_trigger or (prior_drawdown and down_age_quarters < 8)
-    alerts = []
-    if down_trigger and not prior_drawdown:
-        alerts.append({
-            "kind": "THIRTY_DOWN",
-            "key": "30down:" + str(review_q),
-            "title": "9Sig 30 Down: next two sell signals are deferred",
-            "message": (
-                "SPY fell %.2f%% from its rolling eight-quarter closing peak. "
-                "The next two equity sell signals are skipped; buy signals "
-                "continue, with the third would-be sell requiring a 60/40 reset. "
-                "The window expires after eight quarters. No trade was placed."
-            ) % float(decline * 100),
-            "actions": [],
-        })
-
-    tqqq = _quarterly_closes(reference, as_of)
-    current = tqqq.get(review_q)
-    previous = tqqq.get(review_q - 1)
-    spike = (previous is not None and current is not None and previous[1] > ZERO
-             and current[1] >= 2 * previous[1])
-    reset_reason = None
-    note = ""
-    if prior_drawdown and down_age_quarters >= 8:
-        reset_reason = "Eight-quarter 30 Down safety window expired"
-        active_down = False
-    elif active_down and difference < -tolerance:
-        if prior_skipped_sells >= 2:
-            reset_reason = "Two sell signals have already been skipped under 30 Down"
-        else:
-            note = "30 Down active: defer this equity sell signal; do not rebalance."
-    elif spike and not active_down:
-        reset_reason = "The TQQQ reference doubled (gained at least 100%) in a quarter"
-    elif difference > cash + safe_value + tolerance and not active_down:
-        reset_reason = "The equity buy would require selling more than 100% of safe assets"
-    elif active_down and difference > cash + safe_value + tolerance:
-        note = "30 Down active: safe-asset shortage. Review before committing money."
-
-    if not note:
-        note = ("Equity below quarterly signal line."
-                if difference > tolerance else
-                "Equity above quarterly signal line."
-                if difference < -tolerance else
-                "Equity matches the quarterly signal line; no rebalance needed.")
-
-    if reset_reason:
-        note = reset_reason + ": review a reset to 60% equity / 40% safe and cash."
-        difference = total * Decimal("0.60") - equity_value
-
-    actions = []
-    if active_down and not reset_reason and (
-            difference < -tolerance or difference > cash + safe_value + tolerance):
-        actions.append({"side": "HOLD", "symbol": equity_symbol,
-                        "quantity": "0", "estimated_gbp": "0.00"})
-    elif difference < -tolerance:
-        equity_sell = min(equity_qty, _floor_qty(-difference, equity_price))
-        if equity_sell > ZERO:
-            actions.append(_order("SELL", equity_symbol, equity_sell, equity_price))
-        # All proceeds plus existing cash can fund safe purchases. The cash
-        # remainder from rounding stays in the strategy account.
-        safe_budget = cash + equity_sell * equity_price
-        safe_buy = _floor_qty(safe_budget, safe_price)
-        if safe_buy > ZERO:
-            actions.append(_order("BUY", safe_symbol, safe_buy, safe_price))
-    elif difference > tolerance:
-        reserve = cash + safe_value
-        if reset_reason:
-            # A 60/40 reset targets the current total, not the old signal
-            # line. The normal large-buy throttle does not apply.
-            budget = min(difference, reserve)
-        elif difference < reserve * Decimal("0.90"):
-            # Workbook BF4: a regular shortfall BELOW 90% of buying
-            # power is funded IN FULL, not arbitrarily capped at 90%.
-            budget = difference
-        else:
-            # Workbook BF4 uses buying power (cash + bond value), not
-            # only bond value: reserve * 0.9 * (1 - C11); C11=10%.
-            budget = min(difference, reserve * Decimal("0.81"))
-            note += " 9Sig's large-buy throttle limits this quarter's purchase."
-        safe_sale_budget = min(safe_value, max(ZERO, budget - cash))
-        safe_to_sell = min(safe_qty, _floor_qty(safe_sale_budget, safe_price))
-        if safe_to_sell > ZERO:
-            actions.append(_order("SELL", safe_symbol, safe_to_sell, safe_price))
-        available = cash + safe_to_sell * safe_price
-        equity_buy = _floor_qty(min(budget, available), equity_price)
-        if equity_buy > ZERO:
-            actions.append(_order("BUY", equity_symbol, equity_buy, equity_price))
-        if budget + tolerance < difference:
-            note += " Available GBP buying power limits the order size."
-
-    label = "%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
-    alerts.append({
-        "kind": "QUARTERLY", "key": "quarter:" + label,
-        "title": "9Sig quarterly review — " + label,
-        "message": (
-            "%s Signal line £%s = a 9%% rise each completed quarter "
-            "plus half of deposits in that quarter. GBP prices and proposed "
-            "unit quantities are estimates based on closing quotes. "
-            "Review before trading; no orders have been placed."
-        ) % (note, target),
-        "actions": actions,
-    })
-    return alerts
 
 
 def count_skipped_equity_sells(quarterly_signals):
@@ -386,10 +201,16 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
     origin = settlement_close("TQQQ", last_quarter)
     if not origin or origin.currency != "USD" or origin.price <= ZERO:
         return
-    crossed = MarketObservation.objects.filter(
+    candidates = list(MarketObservation.objects.filter(
         symbol="TQQQ", currency="USD", as_of__gt=last_quarter,
-        as_of__lte=tqqq_latest.as_of, price__gte=origin.price * 2,
-    ).order_by("as_of").first()
+        as_of__lte=tqqq_latest.as_of,
+    ).order_by("as_of").values_list("as_of", "price"))
+    crossing = first_100_up_crossing(
+        origin_on=last_quarter, origin_usd=origin.price,
+        daily_usd=candidates, until=tqqq_latest.as_of)
+    crossed = (MarketObservation.objects.filter(
+        symbol="TQQQ", currency="USD", as_of=crossing[0]).first()
+        if crossing else None)
     if not crossed or first_buy.occurred_on > crossed.as_of:
         return
     if baseline is not None and baseline.as_of >= crossed.as_of:
@@ -421,9 +242,11 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
                   "title": "9Sig 100%-up spike: manual reset review",
                   "message": message, "as_of": crossed.as_of, "actions": []})
     if created:
-        dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, key),
-                 "Wealtharr — " + signal.title,
-                 strategy.name + "\n" + message + "\nNo orders placed.")
+        route_notice(strategy.owner, "urgent",
+                     "signal:%s:%s" % (strategy.pk, key),
+                     "Wealtharr — " + signal.title,
+                     strategy.name + "\n" + message + "\nNo orders placed.",
+                     sender=dispatch)
 
 
 def review_strategy(strategy):
@@ -445,6 +268,11 @@ def review_strategy(strategy):
         return {"status": "holdings outside the two configured strategy sleeves"}
     tickers = {strategy.equity_symbol, strategy.safe_symbol, "TQQQ", "SPY"}
     data = {symbol: sync_ticker(symbol) for symbol in tickers}
+    # Fail closed even if old accepted observations remain in the database.
+    # The health issue must be reviewed rather than silently ignored.
+    if YahooSync.objects.filter(symbol__in=tickers,
+            last_error__startswith="PRICE_HOLD:").exists():
+        return {"status": "cannot_compute", "reason": "Market price on hold for review"}
     now = timezone.localdate()
     # Current price marks are for the portfolio dashboard, never for a past
     # quarter's signal. A failed Yahoo lookup cannot invent a new valuation.
@@ -566,6 +394,7 @@ def review_strategy(strategy):
             strategy=strategy, signal_key=alert["key"],
             defaults={"kind": alert["kind"], "title": alert["title"],
                       "message": alert["message"], "actions": alert["actions"],
+                      "reset_reason": alert.get("reset_reason", ""),
                       "as_of": quarter_end})
         if new:
             created += 1
@@ -577,12 +406,14 @@ def review_strategy(strategy):
             # triggering rebalance alerts or cluttering the Overview.
             actionable = alert["kind"] == "THIRTY_DOWN" or any(
                 action.get("side") in ("BUY", "SELL") for action in alert["actions"])
-            if actionable:
-                dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, signal.signal_key),
-                         "Wealtharr — " + signal.title,
-                         strategy.name + "\n" + signal.message + "\n" + details +
-                         "\nReview this in Wealtharr. No orders have been placed.")
-            else:
+            if actionable and alert["kind"] == "THIRTY_DOWN":
+                route_notice(strategy.owner, "urgent",
+                             "signal:%s:%s" % (strategy.pk, signal.signal_key),
+                             "Wealtharr — " + signal.title,
+                             strategy.name + "\n" + signal.message + "\n" + details +
+                             "\nReview this in Wealtharr. No orders have been placed.",
+                             sender=dispatch)
+            elif not actionable:
                 signal.acknowledged_at = timezone.now()
                 signal.save(update_fields=["acknowledged_at"])
     return {"status": "ok", "created": created, "as_of": quarter_end.isoformat()}

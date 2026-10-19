@@ -1,0 +1,223 @@
+/* Added after refresh.css; shares existing dark/light tokens. No inline styles. */
+.cockpit{max-width:1100px;margin-inline:auto;display:grid;gap:18px}
+.ck-narrow{max-width:720px}
+.ck-top,.ck-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ck-top h1{margin:0}
+.ck-section-head h2,.ck-section-head h3{margin:0}
+.ck-overline{font-size:.72rem;letter-spacing:.14em;font-weight:750;color:var(--cyan);margin:0 0 5px}
+.ck-card{padding:clamp(17px,3vw,26px);min-width:0}
+.ck-metrics{display:grid;grid-template-columns:1fr;gap:12px}
+.ck-label{font-size:.86rem;color:var(--muted);margin:0 0 5px}
+.ck-number{font-size:clamp(1.45rem,5vw,2.5rem);font-weight:760;letter-spacing:-.035em;margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ck-muted{font-size:.85rem;color:var(--muted)}
+.ck-chip{display:inline-flex;border:1px solid var(--stroke);border-radius:100px;padding:6px 12px;font-size:.76rem;font-weight:690;background:var(--panel-hi)}
+.ck-ok{color:var(--positive)}.ck-attention{color:var(--warning)}.ck-blocked{color:var(--danger)}
+.ck-action-text{font-size:clamp(1.13rem,2.5vw,1.48rem);font-weight:710;line-height:1.4;margin:13px 0}
+.ck-orders{list-style:decimal;padding-left:24px;margin:15px 0;display:grid;gap:12px}
+.ck-orders li{padding-left:3px}.ck-orders li span{display:block;color:var(--muted);font-size:.82rem}
+.ck-primary{margin-top:12px;display:inline-flex;max-width:100%;justify-content:center}
+.ck-block-message{border-left:3px solid var(--danger);padding:10px 15px;background:var(--panel-hi);border-radius:8px}
+.ck-target{border-top:1px solid var(--stroke-soft);margin-top:24px;padding-top:16px}
+.ck-barline{display:flex;justify-content:space-between;gap:12px;font-size:.82rem;margin-top:13px}
+.ck-target progress{display:block;width:100%;height:12px;border:0;border-radius:99px;overflow:hidden;accent-color:var(--cyan)}
+.ck-target progress.ck-actual-progress{accent-color:var(--teal)}
+.ck-target progress::-webkit-progress-bar{background:var(--stroke);border-radius:99px}
+.ck-target progress::-webkit-progress-value{background:var(--cyan);border-radius:99px}
+.ck-target progress.ck-actual-progress::-webkit-progress-value{background:var(--teal)}
+.ck-chart-panel{min-height:320px}.ck-chart-panel .wealth-chart{min-height:230px}
+.ck-chart-panel .wealth-chart svg{height:230px;width:100%}
+.ck-chart-table{margin-top:12px;color:var(--muted)}.ck-chart-table summary{cursor:pointer}
+.ck-footer{display:grid;gap:12px;padding:0 2px}.ck-footer p{margin:0}
+.ck-deposit-form{display:flex;flex-wrap:wrap;align-items:end;gap:8px}
+.ck-deposit-form label{width:100%;font-size:.85rem}.ck-deposit-form input{max-width:150px}
+.ck-fill{border:1px solid var(--stroke);border-radius:10px;padding:16px;margin:18px 0}
+.ck-fill legend{padding:0 8px;font-weight:700}.ck-fill .form-field{margin-bottom:12px}
+.ck-history{list-style:none;margin:0;padding:0}.ck-history li{padding:16px 0;border-bottom:1px solid var(--stroke-soft)}
+@media(min-width:650px){.ck-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:649px){.cockpit{gap:12px}.ck-card{padding:16px}.ck-primary{width:100%}.ck-section-head .chart-controls{width:100%;overflow-x:auto}}
+@media(prefers-reduced-motion:reduce){.cockpit *{scroll-behavior:auto;transition:none}}
+.ck-test-row{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}
+.cockpit .form-field{margin-block:12px}
+.cockpit .form-field input:not([type=checkbox]),.cockpit .form-field select{max-width:100%;min-height:44px;background:var(--panel-hi);color:var(--text);border:1px solid var(--stroke);border-radius:8px;padding:9px 11px}
+
+/* Section E — one-decision owner experience and reusable investment surfaces. */
+.ck-v2{max-width:1160px;gap:16px}
+.ck-v2 .ck-top{margin-block:4px 6px}
+.ck-v2 .ck-top .ck-muted{margin:5px 0 0}
+.ck-v2 .ck-hero{background:linear-gradient(125deg,var(--panel-hi),var(--panel))}
+.ck-v2 .ck-focus-trade{border-color:var(--cyan)}
+.ck-v2 .ck-focus-review{border-color:var(--warning)}
+.ck-v2 .ck-focus-blocked{border-color:var(--stroke)}
+.ck-v2 .ck-next{display:grid;gap:9px}
+.ck-v2 .ck-next>p,.ck-v2 .ck-next>.ck-action-text{margin:0}
+.ck-v2 .ck-next .ck-orders{margin:4px 0}
+.ck-v2 .ck-next .ck-orders strong{font-variant-numeric:tabular-nums}
+.ck-v2 .ck-refresh-form{margin-top:4px}
+.ck-v2 .ck-freshness{display:flex;gap:10px 24px;flex-wrap:wrap;border-top:1px solid var(--stroke-soft);padding-top:12px;color:var(--muted);font-size:.86rem}
+.ck-v2 .ck-contribution{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);align-items:center;gap:12px 18px}
+.ck-v2 .ck-contribution h2{margin:0 0 4px}
+.ck-v2 .ck-contribution p{margin:0}
+.ck-v2 .ck-deposit-form{display:flex;flex-wrap:wrap;align-items:end;gap:9px}
+.ck-v2 .ck-form-pair{display:grid;gap:4px;min-width:150px;flex:1}
+.ck-v2 .ck-form-pair label{width:auto;color:var(--muted);font-size:.83rem}
+.ck-v2 .ck-form-pair .field{width:100%;max-width:none;min-height:42px}
+.ck-v2 .ck-deposit-form .btn{min-height:42px}
+.ck-v2 .ck-disclosure{padding:0;overflow:visible}
+.ck-v2 .ck-disclosure>summary{cursor:pointer;list-style-position:inside;padding:18px 22px;font-weight:700}
+.ck-v2 .ck-disclosure[open]>summary{border-bottom:1px solid var(--stroke-soft)}
+.ck-v2 .ck-details-body{padding:18px 22px}
+.ck-v2 .ck-details-body .ck-muted:last-child{margin:18px 0 0}
+.ck-v2 .ck-disclosure-inline{margin-top:15px;border-top:1px solid var(--stroke-soft);padding-top:12px}
+.ck-v2 .ck-disclosure-inline summary,.ck-v2 .ck-history summary{cursor:pointer;color:var(--cyan);font-weight:650}
+.ck-v2 summary:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:4px}
+.ck-v2 .ck-disclosure-inline p{margin:12px 0 0}
+.ck-v2 .ck-metrics-two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ck-v2 .ck-stat-pairs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px;margin-top:15px}
+.ck-v2 .ck-stat-pairs>div{display:grid;gap:3px;border-bottom:1px solid var(--stroke-soft);padding-bottom:10px}
+.ck-v2 .ck-stat-pairs span{color:var(--muted);font-size:.86rem}
+.ck-v2 .ck-stat-pairs strong{font-size:1.24rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ck-v2 .ck-detail-summary>.ck-muted{margin:16px 0 0}
+.ck-v2 .ck-timeline li{padding:15px 0}
+.ck-v2 .ck-timeline li:last-child{border-bottom:none;padding-bottom:0}
+.ck-v2 .ck-timeline h3{font-size:1rem;overflow-wrap:anywhere}
+.ck-v2 .ck-timeline details{margin-top:10px}
+.ck-v2 .ck-timeline details p{margin-top:9px;white-space:normal;overflow-wrap:anywhere}
+.ck-v2 .ck-history{list-style:none}
+.ck-v2 .ck-ledger-table{min-width:680px}
+.ck-v2 .ck-ledger-table th,.ck-v2 .ck-ledger-table td{font-variant-numeric:tabular-nums;white-space:nowrap}
+.ck-v2 .ck-ledger-note td{padding-top:0;color:var(--muted);white-space:normal;overflow-wrap:anywhere}
+.ck-v2 .ck-ledger-note{border-bottom:1px solid var(--stroke-soft)}
+.ck-v2 .ck-instrument-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
+.ck-v2 .ck-instrument{border:1px solid var(--stroke-soft);border-radius:var(--radius);padding:18px;min-width:0}
+.ck-v2 .ck-instrument h3{font-size:1.08rem;line-height:1.45;overflow-wrap:anywhere}
+.ck-v2 .ck-instrument .ck-overline{letter-spacing:.08em}
+.ck-v2 .ck-facts{display:grid;gap:9px;margin:15px 0}
+.ck-v2 .ck-facts>div{border-top:1px solid var(--stroke-soft);padding-top:8px;display:grid;gap:2px}
+.ck-v2 .ck-facts dt{color:var(--muted);font-size:.8rem}
+.ck-v2 .ck-facts dd{margin:0;overflow-wrap:anywhere;font-weight:560}
+.ck-v2 .ck-link-row,.ck-v2 .ck-bottom-links{display:flex;flex-wrap:wrap;gap:12px}
+.ck-v2 .ck-link-row a{overflow-wrap:anywhere}
+.ck-v2 .ck-prose{overflow-wrap:anywhere}
+@media(max-width:780px){
+  .ck-v2 .ck-contribution{grid-template-columns:1fr}
+  .ck-v2 .ck-instrument-grid{grid-template-columns:1fr}
+}
+@media(max-width:649px){
+  .ck-v2 .ck-top{align-items:flex-start}
+  .ck-v2 .ck-metrics-two{grid-template-columns:1fr}
+  .ck-v2 .ck-stat-pairs{grid-template-columns:1fr 1fr}
+  .ck-v2 .ck-deposit-form .btn{width:100%}
+  .ck-v2 .ck-details-body{padding:16px}
+  .ck-v2 .ck-disclosure>summary{padding:16px}
+}
+
+
+/* Section E evidence-only components */
+.cockpit{min-width:0}
+.cockpit .ck-gain{color:var(--positive)}
+.cockpit .ck-loss{color:var(--danger)}
+.cockpit .ck-small-gap{margin:5px 0 13px}
+.cockpit .ck-details{border-top:1px solid var(--stroke-soft);margin-top:14px;padding-top:14px}
+.cockpit .ck-details summary{color:var(--cyan);font-weight:700;cursor:pointer}
+.cockpit .ck-details summary:focus-visible,
+.cockpit a:focus-visible,
+.cockpit button:focus-visible,
+.cockpit select:focus-visible,
+.cockpit input:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.cockpit progress{display:block;width:100%;height:12px;border:0;border-radius:12px;accent-color:var(--cyan)}
+.cockpit progress.ck-actual-progress{accent-color:var(--teal)}
+.cockpit progress::-webkit-progress-bar{background:var(--stroke);border-radius:12px}
+.cockpit progress::-webkit-progress-value{background:var(--cyan);border-radius:12px}
+.cockpit progress.ck-actual-progress::-webkit-progress-value{background:var(--teal)}
+.cockpit .ck-ledger-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin:16px 0}
+.cockpit .ck-ledger-controls .ck-form-pair{display:grid;gap:5px;min-width:145px}
+.cockpit .ck-ledger-controls select{min-height:44px;background:var(--panel-hi);color:var(--text);border:1px solid var(--stroke);border-radius:9px;padding:8px}
+.cockpit .ck-ledger-controls button{min-height:44px}
+.cockpit .ck-rule-list{padding-inline-start:22px;display:grid;gap:12px;line-height:1.55}
+.cockpit .ck-history-confirmed{font-size:.87rem;border-left:3px solid var(--teal);padding:9px 12px;background:var(--panel-hi)}
+.cockpit .ck-history-confirmed a{font-weight:700}
+.cockpit .ck-instrument{min-width:0}
+.cockpit .ck-facts dd{overflow-wrap:anywhere}
+.cockpit .ck-deposit-form input{min-height:44px}
+.cockpit .ck-deposit-form button{min-height:44px}
+@media(max-width:390px){
+  .cockpit .ck-top{align-items:flex-start}
+  .cockpit .ck-ledger-controls .ck-form-pair{width:100%}
+  .cockpit .ck-ledger-controls button{width:100%}
+  .cockpit .ck-section-head{align-items:flex-start}
+  .cockpit .ck-barline{align-items:flex-start;flex-direction:column;gap:3px}
+  .cockpit .ck-barline strong{overflow-wrap:anywhere}
+  .cockpit .ck-chart-panel .chart-controls{max-width:100%;overflow-x:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  .cockpit *, .cockpit *::before, .cockpit *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+
+/* Section F: one-screen enrolment and explicit Trading 212 preview. */
+.ck-setup-form{display:grid;gap:20px}
+.ck-setup-stage:not(:first-child){padding-top:18px;border-top:1px solid var(--stroke-soft)}
+.ck-setup-stage>h2{margin:0 0 9px}
+.ck-setup-stage>.ck-muted{margin:10px 0}
+.ck-setup-instruments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
+.ck-setup-instruments>div{padding:12px;border:1px solid var(--stroke-soft);border-radius:9px;background:var(--panel-hi);min-width:0}
+.ck-setup-instruments strong{display:block;font-size:.95rem}
+.ck-setup-instruments small{display:block;margin-top:7px;color:var(--muted);overflow-wrap:anywhere}
+.ck-setup-fresh-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-block:15px}
+.ck-evidence-note{border-left:3px solid var(--warning);padding:7px 11px;background:var(--panel-hi)}
+.ck-setup-form .ck-form-pair{max-width:100%}
+.ck-setup-form .ck-form-pair input,
+.ck-setup-form .form-field select,
+.ck-setup-form .form-field input{width:100%;min-height:42px;background:var(--panel-hi);color:var(--text);border:1px solid var(--stroke);border-radius:8px;padding:9px 11px}
+.ck-setup-form .ck-form-pair label{color:var(--text)}
+.ck-setup-form .errorlist{color:var(--danger);margin:6px 0;padding-left:20px}
+.ck-setup-form .ck-disclosure-inline{margin-top:14px}
+.ck-setup-form .ck-setup-submit{width:100%}
+.ck-import-form{display:grid;gap:13px;margin-top:15px}
+.ck-import-form label{display:block}
+.ck-import-form .field{min-height:43px;width:100%;max-width:100%;overflow-wrap:anywhere}
+.ck-import-form button{justify-self:start}
+.ck-import-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}
+.ck-import-counts>div{display:grid;gap:5px;padding:12px;border:1px solid var(--stroke-soft);border-radius:10px;min-width:0}
+.ck-import-counts strong{font-size:1.6rem;line-height:1;font-variant-numeric:tabular-nums}
+.ck-import-counts span{color:var(--muted);font-size:.83rem}
+.ck-import-table{min-width:690px}
+.ck-import-table th,.ck-import-table td{white-space:nowrap;font-variant-numeric:tabular-nums}
+.ck-import-confirm{border-color:var(--cyan)}
+.ck-import-confirm .ck-import-form button{max-width:100%;white-space:normal}
+@media(max-width:640px){
+  .ck-setup-instruments,.ck-setup-fresh-fields{grid-template-columns:1fr}
+  .ck-import-counts{gap:6px}
+  .ck-import-counts>div{padding:9px}
+  .ck-import-counts strong{font-size:1.3rem}
+  .ck-import-form button{width:100%;justify-self:stretch}
+}
+
+/* G: single actual broker fill; visually separate recorded from proposed. */
+.ck-single-fill{padding-block:18px;border-top:1px solid var(--stroke-soft)}
+.ck-single-fill:first-of-type{border-top:0}
+.ck-single-fill>.ck-section-head{margin-bottom:10px}
+.ck-single-fill>.ck-section-head h3{margin:0}
+.ck-single-fill-form{display:grid;gap:12px}
+.ck-single-fill-form .ck-setup-fresh-fields{margin:0}
+.ck-single-fill-form button{justify-self:start;max-width:100%}
+.ck-fill-history{padding-left:1.4rem;display:grid;gap:10px}
+.ck-fill-history li{line-height:1.5;overflow-wrap:anywhere}
+.ck-fill-history .ck-muted{display:inline-block;margin-left:6px}
+.ck-finalize-panel{border-color:var(--stroke)}
+.ck-finalize-panel p{margin-top:10px}
+@media(max-width:649px){
+  .ck-single-fill-form .ck-setup-fresh-fields{grid-template-columns:1fr}
+  .ck-single-fill-form button,.ck-finalize-panel button{width:100%}
+}
+
+/* Section H — compact accessible owner notification matrix. */
+.ck-route-table{width:100%;min-width:340px}
+.ck-route-table th:first-child{text-align:left;min-width:145px}
+.ck-route-table th:not(:first-child),.ck-route-table td{text-align:center}
+.ck-route-table input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:var(--cyan)}
+.ck-route-table label{display:inline-flex;align-items:center;justify-content:center;min-height:40px;min-width:44px}
+.ck-notify-masters{display:flex;flex-wrap:wrap;gap:14px 22px;padding-block:12px}
+.ck-notify-masters label,.ck-notify-monthly{display:inline-flex;align-items:center;gap:9px}
+.ck-notify-monthly{margin:13px 0}
+.ck-notify-masters input,.ck-notify-monthly input{accent-color:var(--cyan)}
+.ck-v2 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

@@ -104,7 +104,7 @@ class PaperTrialTests(TestCase):
         self.assertEqual(StrategyInstance.objects.filter(owner=self.other).count(), 0)
 
     @patch("tracker.paper.sync_ticker")
-    def test_hourly_quotes_extend_only_virtual_strategy_chart(self, sync):
+    def test_unverified_hourly_quotes_cannot_invent_virtual_strategy_snapshot(self, sync):
         from django.core.management import call_command
         from tracker.models import PriceMark, WealthSnapshot
         sync.side_effect = self.quote
@@ -119,8 +119,10 @@ class PaperTrialTests(TestCase):
                    return_value={"status": "waiting for first completed quarter"}):
             call_command("sync_market_and_signals", verbosity=0)
         rows = list(StrategyValueSnapshot.objects.filter(strategy=strategy))
-        self.assertEqual(len(rows), 2)
+        # A manually modified PriceMark is not a genuine market observation.
+        # The newer scheduler must NOT invent a second price-verified value.
+        self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].as_of, self.day)
-        self.assertEqual(rows[1].as_of, today)
-        self.assertGreater(rows[1].total_value, rows[0].total_value)
+        self.assertFalse(StrategyValueSnapshot.objects.filter(
+            strategy=strategy, as_of=today).exists())
         self.assertFalse(WealthSnapshot.objects.filter(owner=self.owner).exists())

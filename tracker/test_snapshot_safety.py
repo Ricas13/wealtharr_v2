@@ -7,7 +7,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from tracker.models import Account, LedgerEntry, PriceMark, StrategyInstance, StrategyPreset, WealthSnapshot
+from tracker.models import Account, LedgerEntry, MarketObservation, PriceMark, StrategyInstance, StrategyPreset, WealthSnapshot
 from tracker.services import validate_and_record
 
 
@@ -31,6 +31,12 @@ class SnapshotSafetyTests(TestCase):
             strategy=self.strategy, symbol="LQQ3.L", price=D("110"),
             as_of=self.quoted_day, source="manual")
 
+    def verify_yahoo_mark(self):
+        self.mark.source = 'yahoo'
+        self.mark.save(update_fields=['source'])
+        MarketObservation.objects.create(symbol=self.mark.symbol, as_of=self.quoted_day,
+            price=self.mark.price, currency='GBP')
+
     def run_scheduler(self):
         with patch("tracker.management.commands.sync_market_and_signals.review_strategy",
                    return_value={"status": "ok"}):
@@ -41,16 +47,14 @@ class SnapshotSafetyTests(TestCase):
         self.assertFalse(WealthSnapshot.objects.filter(owner=self.owner).exists())
 
     def test_yahoo_snapshot_records_quote_day_not_scheduler_day(self):
-        self.mark.source = "yahoo"
-        self.mark.save(update_fields=["source"])
+        self.verify_yahoo_mark()
         self.run_scheduler()
         snapshot = WealthSnapshot.objects.get(owner=self.owner)
         self.assertEqual(snapshot.as_of, self.quoted_day)
         self.assertEqual(snapshot.total_value, D("1040"))
 
     def test_newer_transaction_cannot_be_backvalued_with_old_price(self):
-        self.mark.source = "yahoo"
-        self.mark.save(update_fields=["source"])
+        self.verify_yahoo_mark()
         validate_and_record(self.strategy, LedgerEntry(
             kind="DEPOSIT", occurred_on=timezone.localdate(), amount=D("100")))
         self.run_scheduler()

@@ -5,10 +5,21 @@ from urllib.parse import urlparse, unquote
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.environ.get("DEBUG", "0") == "1"
-SECRET_KEY = os.environ.get("SECRET_KEY", "")
+def _read_secret_file(variable):
+    """Read the stable secret from a mounted, non-versioned file."""
+    path = os.environ.get(variable, "")
+    if not path:
+        return ""
+    raw = Path(path).read_text(encoding="utf-8").rstrip("\r\n")
+    if not raw:
+        raise RuntimeError("%s points to an empty file" % variable)
+    return raw
+
+
+SECRET_KEY = _read_secret_file("SECRET_KEY_FILE") or os.environ.get("SECRET_KEY", "")
 if not SECRET_KEY:
     if not DEBUG:
-        raise RuntimeError("SECRET_KEY is required when DEBUG=0")
+        raise RuntimeError("SECRET_KEY or SECRET_KEY_FILE is required when DEBUG=0")
     SECRET_KEY = "dev-only-not-for-production-do-not-deploy"
 ALLOWED_HOSTS = [s.strip() for s in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if s.strip()]
 CSRF_TRUSTED_ORIGINS = [s.strip() for s in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if s.strip()]
@@ -24,6 +35,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "tracker.totp_middleware.RequireOwnerTOTP",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -43,7 +55,20 @@ TEMPLATES = [{
 WSGI_APPLICATION = "wealtharr.wsgi.application"
 ASGI_APPLICATION = "wealtharr.asgi.application"
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
-if DATABASE_URL:
+DATABASE_PASSWORD = _read_secret_file("DATABASE_PASSWORD_FILE")
+if DATABASE_PASSWORD:
+    # File-backed DB credentials override an obsolete URL, so punctuation in
+    # random passwords cannot corrupt URL parsing. The file is never logged.
+    DATABASES = {"default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DATABASE_NAME", "wealtharr"),
+        "USER": os.environ.get("DATABASE_USER", "wealtharr"),
+        "PASSWORD": DATABASE_PASSWORD,
+        "HOST": os.environ.get("DATABASE_HOST", "db"),
+        "PORT": os.environ.get("DATABASE_PORT", "5432"),
+        "CONN_MAX_AGE": 60,
+    }}
+elif DATABASE_URL:
     u = urlparse(DATABASE_URL)
     if u.scheme not in ("postgres", "postgresql", "sqlite"):
         raise RuntimeError("Only PostgreSQL or SQLite database URLs are supported")
@@ -64,7 +89,7 @@ if DATABASE_URL:
 elif DEBUG:
     DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "dev.sqlite3"}}
 else:
-    raise RuntimeError("DATABASE_URL (PostgreSQL) is required when DEBUG=0")
+    raise RuntimeError("PostgreSQL DATABASE_PASSWORD_FILE or DATABASE_URL is required when DEBUG=0")
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -88,7 +113,7 @@ STORAGES = {"staticfiles": {"BACKEND": (
 )}}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/login/"
-LOGIN_REDIRECT_URL = "/app/"
+LOGIN_REDIRECT_URL = "/cockpit/"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -99,6 +124,10 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+SESSION_COOKIE_AGE = 60 * 60 * 12
+if not DEBUG and ("*" in ALLOWED_HOSTS or not ALLOWED_HOSTS):
+    raise RuntimeError("Production ALLOWED_HOSTS must enumerate the private hostname")
 X_FRAME_OPTIONS = "DENY"
 TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")

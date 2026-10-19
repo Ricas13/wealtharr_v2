@@ -57,6 +57,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .profile-button{display:grid;place-items:center;background:var(--panel-hi);border-color:var(--stroke);color:var(--text)}
 .ws-skip{position:fixed;z-index:100;top:-100px;left:12px;padding:12px;background:var(--panel);color:var(--text);border:2px solid var(--cyan);border-radius:var(--radius-sm)}
 .ws-skip:focus{top:8px}
+/* On phones, a focused skip link must not cover the navigation toggle.
+   Keep the keyboard link visibly reachable while pointer users can open nav. */
+@media(max-width:870px){.ws-skip:focus{left:76px;top:8px;max-width:calc(100vw - 84px)}}
+
 .ws-theme-toggle{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:8px 10px;border:1px solid var(--stroke);border-radius:var(--radius-sm);background:var(--panel);color:var(--text)}
 .ws-theme-toggle:hover{background:var(--panel-hi)}
 .ws-theme-label{font-size:.82rem}

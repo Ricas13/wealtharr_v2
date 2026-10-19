@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}Ledger{% endblock %}
+{% block content %}
+<div class="cockpit ck-v2">
+  <header class="ck-top">
+    <div><p class="ck-overline">{{ strategy.name }} · YOUR RECORDED TRANSACTIONS</p><h1>Ledger</h1>
+      <p class="ck-muted">Deposits and trades you actually recorded. No simulated fills.</p>
+    </div>
+    <a class="btn btn-subtle btn-sm" href="{% url 'cockpit_csv' %}">Import Trading 212 CSV</a>
+  </header>
+  <div class="ck-metrics ck-metrics-two">
+    <section class="panel ck-card">
+      <h2 class="ck-label">Available recorded cash</h2>
+      <p class="ck-number">£{{ report.cash|floatformat:'2g' }}</p>
+      <p class="ck-muted">Calculated from the append-only ledger, not a live broker balance</p>
+    </section>
+    <section class="panel ck-card">
+      <h2 class="ck-label">Net deposits less withdrawals</h2>
+      <p class="ck-number">£{{ report.net_contributed|floatformat:'2g' }}</p>
+      <p class="ck-muted">Buying an instrument is not a new contribution</p>
+    </section>
+  </div>
+  <details class="panel ck-card ck-disclosure">
+    <summary>Record an actual cash deposit</summary>
+    <div class="ck-details-body">
+      <p class="ck-muted">Enter only money that actually arrived in your Trading 212 ISA. This records a ledger event; Wealtharr never transfers funds.</p>
+      <form method="post" action="{% url 'cockpit_deposit' %}" class="ck-deposit-form">
+        {% csrf_token %}
+        <input type="hidden" name="return_to" value="ledger">
+        <div class="ck-form-pair"><label for="ledger-deposit-amount">Actual amount (£)</label>
+          <input id="ledger-deposit-amount" class="field" name="amount" type="number"
+                 inputmode="decimal" min="0.01" step="0.01" required></div>
+        <div class="ck-form-pair"><label for="ledger-deposit-date">Date money arrived</label>
+          <input id="ledger-deposit-date" class="field" name="occurred_on" type="date"
+                 value="{% now 'Y-m-d' %}" required></div>
+        <button class="btn btn-primary" type="submit">Record this deposit</button>
+      </form>
+      <p class="ck-muted">A planned monthly amount is not a deposit. Your ISA allowance may also depend on contributions outside this portfolio.</p>
+    </div>
+  </details>
+  <section class="panel ck-card" aria-labelledby="transactions-title">
+    <div class="ck-section-head"><h2 id="transactions-title">Transactions</h2><span class="ck-muted">Up to 200 on-screen; CSV exports all matching entries</span></div>
+    <form method="get" action="{% url 'cockpit_ledger' %}" class="ck-ledger-controls" aria-label="Filter and sort ledger entries">
+      <div class="ck-form-pair">
+        <label for="kind-filter">Event type</label>
+        <select id="kind-filter" name="kind" class="field">
+          <option value="">All events</option>
+          {% for kind_value, kind_label in kind_choices %}
+            <option value="{{ kind_value }}" {% if filter_kind == kind_value %}selected{% endif %}>{{ kind_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="ck-form-pair">
+        <label for="order-filter">Sort</label>
+        <select id="order-filter" name="order" class="field">
+          <option value="newest" {% if sort_order == 'newest' %}selected{% endif %}>Newest first</option>
+          <option value="oldest" {% if sort_order == 'oldest' %}selected{% endif %}>Oldest first</option>
+        </select>
+      </div>
+      <button class="btn" type="submit">Apply filters</button>
+      <button class="btn btn-subtle" type="submit" name="format" value="csv">Export matching CSV</button>
+    </form>
+    <div class="table-scroll"><table class="data-table ck-ledger-table">
+      <caption>Recorded movements, with cash effects in GBP. Trades include their actual fees.</caption>
+      <thead><tr><th>Date</th><th>Event</th><th>Instrument</th><th>Units</th><th>Price (£)</th><th>Cash change (£)</th><th>Fees (£)</th></tr></thead>
+      <tbody>
+      {% for entry in entries %}
+        <tr>
+          <td><time datetime="{{ entry.date|date:'Y-m-d' }}">{{ entry.date|date:'j M Y' }}</time></td>
+          <th scope="row">{{ entry.kind }}</th>
+          <td>{{ entry.symbol|default:'—' }}</td>
+          <td>{% if entry.quantity is not None %}{{ entry.quantity }}{% else %}—{% endif %}</td>
+          <td>{% if entry.unit_price is not None %}{{ entry.unit_price }}{% else %}—{% endif %}</td>
+          <td class="ck-tabular">{{ entry.cash_change|floatformat:'2g' }}</td>
+          <td>{% if entry.fee is not None %}{{ entry.fee|floatformat:'2g' }}{% else %}—{% endif %}</td>
+        </tr>
+        {% if entry.note %}<tr class="ck-ledger-note"><td colspan="7"><small>Entry #{{ entry.id }} · {{ entry.note }}</small></td></tr>{% endif %}
+      {% empty %}
+        <tr><td colspan="7">No actual transactions recorded yet. Import your account history or record a real deposit.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% if entry_limit_reached %}<p class="ck-muted">Showing the latest 200 transactions; older records remain stored.</p>{% endif %}
+    <p class="ck-muted">Cash change = recorded trade proceeds or costs after fees; this is not the instrument’s gain/loss. Records cannot be edited here.</p>
+  </section>
+  <a class="btn btn-subtle" href="{% url 'cockpit_today' %}">Back to Today</a>
+</div>
+{% endblock %}
