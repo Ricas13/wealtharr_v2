@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from django.utils import timezone
 from .forms import AccountForm, AutomationForm, IntegrationForm, LedgerForm, NotificationForm, PriceForm, StrategyForm, RealNineSigSetupForm
-from .models import Account, LedgerEntry, NotificationPreference, PriceMark, StrategyInstance, StrategyPreset, StrategySignal, SystemIntegration, WealthSnapshot
+from .models import Account, LedgerEntry, NotificationPreference, PriceMark, StrategyInstance, StrategyPreset, StrategySignal, SystemIntegration, WealthSnapshot, StrategyValueSnapshot
 from .services import consolidated, dispatch, ledger_summary, validate_and_record
 from .market_signals import review_strategy
 from .paper import create_paper_trial, PaperSetupUnavailable, PAPER_NAME
@@ -168,6 +168,18 @@ def dashboard(request):
         if (data["gain"] is not None and data["net_contributed"] > 0 and not withdrawals)
         else None
     )
+    # Tiny, source-grounded sparklines are drawn only from actual saved strategy
+    # valuations. No returns, prices or daily points are interpolated.
+    from .presentation import sparkline_path
+    strategy_ids = [item["strategy"].pk for item in data["items"]]
+    snapshots_by_strategy = {}
+    for point in StrategyValueSnapshot.objects.filter(
+        strategy_id__in=strategy_ids).order_by("as_of"):
+        snapshots_by_strategy.setdefault(point.strategy_id, []).append(
+            (point.as_of, point.total_value))
+    for item in data["items"]:
+        item["sparkline_path"] = sparkline_path(
+            snapshots_by_strategy.get(item["strategy"].pk, []))
     data.update(chart=chart, paper_trial=StrategyInstance.objects.filter(owner=request.user,
                 account__kind="PAPER", account__name=PAPER_NAME).first(),
                 accounts=Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies")),
