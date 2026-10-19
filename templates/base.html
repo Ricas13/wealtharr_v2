@@ -38,11 +38,11 @@
 <aside class="sidebar" id="sidebar" aria-label="Main navigation">
 <nav aria-label="Primary">
   <div class="menu-caption">MY INVESTMENTS</div>
-  <a href="{% url 'cockpit_today' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_today' %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='home' %}</span> Today</a>
-  <a href="{% url 'cockpit_history' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_history' %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='activity' %}</span> History</a>
-  <a href="{% url 'cockpit_ledger' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_ledger' %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='wallet' %}</span> Ledger</a>
-  <a href="{% url 'cockpit_strategy' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_strategy' %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='activity' %}</span> Strategy</a>
-  <a href="{% url 'cockpit_settings' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_settings' %}selected{% endif %}"><span class="nav-icon">{% include 'partials/icon.html' with name='settings' %}</span> Settings</a>
+  <a href="{% url 'cockpit_today' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_today' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_today' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='home' %}</span> Today</a>
+  <a href="{% url 'cockpit_history' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_history' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_history' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='activity' %}</span> History</a>
+  <a href="{% url 'cockpit_ledger' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_ledger' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_ledger' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='wallet' %}</span> Ledger</a>
+  <a href="{% url 'cockpit_strategy' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_strategy' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_strategy' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='activity' %}</span> Strategy</a>
+  <a href="{% url 'cockpit_settings' %}" class="nav-item {% if request.resolver_match.url_name == 'cockpit_settings' %}selected{% endif %}" {% if request.resolver_match.url_name == 'cockpit_settings' %}aria-current="page"{% endif %}><span class="nav-icon">{% include 'partials/icon.html' with name='settings' %}</span> Settings</a>
   {% if user.is_staff %}
     <details class="admin-nav"><summary class="nav-item"><span class="nav-icon">{% include 'partials/icon.html' with name='shield' %}</span> Advanced</summary>
       <a href="{% url 'control' %}" class="nav-item sub-nav">Admin control</a>
