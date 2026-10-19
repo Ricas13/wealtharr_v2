@@ -15,6 +15,7 @@ from .performance import (xirr, time_weighted_return, max_drawdown, simple_retur
 from .services import ledger_summary, validate_and_record
 from .cockpit_import import inspect_csv
 from .cockpit import _performance
+from .management.commands.sync_market_and_signals import save_verified_strategy_snapshot
 from .market_signals import quarter_end_before
 
 class PerformanceSafetyTests(TestCase):
@@ -116,6 +117,20 @@ class GuidedRebalanceTests(TestCase):
         MarketObservation.objects.update_or_create(symbol='ERNS.L', as_of=safe_mark.as_of,
             defaults={'currency': 'GBP', 'price': safe_mark.price})
         self.assertIsNone(_performance(self.strategy, ledger_summary(self.strategy))['xirr'])
+
+    def test_mismatched_market_dates_do_not_create_snapshot(self):
+        safe_mark = PriceMark.objects.get(strategy=self.strategy, symbol='ERNS.L')
+        safe_mark.as_of = self.mark_day - timedelta(days=1)
+        safe_mark.save(update_fields=['as_of'])
+        MarketObservation.objects.update_or_create(symbol='ERNS.L', as_of=safe_mark.as_of,
+            defaults={'currency': 'GBP', 'price': safe_mark.price})
+        self.assertIsNone(save_verified_strategy_snapshot(self.strategy))
+        self.assertEqual(self.strategy.value_snapshots.count(), 0)
+
+    def test_unverified_quote_currency_does_not_create_snapshot(self):
+        MarketObservation.objects.filter(symbol='ERNS.L', as_of=self.mark_day).update(currency='USD')
+        self.assertIsNone(save_verified_strategy_snapshot(self.strategy))
+        self.assertEqual(self.strategy.value_snapshots.count(), 0)
 
     def test_owner_isolation(self):
         stranger = get_user_model().objects.create_user('stranger', password='strong-password')
