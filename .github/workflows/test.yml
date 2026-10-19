@@ -81,13 +81,19 @@ jobs:
             -e POSTGRES_PASSWORD=ci-only-not-a-real-secret \
             -e POSTGRES_DB=ci_restore_source postgres:16-alpine >/dev/null
           trap 'docker rm -f wealtharr-ci-restore-source >/dev/null 2>&1 || true' EXIT
-          for attempt in $(seq 1 45); do
-            if docker exec wealtharr-ci-restore-source \
-              psql -U postgres -d ci_restore_source -Atqc 'SELECT 1' >/dev/null 2>&1; then
+          # Ignore the temporary bootstrap daemon, which cleanly shuts
+          # down before the persistent PostgreSQL server comes up.
+          initialized=0
+          for attempt in $(seq 1 60); do
+            if docker logs wealtharr-ci-restore-source 2>&1 | grep -q 'PostgreSQL init process complete' &&
+               docker exec wealtharr-ci-restore-source \
+                 psql -U postgres -d ci_restore_source -Atqc 'SELECT 1' >/dev/null 2>&1; then
+              initialized=1
               break
             fi
             sleep 1
           done
+          test "$initialized" = 1 || { echo 'Disposable PostgreSQL failed to start' >&2; exit 1; }
           docker exec wealtharr-ci-restore-source \
             psql -v ON_ERROR_STOP=1 -U postgres -d ci_restore_source \
             -c "CREATE TABLE django_migrations (id bigint primary key, app text not null, name text not null); INSERT INTO django_migrations VALUES (1, 'tracker', 'synthetic_ci');"
