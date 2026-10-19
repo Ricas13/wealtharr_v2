@@ -139,3 +139,61 @@ class OwnerContributionAndImportTests(TestCase):
                     self.assertFalse(entries)
                     self.assertTrue(errors)
                 self.assertEqual(self.strategy.ledger.count(), 0)
+
+
+
+class OneScreenOwnerEnrolmentTests(TestCase):
+    def setUp(self):
+        self.owner = get_user_model().objects.create_user(
+            username="section-f-enrol-owner", password="test-only-secret")
+        StrategyPreset.objects.get_or_create(
+            slug="nasdaq-quarterly-target",
+            defaults={"name": "9Sig", "risk": "HIGH",
+                      "summary": "", "active": True})
+        self.client.force_login(self.owner)
+        self.data = {
+            "position_mode": "FRESH",
+            "starting_cash": "18000.00",
+            "start_date": "2026-10-10",
+            "monthly_target": "500.00",
+            "destination": "NONE",
+        }
+
+    def test_reuses_empty_exact_isa_and_only_records_true_deposit(self):
+        before = Account.objects.create(
+            owner=self.owner, name="Trading 212 ISA", kind="ISA",
+            broker="TRADING212", country="GB")
+        response = self.client.post(reverse("cockpit_setup"), self.data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Account.objects.count(), 1)
+        strategy = StrategyInstance.objects.get(owner=self.owner)
+        self.assertEqual(strategy.account_id, before.pk)
+        self.assertEqual(strategy.mapping_version, enrolment_manifest()["mapping_version"])
+        self.assertEqual(strategy.resolved_instruments, enrolment_manifest())
+        self.assertEqual(strategy.ledger.filter(kind="DEPOSIT").count(), 1)
+        self.assertFalse(strategy.ledger.filter(kind="BUY").exists())
+        self.assertEqual(strategy.monthly_target, D("500"))
+        messages = [str(msg) for msg in response.wsgi_request._messages]
+        self.assertTrue(any("approaching" in text for text in messages))
+        self.client.post(reverse("cockpit_setup"), self.data)
+        self.assertEqual(strategy.ledger.count(), 1)
+
+    def test_existing_history_creates_no_opening_holdings_and_goes_to_preview(self):
+        data = {**self.data, "position_mode": "EXISTING",
+                "starting_cash": "", "start_date": ""}
+        response = self.client.post(reverse("cockpit_setup"), data)
+        self.assertRedirects(response, reverse("cockpit_csv"))
+        strategy = StrategyInstance.objects.get(owner=self.owner)
+        self.assertEqual(strategy.ledger.count(), 0)
+        self.assertFalse(strategy.prices.exists())
+
+    def test_mismatched_existing_account_blocks_without_partial_changes(self):
+        Account.objects.create(
+            owner=self.owner, name="Trading 212 ISA", kind="GIA",
+            broker="OTHER", country="GB")
+        response = self.client.post(reverse("cockpit_setup"), self.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already exists")
+        self.assertEqual(Account.objects.count(), 1)
+        self.assertFalse(StrategyInstance.objects.exists())
+        self.assertFalse(LedgerEntry.objects.exists())
