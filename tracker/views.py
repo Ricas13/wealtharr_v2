@@ -308,76 +308,19 @@ def refresh_market(request, pk):
 @login_required
 @require_POST
 def confirm_strategy_reset(request, pk):
-    """Start a new immutable 9Sig cycle only AFTER confirmed manual fill entries."""
-    from datetime import timedelta
-    from decimal import Decimal
-    strategy = get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset"),
-        pk=pk, owner=request.user)
-    reset_notice = strategy.signals.filter(
-        kind__in=("QUARTERLY", "SPIKE_WATCH"),
-        message__icontains="review a reset to 60%"
-    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of", "-pk").first()
-    if request.POST.get("confirm") != "RESET":
-        messages.error(request, "Confirmation required: no strategy baseline changed.")
-        return _return_to_strategy_tab(request, pk, "signals")
-    if not reset_notice or reset_notice.acknowledged_at is None:
-        messages.error(request, "Review and acknowledge the latest 60/40 reset notice first.")
-        return _return_to_strategy_tab(request, pk, "signals")
-    existing = strategy.baselines.filter(as_of__gt=reset_notice.as_of).exists()
-    if existing:
-        messages.error(request, "That reset has already been anchored.")
-        return _return_to_strategy_tab(request, pk, "signals")
-    latest_fill = strategy.ledger.filter(
-        kind__in=(LedgerEntry.BUY, LedgerEntry.SELL),
-        occurred_on__gt=reset_notice.as_of
-    ).order_by("-occurred_on", "-pk").first()
-    if latest_fill is None:
-        messages.error(request, "Record your actual post-reset trades before confirming the new baseline.")
-        return _return_to_strategy_tab(request, pk, "signals")
-    report = ledger_summary(strategy)
-    symbols = (strategy.equity_symbol, strategy.safe_symbol)
-    if any(symbol not in symbols for symbol in report["positions"]):
-        messages.error(request, "Remove unsupported positions from this strategy before re-anchoring.")
-        return _return_to_strategy_tab(request, pk, "signals")
-    marks = [report["marks"].get(symbol) for symbol in symbols]
-    today = timezone.localdate()
-    if any(mark is None or mark.source != "yahoo" or
-           mark.as_of < today - timedelta(days=8) for mark in marks):
-        messages.error(request, "Refresh both GBP Yahoo price marks before confirming the reset.")
-        return _return_to_strategy_tab(request, pk, "signals")
-    as_of = min(mark.as_of for mark in marks)
-    if ((max(mark.as_of for mark in marks) - as_of).days > 1 or
-            latest_fill.occurred_on > as_of or
-            as_of <= reset_notice.as_of):
-        messages.error(request, "The confirmed fills require a later, matching settlement quote.")
-        return _return_to_strategy_tab(request, pk, "signals")
-    equity_qty = report["positions"].get(strategy.equity_symbol, Decimal("0"))
-    safe_qty = report["positions"].get(strategy.safe_symbol, Decimal("0"))
-    equity_value = equity_qty * marks[0].price
-    safe_value = safe_qty * marks[1].price
-    total = equity_value + safe_value + report["cash"]
-    if (total <= 0 or equity_qty <= 0 or report["cash"] < 0 or
-            abs(equity_value / total - Decimal("0.60")) > Decimal("0.05")):
-        messages.error(request, "Actual recorded holdings are not near a 60/40 reset (within 5 percentage points).")
-        return _return_to_strategy_tab(request, pk, "signals")
-    try:
-        with transaction.atomic():
-            locked = StrategyInstance.objects.select_for_update().get(
-                pk=strategy.pk, owner=request.user)
-            if locked.baselines.filter(as_of__gt=reset_notice.as_of).exists():
-                raise ValidationError("This reset has already been anchored.")
-            locked.baselines.create(
-                reset_signal=reset_notice, as_of=as_of,
-                equity_value=equity_value.quantize(Decimal("0.01")),
-                equity_quantity=equity_qty,
-                safe_value=safe_value.quantize(Decimal("0.01")),
-                cash_value=report["cash"],
-            )
-    except (ValidationError, Exception):
-        messages.error(request, "The reset baseline could not be safely recorded.")
-        return _return_to_strategy_tab(request, pk, "signals")
-    messages.success(request, "New 9Sig cycle anchored to your actual recorded holdings; no trade was placed.")
+    """Retired: free-text reset acknowledgement is NEVER execution evidence.
+
+    Kept as a safe bookmark for legacy screens. The Section G owner-confirmed
+    guided workflow, with linked actual fills and verified later GBP closes, is
+    the only route that may create a new quarterly reset baseline.
+    Provisional SPIKE_WATCH notices remain warnings requiring independent
+    reference and execution confirmation, never a synthetic 60/40 baseline.
+    """
+    get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
+    messages.error(request,
+        "This old reset shortcut cannot anchor a strategy. Review the active "
+        "quarterly instruction and record actual fills separately. A verified "
+        "post-fill portfolio is required before any reset.")
     return _return_to_strategy_tab(request, pk, "signals")
 
 
