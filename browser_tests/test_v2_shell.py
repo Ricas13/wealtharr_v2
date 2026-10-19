@@ -114,7 +114,7 @@ class V2ShellBrowserTests(BrowserHarness):
                         "link", name="Instrument catalogue"
                     ).click()
                     self.page.get_by_role(
-                        "heading", name="Instrument catalogue"
+                        "heading", name="Instrument catalogue", level=1
                     ).wait_for()
                     self.assertEqual(menu.get_attribute("aria-expanded"), "false")
                     menu.click()
