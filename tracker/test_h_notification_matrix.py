@@ -110,6 +110,20 @@ class OwnerAlertMatrixTests(TestCase):
         self.assertContains(response, "Scheduler health")
         self.assertContains(response, "2")
 
+    def test_turning_off_urgent_email_suspends_its_pending_retry(self):
+        user = self.owner
+        self.pref.urgent_email = False
+        self.pref.save(update_fields=["urgent_email"])
+        NotificationDelivery.objects.create(
+            owner=user, channel="email", event_key="signal:my:spike",
+            subject="Unverified reference", message="Do not trade",
+            status="FAILED", attempts=1,
+            next_retry_at=timezone.now() - timedelta(minutes=10))
+        from tracker.notification_scheduler import retry_due_deliveries
+        with patch("tracker.notification_scheduler.dispatch") as sender:
+            self.assertEqual(retry_due_deliveries(), (0, 0))
+            sender.assert_not_called()
+
     def test_notification_settings_require_login(self):
         self.client.logout()
         self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 302)
