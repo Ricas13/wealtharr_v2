@@ -66,8 +66,14 @@ class OneScreenSetupForm(forms.Form):
         if mode == "EXISTING" and cash is not None:
             self.add_error("starting_cash",
                            "Existing holdings must come from actual complete account history; do not add a second opening deposit.")
+        if mode == "EXISTING" and when is not None:
+            self.add_error("start_date",
+                           "Do not supply an invented opening date. Import the original history instead.")
         if mode == "FRESH" and cash is not None and not when:
             self.add_error("start_date", "Enter the date this money actually arrived in Trading 212.")
+        if mode == "FRESH" and cash is None and when is not None:
+            self.add_error("starting_cash",
+                           "Enter an actual deposited amount or leave both opening-cash fields blank.")
         if cleaned.get("destination") == "EMAIL" and not cleaned.get("email"):
             self.add_error("email", "Enter an alert email address or configure alerts later.")
         return cleaned
