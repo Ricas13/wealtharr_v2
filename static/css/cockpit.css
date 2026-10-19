@@ -152,3 +152,42 @@
 @media(prefers-reduced-motion:reduce){
   .cockpit *, .cockpit *::before, .cockpit *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+/* Section F: one-screen enrolment and explicit Trading 212 preview. */
+.ck-setup-form{display:grid;gap:20px}
+.ck-setup-stage:not(:first-child){padding-top:18px;border-top:1px solid var(--stroke-soft)}
+.ck-setup-stage>h2{margin:0 0 9px}
+.ck-setup-stage>.ck-muted{margin:10px 0}
+.ck-setup-instruments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
+.ck-setup-instruments>div{padding:12px;border:1px solid var(--stroke-soft);border-radius:9px;background:var(--panel-hi);min-width:0}
+.ck-setup-instruments strong{display:block;font-size:.95rem}
+.ck-setup-instruments small{display:block;margin-top:7px;color:var(--muted);overflow-wrap:anywhere}
+.ck-setup-fresh-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-block:15px}
+.ck-evidence-note{border-left:3px solid var(--warning);padding:7px 11px;background:var(--panel-hi)}
+.ck-setup-form .ck-form-pair{max-width:100%}
+.ck-setup-form .ck-form-pair input,
+.ck-setup-form .form-field select,
+.ck-setup-form .form-field input{width:100%;min-height:42px;background:var(--panel-hi);color:var(--text);border:1px solid var(--stroke);border-radius:8px;padding:9px 11px}
+.ck-setup-form .ck-form-pair label{color:var(--text)}
+.ck-setup-form .errorlist{color:var(--danger);margin:6px 0;padding-left:20px}
+.ck-setup-form .ck-disclosure-inline{margin-top:14px}
+.ck-setup-form .ck-setup-submit{width:100%}
+.ck-import-form{display:grid;gap:13px;margin-top:15px}
+.ck-import-form label{display:block}
+.ck-import-form .field{min-height:43px;width:100%;max-width:100%;overflow-wrap:anywhere}
+.ck-import-form button{justify-self:start}
+.ck-import-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}
+.ck-import-counts>div{display:grid;gap:5px;padding:12px;border:1px solid var(--stroke-soft);border-radius:10px;min-width:0}
+.ck-import-counts strong{font-size:1.6rem;line-height:1;font-variant-numeric:tabular-nums}
+.ck-import-counts span{color:var(--muted);font-size:.83rem}
+.ck-import-table{min-width:690px}
+.ck-import-table th,.ck-import-table td{white-space:nowrap;font-variant-numeric:tabular-nums}
+.ck-import-confirm{border-color:var(--cyan)}
+.ck-import-confirm .ck-import-form button{max-width:100%;white-space:normal}
+@media(max-width:640px){
+  .ck-setup-instruments,.ck-setup-fresh-fields{grid-template-columns:1fr}
+  .ck-import-counts{gap:6px}
+  .ck-import-counts>div{padding:9px}
+  .ck-import-counts strong{font-size:1.3rem}
+  .ck-import-form button{width:100%;justify-self:stretch}
+}
