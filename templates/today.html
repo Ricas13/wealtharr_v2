@@ -76,6 +76,12 @@
           {% endfor %}
         </ol>
         <p class="ck-muted">This is a dated recommendation, not a broker quote or order. Confirm actual fills, prices and fees.</p>
+        {% if "Your reserve is now empty" in signal.message %}
+        <p role="alert"><strong>Your reserve is now empty. Review whether to reset to 60/40.</strong> This is advisory; you control any manual reset.</p>
+        {% endif %}
+        <details class="ck-details"><summary>Breakdown — rule applied and growth-reference drawdown</summary>
+          <p>{{ signal.message }}</p>
+        </details>
         {% endif %}
         <a class="btn btn-primary ck-primary" href="{% url 'cockpit_rebalance' signal.pk %}">Review and record what I did</a>
       {% else %}
@@ -84,7 +90,7 @@
       {% endif %}
       {% if comparison %}
         <details class="ck-details">
-          <summary>How the strategy target was calculated</summary>
+          <summary>Breakdown — how the strategy target was calculated</summary>
           <p class="ck-muted">Historical strategy-specific comparison at {{ comparison.as_of|date:'d M Y' }}, not today's holdings valuation.</p>
           <div class="ck-barline"><span>Quarter-end signal line</span><strong>£{{ comparison.line|floatformat:'2g' }}</strong></div>
           <progress max="100" value="{{ comparison.line_pct }}" aria-label="Signal line relative to larger comparison"></progress>
