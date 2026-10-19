@@ -169,7 +169,7 @@ class OwnerV2AuditRegression(SimpleTestCase):
                 audit = result.audit_row()
                 self.assertEqual(audit["growth_reference_drawdown_pct"], "50.00")
                 self.assertEqual(audit["growth_drawdown_disclosure"],
-                                 "Information only, doesn't affect the advice.")
+                                 "Information only, doesn't affect the advice")
                 self.assertEqual(audit["rule_applied"], "All-in reserve shortage")
                 self.assertEqual(audit["thirty_down_triggered"],
                                  str(spy_current == "60"))
