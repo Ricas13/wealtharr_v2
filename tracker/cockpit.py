@@ -483,10 +483,13 @@ def history(request):
     result = _performance(strategy, ledger_summary(strategy))
     records = list(strategy.signals.order_by('-as_of', '-pk')[:60])
     snapshots = list(strategy.value_snapshots.order_by('-as_of')[:100])
+    executed = dict(RebalanceExecution.objects.filter(
+        strategy=strategy, signal_id__in=[signal.pk for signal in records]
+    ).values_list('signal_id', 'executed_on'))
     return render(request, 'history_cockpit.html', {
         'strategy': strategy, 'performance': result,
         'metrics': visible_performance(result),
-        'signals': signal_display_rows(records),
+        'signals': signal_display_rows(records, executions=executed),
         'snapshots': snapshots,
     })
 
