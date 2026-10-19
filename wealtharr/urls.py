@@ -1,11 +1,13 @@
 from django.contrib import admin
 from django.urls import include, path
-from tracker import views
+from tracker import views, totp_views
 
 urlpatterns = [
     path("", views.home, name="home"),
     path("login/", views.sign_in, name="login"),
     path("logout/", views.sign_out, name="logout"),
+    path("security/authenticator/", totp_views.configure, name="totp_setup"),
+    path("security/verify/", totp_views.challenge, name="totp_challenge"),
     path("cockpit/", include("tracker.cockpit_urls")),
     path("app/", views.dashboard, name="dashboard"),
     path("app/accounts/", views.accounts, name="accounts"),
