@@ -106,7 +106,8 @@ def _last_action(strategy):
         return manual
     sig = strategy.signals.filter(kind='QUARTERLY', as_of=quarter).exclude(
              review_outcome__in=('FALSE_POSITIVE', 'NOT_APPLICABLE')).order_by('-pk').first()
-    if sig and any(a.get('side') in ('BUY', 'SELL') for a in sig.actions):
+    if sig and (any(a.get('side') in ('BUY', 'SELL') for a in sig.actions)
+                or 'Your reserve is now empty' in sig.message):
         if not RebalanceExecution.objects.filter(signal=sig).exists():
             return sig
     return None
