@@ -240,7 +240,8 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
         strategy=strategy, signal_key=key,
         defaults={"kind": "SPIKE_WATCH",
                   "title": "9Sig 100%-up spike: manual reset review",
-                  "message": message, "as_of": crossed.as_of, "actions": []})
+                  "message": message, "as_of": crossed.as_of, "actions": [],
+                  "strategy_version": NINE_SIG_RULE_VERSION})
     if created:
         route_notice(strategy.owner, "urgent",
                      "signal:%s:%s" % (strategy.pk, key),
@@ -255,6 +256,9 @@ def review_strategy(strategy):
         return {"status": "disabled"}
     if strategy.preset.slug != "nasdaq-quarterly-target":
         return {"status": "unsupported"}
+    # Never run v2 against an old pinned v1 owner portfolio implicitly.
+    if strategy.strategy_version and strategy.strategy_version != NINE_SIG_RULE_VERSION:
+        return {"status": "cannot_compute", "reason": "Pinned 9Sig rule version differs; owner review required"}
     if (not TICKER.fullmatch(strategy.equity_symbol) or
             not TICKER.fullmatch(strategy.safe_symbol)):
         return {"status": "invalid symbol"}
@@ -339,9 +343,10 @@ def review_strategy(strategy):
     safe_qty = positions.get(strategy.safe_symbol, ZERO)
     if stock_qty <= ZERO or safe_qty < ZERO or cash < ZERO:
         return {"status": "historical holdings cannot support an advisory review"}
+    # Full observed TQQQ history is informational for the running-high
+    # drawdown; the trade rules still use only completed-quarter references.
     ref_tqqq = list(MarketObservation.objects.filter(
         symbol="TQQQ", as_of__lte=quarter_end,
-        as_of__gte=start_date - timedelta(days=100),
     ).order_by("as_of").values_list("as_of", "price"))
     ref_spy = list(MarketObservation.objects.filter(
         symbol="SPY", as_of__lte=quarter_end,
