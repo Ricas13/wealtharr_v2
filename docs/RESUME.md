@@ -7,7 +7,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ## IMPORTANT: LETTERED PRODUCT REDESIGN — resume checkpoint 2026-10-19
 
-**Current milestone: Sections A, B and C have been implemented as scoped branch deliverables. The next section is D only when the owner says “next”.** Existing cockpit runtime still uses the relocated v1 financial primitives; the new typed evaluation and independent reference-provider interface are available for later orchestration without connecting to any broker.
+**Current milestone: Sections A–D implemented as scoped branch deliverables. The next section is E only when the owner says “next”.** Section D added universal, pure flow-aware metrics and wired the verified-inception money-weighted summary into the existing owner cockpit. Flow-boundary TWR remains unavailable for periods whose genuine pre/post external-flow valuations were not recorded; no historical values have been synthesized.
 
 - **Same active branch:** `feature/owner-9sig-cockpit-resumable` (PR **#11**). No competing branch, no restart. Before edits, fetch current PR HEAD and check concurrent commits.
 - **Section B artefacts:** `docs/instrument-research.md`, `tracker/instrument_mapping.py` (immutable `CURATED_ISA_ROLE_MAP`, `MAPPING_VERSION=2026-10-19.1`, reviewed issuer/Invest evidence with explicit pending owner ISA permission and Yahoo feed flags), `tracker/test_instrument_catalogue.py`, updated `CLAUDE.md`, `docs/architecture.md` and superseded old broker-API proposal.
@@ -20,7 +20,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ### Paste this in a NEW ChatGPT chat to resume
 
-> Continue Wealtharr v2 on PR #11, same branch `feature/owner-9sig-cockpit-resumable`. Read `docs/RESUME.md` and Section C implementation. Sections A (architecture), B (fixed issuer evidence-aware UK ISA mappings), C (pure pinned 9Sig v1 evaluator, audit, owner parity placeholders and independent USD reference fallback) are implemented. Do ONLY **Section D**: strategy-independent audited metrics and exact flow-boundary valuation semantics. Do not revisit or harden the old cockpit, and do not re-check prior safety work. The owner-only inputs are already itemized once in `docs/OWNER_TODO.md` and do not block Section D. Commit to this same branch; update this handoff once at the end; stop and await “next”.
+> Continue Wealtharr v2 on **PR #11**, branch `feature/owner-9sig-cockpit-resumable`. **Read `docs/RESUME.md` first**, then `docs/architecture.md` and the existing code. Sections A (architecture), B (instrument catalogue), C (version-pinned 9Sig evaluation) and **D (strategy-independent, audited GBP metrics and flow-boundary unitisation)** are committed. Implement **ONLY Section E**: strategy-independent, simple Today / History / Ledger / Strategy information views with clear unavailable metric explanations, preserving the manual owner-confirmed trade workflow and current data semantics. Keep Django templates/vanilla JS. Do not revisit old cockpit safeguards or make up missing quotes/broker operations. Owner evidence requests live once in `docs/OWNER_TODO.md` and are not development blockers. Commit only to the **existing branch and PR**, update this handoff once at the end, then stop until “next”.
 ## Objective
 
 Make Wealtharr a strategy-agnostic **tracking and notification** platform for a private owner, with fixed 9Sig as its first (and only currently implemented) strategy. Today shows performance and one next action; the owner manually makes and confirms any broker trades. The product never places orders, never connects to brokers (including read-only APIs), and never invents prices, trades or backtests. Preserve the append-only ledger, immutable confirmed reset baselines and financial refusal rules throughout the refactor.
@@ -30,14 +30,14 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [x] **Section A architecture/documentation only:** committed `docs/architecture.md` and root `CLAUDE.md` to this existing branch. These describe a *target*, not running refactored code; current PR #11 cockpit and its tests are still in place.
 - [x] **B** research issuer identities and issuer-reported ISA status, Trading 212 *Invest* listings, explicit unverified actual Stocks ISA access, alternatives and frozen evidence-aware mapping; see `docs/instrument-research.md`. Account permission and Yahoo live metadata remain unverified.
 - [x] **C** pure pinned `tracker/strategies/nine_sig/v1.py` engine (v1.0.0), immutable inputs/results and audit trace, irregular dated cashflows, 30 Down/100%-up warning, quote refusal; independent, USD-reference-only Stooq fallback in `tracker/core/prices.py`, plus synthetic unit coverage and deliberately empty six-quarter owner parity fixtures.
-- [ ] **D** audited universal metrics with exact flow-boundary tests.
+- [x] **D** pure `tracker/core/metrics.py` v1 universal portfolio returns, verified GBP endpoints, signed irregular external flows, pre/post cash-flow unitisation, exact-period cash gain and XIRR, time-weighted return, annualisation, sampled unit NAV drawdown, role drift and CSV-ready metric audit; Django owner cockpit money-weighted adapter and focused tests.
 - [ ] **E** strategy-independent Today / History / Ledger / Strategy info presentation.
 - [ ] **F** one-screen onboarding, contributions and conservative T212 import.
 - [ ] **G** safe single-transaction owner-confirmed fills and actual-baseline handling.
 - [ ] **H** owner destination/alert matrix, idempotent digest, scheduler diagnostics.
 - [ ] **I** secure Traefik deployment, optional TOTP, backups/restore.
 - [ ] **J** CI/Playwright and incremental ship plan.
-- **Instruction:** user wants **one lettered section per turn**. Stop after C now; proceed with D **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
+- **Instruction:** user wants **one lettered section per turn**. Stop after D now; proceed with E **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
 - **Architecture decision:** no broker/API integration of any kind, no editable preset/ticker/rule UI, no paper account, no billing or public signup. Fixed code-defined strategy versions; role-based evidence-backed exact lines pinned at enrolment. See `docs/architecture.md` and `CLAUDE.md`.
 - **Outstanding verification remains outstanding:** workbook parity, ISA/broker eligibility, real CSV, CI/migrations/browser checks, and deployment. Section A did not test or deploy runtime changes.
 
@@ -70,6 +70,17 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 5. The TQQQ 100%-up comparison is a provisional calendar-close warning, **not** the owner's executed rebalance reference; never issue GBP trade orders from it.
 
 **Next scope:** Section **D only** when the owner says "next"; retain this C evidence and do not redo it. Refresh live PR HEAD before editing because another continuation may add changes on the same branch.
+
+## Section D delivery — 2026-10-19
+
+- [x] Implemented pure `tracker/core/metrics.py` (`METRICS_VERSION=universal.metrics.v1.0.0`): immutable verified GBP valuation points with opaque observation IDs, signed dated `ExternalFlow`, ordered `FlowBoundary`, and `PortfolioPeriod` contract. Nothing in this module depends on 9Sig rules, Django ORM, market-data providers, or broker access.
+- [x] Money-weighted end-to-end metrics from real external cashflows: net funded, cash gain in GBP, XIRR; a single-deposit simple cumulative return is distinguished from repeated irregular deposits/withdrawals. The app no longer presents a compounded-XIRR proxy as “cumulative return” after irregular funding.
+- [x] Exact linked unit NAV from matched pre/post-flow valuations; funding mints/redeems units at the **same verified price**, not investment return. Includes audit trail of values, observation IDs, NAV, issued/outstanding units, status, reason codes, string-serializable rows, sampled flow-adjusted drawdown, period TWR/annualisation and generic allocation percentage-point drift. Ambiguous same-day marks, mismatched prices/units/flow amounts, and absent boundaries never produce an “exact” TWR.
+- [x] Django `tracker/cockpit.py::_performance` delegates qualified inception returns to the new generic core using strategy-scoped deposited/withdrawn ledger rows and source-verified **same-day GBP holdings values**. Existing snapshot-only TWR still requires **zero external flows in its snapshot period**, and its audit distinguishes XIRR/that shorter snapshot period.
+- [x] Focused arithmetic and negative tests: `tracker/test_core_metrics.py` (deposit/withdrawals/multiple same-day flows, price/source equality, missing boundaries, unitised drawdown, audited units, internal fees, drift, partial/refusal, inception) and `tracker/test_metric_adapter.py` (Django owner isolation, irregular deposits, valuation holds). No new database schema or migrations.
+- [ ] Exact portfolio TWR across real owner contributions is **not retroactively computable** from legacy date-only `StrategyValueSnapshot` totals: they do not contain verified pre/post external-flow values. The **calculation engine is ready**; future workflows can supply evidenced boundaries rather than hallucinating them.
+- **CI evidence:** PR #11 head run #397 was *in progress* at the single status observation during Section D. No CI success is claimed and this is not a build blocker.
+- [ ] Next section: **E**, strategy-agnostic Today / History / Ledger / Strategy-information presentation only.
 
 ## State / checkpoints
 
@@ -108,10 +119,10 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## First commands in a NEW CHAT
 
-1. Continue **PR #11** on `feature/owner-9sig-cockpit-resumable`; inspect current files to avoid overwriting concurrent work.
-2. Read this handoff and `docs/architecture.md`; Section C files: `tracker/strategies/nine_sig/v1.py`, `tracker/core/prices.py`, `tracker/test_nine_sig_v1.py` and the workbook fixture directory.
-3. Implement **Section D only**. Use `docs/OWNER_TODO.md` for owner evidence without restating or blocking on it.
-4. Leave one current-branch PR and update the handoff at the end; never claim queued checks passed.
+1. Read this handoff, `docs/architecture.md`, `tracker/core/metrics.py`, `tracker/cockpit.py` and current templates; preserve commits in PR #11.
+2. Implement **Section E only**, keeping the Today experience shorter and clearer than the 9Sig spreadsheet and showing unavailable metrics honestly.
+3. Keep real owner-only evidence requests in `docs/OWNER_TODO.md`, without restating the checklist or blocking development.
+4. Commit changes to the same branch, update this document once, then stop and await "next".
 
 ## Critical financial semantics
 
@@ -124,4 +135,4 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## User prompt for a new chat
 
-**Use the precise Section D-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
+**Use the Section E-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
