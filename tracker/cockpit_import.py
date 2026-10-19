@@ -159,8 +159,14 @@ def inspect_csv(upload, strategy):
         text = upload.read().decode('utf-8-sig')
     except UnicodeDecodeError as e:
         raise ValueError('Use a Trading 212 UTF-8 CSV export') from e
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames or not {'Action', 'Time'}.issubset(reader.fieldnames):
+    if "\x00" in text:
+        raise ValueError('Invalid CSV content: embedded null characters')
+    reader = csv.DictReader(io.StringIO(text, newline=''))
+    fields = reader.fieldnames or ()
+    if (not fields or any(not name or not isinstance(name, str) for name in fields)
+            or len(set(fields)) != len(fields)):
+        raise ValueError('Missing or duplicate CSV column headers; export the original Trading 212 history')
+    if not {'Action', 'Time'}.issubset(fields):
         raise ValueError('Missing Action/Time headers; choose Trading 212 history export')
     entries, errors, duplicates, seen = [], [], [], set()
     imported_rows = list(BrokerImportRow.objects.filter(strategy=strategy).select_related('ledger_entry'))
@@ -170,6 +176,9 @@ def inspect_csv(upload, strategy):
                  and item.ledger_entry.note != 'Trading 212 CSV ID '}
     batch_ids = {}
     for line, row in enumerate(reader, start=2):
+        if None in row:
+            errors.append((line, 'More CSV values than column headers; check the original export'))
+            continue
         if line > 15002:
             errors.append((line, 'Maximum 15,000 rows per import'))
             break
@@ -238,6 +247,7 @@ def csv_import(request):
                     preview=entries[:100], total=len(entries), errors=errors[:100],
                     error_total=len(errors), duplicate_total=len(duplicates),
                     preview_truncated=len(entries) > 100,
+                    duplicate_lines=duplicates[:30],
                     reviewed_file_name=uploaded.name.rsplit('/', 1)[-1][:120],
                 )
                 if not applying:
