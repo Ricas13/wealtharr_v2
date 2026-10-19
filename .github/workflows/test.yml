@@ -37,12 +37,16 @@ jobs:
           import django
           django.setup()
           from django.test import Client, override_settings
+          from django.core.management import call_command
           with override_settings(
               DEBUG=False,
               STORAGES={"staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}},
               ALLOWED_HOSTS=["wealtharr.vpn4u.cc"],
               CSRF_TRUSTED_ORIGINS=["https://wealtharr.vpn4u.cc"],
           ):
+              # CI collected development static earlier; build a real
+              # production hashed manifest before testing production URLs.
+              call_command("collectstatic", interactive=False, clear=True, verbosity=0)
               client = Client(raise_request_exception=True)
               for path in ("/", "/login/"):
                   response = client.get(path, secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
