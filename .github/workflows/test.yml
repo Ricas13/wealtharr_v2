@@ -55,6 +55,7 @@ jobs:
           set -eu
           bash -n wealtharr.sh
           bash wealtharr.sh --help
+          bash scripts/test_portable_cli.sh
           bash -n scripts/restore_backup.sh
           bash -n scripts/verify_backup.sh
           cp .env.example .env.production
