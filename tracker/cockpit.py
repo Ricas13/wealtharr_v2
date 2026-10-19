@@ -289,6 +289,15 @@ def guided_rebalance(request, signal_id):
                             if item['symbol'] == locked.equity_symbol:
                                 expected_qty += D(item['quantity']) * (ONE if item['side'] == 'BUY' else -ONE)
                         target = expected_qty*eq_mark.price
+                        expected_safe_qty = before['positions'].get(locked.safe_symbol, ZERO)
+                        for item in actions:
+                            if item['symbol'] == locked.safe_symbol:
+                                expected_safe_qty += D(item['quantity']) * (
+                                    ONE if item['side'] == 'BUY' else -ONE)
+                        actual_safe_value = after['positions'].get(locked.safe_symbol, ZERO)*safe_mark.price
+                        expected_safe_value = expected_safe_qty*safe_mark.price
+                        if abs(actual_safe_value-expected_safe_value)/after['value'] > D('0.05'):
+                            raise ValidationError('Safe-asset fills differ by over 5 portfolio percentage points from the proposed instructions.')
                     if abs(actual_equity-target)/after['value'] > D('0.05'):
                         raise ValidationError('Equity differs by over 5 percentage points from the proposed target.')
                     if after['cash'] < ZERO or any(s not in (locked.equity_symbol, locked.safe_symbol)
