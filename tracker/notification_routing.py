@@ -40,7 +40,15 @@ def route_notice(owner, category, event_key, subject, message, *, sender=None):
     previous = set(NotificationDelivery.objects.filter(
         owner=owner, event_key=event_key, channel__in=channels, status="SENT"
     ).values_list("channel", flat=True))
-    outcomes = (sender or dispatch)(owner, event_key, subject, message, channels=channels)
+    # The production transport persists the category for future opt-out-safe
+    # retries. Explicit injected senders remain compatible with existing tests.
+    transport = sender or dispatch
+    if transport is dispatch:
+        outcomes = transport(owner, event_key, subject, message,
+                             channels=channels, category=category)
+    else:
+        outcomes = transport(owner, event_key, subject, message,
+                             channels=channels)
     return {channel: ("already_sent" if channel in previous and status == "sent"
                       else status) for channel, status in outcomes.items()}
 
