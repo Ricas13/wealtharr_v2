@@ -136,6 +136,20 @@ class NotificationPreference(models.Model):
     def __str__(self):
         return "Notifications"
 
+class OwnerTOTP(models.Model):
+    """Optional per-account authenticator factor; encrypted secret, no recovery bypass."""
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                 related_name="totp_settings")
+    secret_ciphertext = models.TextField()
+    enabled_at = models.DateTimeField()
+    last_verified_step = models.BigIntegerField(default=-1)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return "Authenticator enabled"
+
+
 class SystemIntegration(models.Model):
     # Only one row (pk=1). Secrets stored encrypted at rest.
     smtp_host = models.CharField(max_length=255, blank=True)
