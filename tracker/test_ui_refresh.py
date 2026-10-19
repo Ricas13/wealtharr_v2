@@ -125,6 +125,20 @@ class PersonalPortalRedesignTests(TestCase):
         self.assertContains(bad, "Select one of the two 9Sig instruments")
         self.assertFalse(self.strategy.ledger.filter(kind=LedgerEntry.BUY).exists())
 
+    def test_false_spike_signal_does_not_offer_reset_confirmation(self):
+        from django.utils import timezone
+        StrategySignal.objects.create(
+            strategy=self.strategy, signal_key="spike:wrong",
+            kind="SPIKE_WATCH", as_of=date(2026, 9, 30),
+            title="Reference price was incorrect",
+            message="Review a reset to 60% equity / 40% safe",
+            actions=[], acknowledged_at=timezone.now(),
+            review_outcome="FALSE_POSITIVE")
+        page = self.client.get(self.url("signals"))
+        self.assertContains(page, "Reference price was incorrect")
+        self.assertNotContains(
+            page, "Confirm executed reset and start next 9Sig cycle")
+
     def test_real_and_paper_money_never_mixed(self):
         paper = Account.objects.create(
             owner=self.owner, name="virtual", kind="PAPER")
