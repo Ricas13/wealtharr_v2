@@ -1,6 +1,6 @@
 # CLAUDE.md — Wealtharr v2 engineering rules
 
-Read `docs/architecture.md`, `docs/RESUME.md`, `docs/FINANCIAL_QA.md` and `docs/9sig-methodology.md` before editing. **The architecture document is a target (Section A), not proof the refactor was implemented.**
+Read `docs/architecture.md`, `docs/instrument-research.md`, `docs/RESUME.md`, `docs/FINANCIAL_QA.md` and `docs/9sig-methodology.md` before editing. **The architecture document is a target (Section A), not proof the refactor was implemented.**
 
 ## Mission
 
@@ -22,7 +22,7 @@ Wealtharr is a private **tracking and notification** application. No broker conn
 ## Working workflow
 
 - Continue the **existing** `feature/owner-9sig-cockpit-resumable` branch and PR #11 unless user explicitly changes it; no parallel replacement branch. Read `docs/RESUME.md` for current checkpoints and update it on implementation progress.
-- Follow the user's lettered sections in order and **stop after the requested section**. Section A is design/docs; do not silently implement sections B–J.
+- Follow the user's lettered sections in order and **stop after the requested section**. A is design/docs; B added the verified-issuer / pending-ISA-access code catalogue, not the full new architecture. Read `docs/RESUME.md` for the current section and do not silently implement later sections.
 - For each change: add tests (pure unit/parity, Django financial invariants, owner permissions; Playwright for critical page flows), run CI, and preserve old safety behaviour until replacements are proven. Refuse to label workbook parity, mapping verification, broker eligibility or deployment complete without evidence.
 - Git history is disposable as far as **unreleased test data/migrations** are concerned, not financial-safety invariants. Never wipe a live database without explicit separate authorisation and backup.
 - Before moving to a next section, describe misinterpretation risks, unverifiable assumptions and what to compare side-by-side with the spreadsheet.
