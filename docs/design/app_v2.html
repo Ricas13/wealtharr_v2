@@ -1,0 +1,1062 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wealtharr · prototype v2</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+:root{--bg:#0c0e12;--bar:#0f1216;--side:#0f1216;--panel:#14171c;--panel-hi:#191d23;--stroke:#262b33;--stroke-soft:#1f242b;--text:#e6e8eb;--muted:#8a929d;--subtle:#6f7782;--cyan:#9aa8bd;--teal:#6ea8fe;--pos:#3ddc97;--neg:#f37d82;--warn:#f1bd6b;--radius:14px;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:400 1rem/1.5 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+h1,h2,h3,p{margin:0}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.muted{color:var(--muted)}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 20px;height:58px;background:var(--bar);border-bottom:1px solid var(--stroke-soft);position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:10px;font-weight:760;letter-spacing:-.02em;color:var(--cyan);font-size:1.25rem}
+.brand i{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:#1b2330;font-style:normal;font-size:1rem}
+.switch{display:flex;gap:6px;align-items:center;font-size:.8rem;color:var(--subtle)}
+.switch a{padding:4px 10px;border:1px solid var(--stroke);border-radius:999px;color:var(--muted)}
+.switch a.on{background:var(--cyan);border-color:var(--cyan);color:#06121f;font-weight:700}
+.tag{font-size:.72rem;letter-spacing:.1em;font-weight:760;color:var(--cyan)}
+.panel{background:var(--panel);border:1px solid var(--stroke);border-radius:var(--radius)}
+.pad{padding:20px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 18px;border:1px solid #2e343d;border-radius:9px;background:#1b1f26;color:var(--text);font:600 .95rem inherit;font-family:inherit;cursor:pointer;transition:background .15s,transform .15s}
+.btn:hover{background:#232830}
+.btn.primary{background:linear-gradient(135deg,#2aa7e0,#6ea8fe);color:#04151f;border-color:transparent;font-weight:720}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:650;border:1px solid var(--stroke);color:var(--muted)}
+.pill.ok{color:var(--pos);border-color:#215a47;background:#10261f}
+.pill.warn{color:var(--warn);border-color:#5a4a22;background:#271f0f}
+.pill.act{color:#06121f;background:var(--warn);border-color:var(--warn)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.lbl{font-size:.78rem;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase;font-weight:650}
+.big{font-size:2.3rem;font-weight:760;letter-spacing:-.03em;line-height:1.1}
+.ranges{display:inline-flex;gap:4px;background:#0f1216;border:1px solid var(--stroke-soft);border-radius:9px;padding:3px}
+.ranges button{background:none;border:0;color:var(--muted);font:600 .8rem inherit;font-family:inherit;padding:5px 11px;border-radius:6px;cursor:pointer}
+.ranges button.on{background:#262b33;color:var(--text)}
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .tip{position:absolute;pointer-events:none;background:#0f1216;border:1px solid var(--stroke);border-radius:8px;padding:8px 10px;font-size:.8rem;white-space:nowrap;transform:translate(-50%,-110%);display:none;z-index:5}
+.legend{display:flex;gap:16px;font-size:.8rem;color:var(--muted)}
+.legend b{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.bar{height:10px;border-radius:6px;background:#0f1216;position:relative;overflow:hidden;border:1px solid var(--stroke-soft)}
+.bar span{position:absolute;top:0;bottom:0;left:0;border-radius:6px}
+.bar em{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;opacity:.85}
+details.calc{border:1px solid var(--stroke);border-radius:10px;padding:10px 14px;background:#101318}
+details.calc summary{cursor:pointer;color:var(--cyan);font-weight:600;font-size:.9rem}
+details.calc table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.88rem}
+details.calc td{padding:6px 0;border-bottom:1px solid var(--stroke-soft);color:var(--muted)}
+details.calc td:last-child{text-align:right;color:var(--text)}
+.trade{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;background:#101318;border:1px solid var(--stroke-soft)}
+.trade .side{font-weight:760;font-size:.8rem;letter-spacing:.08em;padding:4px 9px;border-radius:6px}
+.trade .side.sell{background:#3a1d24;color:var(--neg)}.trade .side.buy{background:#10302a;color:var(--pos)}
+.trade .amt{margin-left:auto;text-align:right;font-weight:720}
+.trade small{display:block;color:var(--muted);font-weight:400}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke-soft)}
+.kv:last-child{border-bottom:0}
+.kv span:first-child{color:var(--muted)}
+.kv b{font-weight:680}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:720px){.topbar{padding:0 12px}.switch span{display:none}.big{font-size:1.9rem}}
+.action{border-color:#5a4a22;background:linear-gradient(180deg,#14171c,#14171c)}
+.topbar .chosen{font-size:.8rem;color:var(--subtle)}
+.shell{display:flex;min-height:calc(100vh - 58px)}
+.rail{width:212px;flex:0 0 212px;background:var(--side);border-right:1px solid var(--stroke-soft);padding:18px 12px;position:sticky;top:58px;height:calc(100vh - 58px)}
+.rail a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:var(--muted);font-weight:600;margin-bottom:2px}
+.rail a.on{background:#1d2229;color:#e8f4ff;box-shadow:inset 2px 0 var(--cyan)}
+.rail .sec{font-size:.7rem;letter-spacing:.12em;color:var(--subtle);margin:16px 12px 6px;font-weight:700}
+.content{flex:1;min-width:0;padding:22px 22px 0;max-width:1240px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start}
+.col{display:grid;gap:16px;min-width:0;grid-template-columns:minmax(0,1fr)}
+.sp{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.mini{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0 16px}
+.steps{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
+.steps li{display:flex;gap:12px;align-items:center;padding:9px 12px;border:1px solid var(--stroke-soft);border-radius:10px;background:#101318;font-size:.9rem}
+.steps li i{font-style:normal;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#232a35;color:var(--cyan);font-size:.74rem;font-weight:760;flex:0 0 22px}
+.steps li.done i{background:#10302a;color:var(--pos)}
+.tl{list-style:none;margin:14px 0 0;padding:0 0 0 18px;border-left:2px solid var(--stroke)}
+.tl li{position:relative;padding:0 0 16px 18px}
+.tl li::before{content:"";position:absolute;left:-26px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--subtle)}
+.tl li.done::before{background:var(--pos);border-color:var(--pos)}
+.tl li.now::before{background:var(--warn);border-color:var(--warn);box-shadow:0 0 0 4px #3b3217}
+.tl li.next::before{border-style:dashed;border-color:var(--cyan)}
+.tl li.future::before{border-style:dashed}
+.tl b{display:block}.tl small{color:var(--muted)}
+.tl li.old{display:none}.tl.all li.old{display:block}
+.tl a.more{font-size:.85rem;font-weight:600}
+.chg{font-size:.9rem;margin-top:2px}
+.ranges.wide{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.ranges.wide::-webkit-scrollbar{display:none}
+.ranges.wide button{white-space:nowrap}
+.ranges button .sub{display:none}
+.cap{font-size:.78rem;color:var(--subtle);margin-top:10px;line-height:1.45}
+.head-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+@media (max-width:1100px){.two{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){.mini{grid-template-columns:1fr 1fr}}
+@media (max-width:720px){.chosen{display:none}}
+
+.view{display:none}.view.on{display:block}
+h1.pt{font-size:1.6rem;letter-spacing:-.02em}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stack{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}.grid3,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tbl-wrap{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:.9rem}
+table.tbl th{text-align:left;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--subtle);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--stroke);white-space:nowrap;position:sticky;top:0;background:var(--panel)}
+table.tbl th.sortable{cursor:pointer}table.tbl th.sortable:hover{color:var(--text)}
+table.tbl td{padding:10px;border-bottom:1px solid var(--stroke-soft);vertical-align:middle;white-space:nowrap}
+table.tbl td.note{white-space:normal;color:var(--muted);min-width:120px}
+table.tbl td.r,table.tbl th.r{text-align:right}
+table.tbl tr.del td{opacity:.45;text-decoration:line-through}
+table.tbl tr.del td.acts{text-decoration:none;opacity:1}
+table.tbl tbody tr:hover{background:#171b21}
+.typ{display:inline-block;padding:2px 9px;border-radius:6px;font-size:.74rem;font-weight:760;letter-spacing:.05em}
+.typ.Buy{background:#10302a;color:var(--pos)}.typ.Sell{background:#3a1d24;color:var(--neg)}
+.typ.Deposit{background:#0f2a3c;color:var(--cyan)}.typ.Withdrawal{background:#33280f;color:var(--warn)}
+.typ.Dividend{background:#17302d;color:var(--teal)}.typ.Fee{background:#262c3a;color:var(--muted)}
+.src{font-size:.74rem;color:var(--subtle);border:1px solid var(--stroke);border-radius:999px;padding:1px 8px}
+.src.g{color:var(--cyan);border-color:#1e4f6a}
+.ibtn{background:none;border:1px solid transparent;color:var(--muted);cursor:pointer;border-radius:7px;padding:5px 8px;font:inherit;font-size:.85rem}
+.ibtn:hover{background:#1b1f26;border-color:var(--stroke);color:var(--text)}
+.ibtn.d:hover{color:var(--neg)}
+.seg{display:inline-flex;gap:4px;background:#0f1216;border:1px solid var(--stroke-soft);border-radius:10px;padding:3px;flex-wrap:wrap}
+.seg button{background:none;border:0;color:var(--muted);font:600 .85rem inherit;font-family:inherit;padding:7px 14px;border-radius:7px;cursor:pointer}
+.seg button.on{background:#262b33;color:var(--text)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:#0f1216;border:1px solid var(--stroke);color:var(--muted);border-radius:999px;padding:5px 12px;font:600 .8rem inherit;font-family:inherit;cursor:pointer}
+.chip.on{background:var(--cyan);border-color:var(--cyan);color:#06121f}
+.field,select.field,input.field,textarea.field{width:100%;min-height:40px;padding:8px 11px;border:1px solid #2e343d;border-radius:8px;background:#0f1216;color:var(--text);font:inherit;outline:none}
+.field:focus{border-color:var(--cyan)}
+select.field{color-scheme:dark}
+label.fl{display:grid;gap:5px;font-size:.8rem;color:var(--muted);font-weight:600}
+.frow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.frow{grid-template-columns:minmax(0,1fr)}}
+dialog{border:1px solid var(--stroke);border-radius:16px;background:var(--panel);color:var(--text);padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto}
+dialog::backdrop{background:#02060ccc}
+dialog .dh{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 0}
+dialog .dh h3{font-size:1.15rem}
+dialog form{padding:16px 20px 20px;display:grid;gap:14px}
+.dfoot{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px}
+.btn.danger{background:#3a1d24;border-color:#5b2b35;color:var(--neg)}
+.err{color:var(--neg);font-size:.85rem;display:none}
+.impact{border:1px solid #5a4a22;background:#1b1a14;border-radius:10px;padding:10px 14px;font-size:.85rem}
+.impact b{color:var(--warn)}.impact ul{margin:6px 0 0;padding-left:18px;color:var(--muted)}
+.info{border:1px solid #1e4f6a;background:#0e1d2c;border-radius:10px;padding:10px 14px;font-size:.85rem;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f1216;border:1px solid var(--stroke);border-radius:12px;padding:11px 16px;display:none;align-items:center;gap:14px;z-index:60;box-shadow:0 10px 30px #0008;max-width:calc(100vw - 24px)}
+.toast.on{display:flex}
+@media (max-width:900px){.toast{bottom:84px}}
+.sw{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:.92rem}
+.sw input{appearance:none;width:40px;height:22px;border-radius:999px;background:#1d2229;position:relative;cursor:pointer;transition:background .15s;margin:0;flex:0 0 40px}
+.sw input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#cfe0f5;transition:left .15s}
+.sw input:checked{background:#1b8f86}.sw input:checked::after{left:21px}
+table.mx td,table.mx th{text-align:center}table.mx td:first-child,table.mx th:first-child{text-align:left}
+table.mx input[type=checkbox]{width:18px;height:18px;accent-color:#6ea8fe}
+.srow{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--stroke-soft)}
+.srow:last-child{border-bottom:0}
+.srow .t b{display:block}.srow .t small{color:var(--muted)}
+ol.rules{margin:10px 0 0;padding-left:20px;display:grid;gap:10px}
+ol.rules li{color:var(--muted)}ol.rules li b{color:var(--text)}
+.log li{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--stroke-soft);font-size:.9rem;list-style:none}
+.log{margin:0;padding:0}.log time{color:var(--subtle);white-space:nowrap;font-variant-numeric:tabular-nums}
+.calc2 td:first-child{color:var(--muted);width:56%}
+table.calc2{width:100%;border-collapse:collapse;font-size:.92rem}
+table.calc2 td{padding:8px 0;border-bottom:1px solid var(--stroke-soft)}
+table.calc2 td:last-child{text-align:right;font-weight:620;font-variant-numeric:tabular-nums}
+table.calc2 tr.hl td{color:var(--text);font-weight:700;border-bottom:1px solid var(--stroke)}
+table.calc2 tr.hd td{padding-top:16px;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--cyan);font-weight:760;border-bottom:1px solid var(--stroke)}
+.ok{color:var(--pos)}.warnc{color:var(--warn)}
+.mt{margin-top:12px}.right{margin-left:auto}
+.hide-s{}
+@media (max-width:720px){.hm{display:none}}
+.tl a.vb{font-size:.8rem;margin-left:8px}
+.acts{white-space:nowrap}
+
+:root{--bg:#0c0e12;--bar:#0f1216;--side:#0f1216;--panel:#14171c;--panel-hi:#191d23;--stroke:#262b33;--stroke-soft:#1f242b;--text:#e6e8eb;--muted:#9aa2ad;--subtle:#6f7782;--cyan:#6ea8fe;--teal:#6ea8fe;--accent:#6ea8fe;--pos:#4cc38a;--neg:#ef6b73;--warn:#e0b252;--radius:8px}
+body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;font-feature-settings:"cv11"}
+.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;vertical-align:-3px}
+.topbar{height:52px;background:var(--bar);padding:0 16px}
+.brand{color:var(--text);font-size:1.02rem;font-weight:650;letter-spacing:-.01em}
+.brand i{background:var(--accent);color:#0b1220;border-radius:6px;width:26px;height:26px;font-weight:800;font-size:.85rem}
+.panel{border-radius:8px;box-shadow:none}
+.pad{padding:18px 20px}
+.btn{border-radius:6px;min-height:36px;padding:0 14px;font-weight:550;font-size:.88rem;background:#1b1f26;border-color:#2e343d;gap:7px}
+.btn:hover{background:#232830}
+.btn.primary{background:var(--accent);color:#0b1220;border-color:var(--accent);font-weight:600}
+.btn.primary:hover{background:#86b6ff;filter:none}
+.btn.ghost{background:transparent}
+.btn.danger{background:transparent;border-color:#5b2b35;color:var(--neg)}
+.pill{border-radius:5px;padding:2px 8px;font-size:.74rem;font-weight:600;background:transparent;gap:6px}
+.pill.ok{color:var(--pos);border-color:#2a4a3b;background:transparent}
+.pill.warn{color:var(--warn);border-color:#4d4126;background:transparent}
+.pill.act{color:var(--warn);background:rgba(224,178,82,.08);border-color:#5a4a26}
+.dot{width:6px;height:6px}
+.lbl{text-transform:none;letter-spacing:0;font-size:.84rem;color:var(--muted);font-weight:600}
+.tag{color:var(--muted);letter-spacing:0;font-weight:500;font-size:.84rem;display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.big{font-weight:600;letter-spacing:-.02em}
+h1.pt{font-size:1.45rem;font-weight:620;letter-spacing:-.02em}
+.action{border-left:3px solid var(--warn);background:var(--panel)}
+.action h2{font-weight:620}
+.trade{background:transparent;border-radius:6px}
+.trade .side{background:transparent!important;border:1px solid currentColor;border-radius:4px;font-size:.68rem;padding:2px 7px}
+.typ{background:transparent!important;border:1px solid currentColor;border-radius:4px;font-size:.68rem;font-weight:650;padding:1px 7px}
+.typ.Deposit{color:var(--accent)}.typ.Dividend{color:#7fc9c0}
+.src{border-radius:4px}.src.g{color:var(--accent);border-color:#2b3a55}
+details.calc{background:transparent;border-radius:6px}
+.chart .tip{background:#0f1216;border-radius:6px}
+.ranges,.seg{border-radius:7px;background:#0f1216}
+.ranges button,.seg button{border-radius:5px}
+.ranges button.on,.seg button.on{background:#262b33}
+.chip{border-radius:6px;background:transparent}
+.chip.on{background:#262b33;border-color:#3a414c;color:var(--text)}
+.mini{gap:0;background:var(--panel);border:1px solid var(--stroke);border-radius:8px;overflow:hidden}
+.mini>.panel{border:0;border-radius:0;border-right:1px solid var(--stroke-soft);background:transparent}
+.mini>.panel:last-child{border-right:0}
+.mini .big{font-size:1.5rem!important}
+.steps li{background:transparent;border-radius:6px}
+.steps li i{background:#1d2229}
+.trade .amt{font-weight:600}
+table.tbl th{background:var(--panel);letter-spacing:.03em;font-weight:600}
+table.tbl tbody tr:hover{background:#171b21}
+.info{border-color:#26344a;background:#121821}
+.impact{border-color:#4d4126;background:#17150f}
+.field,select.field,input.field{border-radius:6px;background:#0f1216;border-color:#2e343d}
+dialog{border-radius:10px}
+.sw input:checked{background:#3f6fb5}
+.tl li.done::before{background:var(--pos);border-color:var(--pos)}
+.tl li.now::before{box-shadow:0 0 0 3px rgba(224,178,82,.18)}
+.legend b{height:2px}
+/* sidebar */
+.shell{min-height:calc(100vh - 52px)}
+.rail{width:248px;flex:0 0 248px;padding:12px 10px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;top:52px;height:calc(100vh - 52px)}
+.rail .sec{font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;color:var(--subtle);margin:16px 10px 4px;font-weight:600}
+.rail a,.rail .grp{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;color:var(--muted);font-weight:500;font-size:.9rem;margin:0;background:none;border:0;width:100%;cursor:pointer;font-family:inherit;text-align:left;box-shadow:none!important}
+.rail a:hover,.rail .grp:hover{background:#171b21;color:var(--text)}
+.rail a.on{background:#1d2229;color:var(--text)}
+.rail .grp .chev{margin-left:auto;transition:transform .15s;width:14px;height:14px}
+.rail .g.open .chev{transform:rotate(90deg)}
+.rail .subs{display:none;margin:2px 0 6px 19px;border-left:1px solid var(--stroke-soft);padding-left:7px}
+.rail .g.open .subs{display:block}
+.rail .subs a{font-size:.86rem;padding:6px 10px}
+.av{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:.66rem;font-weight:750;color:#0b1220;flex:0 0 20px}
+.acct{font-size:.66rem;border:1px solid var(--stroke);border-radius:4px;padding:0 5px;color:var(--subtle);font-weight:600;line-height:1.5}
+.ndot{width:6px;height:6px;border-radius:50%;background:var(--warn);flex:0 0 6px}
+.rail .foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--stroke-soft)}
+.lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.content{max-width:1280px;margin:0 auto;width:100%;padding:24px 28px 0}
+body.rail-min .rail{width:60px;flex-basis:60px}
+body.rail-min .rail .lab,body.rail-min .rail .sec,body.rail-min .rail .subs,body.rail-min .rail .chev,body.rail-min .rail .acct,body.rail-min .rail .ndot{display:none!important}
+body.rail-min .rail a,body.rail-min .rail .grp{justify-content:center;padding:9px 0}
+.menu-btn{display:none}
+.nav-shade{display:none}
+@media (max-width:900px){.menu-btn{display:inline-flex}.rail{position:fixed;left:0;top:52px;bottom:0;z-index:40;transform:translateX(-100%);transition:transform .2s;height:auto;background:var(--side);border-right:1px solid var(--stroke)}.nav-open .rail{transform:none;box-shadow:20px 0 40px #0008}.shell{display:block;padding-bottom:0}.nav-open .nav-shade{display:block;position:fixed;inset:52px 0 0 0;background:#0009;z-index:35}.content{padding:16px 14px 0}.rail .collapse{display:none}.toast{bottom:24px}}
+/* overview + wizard */
+.stbar{height:10px;border-radius:5px;overflow:hidden;display:flex;background:#0f1216;border:1px solid var(--stroke-soft)}
+.stbar span{height:100%}
+.lg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted);margin-top:10px}
+.lg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:0}
+.att{display:flex;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--stroke-soft)}
+.att:last-child{border-bottom:0}
+.att .t{flex:1;min-width:0}.att .t b{display:block;font-weight:600}.att .t small{color:var(--muted)}
+.wz-steps{display:flex;gap:6px;padding:0 20px;margin-top:12px}
+.wz-steps span{flex:1;height:3px;border-radius:2px;background:var(--stroke)}.wz-steps span.on{background:var(--accent)}
+.opts{display:grid;gap:10px}
+.opts.two-c{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:560px){.opts.two-c{grid-template-columns:minmax(0,1fr)}}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:13px 14px;border:1px solid var(--stroke);border-radius:8px;cursor:pointer;background:transparent;color:inherit;text-align:left;font:inherit;width:100%}
+.opt:hover{border-color:#3a414c}.opt.on{border-color:var(--accent);background:rgba(110,168,254,.06)}
+.opt[disabled]{opacity:.45;cursor:not-allowed}
+.opt b{display:block;font-weight:600}.opt small{color:var(--muted);display:block;margin-top:2px}
+dialog#dWiz{width:min(660px,calc(100vw - 24px))}
+.stat-s{font-size:.8rem;color:var(--subtle)}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+</style></head><body>
+<header class="topbar"><div style="display:flex;align-items:center;gap:10px"><button class="ibtn menu-btn" id="menuBtn" aria-label="Open navigation"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="brand"><i>W</i><span>Wealtharr</span></div></div><div class="chosen">Prototype v2 · sample data</div></header>
+<div class="shell"><aside class="rail" id="rail" aria-label="Main"><a data-nav="overview" href="#overview" title="Overview"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="lab">Overview</span></a><div class="sec">Strategies</div><div id="sgroups"></div><a href="#" id="addStrat" title="Add strategy"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="lab">Add strategy</span></a><div class="sec">System</div><a data-nav="catalogue" href="#catalogue" title="Instrument catalogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span class="lab">Instrument catalogue</span></a><a data-nav="settings" href="#settings" title="Settings"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span class="lab">Settings</span></a><div class="foot"><a href="#" class="collapse" id="collapse" title="Collapse sidebar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg><span class="lab">Collapse</span></a></div></aside><div class="nav-shade" id="shade"></div>
+<main class="content">
+
+
+<section class="view" id="v-overview">
+<div class="sp"><div><div class="tag">All strategies</div><h1 class="pt">Overview</h1></div><div class="head-actions"><button class="btn" data-add="Deposit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Contribution</button><button class="btn primary" id="addStrat2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add strategy</button></div></div>
+<div class="grid4 mini" id="ovKpis"></div>
+<div class="two">
+<div class="col">
+<section class="panel pad"><div class="sp"><div class="lbl">Needs your attention</div><span class="stat-s" id="ovAttN"></span></div><div id="ovAtt"></div></section>
+<section class="panel pad"><div class="lbl" style="margin-bottom:6px">Your strategies</div><div class="tbl-wrap"><table class="tbl" id="ovTbl"><thead><tr><th>Strategy</th><th class="r">Value</th><th class="r">Gain</th><th>Status</th></tr></thead><tbody></tbody></table></div></section>
+<section class="panel pad"><div class="lbl">Coming up</div><ul class="tl" id="ovTl"></ul></section>
+</div>
+<div class="col">
+<section class="panel pad" data-perf data-chg="chgO"><div class="sp" style="margin-bottom:12px"><div><div class="lbl">All strategies · performance</div><div class="chg" id="chgO"></div></div><div class="ranges wide" role="group" aria-label="Range"><button data-r="1D">1D</button><button data-r="1W">1W</button><button data-r="1M">1M</button><button data-r="3M">3M</button><button data-r="1Y">1Y</button><button data-r="5Y">5Y</button><button data-r="10Y">10Y</button><button data-r="All" class="on">All</button></div></div><div class="legend"><span><b style="background:#6ea8fe"></b>Value</span><span><b style="background:#8a929d"></b>Contributed</span></div><div class="chart" data-h="300" data-sv="1.556" data-sc="1.605" style="margin-top:8px"></div><p class="cap">1D–1W use hourly valuations recorded during market hours (LSE 08:00–16:30). 1M–1Y use daily closes. 5Y and longer use month-end values. Ranges longer than your history show everything since you started; no history is invented.</p></section>
+<section class="panel pad"><div class="lbl">Split by strategy</div><div class="stbar mt" id="ovBy"></div><div class="lg" id="ovByLg"></div>
+<div class="lbl" style="margin-top:20px">Split by asset type</div><div class="stbar mt" id="ovAc"></div><div class="lg" id="ovAcLg"></div></section>
+<section class="panel pad"><div class="lbl">ISA allowance 2026/27</div><div class="num" style="margin:10px 0 8px;font-weight:600" id="ovIsa"></div><div class="bar"><span id="ovIsaBar" style="width:6%;background:var(--accent)"></span></div><p class="cap">Summed across all your ISA strategies. Resets 6 Apr 2027. Warning only, not tax advice.</p></section>
+</div></div>
+</section>
+
+<section class="view" id="v-aw-today">
+<div class="sp"><div><div class="tag">All Weather <span class="acct">GIA · Trading 212</span></div><h1 class="pt">Today</h1></div><div class="head-actions"><span class="pill ok"><span class="dot"></span> Prices: Yahoo close 16 Oct</span><button class="btn" data-add="Deposit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Contribution</button></div></div>
+<div class="grid4 mini"><div class="panel pad"><div class="lbl">Value</div><div class="big num " style="font-size:1.7rem;margin:4px 0">£8,240</div><div class="muted" style="font-size:.85rem">as of Fri 16 Oct close</div></div><div class="panel pad"><div class="lbl">Contributed</div><div class="big num " style="font-size:1.7rem;margin:4px 0">£7,500</div><div class="muted" style="font-size:.85rem"></div></div><div class="panel pad"><div class="lbl">Gain</div><div class="big num pos" style="font-size:1.7rem;margin:4px 0">+£740</div><div class="muted" style="font-size:.85rem">+9.9%</div></div><div class="panel pad"><div class="lbl">Next review</div><div class="big num " style="font-size:1.7rem;margin:4px 0">4 Jan 2027</div><div class="muted" style="font-size:.85rem">annual</div></div></div>
+<div class="two">
+<div class="col">
+<section class="panel pad" style="border-left:3px solid var(--pos)"><span class="pill ok"><span class="dot"></span> All good</span><h2 style="font-size:1.35rem;font-weight:620;margin:10px 0 6px">Nothing to do until 4 Jan 2027</h2><p class="muted">All five holdings are within their drift bands (largest drift 1.6 pp; a rebalance is triggered at 5 pp or at the annual review).</p></section>
+<div class="impact"><b>Tracking only.</b> These instruments are still marked <i>draft · not verified</i> in the catalogue, so the app shows drift but won’t give trade instructions until they’re verified. <a href="#catalogue">Open catalogue</a></div>
+<section class="panel pad"><div class="lbl" style="margin-bottom:6px">Allocation vs target</div><div id="awAlloc"></div></section>
+</div>
+<div class="col"><section class="panel pad" data-perf data-chg="chgA"><div class="sp" style="margin-bottom:12px"><div><div class="lbl">Performance</div><div class="chg" id="chgA"></div></div><div class="ranges wide" role="group" aria-label="Range"><button data-r="1D">1D</button><button data-r="1W">1W</button><button data-r="1M">1M</button><button data-r="3M">3M</button><button data-r="1Y">1Y</button><button data-r="5Y">5Y</button><button data-r="10Y">10Y</button><button data-r="All" class="on">All</button></div></div><div class="legend"><span><b style="background:#6ea8fe"></b>Value</span><span><b style="background:#8a929d"></b>Contributed</span></div><div class="chart" data-h="300" data-sv="0.556" data-sc="0.605" style="margin-top:8px"></div><p class="cap">1D–1W use hourly valuations recorded during market hours (LSE 08:00–16:30). 1M–1Y use daily closes. 5Y and longer use month-end values. Ranges longer than your history show everything since you started; no history is invented.</p></section></div></div>
+</section>
+
+<section class="view" id="v-aw-strategy">
+<div class="sp"><div><div class="tag">All Weather · fixed strategy, read-only <span class="acct">GIA · Trading 212</span></div><h1 class="pt">All Weather <span class="muted" style="font-size:1rem;font-weight:500">· version all-weather@1</span></h1></div><span class="pill ok"><span class="dot"></span> Latest version</span></div>
+<div class="stack mt">
+<div class="info">Running in <b>Trading 212 · General Investment Account</b> since 2 Jan 2025.</div>
+<section class="panel pad"><div class="lbl">How it works</div><p class="muted" style="margin-top:8px">A fixed mix designed to hold up across growth, recession, inflation and deflation: 30% stocks, 40% long-term government bonds, 15% intermediate government bonds, 7.5% gold, 7.5% commodities. Rebalanced once a year, or earlier if any holding drifts more than 5 percentage points from its target.</p></section>
+<section class="panel pad"><div class="sp" style="margin-bottom:8px"><div class="lbl">Instruments for Trading 212 · GIA</div><span class="pill warn"><span class="dot"></span> Draft · not verified</span></div><div class="tbl-wrap"><table class="tbl" id="awInst"><thead><tr><th>Role</th><th class="r">Target</th><th>Instrument</th><th>Ticker</th><th>ISIN</th><th>Status</th></tr></thead><tbody></tbody></table></div></section>
+</div></section>
+
+<section class="view" id="v-placeholder"><div class="sp"><div><div class="tag" id="phTag"></div><h1 class="pt" id="phTitle"></h1></div></div>
+<section class="panel mt"><div class="empty" id="phBody"></div></section></section>
+
+<section class="view" id="v-catalogue">
+<div class="sp"><div><div class="tag">Maintained in the code · read-only · mapping 2026-10-19.1</div><h1 class="pt">Instrument catalogue</h1></div></div>
+<div class="stack mt">
+<div class="info">For each strategy, each platform and each account type, this is the exact instrument used for every role. The onboarding only offers combinations listed here. Anything not verified is shown as such, and strategies using draft instruments run in <b>tracking-only</b> mode (no trade instructions).</div>
+<section class="panel pad"><div class="sp" style="margin-bottom:12px"><div class="chips" id="catChips"></div><select class="field" id="catType" style="width:auto"><option value="">All account types</option><option>ISA</option><option>GIA</option><option>SIPP</option></select></div>
+<div class="tbl-wrap"><table class="tbl" id="catTbl"><thead><tr><th>Strategy</th><th>Role</th><th class="r">Target</th><th>Platform</th><th>Accounts</th><th>Instrument</th><th>Ticker</th><th>ISIN</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+<p class="cap" id="catNote"></p></section>
+</div></section>
+<!-- ================= TODAY ================= -->
+<section class="view" id="v-today">
+<div class="sp"><div><div class="tag">9Sig <span class="acct">ISA · Trading 212</span></div><h1 class="pt">Today</h1></div><div class="head-actions"><span class="pill ok"><span class="dot"></span> Prices: Yahoo close 16 Oct</span><span class="pill warn"><span class="dot"></span> Rules: partly verified</span><button class="btn" data-add="Deposit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Contribution</button></div></div>
+<div class="grid4 mini"><div class="panel pad"><div class="lbl">Value</div><div class="big num " style="font-size:1.7rem;margin:4px 0">£14,820</div><div class="muted" style="font-size:.85rem">as of Fri 16 Oct close</div></div><div class="panel pad"><div class="lbl">Contributed</div><div class="big num " style="font-size:1.7rem;margin:4px 0">£12,400</div><div class="muted" style="font-size:.85rem"></div></div><div class="panel pad"><div class="lbl">Gain</div><div class="big num pos" style="font-size:1.7rem;margin:4px 0">+£2,420</div><div class="muted" style="font-size:.85rem">+19.5%</div></div><div class="panel pad"><div class="lbl">Next review</div><div class="big num " style="font-size:1.7rem;margin:4px 0">31 Dec</div><div class="muted" style="font-size:.85rem">73 days</div></div></div>
+<div class="two">
+<div class="col">
+<div id="actionslot"></div>
+<section class="panel pad"><div class="sp"><div class="lbl">Quarter by quarter</div><a href="#" class="more" id="showall">Show all quarters</a></div><ul class="tl" id="tl"></ul></section>
+</div>
+<div class="col">
+<section class="panel pad" data-perf data-chg="chg"><div class="sp" style="margin-bottom:12px"><div><div class="lbl">Performance</div><div class="chg" id="chg"></div></div><div class="ranges wide" role="group" aria-label="Range"><button data-r="1D">1D</button><button data-r="1W">1W</button><button data-r="1M">1M</button><button data-r="3M">3M</button><button data-r="1Y">1Y</button><button data-r="5Y">5Y</button><button data-r="10Y">10Y</button><button data-r="All" class="on">All</button></div></div><div class="legend"><span><b style="background:#6ea8fe"></b>Value</span><span><b style="background:#8a929d"></b>Contributed</span></div><div class="chart" data-h="280" style="margin-top:8px"></div><p class="cap">1D–1W use hourly valuations recorded during market hours (LSE 08:00–16:30). 1M–1Y use daily closes. 5Y and longer use month-end values. Ranges longer than your history show everything since you started; no history is invented.</p></section>
+<section class="panel pad"><div class="lbl" style="margin-bottom:6px">Allocation vs target</div><div id="alloc"></div></section>
+<section class="panel pad"><div class="lbl">Metrics</div><div class="kv"><span>XIRR (money-weighted)</span><b class="num pos">+14.2%</b></div>
+<div class="kv"><span>Time-weighted return</span><b class="num pos">+17.8%</b></div>
+<div class="kv"><span>Annualised</span><b class="num pos">+11.6%</b></div>
+<div class="kv"><span>Max drawdown</span><b class="num neg">−31.4%</b></div>
+<div class="kv"><span>ISA allowance used (2026/27)</span><b class="num" id="isa-used">—</b></div></section>
+</div></div>
+</section>
+
+<!-- ================= HISTORY ================= -->
+<section class="view" id="v-history">
+<div class="sp"><div><div class="tag">9Sig <span class="acct">ISA · Trading 212</span></div><h1 class="pt">History</h1></div><div class="head-actions"><button class="btn" id="exp-hist"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Export CSV</button></div></div>
+<div class="stack mt">
+<section class="panel pad" data-perf data-chg="chg2"><div class="sp" style="margin-bottom:12px"><div><div class="lbl">Performance</div><div class="chg" id="chg2"></div></div><div class="ranges wide" role="group" aria-label="Range"><button data-r="1D">1D</button><button data-r="1W">1W</button><button data-r="1M">1M</button><button data-r="3M">3M</button><button data-r="1Y">1Y</button><button data-r="5Y">5Y</button><button data-r="10Y">10Y</button><button data-r="All" class="on">All</button></div></div><div class="legend"><span><b style="background:#6ea8fe"></b>Value</span><span><b style="background:#8a929d"></b>Contributed</span></div><div class="chart" data-h="340" style="margin-top:8px"></div><p class="cap">1D–1W use hourly valuations recorded during market hours (LSE 08:00–16:30). 1M–1Y use daily closes. 5Y and longer use month-end values. Ranges longer than your history show everything since you started; no history is invented.</p></section>
+<div class="grid4">
+<div class="panel pad"><div class="lbl">XIRR</div><div class="big num pos" style="font-size:1.6rem">+14.2%</div><div class="muted" style="font-size:.82rem">money-weighted, irregular deposits</div></div>
+<div class="panel pad"><div class="lbl">Time-weighted</div><div class="big num pos" style="font-size:1.6rem">+17.8%</div><div class="muted" style="font-size:.82rem">ignores deposit timing</div></div>
+<div class="panel pad"><div class="lbl">Annualised</div><div class="big num pos" style="font-size:1.6rem">+11.6%</div><div class="muted" style="font-size:.82rem">since 3 Nov 2016</div></div>
+<div class="panel pad"><div class="lbl">Max drawdown</div><div class="big num neg" style="font-size:1.6rem">−31.4%</div><div class="muted" style="font-size:.82rem">Nov 2021 – Jun 2022 · recovered Mar 2024</div></div>
+<div class="panel pad"><div class="lbl">Best quarter</div><div class="big num pos" style="font-size:1.6rem">+19.3%</div><div class="muted" style="font-size:.82rem">Q1 2023</div></div>
+<div class="panel pad"><div class="lbl">Worst quarter</div><div class="big num neg" style="font-size:1.6rem">−21.8%</div><div class="muted" style="font-size:.82rem">Q2 2022</div></div>
+<div class="panel pad"><div class="lbl">Total contributed</div><div class="big num" style="font-size:1.6rem">£12,400</div><div class="muted" style="font-size:.82rem">51 deposits · 0 withdrawals</div></div>
+<div class="panel pad"><div class="lbl">Rebalances</div><div class="big num" style="font-size:1.6rem">31</div><div class="muted" style="font-size:.82rem">14 buys · 9 sells · 8 skipped</div></div>
+</div>
+<section class="panel pad"><div class="sp" style="margin-bottom:8px"><div class="lbl">Quarterly results</div><span class="muted" style="font-size:.82rem">Click a quarter for its full breakdown</span></div>
+<div class="tbl-wrap"><table class="tbl" id="qtable"><thead><tr><th>Quarter</th><th class="r">Start value</th><th class="r">Contributed</th><th class="r">End value</th><th class="r">Gain</th><th class="r">Gain %</th><th>Signal</th><th>What I did</th></tr></thead><tbody></tbody></table></div></section>
+</div>
+</section>
+
+<!-- ================= LEDGER ================= -->
+<section class="view" id="v-ledger">
+<div class="sp"><div><div class="tag">9Sig <span class="acct">ISA · Trading 212</span></div><h1 class="pt">Ledger</h1></div>
+<div class="head-actions"><button class="btn" id="imp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></svg> Import CSV</button><button class="btn" id="exp-led"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Export CSV</button><button class="btn primary" data-add=""><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add entry</button></div></div>
+<div class="mt"><div class="seg" id="ltabs"><button class="on" data-t="entries">Entries</button><button data-t="rebal">Rebalances</button><button data-t="log">Change history</button></div></div>
+
+<div id="lt-entries" class="stack mt">
+<section class="panel pad">
+<div class="sp" style="margin-bottom:12px;gap:12px"><div class="chips" id="lchips"></div>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input class="field" id="lsearch" placeholder="Search notes, instrument…" style="width:220px"><label class="sw"><input type="checkbox" id="showdel"> Show deleted</label></div></div>
+<div class="tbl-wrap"><table class="tbl" id="ltable"><thead><tr><th class="sortable" data-s="date">Date ↕</th><th class="sortable" data-s="type">Type ↕</th><th>Instrument</th><th class="r hm">Qty</th><th class="r hm">Price</th><th class="r hm">Fee</th><th class="r sortable" data-s="amount">Cash effect ↕</th><th class="hm">Source</th><th class="hm">Note</th><th></th></tr></thead><tbody></tbody></table></div>
+<p class="cap" id="lsum"></p></section>
+<div class="info">Nothing is ever permanently lost: edits keep the previous version, and deleted entries stay in “Show deleted” and the change history. Changing an entry recalculates affected quarterly reviews and shows you the impact first. Sample ledger is partial, so totals elsewhere are illustrative.</div>
+</div>
+
+<div id="lt-rebal" class="stack mt" style="display:none">
+<section class="panel pad"><div class="sp" style="margin-bottom:8px"><div class="lbl">Rebalances</div><span class="muted" style="font-size:.82rem">Recommendation vs what you actually did</span></div>
+<div class="tbl-wrap"><table class="tbl" id="rtable"><thead><tr><th>Quarter</th><th>Recommended</th><th>Recorded fills</th><th class="r">Difference</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div></section>
+<div class="info">Older quarters can only have their <b>recorded fills corrected</b>; their signal can’t be re-executed. “Reopen” is only available for the latest unconfirmed-by-mistake quarter.</div>
+</div>
+
+<div id="lt-log" class="stack mt" style="display:none"><section class="panel pad"><div class="lbl" style="margin-bottom:8px">Change history</div><ul class="log" id="logl"></ul></section></div>
+</section>
+
+<!-- ================= STRATEGY ================= -->
+<section class="view" id="v-strategy">
+<div class="sp"><div><div class="tag">9Sig · fixed strategy, read-only <span class="acct">ISA · Trading 212</span></div><h1 class="pt">9Sig <span class="muted" style="font-size:1rem;font-weight:500">· version nine-sig@1</span></h1></div><span class="pill ok"><span class="dot"></span> Latest version</span></div>
+<div class="stack mt"><div class="info">Running in <b>Trading 212 · Stocks &amp; Shares ISA</b> since 3 Nov 2016. The account can’t be changed here; to run 9Sig in another account (e.g. a GIA), use <b>Add strategy</b>. It becomes a separate strategy with its own instruments, ledger and history.</div>
+<section class="panel pad"><div class="lbl">How it works</div>
+<p style="margin:8px 0 0;color:var(--muted)">Hold 60% in a leveraged Nasdaq-100 fund and 40% in a short-term bond fund. Each quarter a “signal line” for the growth fund rises 9%, plus half of any new money you added. If the growth fund is above the line you move the excess to safe; if below, you buy the shortfall from safe. Extreme falls pause selling.</p>
+<ol class="rules"><li><b>Signal line:</b> last quarter’s line × 1.09, plus half of the contributions made during the quarter.</li><li><b>Rebalance:</b> only on completed calendar quarters, using verified quarter-end closes and your recorded holdings.</li><li><b>Buying throttle:</b> normal buys are funded in full below 90% of cash + bonds; larger buys are capped at 81% of buying power.</li><li><b>30 Down:</b> if SPY closes ≤70% of its highest close in the previous 8 quarters, the next two sells are skipped; a reset to 60/40 is reviewed after.</li><li><b>100%-up spike:</b> if TQQQ doubles within a quarter you get an urgent alert to review a reset.</li><li><b>Never automatic:</b> the app never trades. You trade manually and confirm what really happened.</li></ol></section>
+<section class="panel pad"><div class="sp" style="margin-bottom:8px"><div class="lbl">Instruments for UK · Trading 212 · Stocks &amp; Shares ISA</div><span class="pill warn"><span class="dot"></span> Owner checks pending</span></div>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Role</th><th>Instrument</th><th>Target</th><th>ISIN</th><th>Yahoo</th><th>Quote unit</th><th>Evidence</th><th>Verified</th></tr></thead><tbody>
+<tr><td>Growth</td><td>WisdomTree Nasdaq 100 3x Daily Leveraged</td><td>60%</td><td>IE00BLRPRL42</td><td>LQQ3.L</td><td>GBX ÷ 100</td><td><a href="#">Issuer page ↗</a></td><td><span class="pill ok">Issuer · 19 Oct</span> <span class="pill warn">My ISA access?</span></td></tr>
+<tr><td>Safe</td><td>iShares GBP Ultrashort Bond UCITS ETF</td><td>40%</td><td>IE00BCRY6441</td><td>ERNS.L</td><td>GBP</td><td><a href="#">Issuer page ↗</a></td><td><span class="pill ok">Issuer · 19 Oct</span> <span class="pill warn">My ISA access?</span></td></tr></tbody></table></div>
+<p class="cap">Instruments are fixed by the strategy and cannot be changed in the app. If a mapping can’t be verified, the app refuses to give trade instructions instead of guessing.</p></section>
+<div class="grid2">
+<section class="panel pad"><div class="lbl">Schedule &amp; data</div>
+<div class="kv"><span>Reviews</span><b>Quarter-end (31 Mar / 30 Jun / 30 Sep / 31 Dec)</b></div>
+<div class="kv"><span>Urgent checks</span><b>Daily (spike, 30 Down)</b></div>
+<div class="kv"><span>Price source</span><b>Yahoo daily close · fallback: Stooq</b></div>
+<div class="kv"><span>Reference data</span><b>SPY, TQQQ (USD)</b></div>
+<div class="kv"><span>Rules status</span><b class="warnc">Partly verified against workbook</b></div></section>
+<section class="panel pad"><div class="lbl">Version history</div>
+<ul class="log"><li><time>19 Oct 2026</time><span><b>nine-sig@1</b> — first release. You started on this version.</span></li></ul>
+<p class="cap">When a new version is released you’ll see what changed and choose when to switch. Your past signals always keep the version that produced them.</p></section></div>
+<section class="panel pad"><div class="sp" style="margin-bottom:6px"><div class="lbl">Alerts for this strategy</div><span class="muted" style="font-size:.82rem">Destinations are set up in Settings</span></div>
+<div class="tbl-wrap"><table class="tbl mx"><thead><tr><th>Alert</th><th>Email</th><th>Discord</th><th>Push</th></tr></thead><tbody id="alertmx"></tbody></table></div></section>
+</div></section>
+
+<!-- ================= BREAKDOWN ================= -->
+<section class="view" id="v-breakdown">
+<div class="sp"><div><div class="tag">9Sig · every number, every step <span class="acct">ISA · Trading 212</span></div><h1 class="pt">Breakdown</h1></div>
+<div class="head-actions"><select class="field" id="bq" style="width:auto"></select><button class="btn" id="exp-aud"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> CSV for spreadsheet</button></div></div>
+<div class="two mt">
+<div class="col"><section class="panel pad"><div class="sp" style="margin-bottom:6px"><div class="lbl" id="bt">Calculation</div><span id="bstat"></span></div><table class="calc2" id="bcalc"></table></section></div>
+<div class="col">
+<section class="panel pad"><div class="lbl" style="margin-bottom:8px">Recommended vs recorded</div><div id="bfills"></div></section>
+<section class="panel pad"><div class="lbl" style="margin-bottom:8px">Data used</div><div class="tbl-wrap"><table class="tbl" id="bdata"><thead><tr><th>Item</th><th class="r">Value</th><th>Source</th><th>Check</th></tr></thead><tbody></tbody></table></div></section>
+<section class="panel pad"><div class="lbl" style="margin-bottom:8px">Safety checks</div><ul class="log" id="bchecks"></ul></section>
+</div></div>
+</section>
+
+<!-- ================= SETTINGS ================= -->
+<section class="view" id="v-settings">
+<div class="sp"><div><div class="tag">Applies to all strategies</div><h1 class="pt">Settings</h1></div></div>
+<div class="stack mt">
+<section class="panel pad"><div class="lbl">Notification destinations</div>
+<div class="srow"><div class="t"><b>Email</b><small>you@example.com · SMTP connected</small></div><div style="display:flex;gap:8px;align-items:center"><span class="pill ok"><span class="dot"></span> Last test OK · 12 Oct</span><button class="btn" data-test="Email">Send test</button><button class="btn ghost">Edit</button></div></div>
+<div class="srow"><div class="t"><b>Discord</b><small>Webhook ••••••••k3Fd</small></div><div style="display:flex;gap:8px;align-items:center"><span class="pill ok"><span class="dot"></span> Last test OK · 12 Oct</span><button class="btn" data-test="Discord">Send test</button><button class="btn ghost">Edit</button></div></div>
+<div class="srow"><div class="t"><b>Push (ntfy)</b><small>Not set up</small></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">Not configured</span><button class="btn">Set up</button></div></div>
+<div class="srow"><div class="t"><b>Remind me if I haven’t acted after</b><small>Repeats once per day until you confirm or dismiss</small></div><div style="display:flex;gap:8px;align-items:center"><input class="field" type="number" value="7" min="1" max="30" style="width:80px"> days</div></div></section>
+<div class="grid2">
+<section class="panel pad"><div class="lbl">Your strategies &amp; accounts</div><div id="setStrats"></div><div class="srow"><div class="t"><b>Track ISA allowance</b><small>£20,000 per person per tax year, summed across all your ISA strategies · warning only</small></div><label class="sw"><input type="checkbox" checked> On</label></div><div class="srow"><div class="t"><b>Base currency</b><small>All values shown in GBP</small></div><b>GBP</b></div></section>
+<section class="panel pad"><div class="lbl">Security</div>
+<div class="srow"><div class="t"><b>Password</b><small>Changed 19 Oct 2026</small></div><button class="btn">Change</button></div>
+<div class="srow"><div class="t"><b>Two-factor authentication</b><small>Authenticator app (TOTP)</small></div><label class="sw"><input type="checkbox"> Off</label></div>
+<div class="srow"><div class="t"><b>Active sessions</b><small>This device · Chrome</small></div><button class="btn">Sign out others</button></div></section></div>
+<section class="panel pad"><div class="lbl">Data &amp; health</div>
+<div class="srow"><div class="t"><b>Export everything</b><small>Ledger, rebalances, audit values (CSV)</small></div><button class="btn" id="exp-all"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Export all</button></div>
+<div class="srow"><div class="t"><b>Last backup</b><small>Today 03:00 · encrypted copy off-host</small></div><span class="pill ok"><span class="dot"></span> OK</span></div>
+<div class="srow"><div class="t"><b>Restore drill</b><small>Never tested. Test a restore on a spare copy before you rely on backups.</small></div><span class="pill warn"><span class="dot"></span> Not done</span></div>
+<div class="srow"><div class="t"><b>Scheduler heartbeat</b><small>Hourly price job · last ran 14 min ago</small></div><span class="pill ok"><span class="dot"></span> Healthy</span></div></section>
+<section class="panel pad" style="border-color:#5b2b35"><div class="lbl" style="color:var(--neg)">Danger zone</div>
+<div class="srow"><div class="t"><b>Reset all my data</b><small>Deletes your ledger, rebalances and history. Type RESET to confirm.</small></div><div style="display:flex;gap:8px"><input class="field" placeholder="RESET" style="width:120px"><button class="btn danger">Reset</button></div></div></section>
+</div></section>
+
+</main></div>
+
+<!-- ================= DIALOGS ================= -->
+<dialog id="dEntry"><div class="dh"><h3 id="deTitle">Add entry</h3><button class="ibtn" data-close><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<form method="dialog" id="fEntry" novalidate>
+<div id="deRb" class="info" style="display:none"></div>
+<div class="frow"><label class="fl">Type<select class="field" id="eType"><option>Deposit</option><option>Withdrawal</option><option>Buy</option><option>Sell</option><option>Dividend</option><option>Fee</option></select></label>
+<label class="fl">Date<input class="field" type="date" id="eDate" max="2026-10-19"></label></div>
+<div class="frow" id="rInst"><label class="fl">Instrument<select class="field" id="eInst"><option>LQQ3.L</option><option>ERNS.L</option></select></label><div></div></div>
+<div class="frow" id="rQP"><label class="fl">Quantity (shares)<input class="field" type="number" step="any" min="0" id="eQty"></label><label class="fl">Price per share (£)<input class="field" type="number" step="any" min="0" id="ePrice"></label></div>
+<div class="frow"><label class="fl" id="rAmt">Amount (£)<input class="field" type="number" step="any" min="0" id="eAmt"></label><label class="fl">Fee (£)<input class="field" type="number" step="any" min="0" id="eFee" value="0"></label></div>
+<label class="fl">Note (optional)<input class="field" id="eNote" maxlength="120"></label>
+<div class="err" id="eErr"></div>
+<div class="impact" id="eImpact"></div>
+<div id="eHist" class="info" style="display:none"></div>
+<div class="info">The real app also checks: no overselling, no negative cash, entries only for this strategy’s instruments, and a price/date sanity check.</div>
+<div class="dfoot"><button class="btn danger" id="eDel" type="button" style="margin-right:auto;display:none">Delete…</button><button class="btn ghost" data-close type="button">Cancel</button><button class="btn primary" id="eSave" type="button">Save</button></div></form></dialog>
+
+<dialog id="dFills"><div class="dh"><h3 id="dfTitle">Confirm what you did</h3><button class="ibtn" data-close><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<form method="dialog" novalidate><p class="muted" id="dfIntro" style="font-size:.9rem"></p>
+<div id="dfRows" class="stack"></div>
+<div class="frow"><label class="fl">Date of trades<input class="field" type="date" id="fDate" max="2026-10-19"></label><div></div></div>
+<div class="info" id="dfCheck"></div><div class="err" id="fErr"></div>
+<div class="dfoot"><button class="btn ghost" data-close type="button">Cancel</button><button class="btn primary" id="fSave" type="button">Confirm &amp; save</button></div></form></dialog>
+
+<dialog id="dConfirm"><div class="dh"><h3 id="dcTitle">Are you sure?</h3><button class="ibtn" data-close><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<form method="dialog"><div id="dcBody"></div><div class="dfoot"><button class="btn ghost" data-close type="button">Cancel</button><button class="btn danger" id="dcOk" type="button">Confirm</button></div></form></dialog>
+
+<dialog id="dWiz"><div class="dh"><h3 id="wzTitle">Add a strategy</h3><button class="ibtn" data-close><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="wz-steps" id="wzSteps"></div>
+<form method="dialog" novalidate><div id="wzBody" class="stack"></div><div class="err" id="wzErr"></div>
+<div class="dfoot"><button class="btn ghost" type="button" id="wzBack" style="margin-right:auto">Back</button><button class="btn ghost" data-close type="button">Cancel</button><button class="btn primary" type="button" id="wzNext">Continue</button></div></form></dialog><div class="toast" id="toast"><span id="toastMsg"></span><button class="btn ghost" id="toastUndo" style="min-height:32px;padding:0 12px;display:none">Undo</button></div>
+<script>const IC={"today": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 12h4l3-8 4 16 3-8h4\"/></svg>", "history": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 3v18h18\"/><path d=\"M7 15l4-4 3 3 5-6\"/></svg>", "ledger": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01\"/></svg>", "strategy": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 16v-5M12 8h.01\"/></svg>", "breakdown": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"5\" y=\"3\" width=\"14\" height=\"18\" rx=\"2\"/><path d=\"M9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01\"/></svg>", "chev": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M9 6l6 6-6 6\"/></svg>", "arrow": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg>", "alert": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 3l10 18H2z\"/><path d=\"M12 10v4M12 17h.01\"/></svg>", "check": "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12l5 5L20 7\"/></svg>"};
+const NOW=new Date(2026,9,16,16,0);
+const M=(function(){
+ let s=11;const rnd=()=>{s=(s*16807)%2147483647;return (s-1)/2147483646};
+ const N=120;let adds=[];
+ for(let i=0;i<N;i++)adds.push(i===0?1500:(rnd()<.45?50+rnd()*250:0));
+ const T=adds.reduce((a,b)=>a+b,0),k=12400/T;
+ adds=adds.map(a=>Math.round(a*k/50)*50);
+ const diff=12400-adds.reduce((a,b)=>a+b,0);
+ for(let i=N-1;i>=0;i--){if(adds[i]>0||i===0){adds[i]+=diff;break}}
+ const pts=[];let c=0,v=0;
+ for(let i=0;i<N;i++){
+  c+=adds[i];
+  let r=.0075+(rnd()-.5)*.1; if(i>=36&&i<=39)r-=.045; if(i>=60&&i<=67)r-=.05; if(i>=98&&i<=101)r-=.04;
+  v=v*(1+r)+adds[i];
+  pts.push({d:new Date(2016,10+i,16,16,0),c,v});
+ }
+ const f=14820/pts[N-1].v;pts.forEach((p,i)=>{p.v*=1+(f-1)*(i/(N-1))});
+ pts[N-1].v=14820;pts[N-1].c=12400;
+ return pts;
+})();
+const gbp=n=>'£'+Math.round(n).toLocaleString('en-GB');
+const sgn=n=>(n>=0?'+':'−')+gbp(Math.abs(n));
+const fr=x=>{x=Math.sin(x*12.9898)*43758.5453;return x-Math.floor(x)};
+function interp(t){
+ const ms=t.getTime();let k=0;
+ while(k<M.length-2&&M[k+1].d.getTime()<=ms)k++;
+ const a=M[k],b=M[k+1],tt=Math.min(1,Math.max(0,(ms-a.d)/(b.d-a.d)));
+ const c=ms>=M[M.length-2].d.getTime()?M[M.length-1].c:a.c;
+ return{v:a.v+(b.v-a.v)*tt,c};
+}
+function series(range){
+ if(range==='5Y')return M.slice(-60);
+ if(range==='10Y'||range==='All')return M.slice();
+ const out=[];
+ const hourly=range==='1D'||range==='1W';
+ const days={'1D':1,'1W':5,'1M':30,'3M':91,'1Y':365}[range];
+ const start=new Date(NOW);start.setDate(start.getDate()-(hourly?(range==='1D'?0:6):days));
+ const d0=new Date(start.getFullYear(),start.getMonth(),start.getDate());
+ for(let d=new Date(d0);d<=NOW;d.setDate(d.getDate()+1)){
+  const wd=d.getDay();if(wd===0||wd===6)continue;
+  const hrs=hourly?[8,9,10,11,12,13,14,15,16]:[16];
+  for(const h of hrs){
+   const t=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,0);
+   if(t>NOW)continue;
+   const b=interp(t),amp=hourly?.0035:.007;
+   const noise=t.getTime()===NOW.getTime()?0:(fr(t.getTime()/1e6)-.5)*2*amp;
+   out.push({d:t,c:b.c,v:b.v*(1+noise)});
+  }
+ }
+ return out;
+}
+const wdn=d=>d.toLocaleDateString('en-GB',{weekday:'short'});
+function lab(range,p,i,arr){
+ if(range==='1D')return i%2===0?String(p.d.getHours()).padStart(2,'0')+':00':'';
+ if(range==='1W')return p.d.getHours()===8?wdn(p.d)+' '+p.d.getDate():'';
+ if(range==='1M'||range==='3M')return p.d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+ if(range==='1Y')return p.d.toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
+ return String(p.d.getFullYear());
+}
+function full(range,d){
+ if(range==='1D'||range==='1W')return wdn(d)+' '+d.getDate()+' '+d.toLocaleDateString('en-GB',{month:'short'})+' · '+String(d.getHours()).padStart(2,'0')+':00';
+ if(range==='5Y'||range==='10Y'||range==='All')return d.toLocaleDateString('en-GB',{month:'short',year:'numeric'})+' (month-end)';
+ return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' close';
+}
+function draw(host,range,H,chgId){
+ const data=series(range).map(p=>({d:p.d,v:p.v*(+host.dataset.sv||1),c:p.c*(+host.dataset.sc||1)}));const showC=!(range==='1D'||range==='1W');
+ const w=Math.max(host.clientWidth,260),l=52,r=10,t=12,b=26;
+ const hi=p=>showC?Math.max(p.v,p.c):p.v,lo=p=>showC?Math.min(p.v,p.c):p.v;let max=Math.max(...data.map(hi)),min=Math.min(...data.map(lo));const pad=(max-min)*.12||max*.02;max+=pad;min-=pad;
+ const x=i=>l+(w-l-r)*(data.length===1?0:i/(data.length-1));
+ const y=v=>t+(H-t-b)*(1-(v-min)/(max-min));
+ const path=k=>data.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p[k]).toFixed(1)).join(' ');
+ let g='';
+ for(let k=0;k<=4;k++){const v=min+(max-min)*k/4;g+=`<line x1="${l}" x2="${w-r}" y1="${y(v)}" y2="${y(v)}" stroke="#1f242b"/><text x="${l-8}" y="${y(v)+4}" fill="#6f7782" font-size="11" text-anchor="end">${gbp(v)}</text>`}
+ let last=-1e9;const minGap=(range==='5Y'||range==='10Y'||range==='All')?0:46;
+ let prevLab='';
+ data.forEach((p,i)=>{let tx=lab(range,p,i,data);if(!tx||tx===prevLab)return;
+  if((range==='5Y'||range==='10Y'||range==='All')){if(p.d.getMonth()!==10&&i!==0)return}
+  const px=x(i);if(px-last<(minGap||34))return;last=px;prevLab=tx;
+  g+=`<text x="${px}" y="${H-6}" fill="#6f7782" font-size="11" text-anchor="middle">${tx}</text>`});
+ const id='g'+Math.random().toString(36).slice(2,7);
+ const area=path('v')+` L${x(data.length-1)} ${H-b} L${x(0)} ${H-b} Z`;
+ host.innerHTML=`<svg viewBox="0 0 ${w} ${H}" role="img" aria-label="Portfolio value versus money contributed, ${range}"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ea8fe" stop-opacity=".12"/><stop offset="1" stop-color="#6ea8fe" stop-opacity=".01"/></linearGradient></defs>${g}<path d="${area}" fill="url(#${id})"/>${showC?`<path d="${path('c')}" fill="none" stroke="#8a929d" stroke-width="1.6" stroke-dasharray="5 4"/>`:''}<path d="${path('v')}" fill="none" stroke="#6ea8fe" stroke-width="1.8" stroke-linejoin="round"/><line class="cx" y1="${t}" y2="${H-b}" stroke="#9aa8bd" stroke-opacity=".5" style="display:none"/><circle class="cd" r="5" fill="#6ea8fe" stroke="#0c0e12" stroke-width="2" style="display:none"/></svg><div class="tip"></div>`;
+ const svg=host.querySelector('svg'),tip=host.querySelector('.tip'),cx=svg.querySelector('.cx'),cd=svg.querySelector('.cd');
+ host.onpointermove=e=>{const bb=svg.getBoundingClientRect();const px=(e.clientX-bb.left)*(w/bb.width);let bi=0,bd=1e9;data.forEach((p,i)=>{const dd=Math.abs(x(i)-px);if(dd<bd){bd=dd;bi=i}});const p=data[bi];cx.setAttribute('x1',x(bi));cx.setAttribute('x2',x(bi));cx.style.display='';cd.setAttribute('cx',x(bi));cd.setAttribute('cy',y(p.v));cd.style.display='';tip.style.display='block';tip.style.left=Math.min(Math.max(x(bi)*bb.width/w,70),bb.width-70)+'px';tip.style.top=(y(p.v)*bb.height/H)+'px';const gn=p.v-p.c;tip.innerHTML=`<b>${full(range,p.d)}</b><br>Value ${gbp(p.v)}${showC?`<br>Contributed ${gbp(p.c)}`:''}<br><span class="${gn>=0?'pos':'neg'}">${sgn(gn)} total gain</span>`};
+ host.onpointerleave=()=>{cx.style.display='none';cd.style.display='none';tip.style.display='none'};
+ const a=data[0],z=data[data.length-1];
+ const gain=(z.v-z.c)-(a.v-a.c),base=a.v+Math.max(0,z.c-a.c),pct=base?gain/base*100:0;
+ const el=document.getElementById(chgId||'chg');
+ el.innerHTML=`<span class="${gain>=0?'pos':'neg'} num" style="font-weight:700">${gain>=0?'▲':'▼'} ${sgn(gain)} · ${pct>=0?'+':'−'}${Math.abs(pct).toFixed(1)}%</span> <span class="muted">${({'1D':'in the last trading day','1W':'in the last week','1M':'in the last month','3M':'in the last 3 months','1Y':'in the last year','5Y':'in the last 5 years','10Y':'in the last 10 years','All':'since you started'})[range]}</span>`;
+}
+
+const TODAY_D=new Date(2026,9,19), TODAY_S='2026-10-19';
+const f2=n=>'£'+Math.abs(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+const g0=n=>'£'+Math.round(Math.abs(n)).toLocaleString('en-GB');
+const dshow=s=>{const d=new Date(s+'T00:00:00');return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})};
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+
+/* ---------- strategy sample data (every number derives from these inputs) ---------- */
+const AUD=[
+ {q:'Q3 2026',end:'30 Sep 2026',endISO:'2026-09-30',prev:8376.00,contrib:300,list:['12 Aug · £200','3 Sep · £100'],shares:158.40,price:66.41,safeShares:'—',spy:[580.12,633.30],bp:5330,safeP:5.12},
+ {q:'Q2 2026',end:'30 Jun 2026',endISO:'2026-06-30',prev:7400.00,contrib:620,list:['18 May · £200','10 Jun · £420'],shares:146.00,price:55.25,spy:[612.00,631.60],bp:5330,safeP:5.12},
+ {q:'Q1 2026',end:'31 Mar 2026',endISO:'2026-03-31',prev:6697.25,contrib:200,list:['9 Mar · £200'],shares:139.00,price:52.15,spy:[541.20,615.00],bp:5120,safeP:5.12},
+ {q:'Q4 2025',end:'31 Dec 2025',endISO:'2025-12-31',prev:6098.39,contrib:100,list:['10 Nov · £100'],shares:150.00,price:51.18,spy:[591.00,604.30],bp:4900,safeP:5.12}
+];
+AUD.forEach(a=>{a.grown=a.prev*1.09;a.half=a.contrib/2;a.line=a.grown+a.half;a.actual=a.shares*a.price;a.diff=a.actual-a.line;a.down=1-a.spy[0]/a.spy[1];a.d30=a.down>=.30;a.act=a.diff>0?'Sell':'Buy';a.amt=Math.abs(a.diff);});
+const A3=AUD[0];
+const TOTAL=14820;
+
+/* ---------- ledger ---------- */
+let seq=100;
+let L=[
+ {id:1,date:'2026-10-06',type:'Deposit',inst:'',qty:0,price:0,fee:0,amount:250,note:'Salary top-up',src:'Manual'},
+ {id:2,date:'2026-09-03',type:'Deposit',inst:'',qty:0,price:0,fee:0,amount:100,note:'',src:'Manual'},
+ {id:3,date:'2026-08-12',type:'Deposit',inst:'',qty:0,price:0,fee:0,amount:200,note:'',src:'Manual'},
+ {id:4,date:'2026-07-03',type:'Buy',inst:'LQQ3.L',qty:5.61,price:55.26,fee:0,note:'',src:'Guided',rb:'Q2 2026'},
+ {id:5,date:'2026-07-03',type:'Sell',inst:'ERNS.L',qty:60.55,price:5.12,fee:0,note:'',src:'Guided',rb:'Q2 2026'},
+ {id:6,date:'2026-06-10',type:'Deposit',inst:'',qty:0,price:0,fee:0,amount:420,note:'Bonus',src:'Manual'},
+ {id:7,date:'2026-05-18',type:'Deposit',inst:'',qty:0,price:0,fee:0,amount:200,note:'',src:'Manual'},
+ {id:8,date:'2026-04-02',type:'Buy',inst:'LQQ3.L',qty:2.78,price:53.95,fee:0.45,note:'Price moved 0.3% before fill',src:'Guided',rb:'Q1 2026'},
+ {id:9,date:'2026-04-02',type:'Sell',inst:'ERNS.L',qty:29.3,price:5.12,fee:0,note:'',src:'Guided',rb:'Q1 2026'},
+ {id:10,date:'2026-03-09',type:'Deposit',inst:'',qty:0,price:0,fee:0,amount:200,note:'',src:'Manual'},
+ {id:11,date:'2026-01-02',type:'Sell',inst:'LQQ3.L',qty:19.0,price:51.58,fee:0,note:'',src:'Guided',rb:'Q4 2025'},
+ {id:12,date:'2026-01-02',type:'Buy',inst:'ERNS.L',qty:191.4,price:5.12,fee:0,note:'',src:'Guided',rb:'Q4 2025'},
+ {id:13,date:'2025-12-15',type:'Dividend',inst:'ERNS.L',qty:0,price:0,fee:0,amount:18.40,note:'Distribution',src:'CSV import'},
+ {id:14,date:'2025-11-10',type:'Deposit',inst:'',qty:0,price:0,fee:0,amount:100,note:'',src:'Manual'}
+];
+L.forEach(e=>{e.hist=[];e.deleted=false;e.amount=(e.type==='Buy'||e.type==='Sell')?+(e.qty*e.price).toFixed(2):e.amount});
+const sign=e=>({Deposit:1,Sell:1,Dividend:1,Withdrawal:-1,Buy:-1,Fee:-1})[e.type];
+const cash=e=>sign(e)*(e.amount)-(e.type==='Fee'?0:e.fee)*1;
+let LOG=[
+ {t:'12 Oct 2026 · 09:14',x:'Settings: email test sent (OK)'},
+ {t:'3 Jul 2026 · 18:02',x:'Confirmed Q2 2026 rebalance (fills adjusted: price +0.4%)'},
+ {t:'3 Jul 2026 · 17:55',x:'Added Buy LQQ3.L 5.61 @ £55.26'}
+];
+const logNow=x=>{LOG.unshift({t:'19 Oct 2026 · '+new Date().toTimeString().slice(0,5),x})};
+
+/* rebalances */
+let RB=[
+ {q:'Q3 2026',status:'pending'},
+ {q:'Q2 2026',status:'confirmed',date:'3 Jul 2026',adj:'price +0.4%'},
+ {q:'Q1 2026',status:'confirmed',date:'2 Apr 2026',adj:'fee £0.45'},
+ {q:'Q4 2025',status:'confirmed',date:'2 Jan 2026',adj:''}
+];
+const aud=q=>AUD.find(a=>a.q===q);
+const recText=a=>a.act+' '+g0(a.amt)+' growth'+(a.act==='Sell'?', buy ':', sell ')+g0(a.amt)+' safe';
+const rbEntries=q=>L.filter(e=>e.rb===q&&!e.deleted);
+const rbFills=q=>{const es=rbEntries(q);return es.map(e=>e.type+' '+e.inst+' '+e.qty+' @ '+f2(e.price)).join(' · ')};
+const rbGrowthAmt=q=>{const e=rbEntries(q).find(x=>x.inst==='LQQ3.L');return e?e.amount:null};
+
+/* ---------- toast / confirm ---------- */
+let toastT;
+function toast(msg,undo){const t=$('#toast');$('#toastMsg').textContent=msg;const u=$('#toastUndo');u.style.display=undo?'':'none';u.onclick=()=>{undo();t.classList.remove('on')};t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),undo?9000:3500)}
+function confirmBox(title,body,okLabel,ok){$('#dcTitle').textContent=title;$('#dcBody').innerHTML=body;$('#dcOk').textContent=okLabel;$('#dcOk').onclick=()=>{$('#dConfirm').close();ok()};$('#dConfirm').showModal()}
+$$('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
+
+/* ---------- impact preview ---------- */
+function impact(dateStr,isDelete){
+ const out=[];
+ AUD.forEach(a=>{ if(dateStr<=a.endISO){
+   const r=RB.find(x=>x.q===a.q);
+   out.push(r&&r.status==='confirmed'?'<b>'+a.q+'</b> review is recalculated; it is already confirmed, so you’ll be asked to re-check its fills and baseline.':'<b>'+a.q+'</b> review (pending) is recalculated — the action may change.');
+ }});
+ if(!out.length)out.push('No quarterly review is affected (entry is after the last completed quarter). Performance and allowance figures update.');
+ out.push('Performance metrics (XIRR, gain, allocation) and ISA allowance update.');
+ return '<b>What this '+(isDelete?'deletion':'change')+' affects</b><ul>'+out.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+}
+
+/* ---------- entry dialog ---------- */
+let editing=null;
+function syncEntryForm(){
+ const t=$('#eType').value, trade=(t==='Buy'||t==='Sell');
+ $('#rInst').style.display=(trade||t==='Dividend')?'':'none';
+ $('#rQP').style.display=trade?'':'none';
+ $('#rAmt').style.display=trade?'none':'';
+ $('#eErr').style.display='none';
+ $('#eImpact').innerHTML=impact($('#eDate').value||TODAY_S,false);
+}
+function openEntry(id,preset){
+ editing=id?L.find(e=>e.id===id):null;
+ const e=editing||{type:preset||'Deposit',date:TODAY_S,inst:'LQQ3.L',qty:'',price:'',fee:0,amount:'',note:''};
+ $('#deTitle').textContent=editing?'Edit entry':(preset==='Deposit'?'Record a contribution':'Add entry');
+ $('#eType').value=e.type;$('#eDate').value=e.date;$('#eInst').value=e.inst||'LQQ3.L';
+ $('#eQty').value=e.qty||'';$('#ePrice').value=e.price||'';$('#eAmt').value=(e.type==='Buy'||e.type==='Sell')?'':(e.amount||'');
+ $('#eFee').value=e.fee||0;$('#eNote').value=e.note||'';
+ $('#eDel').style.display=editing?'':'none';
+ const rb=$('#deRb');
+ if(editing&&editing.rb){rb.style.display='';rb.innerHTML='This entry is part of the <b>'+editing.rb+'</b> rebalance. Prefer <a href="#" id="goRb">Rebalances → Edit fills</a> so the recommendation comparison stays correct.';$('#goRb').onclick=ev=>{ev.preventDefault();$('#dEntry').close();go('ledger');showLT('rebal')}}else rb.style.display='none';
+ const h=$('#eHist');
+ if(editing&&editing.hist.length){h.style.display='';h.innerHTML='<b>Edited '+editing.hist.length+'×.</b> Previous versions kept:<ul style="margin:6px 0 0;padding-left:18px">'+editing.hist.slice(-3).reverse().map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'}else h.style.display='none';
+ syncEntryForm();$('#dEntry').showModal();
+}
+['eType','eDate'].forEach(i=>$('#'+i).addEventListener('change',syncEntryForm));
+const sumE=e=>e.type+(e.inst?' '+e.inst:'')+' · '+dshow(e.date)+' · '+((e.type==='Buy'||e.type==='Sell')?e.qty+' @ '+f2(e.price):f2(e.amount))+(e.fee?' · fee '+f2(e.fee):'');
+$('#eSave').onclick=()=>{
+ const t=$('#eType').value,d=$('#eDate').value,trade=(t==='Buy'||t==='Sell');
+ const qty=+$('#eQty').value,price=+$('#ePrice').value,amt=+$('#eAmt').value,fee=+$('#eFee').value||0;
+ let err='';
+ if(!d)err='Choose a date.';else if(d>TODAY_S)err='The date can’t be in the future.';
+ else if(trade&&!(qty>0&&price>0))err='Enter a quantity and a price above zero.';
+ else if(!trade&&!(amt>0))err='Enter an amount above zero.';
+ else if(fee<0)err='Fee can’t be negative.';
+ const eb=$('#eErr');if(err){eb.textContent=err;eb.style.display='block';return}
+ const data={type:t,date:d,inst:(trade||t==='Dividend')?$('#eInst').value:'',qty:trade?qty:0,price:trade?price:0,fee,amount:trade?+(qty*price).toFixed(2):amt,note:$('#eNote').value};
+ if(editing){const before=sumE(editing);editing.hist.push(before);Object.assign(editing,data);logNow('Edited entry: '+before+' → '+sumE(editing));toast('Entry updated · affected reviews recalculated')}
+ else{const e=Object.assign({id:++seq,src:'Manual',hist:[],deleted:false},data);L.push(e);logNow('Added '+sumE(e));toast('Entry added · affected reviews recalculated')}
+ $('#dEntry').close();renderAll();
+};
+function deleteEntry(id){
+ const e=L.find(x=>x.id===id);
+ confirmBox('Delete this entry?','<p class="muted" style="margin-bottom:10px">'+esc(sumE(e))+'</p><div class="impact">'+impact(e.date,true)+'</div><p class="cap">It isn’t permanently erased: you can undo, and it stays in “Show deleted” and the change history.</p>','Delete entry',()=>{
+  e.deleted=true;logNow('Deleted entry: '+sumE(e));renderAll();toast('Entry deleted',()=>{e.deleted=false;logNow('Restored entry: '+sumE(e));renderAll()})});
+}
+$('#eDel').onclick=()=>{$('#dEntry').close();deleteEntry(editing.id)};
+
+/* ---------- ledger render ---------- */
+let LF='All',LS='date',LDIR=-1,LQ='';
+function renderLedger(){
+ const types=['All','Buy','Sell','Deposit','Withdrawal','Dividend','Fee'];
+ $('#lchips').innerHTML=types.map(t=>'<button class="chip '+(t===LF?'on':'')+'" data-f="'+t+'">'+t+'</button>').join('');
+ $$('#lchips .chip').forEach(b=>b.onclick=()=>{LF=b.dataset.f;renderLedger()});
+ const showDel=$('#showdel').checked;
+ let rows=L.filter(e=>(showDel||!e.deleted)&&(LF==='All'||e.type===LF)&&(!LQ||(e.note+' '+e.inst+' '+e.type).toLowerCase().includes(LQ)));
+ rows.sort((a,b)=>{let x,y;if(LS==='amount'){x=cash(a);y=cash(b)}else if(LS==='type'){x=a.type;y=b.type}else{x=a.date+String(a.id).padStart(4,'0');y=b.date+String(b.id).padStart(4,'0')}return (x>y?1:x<y?-1:0)*LDIR});
+ $('#ltable tbody').innerHTML=rows.map(e=>{const c=cash(e);return '<tr class="'+(e.deleted?'del':'')+'"><td>'+dshow(e.date)+'</td><td><span class="typ '+e.type+'">'+e.type.toUpperCase()+'</span></td><td>'+(e.inst||'—')+'</td><td class="r hm num">'+(e.qty||'')+'</td><td class="r hm num">'+(e.price?f2(e.price):'')+'</td><td class="r hm num">'+(e.fee?f2(e.fee):'—')+'</td><td class="r num '+(c>=0?'pos':'neg')+'">'+(c>=0?'+':'−')+f2(c)+'</td><td class="hm"><span class="src '+(e.src==='Guided'?'g':'')+'">'+(e.src==='Guided'?'Rebalance '+e.rb:e.src)+'</span></td><td class="note hm">'+esc(e.note)+'</td><td class="acts">'+(e.deleted?'<button class="ibtn" data-r="'+e.id+'">Restore</button>':'<button class="ibtn" data-e="'+e.id+'" title="Edit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4L8 20H4v-4z"/></svg> Edit</button><button class="ibtn d" data-d="'+e.id+'" title="Delete"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/></svg></button>')+'</td></tr>'}).join('')||'<tr><td colspan="10" class="muted" style="padding:24px;text-align:center">No entries match.</td></tr>';
+ $$('#ltable [data-e]').forEach(b=>b.onclick=()=>openEntry(+b.dataset.e));
+ $$('#ltable [data-d]').forEach(b=>b.onclick=()=>deleteEntry(+b.dataset.d));
+ $$('#ltable [data-r]').forEach(b=>b.onclick=()=>{const e=L.find(x=>x.id===+b.dataset.r);e.deleted=false;logNow('Restored entry: '+sumE(e));renderAll();toast('Entry restored')});
+ const live=L.filter(e=>!e.deleted);
+ const dep=live.filter(e=>e.type==='Deposit').reduce((s,e)=>s+e.amount,0);
+ $('#lsum').textContent=live.length+' entries · '+f2(dep)+' deposited (sample ledger is partial)'+(L.some(e=>e.deleted)?' · '+L.filter(e=>e.deleted).length+' deleted':'');
+}
+$$('#ltable th.sortable').forEach(th=>th.onclick=()=>{const s=th.dataset.s;if(LS===s)LDIR*=-1;else{LS=s;LDIR=-1}renderLedger()});
+$('#lsearch').oninput=e=>{LQ=e.target.value.toLowerCase();renderLedger()};
+$('#showdel').onchange=renderLedger;
+$$('[data-add]').forEach(b=>b.onclick=()=>openEntry(null,b.dataset.add||'Deposit'));
+function showLT(t){$$('#ltabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['entries','rebal','log'].forEach(x=>$('#lt-'+x).style.display=x===t?'':'none')}
+$$('#ltabs button').forEach(b=>b.onclick=()=>showLT(b.dataset.t));
+$('#imp').onclick=()=>toast('Import opens a preview first: nothing is saved until you confirm (prototype)');
+['exp-led','exp-hist','exp-aud','exp-all'].forEach(i=>$('#'+i).onclick=()=>toast('CSV download (prototype)'));
+
+/* ---------- rebalances ---------- */
+function renderRebal(){
+ $('#rtable tbody').innerHTML=RB.map(r=>{const a=aud(r.q);const g=rbGrowthAmt(r.q);const diff=g==null?null:g-a.amt;
+  const conf=r.status==='confirmed';
+  return '<tr><td><b>'+r.q+'</b></td><td>'+recText(a)+'</td><td class="note" style="white-space:normal">'+(conf?esc(rbFills(r.q))||'—':'<span class="muted">Not recorded yet</span>')+'</td><td class="r num '+(diff==null?'':Math.abs(diff)<2?'':'warnc')+'">'+(diff==null?'—':(diff>=0?'+':'−')+f2(diff))+'</td><td>'+(conf?'<span class="pill ok">Confirmed '+r.date+'</span>':'<span class="pill act">Action needed</span>')+'</td><td class="acts">'+(conf?'<button class="ibtn" data-ef="'+r.q+'"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4L8 20H4v-4z"/></svg> Edit fills</button>'+(r.q==='Q3 2026'?'<button class="ibtn d" data-ro="'+r.q+'"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg> Reopen</button>':''):'<button class="ibtn" data-ef="'+r.q+'">Confirm…</button>')+'</td></tr>'}).join('');
+ $$('#rtable [data-ef]').forEach(b=>b.onclick=()=>openFills(b.dataset.ef));
+ $$('#rtable [data-ro]').forEach(b=>b.onclick=()=>reopen(b.dataset.ro));
+}
+function reopen(q){confirmBox('Reopen '+q+'?','<p class="muted">The action returns to Today as “Action needed”. Your recorded fills stay in the ledger but are marked as unconfirmed, and the baseline created by this confirmation is withdrawn until you confirm again.</p>','Reopen',()=>{const r=RB.find(x=>x.q===q);r.status='pending';logNow('Reopened '+q+' rebalance');renderAll();toast(q+' reopened')})}
+
+/* ---------- fills dialog (guided "I did this") ---------- */
+let fq=null;
+function openFills(q){
+ fq=q;const a=aud(q),r=RB.find(x=>x.q===q),conf=r.status==='confirmed';
+ $('#dfTitle').textContent=conf?'Edit recorded fills · '+q:'Confirm what you did · '+q;
+ $('#dfIntro').textContent=(conf?'Correct what actually happened. ':'Pre-filled from the recommendation. Change anything that differs. ')+'Recommended: '+recText(a)+'.';
+ const growth=(a.act==='Sell');
+ const ex=rbEntries(q);
+ const gi=ex.find(e=>e.inst==='LQQ3.L'),si=ex.find(e=>e.inst==='ERNS.L');
+ const gQty=gi?gi.qty:+(a.amt/a.price).toFixed(2),gP=gi?gi.price:a.price,gF=gi?gi.fee:0;
+ const sQty=si?si.qty:+(a.amt/a.safeP).toFixed(2),sP=si?si.price:a.safeP,sF=si?si.fee:0;
+ const row=(id,side,inst,qty,p,fee)=>'<div class="panel pad" style="padding:14px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:10px"><span class="typ '+side+'">'+side.toUpperCase()+'</span><b>'+inst+'</b><span class="muted right num" id="'+id+'t"></span></div><div class="frow" style="grid-template-columns:repeat(3,minmax(0,1fr))"><label class="fl">Shares<input class="field" type="number" step="any" id="'+id+'q" value="'+qty+'"></label><label class="fl">Price £<input class="field" type="number" step="any" id="'+id+'p" value="'+p+'"></label><label class="fl">Fee £<input class="field" type="number" step="any" id="'+id+'f" value="'+fee+'"></label></div></div>';
+ $('#dfRows').innerHTML=row('g',growth?'Sell':'Buy','LQQ3.L',gQty,gP,gF)+row('s',growth?'Buy':'Sell','ERNS.L',sQty,sP,sF);
+ $('#fDate').value=conf?(ex[0]?ex[0].date:TODAY_S):TODAY_S;
+ ['gq','gp','gf','sq','sp','sf'].forEach(i=>$('#'+i).oninput=fillCheck);
+ fillCheck();$('#fErr').style.display='none';$('#dFills').showModal();
+}
+function fillCheck(){
+ const a=aud(fq),growth=a.act==='Sell';
+ const gv=+$('#gq').value*+$('#gp').value,sv=+$('#sq').value*+$('#sp').value;
+ $('#gt').textContent=f2(gv);$('#st').textContent=f2(sv);
+ const after=growth?(a.actual-gv):(a.actual+gv);
+ const tot=a.actual+(TOTAL-A3.actual);
+ const pct=after/ (q3total(a)) *100, tgt=a.line/(q3total(a))*100;
+ const dd=Math.abs(gv-a.amt);
+ $('#dfCheck').innerHTML='<b>Check:</b> growth fund would be '+f2(after)+' vs signal line '+f2(a.line)+' ('+(after-a.line>=0?'+':'−')+f2(after-a.line)+'). '+(Math.abs(after-a.line)<=Math.max(25,a.amt*.03)?'<span class="ok">Within tolerance of the recommendation.</span>':'<span class="warnc">Differs noticeably from the recommendation. Allowed, but flagged in the history.</span>')+'<br>Difference from recommended trade: '+(gv-a.amt>=0?'+':'−')+f2(gv-a.amt)+'.';
+}
+const q3total=a=>a.actual+(a.q==='Q3 2026'?TOTAL-a.actual:(a.actual*0.42));
+$('#fSave').onclick=()=>{
+ const a=aud(fq),growth=a.act==='Sell',d=$('#fDate').value;
+ const gq=+$('#gq').value,gp=+$('#gp').value,gf=+$('#gf').value||0,sq=+$('#sq').value,sp=+$('#sp').value,sf=+$('#sf').value||0;
+ const eb=$('#fErr');
+ if(!d||d>TODAY_S||!(gq>0&&gp>0&&sq>0&&sp>0)){eb.textContent='Enter valid dates, shares and prices (above zero, not in the future).';eb.style.display='block';return}
+ const r=RB.find(x=>x.q===fq);
+ const set=(inst,type,qty,price,fee)=>{let e=L.find(x=>x.rb===fq&&x.inst===inst&&!x.deleted);const data={type,date:d,inst,qty,price,fee,amount:+(qty*price).toFixed(2),note:e&&e.note||'',src:'Guided',rb:fq};
+  if(e){e.hist.push(sumE(e));Object.assign(e,data)}else{L.push(Object.assign({id:++seq,hist:[],deleted:false},data))}};
+ set('LQQ3.L',growth?'Sell':'Buy',gq,gp,gf);set('ERNS.L',growth?'Buy':'Sell',sq,sp,sf);
+ const was=r.status;r.status='confirmed';r.date=dshow(d).replace(/ 20(\d\d)$/,' 20$1');
+ const gv=gq*gp;r.adj=Math.abs(gv-a.amt)>2?'fills differ by '+f2(gv-a.amt):'';
+ logNow((was==='pending'?'Confirmed ':'Edited fills for ')+fq+' rebalance ('+(growth?'Sell':'Buy')+' LQQ3.L '+gq+' @ '+f2(gp)+')');
+ $('#dFills').close();renderAll();toast(fq+' '+(was==='pending'?'confirmed · baseline saved · next review 31 Dec':'fills updated'));
+};
+
+/* ---------- Today ---------- */
+function renderToday(){
+ const a=A3,r=RB[0],pending=r.status==='pending';
+ const sellSh=a.amt/a.price,buySh=a.amt/a.safeP;
+ const slot=$('#actionslot');
+ if(pending){
+  slot.innerHTML='<section class="panel pad action"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><span class="pill act"><span class="dot"></span> Action needed</span><span class="muted" style="font-size:.9rem">Q3 review · quarter ended '+a.end+'</span></div>'+
+  '<h2 style="font-size:1.45rem;letter-spacing:-.02em;margin-bottom:6px">Move '+g0(a.amt)+' from growth to safe</h2><p class="muted" style="margin-bottom:16px">Your growth holding is above its signal line. Place these two trades at Trading 212, then confirm.</p>'+
+  '<div style="display:grid;gap:10px"><div class="trade"><span class="side sell">SELL</span><div><b>LQQ3.L</b><small>WisdomTree Nasdaq 100 3x Daily</small></div><div class="amt num">'+g0(a.amt)+'<small>≈ '+sellSh.toFixed(2)+' shares @ '+f2(a.price)+'</small></div></div>'+
+  '<div class="trade"><span class="side buy">BUY</span><div><b>ERNS.L</b><small>iShares GBP Ultrashort Bond</small></div><div class="amt num">'+g0(a.amt)+'<small>≈ '+buySh.toFixed(1)+' shares @ '+f2(a.safeP)+'</small></div></div></div>'+
+  '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 14px"><button class="btn primary" id="didit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg> I did this</button><button class="btn ghost" id="adjfills">Adjust fills</button></div>'+
+  '<details class="calc" style="margin-bottom:10px"><summary>Step by step</summary><ol class="steps"><li class="done"><i>✓</i>Quarter closed &amp; prices verified</li><li class="done"><i>✓</i>Recommendation calculated</li><li><i>3</i>Place the 2 trades at Trading 212</li><li><i>4</i>Press “I did this” and adjust the fills if needed</li><li><i>5</i>New baseline saved · next review 31 Dec</li></ol></details>'+
+  '<details class="calc"><summary>How was this calculated?</summary><table class="calc2" style="margin-top:8px"><tr><td>Last quarter’s signal line × 1.09</td><td>'+f2(a.grown)+'</td></tr><tr><td>+ half of this quarter’s new money ('+f2(a.contrib)+' ÷ 2)</td><td>'+f2(a.half)+'</td></tr><tr class="hl"><td>Signal line</td><td>'+f2(a.line)+'</td></tr><tr><td>Growth fund now ('+a.shares+' × '+f2(a.price)+')</td><td>'+f2(a.actual)+'</td></tr><tr class="hl"><td>Above the line by</td><td>'+f2(a.diff)+'</td></tr></table><p class="cap"><a href="#breakdown">See every step in Breakdown →</a></p></details></section>';
+  $('#didit').onclick=()=>openFills('Q3 2026');$('#adjfills').onclick=()=>openFills('Q3 2026');
+ }else{
+  slot.innerHTML='<section class="panel pad" style="border-color:#215a47"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><span class="pill ok"><span class="dot"></span> All good</span></div><h2 style="font-size:1.45rem;letter-spacing:-.02em;margin-bottom:6px">Nothing to do until 31 Dec</h2><p class="muted">Q3 rebalance confirmed '+r.date+'. Your next review is the Q4 quarter-end; the alert goes to email + Discord. Money you add before then counts towards it.</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px"><button class="btn" data-add="Deposit" id="contrib2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Record a contribution</button><a class="btn ghost" href="#ledger">Review the ledger</a></div></section>';
+  $('#contrib2').onclick=()=>openEntry(null,'Deposit');
+ }
+ /* alloc */
+ const grow=pending?a.actual:(a.line);const gpct=grow/TOTAL*100,tgt=60;
+ $('#alloc').innerHTML='<div class="kv"><span>Growth (LQQ3.L)</span><b class="num">'+gpct.toFixed(1)+'% <span class="muted" style="font-weight:400">/ target 60%</span></b></div><div class="bar" style="margin:6px 0 14px"><span style="width:'+gpct+'%;background:#6ea8fe"></span><em style="left:60%"></em></div><div class="kv"><span>Safe (ERNS.L)</span><b class="num">'+(100-gpct).toFixed(1)+'% <span class="muted" style="font-weight:400">/ target 40%</span></b></div><div class="bar" style="margin:6px 0 4px"><span style="width:'+(100-gpct)+'%;background:#9aa8bd"></span><em style="left:40%"></em></div><p class="cap">Drift '+(gpct-60>=0?'+':'−')+Math.abs(gpct-60).toFixed(1)+' pp '+(gpct>=60?'towards growth':'towards safe')+'. White marker = target.'+(pending?'':' The signal line, not a fixed 60/40, sets your trades each quarter.')+'</p>';
+ /* timeline */
+ const items=[{c:'next',h:'31 Dec 2026 · Q4 review',s:'73 days away · alert goes to email + Discord'}].concat(RB.map(r=>{const x=aud(r.q);const conf=r.status==='confirmed';
+   const g=rbGrowthAmt(r.q);
+   return {c:conf?'done':'now',h:x.end+' · '+r.q.split(' ')[0]+' review'+(conf?'':' — action needed'),s:conf?((x.act==='Sell'?'Sold ':'Bought ')+g0(g==null?x.amt:g)+' growth · confirmed '+r.date+(r.adj?' ('+r.adj+')':'')):recText(x)+' · not yet confirmed',q:r.q}}));
+ items.push({c:'done old',h:'30 Sep 2025 · Q3 review',s:'Bought £450 growth · confirmed 1 Oct'},{c:'done old',h:'30 Jun 2025 · Q2 review',s:'30 Down active · sell skipped'},{c:'done old',h:'31 Mar 2025 · Q1 review',s:'Bought £620 growth · confirmed 2 Apr'});
+ $('#tl').innerHTML=items.map(i=>'<li class="'+i.c+'"><b>'+i.h+(i.q?' <a class="vb" href="#breakdown" data-bq="'+i.q+'">breakdown →</a>':'')+'</b><small>'+i.s+'</small></li>').join('');
+ $$('#tl [data-bq]').forEach(l=>l.onclick=()=>{$('#bq').value=l.dataset.bq;renderBreakdown()});
+ const gain=TOTAL-12400;
+}
+$('#showall').onclick=e=>{e.preventDefault();const t=$('#tl');t.classList.toggle('all');e.target.textContent=t.classList.contains('all')?'Show fewer quarters':'Show all quarters'};
+
+/* ---------- History ---------- */
+function renderHistory(){
+ const rows=[['Q3 2026',13660,300,14820,860,'Sell '+g0(A3.amt),'RB'],['Q2 2026',12000,620,13660,1040,'Buy '+g0(AUD[1].amt),'RB'],['Q1 2026',12280,200,12000,-480,'Buy '+g0(AUD[2].amt),'RB'],['Q4 2025',11400,100,12280,780,'Sell '+g0(AUD[3].amt),'RB'],['Q3 2025',10300,450,11400,650,'Buy £450',''],['Q2 2025',9900,0,10300,400,'Sell skipped (30 Down)','']];
+ $('#qtable tbody').innerHTML=rows.map(r=>{const pct=r[4]/(r[1]+r[2])*100;const rb=RB.find(x=>x.q===r[0]);const did=r[6]?(rb.status==='confirmed'?'Confirmed '+rb.date:'<span class="pill act">Pending</span>'):'Confirmed';
+  return '<tr><td>'+(aud(r[0])?'<a href="#breakdown" data-bq="'+r[0]+'"><b>'+r[0]+'</b></a>':'<b>'+r[0]+'</b>')+'</td><td class="r num">'+g0(r[1])+'</td><td class="r num">'+g0(r[2])+'</td><td class="r num">'+g0(r[3])+'</td><td class="r num '+(r[4]>=0?'pos':'neg')+'">'+(r[4]>=0?'+':'−')+g0(r[4])+'</td><td class="r num '+(r[4]>=0?'pos':'neg')+'">'+(pct>=0?'+':'−')+Math.abs(pct).toFixed(1)+'%</td><td>'+r[5]+'</td><td>'+did+'</td></tr>'}).join('');
+ $$('#qtable [data-bq]').forEach(l=>l.onclick=()=>{$('#bq').value=l.dataset.bq;renderBreakdown()});
+}
+
+/* ---------- Breakdown ---------- */
+function renderBreakdown(){
+ const sel=$('#bq');if(!sel.options.length)AUD.forEach(a=>sel.add(new Option(a.q+' · quarter ended '+a.end,a.q)));
+ const a=aud(sel.value),r=RB.find(x=>x.q===a.q),conf=r.status==='confirmed';
+ $('#bt').textContent=a.q+' review · calculation';
+ $('#bstat').innerHTML=conf?'<span class="pill ok">Confirmed '+r.date+'</span>':'<span class="pill act">Action needed</span>';
+ const row=(l,v,c)=>'<tr class="'+(c||'')+'"><td>'+l+'</td><td>'+v+'</td></tr>';
+ const buyBand=a.bp*.9;
+ $('#bcalc').innerHTML=
+  row('1 · Signal line','','hd')+row('Previous quarter’s signal line',f2(a.prev))+row('× 1.09 growth',f2(a.grown))+
+  row('New money added this quarter',f2(a.contrib)+' <span class="muted">('+a.list.join(', ')+')</span>')+row('+ half of new money',f2(a.half))+row('Signal line for '+a.q,f2(a.line),'hl')+
+  row('2 · Where you actually are','','hd')+row('Growth fund holding',a.shares+' shares')+row('Closing price (£)',f2(a.price)+' <span class="muted">(GBX '+(a.price*100).toFixed(0)+' ÷ 100)</span>')+row('Growth fund value',f2(a.actual),'hl')+
+  row('3 · Difference','','hd')+row(a.diff>0?'Above the signal line by':'Below the signal line by',f2(a.diff),'hl')+
+  row('4 · Rules','','hd')+row('SPY close vs highest of previous 8 quarters','$'+a.spy[0].toFixed(2)+' vs $'+a.spy[1].toFixed(2)+' ('+(a.down*100).toFixed(1)+'% below)')+row('30 Down active? (needs ≥30% below)',a.d30?'<span class="warnc">Yes: sell skipped</span>':'<span class="ok">No</span>')+
+  (a.act==='Buy'?row('Buying power (cash + bonds)',f2(a.bp))+row('90% test: shortfall below '+f2(buyBand)+'?',a.amt<buyBand?'<span class="ok">Yes: fund in full</span>':'No: capped at 81%'):row('Buying throttle','n/a (this is a sell)'))+
+  row('5 · Result','','hd')+row('Recommended action',recText(a),'hl')+
+  row('Approx. trade size',(a.act==='Sell'?'sell ':'buy ')+(a.amt/a.price).toFixed(2)+' LQQ3.L @ '+f2(a.price));
+ const ex=rbEntries(a.q);
+ $('#bfills').innerHTML=conf?'<table class="calc2"><tr><td>Recommended</td><td>'+recText(a)+'</td></tr><tr><td>Recorded</td><td>'+esc(rbFills(a.q))+'</td></tr><tr class="hl"><td>Growth-leg difference</td><td>'+(()=>{const g=rbGrowthAmt(a.q);return g==null?'—':((g-a.amt>=0?'+':'−')+f2(g-a.amt))})()+'</td></tr></table><div class="dfoot" style="justify-content:flex-start;margin-top:12px"><button class="btn" id="bef"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4L8 20H4v-4z"/></svg> Edit fills</button></div>':'<p class="muted">No fills recorded yet.</p><div class="dfoot" style="justify-content:flex-start;margin-top:12px"><button class="btn primary" id="bef">Confirm what I did…</button></div>';
+ $('#bef').onclick=()=>openFills(a.q);
+ const d=[['LQQ3.L close',f2(a.price),'Yahoo · '+a.end+' · GBX ÷ 100','✓ date & unit'],['ERNS.L close',f2(a.safeP),'Yahoo · '+a.end+' · GBP','✓ date & unit'],['SPY close','$'+a.spy[0].toFixed(2),'Yahoo · '+a.end+' · USD','✓ matches fallback'],['SPY 8-quarter high','$'+a.spy[1].toFixed(2),'Yahoo · 8 quarters','✓ complete history'],['Ledger replay','to '+a.end,'Your entries ('+L.filter(e=>!e.deleted&&e.date<=a.endISO).length+')','✓ no negative cash']];
+ $('#bdata tbody').innerHTML=d.map(x=>'<tr><td>'+x[0]+'</td><td class="r num">'+x[1]+'</td><td>'+x[2]+'</td><td class="ok">'+x[3]+'</td></tr>').join('');
+ $('#bchecks').innerHTML=['Prices are quarter-end closes, not intraday','Quote units converted (GBX → £) and currency verified','No holdings outside this strategy','Strategy version nine-sig@1 · instrument map 2026-10-19.1','No stale or on-hold prices used'].map(x=>'<li><span class="ok">✓</span><span>'+x+'</span></li>').join('')+'<li><span class="warnc">!</span><span>Not yet compared with your spreadsheet. Use “CSV for spreadsheet”.</span></li>';
+}
+$('#bq').onchange=renderBreakdown;
+
+/* ---------- Strategy alert matrix + settings ---------- */
+const ALERTS=['Quarter-end action (with exact trades)','Urgent mid-quarter (spike, 30 Down)','Reminder if I haven’t acted','Contribution reminder','Data problem near a review date'];
+const DEF=[[1,1,0],[1,1,1],[1,0,0],[0,0,0],[1,1,0]];
+$('#alertmx').innerHTML=ALERTS.map((a,i)=>'<tr><td>'+a+'</td>'+DEF[i].map((v,j)=>'<td><input type="checkbox" '+(v?'checked':'')+(j===2?' disabled title="Set up push in Settings"':'')+'></td>').join('')+'</tr>').join('');
+$$('#alertmx input').forEach(c=>c.onchange=()=>toast('Alert preference saved'));
+$$('[data-test]').forEach(b=>b.onclick=()=>toast(b.dataset.test+' test sent (prototype)'));
+
+
+
+/* ---------- charts ---------- */
+function mountCharts(){
+ $$('[data-perf]').forEach(box=>{
+  const host=box.querySelector('.chart'),chg=box.dataset.chg;let range='All';
+  const draw1=()=>{if(host.clientWidth>0)draw(host,range,+host.dataset.h||280,chg)};
+  box.querySelectorAll('.ranges button').forEach(bt=>{bt.onclick=()=>{box.querySelectorAll('.ranges button').forEach(x=>x.classList.remove('on'));bt.classList.add('on');range=bt.dataset.r;draw1()}});
+  draw1();new ResizeObserver(draw1).observe(host);
+ });
+}
+
+function renderAll(){
+ if(typeof renderOverview==='function')renderOverview();renderLedger();renderRebal();renderToday();renderHistory();
+ $$('[data-add]').forEach(b=>b.onclick=()=>openEntry(null,b.dataset.add||'Deposit'));
+ $('#logl').innerHTML=LOG.map(l=>'<li><time>'+l.t+'</time><span>'+esc(l.x)+'</span></li>').join('');
+ const since='2026-04-06';
+ const used=L.filter(e=>!e.deleted&&e.type==='Deposit'&&e.date>=since).reduce((s,e)=>s+e.amount,0);
+ $('#isa-used').innerHTML=f2(used)+' <span class="muted" style="font-weight:400">/ £20,000</span>';
+ if($('#bq').options.length)renderBreakdown();
+}
+
+
+/* ================= v2: strategies, catalogue, onboarding, router ================= */
+const CAT={
+ strategies:{
+  '9sig':{name:'9Sig',color:'#6ea8fe',risk:'High risk',cadence:'Quarterly',desc:'60% 3× leveraged Nasdaq-100 / 40% short-term bonds. A signal line grows 9% a quarter; you sell above it and buy below it.',roles:{growth:['3× Nasdaq-100',60],safe:['Short-term GBP bonds',40]}},
+  'aw':{name:'All Weather',color:'#c9a5ff',risk:'Moderate risk',cadence:'Annual',desc:'30% stocks, 40% long bonds, 15% intermediate bonds, 7.5% gold, 7.5% commodities. Rebalanced yearly or on 5 pp drift.',roles:{stocks:['Global equities',30],long:['Long-term government bonds',40],inter:['Intermediate government bonds',15],gold:['Gold',7.5],comm:['Broad commodities',7.5]}},
+  '6040':{name:'Classic 60/40',soon:true,desc:'Coming later'},
+  'perm':{name:'Permanent Portfolio',soon:true,desc:'Coming later'}
+ },
+ platforms:{
+  t212:{name:'Trading 212',types:['ISA','GIA'],no:{SIPP:'Trading 212 doesn’t offer a SIPP (to my knowledge; verify)'}},
+  ajbell:{name:'AJ Bell',soon:true},hl:{name:'Hargreaves Lansdown',soon:true},vg:{name:'Vanguard UK',soon:true}
+ },
+ types:{ISA:{name:'Stocks & Shares ISA',sub:'Tax-free · £20,000 a year allowance'},GIA:{name:'General Investment Account',sub:'No allowance · gains and dividends may be taxable'},SIPP:{name:'SIPP (pension)',sub:'Tax relief added · locked until pension age'}},
+ rows:[
+  ['9sig','growth','t212',['ISA','GIA'],'WisdomTree Nasdaq 100 3x Daily Leveraged','LQQ3.L','IE00BLRPRL42','pending'],
+  ['9sig','safe','t212',['ISA','GIA'],'iShares GBP Ultrashort Bond UCITS ETF','ERNS.L','IE00BCRY6441','pending'],
+  ['aw','stocks','t212',['ISA','GIA'],'Vanguard FTSE All-World UCITS ETF (Acc)','VWRP.L','IE00BK5BQT80','draft'],
+  ['aw','long','t212',['ISA','GIA'],'iShares $ Treasury Bond 20+yr UCITS ETF','IDTL.L','IE00BSKRJZ44','draft'],
+  ['aw','inter','t212',['ISA','GIA'],'iShares $ Treasury Bond 7-10yr UCITS ETF','IBTM.L','to verify','draft'],
+  ['aw','gold','t212',['ISA','GIA'],'iShares Physical Gold ETC','SGLN.L','IE00B4ND3602','draft'],
+  ['aw','comm','t212',['ISA','GIA'],'iShares Diversified Commodity Swap UCITS ETF','ICOM.L','to verify','draft']
+ ]
+};
+const ST={pending:['warn','Account check pending'],draft:['','Draft · not verified'],verified:['ok','Verified']};
+const stPill=s=>'<span class="pill '+ST[s][0]+'">'+ST[s][1]+'</span>';
+let STRATS=[
+ {key:'9sig',strat:'9sig',name:'9Sig',type:'ISA',platform:'t212',value:14820,contrib:12400,xirr:14.2,next:'31 Dec 2026',since:'3 Nov 2016',full:true},
+ {key:'aw',strat:'aw',name:'All Weather',type:'GIA',platform:'t212',value:8240,contrib:7500,xirr:6.8,next:'4 Jan 2027',since:'2 Jan 2025',aw:true}
+];
+const SUBS=[['today','Today'],['history','History'],['ledger','Ledger'],['strategy','Strategy'],['breakdown','Breakdown']];
+let OPEN={'9sig':true};
+function stStatus(s){
+ if(s.key==='9sig')return RB[0].status==='pending'?['act','Action needed']:['ok','All good'];
+ if(s.aw)return['ok','All good'];
+ return['','Awaiting first entries'];
+}
+function renderNav(){
+ $('#sgroups').innerHTML=STRATS.map(s=>{const c=CAT.strategies[s.strat].color,st=stStatus(s);
+  return '<div class="g '+(OPEN[s.key]?'open':'')+'" data-g="'+s.key+'"><button class="grp" type="button" title="'+s.name+'" aria-expanded="'+(!!OPEN[s.key])+'"><span class="av" style="background:'+c+'">'+s.name.replace(/[^A-Za-z0-9]/g,'').slice(0,2)+'</span><span class="lab">'+s.name+'</span><span class="acct">'+s.type+'</span>'+(st[0]==='act'?'<span class="ndot" title="Action needed"></span>':'')+IC.chev.replace('class="ic"','class="ic chev"')+'</button><div class="subs">'+
+  SUBS.map(x=>'<a data-nav="'+s.key+'/'+x[0]+'" href="#'+s.key+'/'+x[0]+'">'+IC[x[0]]+'<span class="lab">'+x[1]+'</span></a>').join('')+'</div></div>'}).join('');
+ $$('#sgroups .grp').forEach(b=>b.onclick=()=>{const k=b.parentElement.dataset.g;
+  if(document.body.classList.contains('rail-min')){location.hash=k+'/today';return}
+  OPEN[k]=!OPEN[k];b.parentElement.classList.toggle('open',OPEN[k]);b.setAttribute('aria-expanded',OPEN[k])});
+ markNav();
+ $('#setStrats').innerHTML=STRATS.map(s=>'<div class="srow"><div class="t"><b>'+s.name+'</b><small>'+CAT.platforms[s.platform].name+' · '+CAT.types[s.type].name+' · since '+s.since+'</small></div><a class="btn ghost" href="#'+s.key+'/strategy">View</a></div>').join('');
+}
+
+/* overview */
+function renderOverview(){
+ if(!$('#ovKpis'))return;
+ const tv=STRATS.reduce((a,s)=>a+s.value,0),tc=STRATS.reduce((a,s)=>a+s.contrib,0),g=tv-tc;
+ const acts=STRATS.filter(s=>stStatus(s)[0]==='act');
+ $('#ovKpis').innerHTML=[['Total value',g0(tv),STRATS.length+' strategies'],['Contributed',g0(tc),''],['Gain',(g>=0?'+':'−')+g0(g),(g/tc*100).toFixed(1)+'%','pos'],['Actions needed',String(acts.length),acts.length?'see below':'nothing to do',acts.length?'':'']].map(k=>'<div class="panel pad"><div class="lbl">'+k[0]+'</div><div class="big num '+(k[3]||'')+'" style="font-size:1.5rem;margin:4px 0">'+k[1]+'</div><div class="muted" style="font-size:.84rem">'+k[2]+'</div></div>').join('');
+ $('#ovAttN').textContent=acts.length?acts.length+' action':'';
+ $('#ovAtt').innerHTML=(acts.length?acts.map(s=>'<div class="att"><span class="av" style="background:'+CAT.strategies[s.strat].color+'">'+s.name.slice(0,2)+'</span><div class="t"><b>'+s.name+' · Q3 rebalance</b><small>'+recText(A3)+' · '+s.type+'</small></div><a class="btn" href="#'+s.key+'/today">Open '+IC.arrow+'</a></div>').join(''):'<div class="att"><div class="t"><b>All good</b><small>No strategy needs anything from you right now.</small></div></div>')+
+  '<div class="att"><span class="pill warn" style="flex:0 0 auto">Check</span><div class="t"><b>All Weather instruments not verified</b><small>Tracking only until the catalogue entries are verified.</small></div><a class="btn ghost" href="#catalogue">Catalogue</a></div>';
+ $('#ovTbl tbody').innerHTML=STRATS.map(s=>{const gg=s.value-s.contrib,st=stStatus(s);return '<tr><td><a href="#'+s.key+'/today" style="color:var(--text);display:flex;align-items:center;gap:8px"><span class="av" style="background:'+CAT.strategies[s.strat].color+'">'+s.name.slice(0,2)+'</span><span><b style="font-weight:600">'+s.name+'</b> <span class="acct">'+s.type+'</span><span class="stat-s" style="display:block">'+(s.next?'Next: '+s.next+(s.xirr?' · XIRR +'+s.xirr+'%':''):'Not started')+'</span></span></a></td><td class="r num">'+(s.value?g0(s.value):'—')+'</td><td class="r num '+(gg>=0?'pos':'neg')+'">'+(s.value?(gg>=0?'+':'−')+g0(gg)+'<span class="stat-s" style="display:block">'+(gg/s.contrib*100).toFixed(1)+'%</span>':'—')+'</td><td><span class="pill '+st[0]+'">'+st[1]+'</span></td></tr>'}).join('');
+ $('#ovTl').innerHTML=[['next','31 Dec 2026 · 9Sig Q4 review','ISA · alert to email + Discord'],['next','4 Jan 2027 · All Weather annual review','GIA · or earlier if drift exceeds 5 pp'],['future','5 Apr 2027 · Tax year ends','ISA allowance resets on 6 Apr']].concat(STRATS.filter(s=>!s.full&&!s.aw).map(s=>['future','Next step · '+s.name,'Record your starting holdings to begin'])).map(x=>'<li class="'+x[0]+'"><b>'+x[1]+'</b><small>'+x[2]+'</small></li>').join('');
+ const cols=STRATS.map(s=>CAT.strategies[s.strat].color);
+ $('#ovBy').innerHTML=STRATS.map((s,i)=>'<span style="width:'+(s.value/tv*100)+'%;background:'+cols[i]+'"></span>').join('');
+ $('#ovByLg').innerHTML=STRATS.map((s,i)=>'<span><i style="background:'+cols[i]+'"></i>'+s.name+' '+(s.value/tv*100).toFixed(0)+'%</span>').join('');
+ const growth=(RB[0].status==='pending'?A3.actual:A3.line),nsafe=14820-growth;
+ const ac=[['3× leveraged equity',growth,'#6ea8fe'],['Global equity',8240*.312,'#8fd3c7'],['Bonds',nsafe+8240*.54,'#9aa8bd'],['Gold',8240*.079,'#e0b252'],['Commodities',8240*.069,'#c9a5ff']];
+ $('#ovAc').innerHTML=ac.map(a=>'<span style="width:'+(a[1]/tv*100)+'%;background:'+a[2]+'"></span>').join('');
+ $('#ovAcLg').innerHTML=ac.map(a=>'<span><i style="background:'+a[2]+'"></i>'+a[0]+' '+(a[1]/tv*100).toFixed(1)+'%</span>').join('');
+ const used=L.filter(e=>!e.deleted&&e.type==='Deposit'&&e.date>='2026-04-06').reduce((s,e)=>s+e.amount,0);
+ $('#ovIsa').innerHTML=f2(used)+' <span class="muted" style="font-weight:400">of £20,000 · ISA strategies: '+STRATS.filter(s=>s.type==='ISA').map(s=>s.name).join(', ')+'</span>';
+ $('#ovIsaBar').style.width=Math.max(1,used/20000*100)+'%';
+ renderNav();
+}
+
+/* All Weather */
+(function(){
+ const r=CAT.rows.filter(x=>x[0]==='aw'),act=[31.2,38.4,15.6,7.9,6.9];
+ $('#awAlloc').innerHTML=r.map((x,i)=>{const t=CAT.strategies.aw.roles[x[1]][1],d=act[i]-t;return '<div class="kv"><span>'+CAT.strategies.aw.roles[x[1]][0]+' <span class="muted">('+x[5]+')</span></span><b class="num">'+act[i].toFixed(1)+'% <span class="muted" style="font-weight:400">/ '+t+'% · '+(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pp</span></b></div><div class="bar" style="margin:6px 0 12px"><span style="width:'+act[i]+'%;background:var(--accent)"></span><em style="left:'+t+'%"></em></div>'}).join('')+'<p class="cap">Rebalance triggers: annual review on the first trading day of January, or any holding more than 5 pp from target.</p>';
+ $('#awInst tbody').innerHTML=r.map(x=>{const ro=CAT.strategies.aw.roles[x[1]];return '<tr><td>'+ro[0]+'</td><td class="r">'+ro[1]+'%</td><td>'+x[4]+'</td><td>'+x[5]+'</td><td class="num">'+x[6]+'</td><td>'+stPill(x[7])+'</td></tr>'}).join('');
+})();
+
+/* catalogue */
+let CF='all';
+function renderCat(){
+ const ks=Object.keys(CAT.strategies);
+ $('#catChips').innerHTML=['all'].concat(ks).map(k=>'<button class="chip '+(CF===k?'on':'')+'" data-k="'+k+'">'+(k==='all'?'All strategies':CAT.strategies[k].name+(CAT.strategies[k].soon?' (soon)':''))+'</button>').join('');
+ $$('#catChips .chip').forEach(b=>b.onclick=()=>{CF=b.dataset.k;renderCat()});
+ const ty=$('#catType').value;
+ const rows=CAT.rows.filter(x=>(CF==='all'||x[0]===CF)&&(!ty||x[3].includes(ty)));
+ $('#catTbl tbody').innerHTML=rows.map(x=>{const s=CAT.strategies[x[0]],ro=s.roles[x[1]];return '<tr><td>'+s.name+'</td><td>'+ro[0]+'</td><td class="r">'+ro[1]+'%</td><td>'+CAT.platforms[x[2]].name+'</td><td>'+x[3].map(t=>'<span class="acct">'+t+'</span>').join(' ')+'</td><td>'+x[4]+'</td><td>'+x[5]+'</td><td class="num">'+x[6]+'</td><td>'+stPill(x[7])+'</td></tr>'}).join('')||'<tr><td colspan="9" class="empty">'+(ty==='SIPP'?'No SIPP mappings yet. Trading 212 doesn’t offer a SIPP; another platform would be needed.':(CF!=='all'&&CAT.strategies[CF].soon?CAT.strategies[CF].name+' isn’t available yet.':'No instruments match.'))+'</td></tr>';
+ $('#catNote').textContent='Not mapped yet: AJ Bell, Hargreaves Lansdown, Vanguard UK. Every entry needs a source link and a “verified on” date before it can drive trade instructions.';
+}
+$('#catType').onchange=renderCat;
+
+/* onboarding wizard */
+let W;
+function openWiz(){W={step:1,strat:null,platform:'t212',type:null,name:'',start:TODAY_S,mode:'fresh',cash:'',ack:false,alerts:{act:[1,1],urg:[1,1],rem:[1,0]}};renderWiz();$('#dWiz').showModal()}
+const rowsFor=()=>CAT.rows.filter(x=>x[0]===W.strat&&x[2]===W.platform&&x[3].includes(W.type));
+function renderWiz(){
+ $('#wzSteps').innerHTML=[1,2,3,4,5].map(i=>'<span class="'+(i<=W.step?'on':'')+'"></span>').join('');
+ $('#wzErr').style.display='none';
+ $('#wzBack').style.visibility=W.step>1?'visible':'hidden';
+ $('#wzNext').textContent=W.step===5?'Create strategy':'Continue';
+ const b=$('#wzBody');let h='';
+ if(W.step===1){
+  $('#wzTitle').textContent='Add a strategy · choose one';
+  h='<div class="opts">'+Object.entries(CAT.strategies).map(([k,s])=>'<button type="button" class="opt '+(W.strat===k?'on':'')+'" data-s="'+k+'" '+(s.soon?'disabled':'')+'><span class="av" style="background:'+(s.color||'#3a414c')+'">'+s.name.replace(/[^A-Za-z0-9]/g,'').slice(0,2)+'</span><span><b>'+s.name+(s.soon?' · coming later':'')+'</b><small>'+(s.risk?s.risk+' · '+s.cadence+' review · ':'')+s.desc+'</small></span></button>').join('')+'</div>';
+ }
+ if(W.step===2){
+  $('#wzTitle').textContent='Where will you run '+CAT.strategies[W.strat].name+'?';
+  h='<label class="fl">Platform<select class="field" id="wzPlat">'+Object.entries(CAT.platforms).map(([k,p])=>'<option value="'+k+'" '+(p.soon?'disabled':'')+' '+(W.platform===k?'selected':'')+'>'+p.name+(p.soon?' (not mapped yet)':'')+'</option>').join('')+'</select></label><div class="lbl">Account type</div><div class="opts">'+
+   Object.entries(CAT.types).map(([k,t])=>{const p=CAT.platforms[W.platform],has=CAT.rows.some(x=>x[0]===W.strat&&x[2]===W.platform&&x[3].includes(k)),ok=p.types.includes(k)&&has;
+    const why=!p.types.includes(k)?(p.no&&p.no[k]||'Not offered on this platform'):(!has?'No instruments mapped for this account yet':'');
+    return '<button type="button" class="opt '+(W.type===k?'on':'')+'" data-t="'+k+'" '+(ok?'':'disabled')+'><span><b>'+t.name+'</b><small>'+(why||t.sub)+'</small></span></button>'}).join('')+'</div>';
+  const dup=W.type&&STRATS.find(s=>s.strat===W.strat&&s.type===W.type);
+  if(dup)h+='<div class="impact"><b>You already run '+dup.name+' in a '+W.type+'.</b> You can add it again as a separate strategy (for example in a second account); it will have its own ledger and history.</div>';
+ }
+ if(W.step===3){
+  const rs=rowsFor(),pend=rs.some(r=>r[7]==='pending'),draft=rs.some(r=>r[7]==='draft');
+  $('#wzTitle').textContent='Instruments you’ll hold';
+  h='<p class="muted" style="font-size:.9rem">Fixed by the strategy for '+CAT.platforms[W.platform].name+' · '+CAT.types[W.type].name+'. You can’t change these.</p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Role</th><th class="r">Target</th><th>Instrument</th><th>Ticker</th><th>Status</th></tr></thead><tbody>'+rs.map(r=>{const ro=CAT.strategies[W.strat].roles[r[1]];return '<tr><td>'+ro[0]+'</td><td class="r">'+ro[1]+'%</td><td style="white-space:normal">'+r[4]+'</td><td>'+r[5]+'</td><td>'+stPill(r[7])+'</td></tr>'}).join('')+'</tbody></table></div>';
+  if(draft)h+='<div class="impact"><b>Tracking only.</b> Some instruments are draft and not yet verified. You can track holdings, drift and performance, but the app won’t give trade instructions until every instrument is verified.</div>';
+  if(pend)h+='<div class="info">The issuers and Trading 212 list these, but only you can confirm they’re buyable in <b>your</b> '+CAT.types[W.type].name+'.</div>';
+  h+='<label class="sw" style="align-items:flex-start"><input type="checkbox" id="wzAck" '+(W.ack?'checked':'')+'> <span>I’ve checked these instruments in my '+CAT.platforms[W.platform].name+' account'+(draft?' and understand this strategy starts in tracking-only mode':'')+'.</span></label>';
+ }
+ if(W.step===4){
+  $('#wzTitle').textContent='Your starting point';
+  if(!W.name)W.name=CAT.strategies[W.strat].name+(STRATS.some(s=>s.strat===W.strat)?' · '+W.type:'');
+  const rs=rowsFor();
+  h='<div class="frow"><label class="fl">Name in the menu<input class="field" id="wzName" value="'+esc(W.name)+'" maxlength="28"></label><label class="fl">Start date<input class="field" type="date" id="wzStart" max="'+TODAY_S+'" value="'+W.start+'"></label></div>'+
+   '<div class="opts two-c"><button type="button" class="opt '+(W.mode==='fresh'?'on':'')+'" data-m="fresh"><span><b>Starting fresh</b><small>I’ll deposit cash and buy the target mix</small></span></button><button type="button" class="opt '+(W.mode==='hold'?'on':'')+'" data-m="hold"><span><b>I already hold these</b><small>Enter current shares and average price</small></span></button></div>'+
+   (W.mode==='fresh'?'<label class="fl">Starting deposit (£)<input class="field" type="number" min="0" step="any" id="wzCash" value="'+W.cash+'"></label>':'<div class="stack">'+rs.map(r=>'<div class="frow"><label class="fl">'+r[5]+' shares<input class="field" type="number" min="0" step="any"></label><label class="fl">Average price £<input class="field" type="number" min="0" step="any"></label></div>').join('')+'</div>');
+  if(W.type==='ISA'){const used=L.filter(e=>!e.deleted&&e.type==='Deposit'&&e.date>='2026-04-06').reduce((s,e)=>s+e.amount,0);h+='<div class="info" id="wzIsa">ISA allowance used this tax year across your ISAs: <b>'+f2(used)+'</b> of £20,000.</div>'}
+  if(W.type==='GIA')h+='<div class="info">GIA: gains and dividends may be taxable. The app can show a simple gains and dividends summary per tax year (not tax advice).</div>';
+ }
+ if(W.step===5){
+  $('#wzTitle').textContent='Alerts for '+W.name;
+  const rowsA=[['act','Rebalance or action needed (with exact trades)'],['urg','Urgent mid-period warnings'],['rem','Reminder if I haven’t acted']];
+  h='<div class="tbl-wrap"><table class="tbl mx"><thead><tr><th>Alert</th><th>Email</th><th>Discord</th></tr></thead><tbody>'+rowsA.map(r=>'<tr><td>'+r[1]+'</td>'+W.alerts[r[0]].map((v,j)=>'<td><input type="checkbox" data-a="'+r[0]+'" data-j="'+j+'" '+(v?'checked':'')+'></td>').join('')+'</tr>').join('')+'</tbody></table></div>'+
+   '<div class="info"><b>Summary:</b> '+CAT.strategies[W.strat].name+' in '+CAT.platforms[W.platform].name+' · '+CAT.types[W.type].name+', starting '+dshow(W.start)+(W.mode==='fresh'&&W.cash?' with '+f2(+W.cash):'')+'. A new <b>'+esc(W.name)+'</b> menu will appear with Today, History, Ledger, Strategy and Breakdown.</div>';
+ }
+ b.innerHTML=h;
+ $$('#wzBody [data-s]').forEach(x=>x.onclick=()=>{W.strat=x.dataset.s;W.type=null;W.name='';renderWiz()});
+ $$('#wzBody [data-t]').forEach(x=>x.onclick=()=>{W.type=x.dataset.t;W.name='';W.ack=false;renderWiz()});
+ $$('#wzBody [data-m]').forEach(x=>x.onclick=()=>{W.name=$('#wzName').value;W.start=$('#wzStart').value;W.mode=x.dataset.m;renderWiz()});
+ $$('#wzBody [data-a]').forEach(x=>x.onchange=()=>{W.alerts[x.dataset.a][+x.dataset.j]=x.checked?1:0});
+ const pl=$('#wzPlat');if(pl)pl.onchange=()=>{W.platform=pl.value;W.type=null;renderWiz()};
+ const ak=$('#wzAck');if(ak)ak.onchange=()=>{W.ack=ak.checked};
+ const ca=$('#wzCash');if(ca)ca.oninput=()=>{W.cash=ca.value;const box=$('#wzIsa');if(box){const used=L.filter(e=>!e.deleted&&e.type==='Deposit'&&e.date>='2026-04-06').reduce((s,e)=>s+e.amount,0),after=used+(+ca.value||0);box.innerHTML='ISA allowance used this tax year across your ISAs: <b>'+f2(used)+'</b> of £20,000.'+(ca.value?' After this deposit: <b>'+f2(after)+'</b>'+(after>20000?' <span class="warnc">· over the allowance</span>':'')+'.':'')}};
+}
+function wzErr(m){const e=$('#wzErr');e.textContent=m;e.style.display='block'}
+$('#wzBack').onclick=()=>{if(W.step===4){W.name=$('#wzName').value;W.start=$('#wzStart').value}W.step--;renderWiz()};
+$('#wzNext').onclick=()=>{
+ if(W.step===1&&!W.strat)return wzErr('Choose a strategy.');
+ if(W.step===2&&!W.type)return wzErr('Choose an account type.');
+ if(W.step===3&&!W.ack)return wzErr('Please confirm you’ve checked the instruments in your account.');
+ if(W.step===4){W.name=$('#wzName').value.trim();W.start=$('#wzStart').value;
+  if(!W.name)return wzErr('Give it a name.');if(!W.start||W.start>TODAY_S)return wzErr('Choose a start date that isn’t in the future.');
+  if(W.mode==='fresh'&&!(+W.cash>0))return wzErr('Enter a starting deposit above zero.');}
+ if(W.step<5){W.step++;renderWiz();return}
+ const key='s'+(STRATS.length+1);
+ STRATS.push({key,strat:W.strat,name:W.name,type:W.type,platform:W.platform,value:0,contrib:0,xirr:null,next:null,since:dshow(W.start)});
+ OPEN[key]=true;logNow('Added strategy '+W.name+' ('+W.type+')');$('#dWiz').close();renderOverview();location.hash=key+'/today';toast(W.name+' added · record your starting holdings next');
+};
+['addStrat','addStrat2'].forEach(i=>$('#'+i).onclick=e=>{e.preventDefault();openWiz()});
+
+/* router */
+const ALIAS={today:'9sig/today',history:'9sig/history',ledger:'9sig/ledger',strategy:'9sig/strategy',breakdown:'9sig/breakdown'};
+const MAP={'overview':'v-overview','9sig/today':'v-today','9sig/history':'v-history','9sig/ledger':'v-ledger','9sig/strategy':'v-strategy','9sig/breakdown':'v-breakdown','aw/today':'v-aw-today','aw/strategy':'v-aw-strategy','catalogue':'v-catalogue','settings':'v-settings'};
+let CUR='overview';
+function markNav(){$$('.rail [data-nav]').forEach(a=>a.classList.toggle('on',a.dataset.nav===CUR))}
+function go(v){location.hash=ALIAS[v]||v}
+function route(){
+ let h=location.hash.slice(1)||'overview';h=ALIAS[h]||h;
+ let id=MAP[h];
+ if(!id){const [k,p]=h.split('/');const s=STRATS.find(x=>x.key===k);if(s&&p){id='v-placeholder';
+   $('#phTag').innerHTML=s.name+' <span class="acct">'+s.type+' · '+CAT.platforms[s.platform].name+'</span>';
+   const lab=(SUBS.find(x=>x[0]===p)||[0,p])[1];$('#phTitle').textContent=lab;
+   $('#phBody').innerHTML=s.aw?'This page has the same layout as 9Sig’s '+lab+', filled with All Weather data.<br>The prototype only fills it in for 9Sig.':'<b style="color:var(--text);font-size:1.1rem">'+s.name+' is set up</b><br>'+lab+' fills in once you record your starting holdings.<br><br><button class="btn primary" data-add="Deposit" id="phAdd">'+IC.check+' Record starting holdings</button>';
+   const pa=$('#phAdd');if(pa)pa.onclick=()=>openEntry(null,'Deposit');}
+  else{id='v-overview';h='overview'}}
+ CUR=h;const k=h.split('/')[0];if(STRATS.some(s=>s.key===k)&&!OPEN[k]){OPEN[k]=true;renderNav()}
+ $$('.view').forEach(x=>x.classList.toggle('on',x.id===id));markNav();
+ document.body.classList.remove('nav-open');window.scrollTo(0,0);
+ if(id==='v-breakdown')renderBreakdown();if(id==='v-catalogue')renderCat();
+ window.dispatchEvent(new Event('resize'));
+}
+window.addEventListener('hashchange',route);
+$('#menuBtn').onclick=()=>document.body.classList.toggle('nav-open');
+$('#shade').onclick=()=>document.body.classList.remove('nav-open');
+$('#collapse').onclick=e=>{e.preventDefault();document.body.classList.toggle('rail-min');window.dispatchEvent(new Event('resize'))};
+renderAll();mountCharts();route();
+</script></body></html>

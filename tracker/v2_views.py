@@ -1,0 +1,84 @@
+"""Phase 1: owner-scoped, strategy-neutral v2 page shell.
+
+The financial cockpit under /cockpit/ remains authoritative until later
+phases replace its pages. No values, strategy evaluations or trades are
+fabricated by these placeholder views.
+"""
+from django.contrib.auth.decorators import login_required
+from django.http import Http404
+from django.shortcuts import get_object_or_404, render
+
+from .models import StrategyInstance
+
+
+SECTIONS = ("today", "history", "ledger", "strategy", "breakdown")
+LABELS = {
+    "today": "Today",
+    "history": "History",
+    "ledger": "Ledger",
+    "strategy": "Strategy",
+    "breakdown": "Breakdown",
+}
+
+
+def _instances(request):
+    return list(
+        StrategyInstance.objects.filter(
+            owner=request.user, account__owner=request.user
+        ).exclude(account__kind="PAPER").select_related(
+            "account", "preset"
+        ).order_by("created_at", "pk")
+    )
+
+
+def _render(request, *, page_key, page_title, instance=None, section=None):
+    items = _instances(request)
+    return render(
+        request, "v2/page.html",
+        {
+            "shell_instances": items,
+            "selected_instance": instance,
+            "section": section,
+            "page_key": page_key,
+            "page_title": page_title,
+            "instance_count": len(items),
+        },
+    )
+
+
+@login_required
+def overview(request):
+    return _render(request, page_key="overview", page_title="Overview")
+
+
+@login_required
+def instance_page(request, instance_id, section):
+    if section not in SECTIONS:
+        raise Http404("Unknown strategy page")
+    instance = get_object_or_404(
+        StrategyInstance.objects.select_related("account", "preset"),
+        pk=instance_id,
+        owner=request.user,
+        account__owner=request.user,
+    )
+    if instance.account.kind == "PAPER":
+        raise Http404("Unsupported account type")
+    return _render(
+        request, page_key="instance", page_title=LABELS[section],
+        instance=instance, section=section,
+    )
+
+
+@login_required
+def catalogue(request):
+    return _render(request, page_key="catalogue", page_title="Instrument catalogue")
+
+
+@login_required
+def settings(request):
+    return _render(request, page_key="settings", page_title="Settings")
+
+
+@login_required
+def add_strategy(request):
+    return _render(request, page_key="add", page_title="Add strategy")

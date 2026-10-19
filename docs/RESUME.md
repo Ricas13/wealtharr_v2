@@ -1,5 +1,42 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+## NEW SEVEN-PHASE DESIGN IMPLEMENTATION — Phase 1 (2026-10-19)
+
+The owner's approved \`docs/design/app_v2.html\` and phase brief supersede the
+previous lettered A–J UX/implementation sequencing for this **new branch only**.
+Branch: \`feature/v2-phase1-shell-styling\` (based on \`main\`), draft PR.
+The previous A–J work is preserved on \`main\`; legacy \`/cockpit/\` and
+its financially guarded actions remain untouched and authoritative.
+
+**Phase 1 complete in this branch (scope limited to shell and styling):**
+- Committed the complete approved sample-data prototype as design reference;
+  it is NOT used for real valuations, instrument permissions or trades.
+- Added independent server-rendered Django v2 base template, graphite design
+  tokens, Lucide-compatible sprite icons, fixed 52px bar, 248px nested strategy
+  sidebar, owner-scoped collapsible strategy groups, mobile drawer, desktop
+  collapse with preference persistence, focus/skip/reduced-motion states.
+- Reserved URLs \`/overview/\`, \`/s/<instance_id>/today|history|ledger|strategy|breakdown/\`,
+  \`/catalogue/\`, \`/settings/\` and \`/add-strategy/\` for later phase integrations.
+  They are login protected; inaccessible/foreign strategy ids return 404.
+- The nine new page skeletons show **no fabricated values** and provide no
+  trade instructions. Sample ledger, charts and fake statuses are not ported.
+- Added owner-scope/unit smoke tests and an isolated Chromium 1440/390px test
+  for every touched route; its screenshot capture flag is
+  \`WEALTHARR_CAPTURE_V2_BASELINES=1\`. Browser comparisons verify shared
+  shell geometry against the approved HTML, not fake financial card contents.
+- **Not included:** actual instance model refactor, five-step onboarding,
+  live metrics/evaluations, ledger rewrite, settings/alerts or strategy rules.
+  These belong to Phases 2–7. The existing source-safe pages keep working.
+
+**Next turn:** implement **Phase 2 only** on a NEW branch based on updated
+\`main\` when the owner requests it; do not silently use PR #11 or broaden
+this Phase 1 PR. Keep owner evidence requirements in the existing
+\`docs/OWNER_TODO.md\` and never invent eligibility, parity or prices.
+The new phase route/base architecture is intentionally isolated to avoid
+breaking pre-existing financial safety while the design is rolled out.
+
+---
+
 Repository: `Ricas13/wealtharr_v2`  
 Working branch: `feature/owner-9sig-cockpit-resumable`  
 Pull request: https://github.com/Ricas13/wealtharr_v2/pull/11  
