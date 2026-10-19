@@ -1,127 +1,121 @@
 {% extends 'base.html' %}
 {% block title %}Today{% endblock %}
 {% block content %}
-<div class="cockpit ck-v2">
+<div class="cockpit">
   <header class="ck-top">
     <div>
-      <p class="ck-overline">YOUR INVESTMENTS · {{ strategy.name|default:'PORTFOLIO' }}</p>
+      <p class="ck-overline">YOUR PORTFOLIO{% if strategy %} · {{ strategy.name }}{% endif %}</p>
       <h1>Today</h1>
-      {% if strategy %}<p class="ck-muted">{{ strategy.account.name }} · {{ strategy.account.get_kind_display }} · GBP</p>{% endif %}
     </div>
-    <a class="btn btn-subtle btn-sm" href="{% url 'cockpit_strategy' %}">About this strategy</a>
+    <span class="ck-chip {% if next_step.state == 'trade' or next_step.state == 'review' %}ck-attention{% elif blocking_reason %}ck-blocked{% else %}ck-ok{% endif %}" role="status">{{ status|default:"Setup needed" }}</span>
   </header>
-
   {% if empty %}
     <section class="panel ck-card" role="alert">
-      <h2>Select a primary account</h2>
-      <p>{{ blocking_reason }}</p>
-      <a class="btn" href="{% url 'accounts' %}">Open accounts</a>
+      <h2>Choose your primary account</h2><p>{{ blocking_reason }}</p>
+      <a href="{% url 'accounts' %}" class="btn">Open accounts</a>
     </section>
   {% else %}
-    <section class="ck-metrics" aria-label="Portfolio at a glance">
+    <section class="ck-metrics" aria-label="Investment performance">
       <article class="panel ck-card ck-hero">
-        <p class="ck-label">Portfolio value</p>
-        <p class="ck-number">{% if display_value is not None %}£{{ display_value|floatformat:'2g' }}{% else %}Unavailable{% endif %}</p>
-        <p class="ck-muted">{% if not report.positions %}Recorded cash balance{% elif display_value is not None %}Verified GBP closing prices{% else %}Needs one verified valuation date{% endif %}</p>
+        <p class="ck-label">Current verified value</p>
+        <p class="ck-number" data-testid="portfolio-value">{% if display_value is not None %}£{{ display_value|floatformat:'2g' }}{% else %}Unavailable{% endif %}</p>
+        <p class="ck-muted">{{ strategy.account.get_kind_display }} · GBP{% if not fresh %} · Holdings value awaiting verified prices{% endif %}</p>
       </article>
       <article class="panel ck-card">
-        <p class="ck-label">Net money added</p>
+        <p class="ck-label">Net contributed</p>
         <p class="ck-number">£{{ report.net_contributed|floatformat:'2g' }}</p>
-        <p class="ck-muted">Recorded deposits minus withdrawals</p>
+        <p class="ck-muted">Recorded deposits less withdrawals</p>
       </article>
       <article class="panel ck-card">
-        <p class="ck-label">Investment gain / loss</p>
-        <p class="ck-number">{% if display_gain is not None %}£{{ display_gain|floatformat:'2g' }}{% else %}Unavailable{% endif %}</p>
-        <p class="ck-muted">{% if display_gain is not None %}Value less net money added · not an annual return{% else %}A verified closing value and funding history are needed{% endif %}</p>
+        <p class="ck-label">Gain / loss</p>
+        <p class="ck-number {% if display_gain is not None and display_gain < 0 %}ck-loss{% elif display_gain is not None and display_gain > 0 %}ck-gain{% endif %}">
+          {% if display_gain is not None %}{% if display_gain > 0 %}↑ {% elif display_gain < 0 %}↓ {% endif %}£{{ display_gain|floatformat:'2g' }}{% else %}Unavailable{% endif %}
+        </p>
+        <p class="ck-muted">
+          {% if fresh and perf.xirr is not None %}Annualised money-weighted return: {{ perf.xirr|floatformat:2 }}%
+          {% elif fresh and perf.cumulative is not None %}Single-funding return: {{ perf.cumulative|floatformat:2 }}%
+          {% else %}No percentage return claimed without adequate actual cashflow and price evidence.{% endif %}
+        </p>
       </article>
     </section>
 
-    <section class="panel ck-card ck-next ck-focus-{{ next_step.state }}" aria-labelledby="next-title">
+    <section class="panel ck-card ck-next" aria-labelledby="next-title" data-testid="next-action">
       <div class="ck-section-head">
-        <h2 id="next-title">What to do next</h2>
-        <span role="status" class="ck-chip {% if next_step.state == 'trade' or next_step.state == 'review' %}ck-attention{% elif next_step.state == 'blocked' %}ck-blocked{% else %}ck-ok{% endif %}">
-          {% if next_step.state == 'trade' %}Action to review{% elif next_step.state == 'review' %}Manual review{% elif next_step.state == 'blocked' %}Calculation unavailable{% else %}Up to date{% endif %}
-        </span>
+        <h2 id="next-title">Next action</h2>
+        {% include 'partials/data_status.html' %}
       </div>
-      <h3 class="ck-action-text">{{ next_step.title }}</h3>
-      <p>{{ next_step.explanation }}</p>
       {% if next_step.state == 'review' %}
-        {% if next_step.details %}<p class="ck-muted">Separate data issue: {{ next_step.details }}</p>{% endif %}
-        <a href="{% url 'cockpit_history' %}" class="btn btn-primary ck-primary">Read the warning</a>
+        <p class="ck-action-text">{{ next_step.title }}</p>
+        <p>{{ next_step.explanation }}</p>
+        {% if next_step.details %}<p class="ck-muted" role="alert">Data check: {{ next_step.details }}</p>{% endif %}
+        <a href="{% url 'cockpit_history' %}" class="btn">Review warning</a>
       {% elif next_step.state == 'blocked' %}
-        <p class="ck-muted">Wealtharr will not suggest a trade from incomplete data.</p>
-        <form action="{% url 'cockpit_refresh' %}" method="post" data-loading-form class="ck-refresh-form">
-          {% csrf_token %}<button type="submit" class="btn" data-loading-text="Checking verified prices…">Check prices and reviews</button>
+        <div class="ck-block-message" role="alert"><strong>{{ next_step.title }}</strong><p>{{ next_step.explanation }}</p></div>
+        <form action="{% url 'cockpit_refresh' %}" method="post" class="ck-refresh-form" data-loading-form>
+          {% csrf_token %}
+          <button type="submit" class="btn" data-loading-text="Checking prices…">Check verified prices again</button>
         </form>
-      {% elif next_step.state == 'trade' and signal %}
+      {% elif next_step.state == 'trade' and actionable %}
+        <p class="ck-action-text">{{ next_step.title }}</p>
+        <p>{{ next_step.explanation }}</p>
         <ol class="ck-orders">
           {% for action in actions %}
-            <li><strong>{{ action.side|title }} {{ action.symbol }}</strong>
-              <span>About {{ action.quantity }} units · estimated £{{ action.estimated_gbp }} at the historical review close</span>
-            </li>
+          <li>
+            <strong>{{ action.side|title }}</strong> approximately <strong>£{{ action.estimated_gbp }}</strong> of <strong>{{ action.symbol }}</strong>
+            <span>≈ {{ action.quantity }} shares estimated at the {{ signal.as_of|date:'d M Y' }} verified quarter-end close</span>
+          </li>
           {% endfor %}
         </ol>
-        <p class="ck-muted">Advisory only · {{ signal.as_of|date:'j M Y' }} historical prices, not executable quotes.</p>
-        <a class="btn btn-primary ck-primary" href="{% url 'cockpit_rebalance' signal.pk %}">Review and record what I actually traded</a>
+        <p class="ck-muted">This is a dated recommendation, not a broker quote or order. Confirm actual fills, prices and fees.</p>
+        <a class="btn btn-primary ck-primary" href="{% url 'cockpit_rebalance' signal.pk %}">Review and record what I did</a>
       {% else %}
-        <a class="btn btn-subtle ck-primary" href="{% url 'cockpit_history' %}">See performance history</a>
+        <p class="ck-action-text">{{ next_step.title }}</p>
+        <p>{{ next_step.explanation }}</p>
       {% endif %}
-      <div class="ck-freshness">
-        <span>{% if price_date %}Last displayed quote: {{ price_date|date:'j M Y' }}{% else %}No verified quote date yet{% endif %}</span>
-        <span>Next review: {{ next_review|date:'j M Y' }}</span>
-      </div>
+      {% if comparison %}
+        <details class="ck-details">
+          <summary>How the strategy target was calculated</summary>
+          <p class="ck-muted">Historical strategy-specific comparison at {{ comparison.as_of|date:'d M Y' }}, not today's holdings valuation.</p>
+          <div class="ck-barline"><span>Quarter-end signal line</span><strong>£{{ comparison.line|floatformat:'2g' }}</strong></div>
+          <progress max="100" value="{{ comparison.line_pct }}" aria-label="Signal line relative to larger comparison"></progress>
+          <div class="ck-barline"><span>Recorded growth value then</span><strong>£{{ comparison.actual|floatformat:'2g' }}</strong></div>
+          <progress class="ck-actual-progress" max="100" value="{{ comparison.actual_pct }}" aria-label="Growth value relative to larger comparison"></progress>
+          <p class="ck-muted">Full spreadsheet parity is still pending owner verification.</p>
+        </details>
+      {% endif %}
     </section>
 
-    <section class="panel ck-card ck-contribution" aria-labelledby="contribution-title">
-      <div>
-        <h2 id="contribution-title">Already added money?</h2>
-        <p class="ck-muted">Record a deposit only after it appears in your investment account.</p>
-      </div>
+    {% if allocation %}
+      <section class="panel ck-card" aria-labelledby="allocation-title">
+        <div class="ck-section-head"><h2 id="allocation-title">Current vs reference allocation</h2><span class="ck-chip">Observed GBP holdings</span></div>
+        <p class="ck-muted">{{ description.target_explanation|default:"Reference weights apply only to the strategy-defined review or reset." }}</p>
+        {% for item in allocation %}
+          <div class="ck-barline"><span>{{ item.role|capfirst }}</span><strong>{{ item.actual_pct|floatformat:1 }}% actual · {{ item.reference_pct|floatformat:1 }}% reference</strong></div>
+          <progress class="ck-actual-progress" max="100" value="{{ item.actual_pct }}" aria-label="{{ item.role }} actual allocation percent"></progress>
+          <p class="ck-muted ck-small-gap">£{{ item.value_gbp|floatformat:'2g' }} · {% if item.drift_pp > 0 %}+{% endif %}{{ item.drift_pp|floatformat:1 }} percentage points from reference</p>
+        {% endfor %}
+      </section>
+    {% elif holdings %}
+      <section class="panel ck-card"><h2>Holdings</h2><p class="ck-muted">A complete allocation comparison is unavailable until all strategy holdings have verified matching-date GBP prices.</p></section>
+    {% endif %}
+
+    {% include 'partials/performance_chart.html' with chart_points=perf.chart %}
+
+    <section class="panel ck-card" aria-labelledby="contribution-title">
+      <div class="ck-section-head"><h2 id="contribution-title">Record a contribution</h2><a href="{% url 'cockpit_ledger' %}">View ledger</a></div>
+      <p class="ck-muted">Only enter money you actually deposited. This never transfers funds or places a trade.</p>
       <form action="{% url 'cockpit_deposit' %}" method="post" class="ck-deposit-form">
         {% csrf_token %}
-        <div class="ck-form-pair">
-          <label for="deposit-amount">Amount (£)</label>
-          <input class="field" id="deposit-amount" name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" value="{{ target }}" required>
-        </div>
-        <div class="ck-form-pair">
-          <label for="deposit-date">Actual deposit date</label>
-          <input class="field" id="deposit-date" name="occurred_on" type="date" value="{% now 'Y-m-d' %}" required>
-        </div>
-        <button type="submit" class="btn">Record actual deposit</button>
+        <label for="deposit-amount">Actual deposit (£)</label>
+        <input class="field" id="deposit-amount" name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Amount deposited" required>
+        <input type="hidden" name="occurred_on" value="{% now 'Y-m-d' %}">
+        <button type="submit" class="btn">Record actual contribution</button>
       </form>
     </section>
-
-    <details class="panel ck-card ck-disclosure">
-      <summary>Holdings and calculation details</summary>
-      <div class="ck-details-body">
-        <h3>Recorded holdings</h3>
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead><tr><th>Instrument</th><th>Role</th><th>Units</th><th>Value (£)</th><th>Quote date</th></tr></thead>
-            <tbody>
-            {% for item in holdings %}
-              <tr><th scope="row">{{ item.symbol }}</th><td>{{ item.role }}</td><td>{{ item.quantity }}</td>
-                <td>{% if item.value_gbp is not None %}{{ item.value_gbp|floatformat:'2g' }}{% else %}Unavailable{% endif %}</td>
-                <td>{{ item.as_of|date:'j M Y'|default:'—' }}</td></tr>
-            {% empty %}
-              <tr><td colspan="5">No purchased holdings recorded. Cash: £{{ report.cash|floatformat:'2g' }}.</td></tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% if comparison %}
-          <div class="ck-target">
-            <h3>Latest recorded review comparison</h3>
-            <p class="ck-muted">{{ comparison.as_of|date:'j M Y' }} · Both values are from the same historical close</p>
-            <div class="ck-barline"><span>Strategy target</span><strong>£{{ comparison.line|floatformat:'2g' }}</strong></div>
-            <progress max="100" value="{{ comparison.line_pct }}" aria-label="Historical target relative to larger value"></progress>
-            <div class="ck-barline"><span>Recorded equity</span><strong>£{{ comparison.actual|floatformat:'2g' }}</strong></div>
-            <progress class="ck-actual-progress" max="100" value="{{ comparison.actual_pct }}" aria-label="Historical growth holding relative to larger value"></progress>
-          </div>
-        {% endif %}
-        <p class="ck-muted">Price freshness only determines what can be displayed or recommended. No orders are placed by Wealtharr. <a href="{% url 'cockpit_history' %}">See returns and limitations</a>.</p>
-      </div>
-    </details>
+    <footer class="ck-footer">
+      <p><strong>{{ days_left }} days</strong> until the {{ next_review|date:'d M Y' }} review</p>
+      <p class="ck-muted">Rules: partial verification. <a href="{% url 'cockpit_strategy' %}">Fixed strategy rules, instruments and evidence</a>. Wealtharr never trades for you.</p>
+    </footer>
   {% endif %}
 </div>
 {% endblock %}
