@@ -49,6 +49,7 @@ class StrategyInstance(models.Model):
     safe_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the safe asset")
     # Source-controlled, owner-enrolment instrument manifest; empty for legacy
     # instances until an explicit, owner-approved migration is implemented.
+    strategy_version = models.CharField(max_length=48, blank=True, default="", editable=False)
     mapping_version = models.CharField(max_length=40, blank=True, default="", editable=False)
     resolved_instruments = models.JSONField(blank=True, default=dict, editable=False)
     market_data_enabled = models.BooleanField(default=False, help_text="Fetch Yahoo closes and enable advisory strategy reviews")
