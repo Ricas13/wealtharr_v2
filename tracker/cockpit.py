@@ -21,8 +21,8 @@ from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
                      NotificationPreference, PriceMark, RebalanceExecution,
                      StrategyBaseline, StrategyInstance, StrategyPreset,
                      StrategySignal, StrategyValueSnapshot)
-from .performance import (cash_gain, cumulative_from_annualized, simple_return,
-                          xirr, snapshot_twr_ready, annualized_return, max_drawdown)
+from .performance import snapshot_twr_ready, annualized_return, max_drawdown
+from .core.metrics import ExternalFlow, VerifiedValuation, evaluate_inception
 from .services import ledger_summary, validate_and_record
 
 D = Decimal
@@ -132,36 +132,64 @@ def _line_comparison(strategy, signal):
 
 
 def _performance(strategy, summary):
+    """Dated, owner-account-scoped money-weighted results plus honest TWR holds.
+
+    No claimed cumulative return across irregular funding based on an annual
+    XIRR proxy. Snapshot-only TWR is retained for periods with NO external
+    flows; full boundary-unitisation lives in core.metrics and requires
+    separately verified, sequenced pre/post valuations.
+    """
     snaps = list(StrategyValueSnapshot.objects.filter(strategy=strategy).order_by('as_of'))
-    entries = list(strategy.ledger.filter(kind__in=('DEPOSIT', 'WITHDRAW')).order_by('occurred_on', 'pk'))
-    first = entries[0].occurred_on if entries else None
-    held_marks = [summary['marks'].get(sym) for sym, qty in summary['positions'].items() if qty > ZERO]
-    held_marks = [m for m in held_marks if m is not None]
-    end = min((m.as_of for m in held_marks), default=timezone.localdate())
-    # Exact money-weighted returns require all held sleeve marks to share one
-    # valuation date. A one-day mismatch is fine for an advisory freshness
-    # warning, NOT for claiming an exact dated liquidation value.
-    valid_end = bool(held_marks) and len(held_marks) == sum(q > ZERO for q in summary['positions'].values()) and all(
-        mark.source == 'yahoo' and MarketObservation.objects.filter(
-            symbol=mark.symbol, as_of=mark.as_of, currency='GBP', price=mark.price).exists()
-        for mark in held_marks) and (
-        max(m.as_of for m in held_marks) == end) and not strategy.ledger.filter(occurred_on__gt=end).exists()
-    irr = xirr([(e.occurred_on, -e.amount if e.kind == 'DEPOSIT' else e.amount) for e in entries],
-               end, summary['value']) if first and valid_end and summary['value'] is not None else None
-    # Simple cumulative ratio is shown only for precisely one initial cash movement.
-    simple = simple_return(summary['value'], entries[0].amount) if (
-        len(entries) == 1 and entries[0].kind == 'DEPOSIT' and valid_end) else None
-    cumulative = simple if simple is not None else (
-        cumulative_from_annualized(irr, first, end) if first else None)
+    entries = list(strategy.ledger.filter(kind__in=('DEPOSIT', 'WITHDRAW'))
+                   .order_by('occurred_on', 'pk'))
+    held_marks = [summary['marks'].get(sym) for sym, qty in
+                  summary['positions'].items() if qty > ZERO]
+    held_count = sum(q > ZERO for q in summary['positions'].values())
+    end = min((m.as_of for m in held_marks if m is not None),
+              default=timezone.localdate())
+    observed = []
+    for mark in held_marks:
+        if mark is None or mark.source != 'yahoo' or mark.price <= ZERO:
+            break
+        proof = MarketObservation.objects.filter(
+            symbol=mark.symbol, as_of=mark.as_of, currency='GBP',
+            price=mark.price).values_list('pk', flat=True).first()
+        if proof is None:
+            break
+        observed.append('market-observation:%s' % proof)
+    # A money-weighted liquidation value must be verified for exactly one
+    # close date; a later ledger movement cannot be valued at yesterday's NAV.
+    valid_end = (bool(held_count) and len(observed) == held_count and
+                 len(held_marks) == held_count and
+                 all(m is not None and m.as_of == end for m in held_marks) and
+                 not strategy.ledger.filter(occurred_on__gt=end).exists() and
+                 summary['value'] is not None and summary['value'] >= ZERO)
+    flow_rows = tuple(ExternalFlow(
+        event_id='ledger:%s' % entry.pk,
+        occurred_on=entry.occurred_on,
+        amount_gbp=entry.amount if entry.kind == 'DEPOSIT' else -entry.amount,
+        sequence=entry.pk)
+        for entry in entries)
+    inception = (evaluate_inception(flow_rows, VerifiedValuation(
+        as_of=end, value_gbp=summary['value'],
+        observation_ids=tuple(observed), verified=True))
+        if valid_end else None)
+    irr = inception.xirr_annual if inception and inception.status == 'ok' else None
+    simple = (inception.simple_cumulative_return
+              if inception and inception.status == 'ok' else None)
     twr = snapshot_twr_ready(snaps, strategy.ledger)
     annual = annualized_return(twr, snaps[0].as_of, snaps[-1].as_of) if twr is not None else irr
-    # Raw snapshots with external flows are NOT drawdown-safe.
+    # Raw snapshot drawdown is meaningful only if the window has no flows.
     drawdown = max_drawdown([s.total_value for s in snaps]) if twr is not None else None
-    return {'cumulative': cumulative*100 if cumulative is not None else None,
+    return {'cumulative': simple*100 if simple is not None else None,
             'xirr': irr*100 if irr is not None else None,
             'twr': twr*100 if twr is not None else None,
             'annual': annual*100 if annual is not None else None,
             'drawdown': drawdown*100 if drawdown is not None else None,
+            'gain_gbp': inception.cash_gain_gbp if inception and inception.status == 'ok' else None,
+            'net_contributed_gbp': inception.net_contributed_gbp if inception and inception.status == 'ok' else None,
+            'metric_reason': (inception.reason_code if inception else
+                              'UNVERIFIED_END_OR_INCOMPLETE_PRICE_DATES'),
             'chart': [{'date': s.as_of.isoformat(), 'value': str(s.total_value),
                        'contributed': str(s.net_contributed)} for s in snaps]}
 
