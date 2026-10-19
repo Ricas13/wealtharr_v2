@@ -9,6 +9,7 @@ No broker calls, no persistence, no price fabrication.
 from __future__ import annotations
 
 import csv
+from dataclasses import dataclass
 import io
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
@@ -20,6 +21,79 @@ from tracker.strategies.nine_sig.v1 import NormalizedQuote, quarter_number
 STOOQ_REFERENCE_MAP = {"TQQQ": "tqqq.us", "SPY": "spy.us"}
 MAX_REFERENCE_DIFFERENCE = Decimal("0.01")
 MAX_DOWNLOAD_BYTES = 2_000_000
+
+
+
+@dataclass(frozen=True)
+class PriceSanityDecision:
+    """Only APPROVED observations may be persisted or fed to a strategy."""
+    status: str             # APPROVED or HOLD
+    code: str
+    explanation: str
+
+
+def check_price_series(
+    symbol: str,
+    series: tuple[tuple[date, Decimal], ...] | list[tuple[date, Decimal]],
+    *,
+    as_of: date,
+    previous: tuple[date, Decimal] | None = None,
+    max_daily_move: Decimal | None = None,
+    max_age_days: int = 8,
+) -> PriceSanityDecision:
+    """Fail closed on anomalous or stale *already unit-normalized* vendor closes.
+
+    No 'corrected' price is invented and no suspicious observation is persisted.
+    Any suspected split/restrike/pence error needs reviewed evidence before
+    clearing the hold. This policy intentionally errs on false positives.
+    """
+    def hold(code: str, message: str) -> PriceSanityDecision:
+        return PriceSanityDecision("HOLD", code, message)
+
+    # Daily 3x leveraged products can move much more than unleveraged funds.
+    # Threshold is an anomaly screen, not a trading or return-limit rule.
+    if max_daily_move is None:
+        max_daily_move = (Decimal("0.85") if symbol in ("LQQ3.L", "TQQQ")
+                          else Decimal("0.40"))
+    if (not isinstance(max_daily_move, Decimal) or
+            not max_daily_move.is_finite() or
+            max_daily_move <= 0 or max_daily_move >= 1 or
+            max_age_days < 0):
+        return hold("INVALID_POLICY", "Market-data safety policy is invalid")
+    if not series:
+        return hold("MISSING_PRICE", "No usable close from the price provider")
+    ordered = tuple(sorted(series))
+    if len({day for day, _ in ordered}) != len(ordered):
+        return hold("DUPLICATE_DATE", "Quote dates conflict")
+    if any(not isinstance(day, date) or not isinstance(price, Decimal) or
+           not price.is_finite() or price <= 0 or day > as_of
+           for day, price in ordered):
+        return hold("BAD_PRICE", "Quote contains an invalid price or future date")
+    if as_of - ordered[-1][0] > timedelta(days=max_age_days):
+        return hold("STALE_PRICE", "Latest quote is too old for a review")
+
+    predecessor = previous
+    for day, price in ordered:
+        if predecessor is not None:
+            previous_date, previous_price = predecessor
+            if (not isinstance(previous_date, date) or
+                    not isinstance(previous_price, Decimal) or
+                    not previous_price.is_finite() or previous_price <= 0):
+                return hold("BAD_PRIOR_PRICE", "Previous accepted close is invalid")
+            if day <= previous_date:
+                # Overlapping historical refreshes are common. Do not compare
+                # a historic quote to a more recent database observation.
+                predecessor = (day, price)
+                continue
+            change = abs(price / previous_price - Decimal("1"))
+            if change > max_daily_move:
+                return hold(
+                    "LARGE_MOVE",
+                    "Market price change exceeds the safety threshold; "
+                    "check splits/restrikes, quote units and source",
+                )
+        predecessor = (day, price)
+    return PriceSanityDecision("APPROVED", "", "")
 
 
 class QuoteUnavailable(ValueError):
