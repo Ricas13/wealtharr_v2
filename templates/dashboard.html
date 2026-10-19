@@ -67,6 +67,8 @@
       <div class="ws-card-meta"><span class="ws-pill">{{ item.strategy.account.get_kind_display }}</span><span class="risk-pill {{ item.strategy.preset.risk|lower }}">{{ item.strategy.preset.get_risk_display }} risk</span></div>
       <h3>{{ item.strategy.name }}</h3><p class="muted">{{ item.strategy.account.name }} · {{ item.strategy.preset.name }}</p>
       <p class="ws-strategy-value">{% if item.value is not None %}£{{ item.value|floatformat:2 }}{% else %}Needs prices{% endif %}</p>
+      {% if item.sparkline_path %}<svg class="ws-sparkline" viewBox="0 0 112 32" preserveAspectRatio="none" role="img" aria-label="Actual recorded strategy value trend"><path d="{{ item.sparkline_path }}" /></svg>
+      {% else %}<p class="ws-spark-empty">Trend appears after two dated valuations.</p>{% endif %}
       <div class="ws-card-footer"><span>Cash £{{ item.cash|floatformat:2 }}</span><span>Open {% include 'partials/icon.html' with name='arrow-up-right' %}</span></div>
     </a>
   {% empty %}
