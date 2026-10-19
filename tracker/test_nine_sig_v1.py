@@ -84,7 +84,7 @@ class PureEvaluationTests(TestCase):
 
     def test_spy_30down_raises_warning(self):
         history, prices = sample()
-        spy = prices.spy[:-1] + (replace(prices.spy[-1], price=D("65")),)
+        spy = prices.spy[:-1] + (replace(prices.spy[-1], price=D("65"), raw_close=D("65")),)
         result = evaluate(history, replace(prices, spy=spy))
         self.assertIn(result.status, ("ok", "action_needed"))
         self.assertEqual(audit_map(result)["thirty_down_triggered"], "True")
@@ -93,7 +93,7 @@ class PureEvaluationTests(TestCase):
 
     def test_100_percent_tqqq_proxy_is_not_executable(self):
         history, prices = sample()
-        tqqq = prices.tqqq[:-1] + (replace(prices.tqqq[-1], price=D("100")),)
+        tqqq = prices.tqqq[:-1] + (replace(prices.tqqq[-1], price=D("100"), raw_close=D("100")),)
         result = evaluate(history, replace(prices, tqqq=tqqq))
         self.assertIn(result.status, ("ok", "action_needed"))
         self.assertEqual(audit_map(result)["potential_spike"], "True")
