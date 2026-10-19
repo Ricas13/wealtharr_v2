@@ -77,12 +77,17 @@ class NineSigCalculations(SimpleTestCase):
         self.assertFalse(any(x["side"] == "HOLD" for x in q["actions"]))
 
     def test_safe_asset_cash_reserve_limits_proposed_buy(self):
+        # v2 owner decision 3: over-reserve shortfall sells ALL 2 safe units,
+        # rather than preserving the v1 10%-20% throttle reserve.
         signals = evaluate(cash=D("0"), safe=D("2"), equity_price=D("30"), starting=D("1000"))
         q = next(x for x in signals if x["kind"] == "QUARTERLY")
-        safe_sales = sum(D(a["estimated_gbp"]) for a in q["actions"] if a["symbol"] == "AGBP.L")
-        self.assertLessEqual(safe_sales, D("180"))
+        safe_sales = sum(D(a["estimated_gbp"]) for a in q["actions"]
+                         if a["symbol"] == "AGBP.L" and a["side"] == "SELL")
         equity_buys = sum(D(a["estimated_gbp"]) for a in q["actions"] if a["side"] == "BUY")
+        self.assertEqual(safe_sales, D("200.00"))
         self.assertLessEqual(equity_buys, safe_sales)
+        self.assertEqual(q["reset_reason"], "")
+        self.assertIn("Your reserve is now empty", q["message"])
 
     def test_unfunded_or_missing_equity_never_proposes_a_trade(self):
         self.assertEqual(evaluate(equity_qty=D("0")), [])
