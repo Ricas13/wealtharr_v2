@@ -24,7 +24,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ## Objective
 
-Make Wealtharr a single-owner 9Sig investment cockpit: Today (value, contributed, gains, a reliable next action), History, Ledger, Settings, one guided manual rebalance, Trading 212 CSV preview/import, one-screen setup, money-weighted returns, concise reminders. Do not place broker orders or invent prices. Existing append-only ledger, immutable reset baseline, and hard refusals must remain intact.
+Make Wealtharr a strategy-agnostic **tracking and notification** platform for a private owner, with fixed 9Sig as its first (and only currently implemented) strategy. Today shows performance and one next action; the owner manually makes and confirms any broker trades. The product never places orders, never connects to brokers (including read-only APIs), and never invents prices, trades or backtests. Preserve the append-only ledger, immutable confirmed reset baselines and financial refusal rules throughout the refactor.
 
 ## New product brief — lettered redesign (2026-10-19)
 
@@ -79,12 +79,12 @@ Make Wealtharr a single-owner 9Sig investment cockpit: Today (value, contributed
 
 ## First commands in a NEW CHAT
 
-1. Open the repo and branch: `https://github.com/Ricas13/wealtharr_v2/tree/feature/owner-9sig-cockpit-resumable`.
-2. Read this file, `docs/INSTALL.md` and `docs/FINANCIAL_QA.md` plus latest PR and CI statuses.
-3. Fix failing checks. Do not start a second competing branch unless the PR has been merged.
-4. Use this branch and its PR for all further commits; update this checklist after each meaningful step. Treat unmarked checks as OPEN, not silently complete.
-5. Test: `DEBUG=1 SECRET_KEY=test-only python manage.py check; python manage.py makemigrations --check --dry-run; python manage.py test tracker; python manage.py collectstatic --noinput`.
-6. Follow migration and deployment instructions in `docs/INSTALL.md`. Keep one scheduler replica, do not run old and new notification commands together.
+1. Open PR #11 and the **same** `feature/owner-9sig-cockpit-resumable` branch; inspect the newest commit/CI and reconcile any concurrent writes.
+2. Read `CLAUDE.md`, `docs/architecture.md`, `docs/instrument-research.md`, this file and `docs/FINANCIAL_QA.md`. Do not ask for the product brief again.
+3. Use the **Section C-only prompt at the top** once the user says "next". Do not jump to D–J. All new edits belong on the same branch/PR, without rewriting already-committed work.
+4. Run/check CI including `DEBUG=1 SECRET_KEY=test-only python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py test tracker`, and `python manage.py collectstatic --noinput`. If a Section B regression is found, fix it while advancing the authorised section.
+5. Update this checkpoint with genuine results (no "green" for queued CI, no "ISA verified" for public Invest listings), note remaining work and leave a pasteable next-section prompt.
+6. Do not deploy or alter infrastructure without separate explicit authorisation; keep one scheduler replica and never run both competing notifier commands.
 
 ## Critical financial semantics
 
