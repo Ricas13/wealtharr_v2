@@ -7,7 +7,7 @@ import csv
 import hashlib
 import io
 import re
-from datetime import datetime
+from datetime import datetime, timezone as datetime_timezone
 from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -38,12 +38,21 @@ def _number(value, name):
     return result
 
 
-def _when(value):
-    raw = (value or '').strip().removesuffix('Z')
+def _event_instant(value):
+    raw = (value or '').strip()
     try:
-        return datetime.fromisoformat(raw.replace(' ', 'T')).date()
+        parsed = datetime.fromisoformat(raw.replace(' ', 'T').replace('Z', '+00:00'))
     except ValueError as e:
         raise ValueError('Unrecognised time/date column') from e
+    # Trading 212 exports without timezone information are interpreted as UTC.
+    # Do not compare naive with offset-aware timestamps (would raise TypeError).
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=datetime_timezone.utc)
+    return parsed.astimezone(datetime_timezone.utc)
+
+
+def _when(value):
+    return _event_instant(value).date()
 
 
 def _total_gbp(row):
@@ -132,7 +141,7 @@ def _canonical(row, strategy):
                 str(qty), str(price), str(amount), str(fee))
     digest = hashlib.sha256(repr(identity).encode('utf-8')).hexdigest()
     return {'fingerprint': digest, 'broker_id': raw_id, 'kind': kind, 'occurred_on': when,
-            'event_time': datetime.fromisoformat((row.get('Time') or row.get('Date')).strip().removesuffix('Z').replace(' ', 'T')),
+            'event_time': _event_instant(row.get('Time') or row.get('Date')),
             'symbol': symbol,
             'quantity': qty, 'unit_price': price, 'amount': amount, 'fee': fee,
             'note': f'Trading 212 CSV ID {raw_id}'[:280],

@@ -184,3 +184,13 @@ class ImportCorrectionTests(ImportSafetyTests):
         self.assertEqual(len(errors), 1)
         self.assertIn('reused', errors[0][1])
         self.assertEqual(duplicate_lines, [])
+
+class ImportTimezoneTests(ImportSafetyTests):
+    def test_mixed_timezone_formats_dont_crash_or_reorder_unpredictably(self):
+        text = ('Action,Time,Total (GBP),ID\n'
+                'Deposit,2026-01-02T12:01:00+01:00,500,one\n'
+                'Deposit,2026-01-02T11:02:00Z,700,two\n'
+                'Deposit,2026-01-02 11:00:00,200,three\n')
+        entries, errors, _ = inspect_csv(self.file(text), self.strategy)
+        self.assertEqual(errors, [])
+        self.assertEqual([e['broker_id'] for e in entries], ['three', 'one', 'two'])

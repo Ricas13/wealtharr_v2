@@ -16,8 +16,10 @@ Make Wealtharr a single-owner 9Sig investment cockpit: Today (value, contributed
 - [x] Added additive `RebalanceExecution` and `BrokerImportRow` models and migration `0009`.
 - [x] Wired `/cockpit/`, set Today as authenticated landing, simplified navigation, preserved legacy URLs.
 - [x] Prevented duplicate immediate quarterly notification delivery; one concise digest scheduler replaces legacy monthly sender.
-- [x] Source Python compile/syntax checks in authoring environment.
-- [ ] GitHub CI: `python manage.py check`, `makemigrations --check --dry-run`, migrate, tests, collectstatic. **Inspect live CI results and fix until green.**
+- [x] Source Python compile/syntax checks and standalone Decimal examples in authoring environment.
+- [x] CSV event-ID collision protection and mixed-timezone parsing regression coverage.
+- [x] Optional Trading 212 read-only API security/rollout decision note.
+- [ ] GitHub Actions was **queued** at the last check; GitHub CI: `python manage.py check`, `makemigrations --check --dry-run`, migrate, tests, collectstatic. **Inspect live CI results and fix until green.**
 - [ ] Run dry-run CSV preview with a REAL, redacted Trading 212 export; ensure currency, fees, splits/dividends and ISIN mapping match broker records.
 - [ ] Validate every quarter against owner's Jason Kelly workbook (see `docs/FINANCIAL_QA.md`); current signal engine documents unverified discretionary branches.
 - [ ] Manual in-browser mobile/accessibility smoke and notifications test via configured destination.
