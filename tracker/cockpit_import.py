@@ -111,7 +111,9 @@ def _canonical(row, strategy):
         if broker_symbol not in mapped:
             raise ValueError(f'Unknown ticker {broker_symbol}; do not substitute securities')
         instrument = mapped[broker_symbol]
-        if row.get('ISIN') and row['ISIN'].strip().upper() != instrument.isin:
+        if not (row.get('ISIN') or '').strip():
+            raise ValueError('Trade has no ISIN; exact instrument identity must be verified')
+        if row['ISIN'].strip().upper() != instrument.isin:
             raise ValueError('Broker ISIN does not match mapped instrument: ' + broker_symbol)
         symbol = instrument.yahoo_ticker
         qty = abs(_number(row.get('No. of shares'), 'No. of shares'))
@@ -137,6 +139,8 @@ def _canonical(row, strategy):
     if amount < ZERO or fee < ZERO or (kind in ('DEPOSIT', 'WITHDRAW', 'DIVIDEND', 'FEE') and amount <= ZERO):
         raise ValueError('Nonpositive cash movement')
     raw_id = (row.get('ID') or '').strip()
+    if len(raw_id) > 200:
+        raise ValueError('Broker event ID too long to reconcile safely')
     identity = (raw_id, row.get('Time') or row.get('Date'), kind, symbol,
                 str(qty), str(price), str(amount), str(fee))
     digest = hashlib.sha256(repr(identity).encode('utf-8')).hexdigest()
@@ -172,7 +176,13 @@ def inspect_csv(upload, strategy):
         try:
             entry = _canonical(row, strategy)
             fp = entry['fingerprint']
-            if fp in seen or fp in existing_fp:
+            if fp in seen:
+                if not entry['broker_id']:
+                    errors.append((line, 'Ambiguous repeated event without a broker ID; reconcile before import'))
+                else:
+                    duplicates.append(line)
+                continue
+            if fp in existing_fp:
                 duplicates.append(line)
                 continue
             seen.add(fp)
@@ -211,29 +221,56 @@ def csv_import(request):
             messages.error(request, 'Choose a Trading 212 CSV file.')
         else:
             try:
+                # Applying requires a successful dry-run of the EXACT bytes in
+                # the same authenticated session. The re-upload is still fully
+                # validated rather than trusting client-supplied row data.
+                if uploaded.size > 4_000_000:
+                    raise ValueError('File over 4 MB; split export into smaller periods')
+                digest = hashlib.sha256(uploaded.read()).hexdigest()
+                uploaded.seek(0)
+                preview_key = f'{strategy.pk}:{digest}'
+                applying = request.POST.get('apply') == 'yes'
+                if applying and request.session.get('cockpit_t212_preview') != preview_key:
+                    raise ValueError('Preview this exact CSV successfully before confirming import')
                 entries, errors, duplicates = inspect_csv(uploaded, strategy)
                 ctx.update(preview=entries[:100], total=len(entries), errors=errors[:100],
                            error_total=len(errors), duplicate_total=len(duplicates))
-                if request.POST.get('apply') == 'yes':
+                if not applying:
+                    if errors:
+                        request.session.pop('cockpit_t212_preview', None)
+                    else:
+                        request.session['cockpit_t212_preview'] = preview_key
+                else:
                     if errors:
                         raise ValueError('Nothing imported: resolve every CSV error first')
-                    if not entries:
-                        raise ValueError('No new transactions to import')
                     with transaction.atomic():
-                        locked = type(strategy).objects.select_for_update().get(pk=strategy.pk,
-                                                                                owner=request.user)
-                        for row in entries:
-                            if BrokerImportRow.objects.filter(strategy=locked, fingerprint=row['fingerprint']).exists():
+                        locked = type(strategy).objects.select_for_update().get(
+                            pk=strategy.pk, owner=request.user)
+                        # Close the gap between preview and writes: a different
+                        # tab may have recorded an overlapping manual event.
+                        uploaded.seek(0)
+                        ready, concurrent_errors, concurrent_duplicates = inspect_csv(
+                            uploaded, locked)
+                        if concurrent_errors:
+                            raise ValueError('The ledger changed since preview; preview again and reconcile overlaps')
+                        saved = 0
+                        for row in ready:
+                            if BrokerImportRow.objects.filter(
+                                    strategy=locked, fingerprint=row['fingerprint']).exists():
                                 continue
                             ledger = LedgerEntry(**{key: row[key] for key in
                                 ('kind', 'occurred_on', 'symbol', 'quantity', 'unit_price', 'amount', 'fee', 'note')})
                             ledger.full_clean(exclude=['strategy'])
                             validate_and_record(locked, ledger)
-                            BrokerImportRow.objects.create(strategy=locked,
-                                fingerprint=row['fingerprint'], ledger_entry=ledger)
-                    messages.success(request, f'Imported {len(entries)} rows. Reconcile cash and positions with Trading 212.')
+                            BrokerImportRow.objects.create(
+                                strategy=locked, fingerprint=row['fingerprint'], ledger_entry=ledger)
+                            saved += 1
+                    request.session.pop('cockpit_t212_preview', None)
+                    messages.success(request, f'Imported {saved} new rows. Reconcile cash and positions with Trading 212.')
                     return redirect('cockpit_ledger')
             except (ValueError, ValidationError, IntegrityError) as exc:
+                request.session.pop('cockpit_t212_preview', None)
                 messages.error(request, 'Import was rolled back. ' + (
-                    str(exc) if not isinstance(exc, IntegrityError) else 'Duplicate or database constraint conflict.'))
+                    str(exc) if not isinstance(exc, IntegrityError) else
+                    'Duplicate or database constraint conflict.'))
     return render(request, 'csv_cockpit.html', ctx)
