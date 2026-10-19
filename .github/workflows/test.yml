@@ -118,3 +118,26 @@ jobs:
                   raise RuntimeError(f"{ticker}: expected {expected}, got {currency}")
               print(f"Yahoo {ticker}: {currency} as of {rows[-1][0]}, {len(rows)} closes")
           PY
+
+  browser:
+    name: Real browser owner journeys (360px and desktop)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DEBUG: "1"
+      SECRET_KEY: "github-actions-browser-synthetic-only"
+      PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install application and pinned Playwright
+        run: |
+          pip install -r requirements.txt
+          pip install "playwright==1.56.0"
+      - name: Install headless Chromium system dependencies
+        run: python -m playwright install --with-deps chromium
+      - name: Test real owner journeys in Chromium
+        run: python manage.py test browser_tests --verbosity 2
