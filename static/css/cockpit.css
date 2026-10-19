@@ -110,3 +110,45 @@
   .ck-v2 .ck-details-body{padding:16px}
   .ck-v2 .ck-disclosure>summary{padding:16px}
 }
+
+
+/* Section E evidence-only components */
+.cockpit{min-width:0}
+.cockpit .ck-gain{color:var(--positive)}
+.cockpit .ck-loss{color:var(--danger)}
+.cockpit .ck-small-gap{margin:5px 0 13px}
+.cockpit .ck-details{border-top:1px solid var(--stroke-soft);margin-top:14px;padding-top:14px}
+.cockpit .ck-details summary{color:var(--cyan);font-weight:700;cursor:pointer}
+.cockpit .ck-details summary:focus-visible,
+.cockpit a:focus-visible,
+.cockpit button:focus-visible,
+.cockpit select:focus-visible,
+.cockpit input:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.cockpit progress{display:block;width:100%;height:12px;border:0;border-radius:12px;accent-color:var(--cyan)}
+.cockpit progress.ck-actual-progress{accent-color:var(--teal)}
+.cockpit progress::-webkit-progress-bar{background:var(--stroke);border-radius:12px}
+.cockpit progress::-webkit-progress-value{background:var(--cyan);border-radius:12px}
+.cockpit progress.ck-actual-progress::-webkit-progress-value{background:var(--teal)}
+.cockpit .ck-ledger-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin:16px 0}
+.cockpit .ck-ledger-controls .ck-form-pair{display:grid;gap:5px;min-width:145px}
+.cockpit .ck-ledger-controls select{min-height:44px;background:var(--panel-hi);color:var(--text);border:1px solid var(--stroke);border-radius:9px;padding:8px}
+.cockpit .ck-ledger-controls button{min-height:44px}
+.cockpit .ck-rule-list{padding-inline-start:22px;display:grid;gap:12px;line-height:1.55}
+.cockpit .ck-history-confirmed{font-size:.87rem;border-left:3px solid var(--teal);padding:9px 12px;background:var(--panel-hi)}
+.cockpit .ck-history-confirmed a{font-weight:700}
+.cockpit .ck-instrument{min-width:0}
+.cockpit .ck-facts dd{overflow-wrap:anywhere}
+.cockpit .ck-deposit-form input{min-height:44px}
+.cockpit .ck-deposit-form button{min-height:44px}
+@media(max-width:390px){
+  .cockpit .ck-top{align-items:flex-start}
+  .cockpit .ck-ledger-controls .ck-form-pair{width:100%}
+  .cockpit .ck-ledger-controls button{width:100%}
+  .cockpit .ck-section-head{align-items:flex-start}
+  .cockpit .ck-barline{align-items:flex-start;flex-direction:column;gap:3px}
+  .cockpit .ck-barline strong{overflow-wrap:anywhere}
+  .cockpit .ck-chart-panel .chart-controls{max-width:100%;overflow-x:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  .cockpit *, .cockpit *::before, .cockpit *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
