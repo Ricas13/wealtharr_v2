@@ -1,0 +1,7 @@
+case_id,quarter_end,baseline_start_date,baseline_equity_gbp,growth_shares_before,growth_close_gbp,safe_shares_before,safe_close_gbp,cash_before_gbp,cash_flows_json,spy_quarters_json,tqqq_quarters_json,skipped_sells_count,30down_active_yes_no,expected_signal_line_gbp,expected_growth_buy_shares,expected_growth_sell_shares,expected_safe_buy_shares,expected_safe_sell_shares,expected_thirty_down,expected_spike_warning,expected_reset_review,fixture_status,notes
+2024-Q1,2024-03-31,,,,,,,,,,,,,,,,,,,,,PENDING,
+2024-Q2,2024-06-30,,,,,,,,,,,,,,,,,,,,,PENDING,
+2024-Q3,2024-09-30,,,,,,,,,,,,,,,,,,,,,PENDING,
+2024-Q4,2024-12-31,,,,,,,,,,,,,,,,,,,,,PENDING,
+2025-Q1,2025-03-31,,,,,,,,,,,,,,,,,,,,,PENDING,
+2025-Q2,2025-06-30,,,,,,,,,,,,,,,,,,,,,PENDING,
