@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Complete quarterly review{% endblock %}
 {% block content %}
-<main class="cockpit ck-narrow"><a href="{% url 'cockpit_today' %}" class="ck-muted">← Today</a>
+<section class="cockpit ck-narrow"><a href="{% url 'cockpit_today' %}" class="ck-muted">← Today</a>
   <p class="ck-overline">STEP 1 · REVIEW INSTRUCTIONS</p><h1>Your quarterly rebalance</h1>
   <p class="ck-muted">These are suggestions using the {{ signal.as_of|date:'d M Y' }} verified quarter-end close, not live execution prices. Make the trades yourself.</p>
   <section class="panel ck-card"><h2>What to do</h2><ol class="ck-orders">
@@ -19,5 +19,5 @@
       <button class="btn btn-primary ck-primary" type="submit">I executed these fills — validate &amp; record</button>
     </form>
   </section>
-</main>
+</section>
 {% endblock %}

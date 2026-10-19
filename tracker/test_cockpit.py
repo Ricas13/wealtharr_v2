@@ -173,3 +173,14 @@ class CashOnlyTodayTests(TestCase):
         response = self.client.get(reverse('cockpit_today'))
         self.assertContains(response, '1,000.00')
         self.assertContains(response, 'Add your actual purchases')
+
+class ImportCorrectionTests(ImportSafetyTests):
+    def test_reused_broker_id_with_changed_amount_fails_preview(self):
+        text = ('Action,Time,Total (GBP),ID\n'
+                'Deposit,2026-01-02 12:00:00,500,dep-1\n'
+                'Deposit,2026-01-02 12:00:00,600,dep-1\n')
+        rows, errors, duplicate_lines = inspect_csv(self.file(text), self.strategy)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(errors), 1)
+        self.assertIn('reused', errors[0][1])
+        self.assertEqual(duplicate_lines, [])

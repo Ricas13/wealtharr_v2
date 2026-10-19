@@ -131,7 +131,7 @@ def _canonical(row, strategy):
     identity = (raw_id, row.get('Time') or row.get('Date'), kind, symbol,
                 str(qty), str(price), str(amount), str(fee))
     digest = hashlib.sha256(repr(identity).encode('utf-8')).hexdigest()
-    return {'fingerprint': digest, 'kind': kind, 'occurred_on': when,
+    return {'fingerprint': digest, 'broker_id': raw_id, 'kind': kind, 'occurred_on': when,
             'event_time': datetime.fromisoformat((row.get('Time') or row.get('Date')).strip().removesuffix('Z').replace(' ', 'T')),
             'symbol': symbol,
             'quantity': qty, 'unit_price': price, 'amount': amount, 'fee': fee,
@@ -150,7 +150,12 @@ def inspect_csv(upload, strategy):
     if not reader.fieldnames or not {'Action', 'Time'}.issubset(reader.fieldnames):
         raise ValueError('Missing Action/Time headers; choose Trading 212 history export')
     entries, errors, duplicates, seen = [], [], [], set()
-    existing_fp = set(BrokerImportRow.objects.filter(strategy=strategy).values_list('fingerprint', flat=True))
+    imported_rows = list(BrokerImportRow.objects.filter(strategy=strategy).select_related('ledger_entry'))
+    existing_fp = {item.fingerprint for item in imported_rows}
+    known_ids = {item.ledger_entry.note.removeprefix('Trading 212 CSV ID '): item.fingerprint
+                 for item in imported_rows if item.ledger_entry.note.startswith('Trading 212 CSV ID ')
+                 and item.ledger_entry.note != 'Trading 212 CSV ID '}
+    batch_ids = {}
     for line, row in enumerate(reader, start=2):
         if line > 15002:
             errors.append((line, 'Maximum 15,000 rows per import'))
@@ -162,6 +167,13 @@ def inspect_csv(upload, strategy):
                 duplicates.append(line)
                 continue
             seen.add(fp)
+            broker_id = entry['broker_id']
+            if broker_id and ((broker_id in known_ids and known_ids[broker_id] != fp) or
+                              (broker_id in batch_ids and batch_ids[broker_id] != fp)):
+                errors.append((line, 'Broker event ID was reused with different details; reconcile correction before import'))
+                continue
+            if broker_id:
+                batch_ids[broker_id] = fp
             match = strategy.ledger.filter(
                 kind=entry['kind'], occurred_on=entry['occurred_on'],
                 symbol=entry['symbol'], quantity=entry['quantity'],
