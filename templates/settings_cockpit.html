@@ -7,6 +7,11 @@
     <p class="ck-muted">Choose what to receive, and where. Alerts never trade or transfer money.</p>
   </div></header>
 
+  <section class="panel ck-card">
+    <h2>Private account security</h2>
+    <p>Enable an optional six-digit authenticator to protect your private portfolio and admin pages after password sign-in.</p>
+    <p><a href="{% url 'totp_setup' %}" class="btn">Manage authenticator</a></p>
+  </section>
   <form method="post" class="panel ck-card">
     {% csrf_token %}<input type="hidden" name="save" value="preferences">
     <h2>1. My destinations</h2>
