@@ -1,5 +1,7 @@
 # Wealtharr Section I — private Oracle / Traefik deployment and recoverability
 
+**Simplified current operator commands:** see [Portable deployment](PORTABLE_DEPLOYMENT.md). The `wealtharr.sh` wrapper pins the Compose project/files and supports checked portable migrations; detailed disaster recovery contract remains below.
+
 Status: deployable configuration committed on PR #11, **not a claim that Oracle has been changed, backup restored, the owner received an email, or TOTP was enrolled**. Financial 9Sig source/ISA verification is separate. No broker API, order placement or public signup exists.
 
 ## Network architecture
