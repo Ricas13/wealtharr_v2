@@ -54,6 +54,17 @@ class ReleasedAuditTests(TestCase):
         self.assertEqual(version.reason_code, "UNSUPPORTED_VERSION")
         self.assertFalse(version.trades)
 
+    def test_unpinned_security_and_midquarter_spy_observation_refuse(self):
+        history, prices = sample()
+        self.assertEqual(evaluate(
+            replace(history, equity_symbol="QQQ3.L"), prices).reason_code,
+            "UNSUPPORTED_MAPPING")
+        spy = (replace(prices.spy[0], as_of=date(2024, 2, 1)),) + prices.spy[1:]
+        self.assertEqual(evaluate(history, replace(prices, spy=spy)).reason_code,
+                         "STALE_PRICE")
+        self.assertEqual(evaluate(history, prices, as_of=date(2026, 6, 30)).reason_code,
+                         "AS_OF_MISMATCH")
+
     def test_pure_first_intraperiod_crossing_does_not_look_ahead(self):
         actual = first_100_up_crossing(
             origin_on=date(2026, 3, 31), origin_usd=D("50"),
