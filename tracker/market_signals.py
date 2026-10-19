@@ -18,6 +18,7 @@ from .models import (
     LedgerEntry, MarketObservation, PriceMark, StrategySignal, YahooSync,
 )
 from .services import ledger_summary, dispatch
+from .notification_routing import route_notice
 from .core.prices import check_price_series
 
 LOG = logging.getLogger(__name__)
@@ -241,9 +242,11 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
                   "title": "9Sig 100%-up spike: manual reset review",
                   "message": message, "as_of": crossed.as_of, "actions": []})
     if created:
-        dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, key),
-                 "Wealtharr — " + signal.title,
-                 strategy.name + "\n" + message + "\nNo orders placed.")
+        route_notice(strategy.owner, "urgent",
+                     "signal:%s:%s" % (strategy.pk, key),
+                     "Wealtharr — " + signal.title,
+                     strategy.name + "\n" + message + "\nNo orders placed.",
+                     sender=dispatch)
 
 
 def review_strategy(strategy):
@@ -404,10 +407,12 @@ def review_strategy(strategy):
             actionable = alert["kind"] == "THIRTY_DOWN" or any(
                 action.get("side") in ("BUY", "SELL") for action in alert["actions"])
             if actionable and alert["kind"] == "THIRTY_DOWN":
-                dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, signal.signal_key),
-                         "Wealtharr — " + signal.title,
-                         strategy.name + "\n" + signal.message + "\n" + details +
-                         "\nReview this in Wealtharr. No orders have been placed.")
+                route_notice(strategy.owner, "urgent",
+                             "signal:%s:%s" % (strategy.pk, signal.signal_key),
+                             "Wealtharr — " + signal.title,
+                             strategy.name + "\n" + signal.message + "\n" + details +
+                             "\nReview this in Wealtharr. No orders have been placed.",
+                             sender=dispatch)
             elif not actionable:
                 signal.acknowledged_at = timezone.now()
                 signal.save(update_fields=["acknowledged_at"])
