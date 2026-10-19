@@ -76,7 +76,12 @@
     var hi = Math.max(1, Math.max.apply(null, range));
     var padding = (hi - lo) * .1;
     var min = lo - padding, max = hi + padding;
-    function x(i){ return values.length === 1 ? (l + w - r) / 2 : l + i * (w - r - l)/(values.length-1); }
+    // Preserve actual time distances between saved valuations: equal spacing
+    // wrongly represents a six-month gap as one day.
+    var times = values.map(function(p){ return new Date(p.date + "T12:00:00").getTime(); });
+    var timeSpan = times[times.length - 1] - times[0];
+    function x(i){ return values.length === 1 || timeSpan <= 0
+      ? (l + w - r) / 2 : l + (times[i] - times[0]) * (w - r - l) / timeSpan; }
     function y(n){ return t + (max - n) * (h - b - t) / (max - min); }
     function path(key){ return values.map(function(p,i){return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(Number(p[key])).toFixed(1);}).join(" "); }
     var line = path("value"), contributed = path("contributed");
