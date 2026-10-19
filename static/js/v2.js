@@ -94,3 +94,21 @@
     }
   );
 }());
+
+/* Phase 3 entry form: reveal relevant fields, not a client-side validation gate. */
+(function () {
+  "use strict";
+  var kind = document.getElementById("w2-entry-kind");
+  if (!kind) return;
+  function switchKind() {
+    var trade = kind.value === "BUY" || kind.value === "SELL";
+    document.querySelectorAll("[data-v2-trade-field]").forEach(function (el) {
+      el.hidden = !trade;
+    });
+    document.querySelectorAll("[data-v2-cash-field]").forEach(function (el) {
+      el.hidden = trade;
+    });
+  }
+  kind.addEventListener("change", switchKind);
+  switchKind();
+}());

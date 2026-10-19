@@ -19,7 +19,7 @@ from django.views.decorators.http import require_http_methods
 from .models import BrokerImportRow, LedgerEntry
 from .services import ledger_summary, validate_and_record
 from .cockpit import _strategy
-from .instrument_mapping import for_strategy
+from .instrument_mapping import for_strategy, for_historical_import
 
 D = Decimal
 ZERO = D('0')
@@ -100,7 +100,7 @@ def _canonical(row, strategy):
     elif ('buy' in action or 'sell' in action) and any(x in action for x in ('market', 'limit', 'stop')):
         kind = 'BUY' if 'buy' in action else 'SELL'
         broker_symbol = (row.get('Ticker') or '').strip().upper()
-        profile = for_strategy(strategy)
+        profile = for_historical_import(strategy)
         if profile is None:
             raise ValueError('No verified broker-to-Yahoo instrument mapping; review in Settings')
         mapped = {}

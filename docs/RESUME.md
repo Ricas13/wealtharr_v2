@@ -1,5 +1,17 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+## APPROVED v2 DESIGN — Phase 3 handoff (19 October 2026)
+
+- Current work: Phase 3 branch `feature/v2-phase3-versioned-ledger`, stacked on Phase 2 (`feature/v2-phase2-instances-catalogue`). Phase 1 PR #12 and Phase 2 PR #13 were confirmed green at their current heads when this phase started. Phase 3 targets Phase 2 so that its diff contains only Phase 3; merge sequentially #12 -> #13 -> Phase 3, retarget after earlier merges.
+- Ledger implementation: append-only `LedgerRevision` with source entry, old/new immutable snapshots, owner, reason, affected reviews and soft deletion/restore. The `LedgerEntry` row remains unchanged. The existing `ledger_summary` now uses effective revised entries to prevent double-counting, and impact preview replays all dated GBP balances and positions, rejecting negative cash, overselling, unmapped symbols, future dates and stale session-confirmation; source-linked imported events/quarterly fills cannot be overwritten.
+- Historical conflict policy: if a proposed change affects a completed/confirmed review, a stored confirmed reset baseline, or recorded valuation snapshots, it is **refused** pending separately audited reconciliation. Unconfirmed reviews appear in impact preview with recheck flags; no historic signal/baseline is automatically changed. There is no auto-trade.
+- New per-instance ledger: Entries, Rebalances (recorded vs recommended shares from original SignalFill; intentionally read-only for confirmed periods), Change history, filters/search/sort/deleted toggle and spreadsheet-safe CSV export. Existing unpinned strategies remain read-only in this new editor; their old cockpit stays unchanged.
+- New Trading 212 importer reuses the established exact ISIN+GBP unit, atomic preview, duplicate detection and manual-overlap refusal. Pinned v2 instances may read **past actual** execution evidence without enabling new trading advice (`for_historical_import` separate from `for_strategy`). Existing holdings remain unvalued until a COMPLETE original broker CSV reproduces all owner-reported shares and cash; `OpeningReconciliation` stores immutable evidence. All imports revalidate the exact uploaded file under an owner-scoped row lock.
+- Limitations: historic confirmed fills are deliberately not mutable; do not re-execute/reopen a completed 9Sig signal or rederive baselines silently. Reopening latest-period guided fills belongs to Phase 4; don’t claim it is implemented in Phase 3. CSV requires original broker history, not inferred transactions. No new valuation snapshots or market prices are fabricated.
+- Tests added: `tracker/test_v2_phase3.py`, `browser_tests/test_v2_phase3.py` (1440px/390px). Check the actual newest PR/CI result; do not claim green until GitHub reports success. Owner inputs remain consolidated in `docs/OWNER_TODO.md`.
+- NEXT when owner says keep going: **Phase 4 Today** standard-result-driven action card, guided actual-fill workflow and hourly source-verified valuation job, preserving all current tracking-only holds and post-fill review rules.
+
+---
 ## APPROVED v2 DESIGN — Phase 2 handoff (19 October 2026)
 
 The attached and committed reference is docs/design/app_v2.html. The newer seven-phase product brief governs this redesign; the older lettered A–J summary below remains historical context.

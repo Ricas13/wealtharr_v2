@@ -1,0 +1,49 @@
+<section class="w2-panel w2-space-top w2-wizard">
+  <div class="w2-section-heading">
+    <div><h2>Import original Trading 212 history</h2>
+      <p class="w2-muted">Dry-run first, then re-upload the exact file to confirm. Nothing is written during preview.</p></div>
+    <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Back to ledger</a>
+  </div>
+  <div class="w2-notice">
+    <strong>Exact source evidence only.</strong> Trades require the correct ISIN and verified GBP/GBX execution units. Foreign currency, unsupported actions, overlapping manual entries, and ambiguous duplicates are refused, not guessed. Never supply broker passwords or API keys.
+    {% if import_unreconciled %}
+      <p>For existing holdings, all imported events must reproduce the reported opening cash and quantities. Otherwise the entire import rolls back.</p>
+    {% endif %}
+  </div>
+  {% if import_error %}<p class="w2-form-error" role="alert">{{ import_error }}</p>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="w2-wizard-form">
+    {% csrf_token %}
+    <label class="w2-field">Trading 212 CSV export (UTF-8, up to 4 MB)
+      <input class="w2-input" type="file" name="csv_file" accept=".csv,text/csv" required></label>
+    <button class="w2-button w2-button-primary" type="submit">Preview CSV without saving</button>
+  </form>
+  {% if import_preview.ran %}
+    <div class="w2-preview">
+      <h3>Preview · {{ import_preview.file_name }}</h3>
+      <div class="w2-form-grid">
+        <div class="w2-panel"><p class="w2-label">New rows</p><p class="w2-stat-value">{{ import_preview.count }}</p></div>
+        <div class="w2-panel"><p class="w2-label">Duplicate events</p><p class="w2-stat-value">{{ import_preview.duplicates }}</p></div>
+      </div>
+      {% if import_preview.errors %}
+        <div class="w2-form-error" role="alert">
+          <strong>{{ import_preview.error_count }} errors. Nothing can be imported.</strong>
+          <ul>{% for line, error in import_preview.errors %}<li>Line {{ line }}: {{ error }}</li>{% endfor %}</ul>
+        </div>
+      {% elif import_preview.ready %}
+        <p class="w2-notice">Preview passed. Re-upload this <strong>exact same file</strong> to confirm. The ledger is rechecked under a database lock before any write.</p>
+        <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Transaction</th><th>Kind</th><th>Instrument</th><th>Shares</th><th>GBP total</th></tr></thead><tbody>
+          {% for row in import_preview.rows %}
+            <tr><td>{{ row.occurred_on }}</td><td>{{ row.kind }}</td><td>{{ row.symbol|default:"—" }}</td><td>{{ row.quantity }}</td><td>{{ row.amount }}</td></tr>
+          {% empty %}<tr><td colspan="5">All rows are already imported; no new events.</td></tr>{% endfor %}
+        </tbody></table></div>
+        {% if import_preview.count > 100 %}<p class="w2-note">Showing the first 100 rows; all {{ import_preview.count }} are checked before saving.</p>{% endif %}
+        <form method="post" enctype="multipart/form-data" class="w2-wizard-form">
+          {% csrf_token %}
+          <label class="w2-field">Re-upload the same CSV to confirm
+            <input class="w2-input" type="file" name="csv_file" accept=".csv,text/csv" required></label>
+          <button class="w2-button w2-button-primary" name="apply" value="yes" type="submit">Confirm original CSV import</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
