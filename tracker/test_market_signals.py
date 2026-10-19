@@ -216,7 +216,11 @@ class MarketWorkflowTests(TestCase):
         self.assertEqual(first["status"], "ok")
         self.assertGreaterEqual(first["created"], 1)
         self.assertEqual(second["created"], 0)
-        self.assertEqual(dispatcher.call_count, first["created"])
+        # THIRTY_DOWN is urgent and immediate; QUARTERLY moves to the
+        # scheduled digest so it must NOT trigger a second instant alert.
+        self.assertEqual(first["created"], 2)
+        self.assertEqual(dispatcher.call_count, 1)
+        self.assertIn('30down:', dispatcher.call_args.args[1])
         self.assertEqual(
             StrategySignal.objects.filter(strategy=self.strategy, kind="THIRTY_DOWN").count(), 1
         )
