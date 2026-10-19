@@ -6,6 +6,7 @@ signal strategy simulation v1.07 workbook. Suggestions never place orders.
 import json
 import logging
 import re
+from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone as utc_timezone
 from decimal import Decimal, ROUND_DOWN
 from urllib.parse import quote, urlencode
@@ -264,6 +265,11 @@ def review_strategy(strategy):
         return {"status": "invalid symbol"}
     if strategy.account.currency != "GBP":
         return {"status": "unsupported account currency"}
+    # The live adapter must enforce the exact pinned UK trading lines just
+    # as the pure evaluator, cockpit and single-fill path already do.
+    from .instrument_mapping import for_strategy
+    if for_strategy(strategy) is None:
+        return {"status": "cannot_compute", "reason": "Unverified instrument mapping or account trading line"}
     report = ledger_summary(strategy)
     if not report["positions"]:
         return {"status": "waiting for first purchase"}
@@ -372,10 +378,26 @@ def review_strategy(strategy):
             as_of__gte=active_down_signal.as_of,
         ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("as_of")
         skipped = count_skipped_equity_sells(earlier)
-    if len(_quarterly_closes(ref_spy, quarter_end)) < 2:
-        return {"status": "insufficient SPY quarter-end reference history"}
-    if len(_quarterly_closes(ref_tqqq, quarter_end)) < 2:
-        return {"status": "insufficient TQQQ quarter-end reference history"}
+    # An eight-quarter SPY window must be complete and quarter-close-dated,
+    # not inferred from two convenient samples. A missing previous peak
+    # could silently turn a genuine 30 Down into a normal buy/sell signal.
+    review_q = quarter_number(quarter_end)
+    def settled_end(q):
+        year, quarter_index = divmod(q, 4)
+        month = 3 * (quarter_index + 1)
+        return date(year, month, monthrange(year, month)[1])
+    spy_closes = _quarterly_closes(ref_spy, quarter_end)
+    if any(q not in spy_closes or
+           (settled_end(q) - spy_closes[q][0]).days > 6
+           for q in range(review_q - 8, review_q + 1)):
+        return {"status": "cannot_compute",
+                "reason": "SPY eight-quarter verified quarter-end history incomplete"}
+    tqqq_closes = _quarterly_closes(ref_tqqq, quarter_end)
+    if any(q not in tqqq_closes or
+           (settled_end(q) - tqqq_closes[q][0]).days > 6
+           for q in (review_q - 1, review_q)):
+        return {"status": "cannot_compute",
+                "reason": "TQQQ preceding/current verified quarter-end history incomplete"}
     # Initial equity baseline includes the first purchase date only.
     # Subsequent buys in the first calendar quarter must not silently
     # inflate the baseline and double-count their funding contributions.
