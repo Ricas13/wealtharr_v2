@@ -210,6 +210,9 @@ class StrategyBaseline(models.Model):
     equity_quantity = models.DecimalField(max_digits=22, decimal_places=8)
     safe_value = models.DecimalField(max_digits=22, decimal_places=2)
     cash_value = models.DecimalField(max_digits=22, decimal_places=2)
+    strategy_version = models.CharField(max_length=48, blank=True, default="", editable=False)
+    mapping_version = models.CharField(max_length=40, blank=True, default="", editable=False)
+    quote_evidence = models.JSONField(blank=True, default=dict, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
