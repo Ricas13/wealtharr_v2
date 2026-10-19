@@ -97,6 +97,8 @@ Practical schema constraints:
 - Financial records and accepted quotes require DB-level immutability protections (including staff/admin paths) plus transactional services. A successful signal must cite exactly which approved observations and version produced it.
 - Keep exact XIRR/TWR histories only when actual dated external flows and boundary valuations support them; otherwise show unavailable. Optional ISA allowance warning uses 6 April–5 April and only recorded eligible subscriptions, not claimed full broker/tax knowledge.
 
+**Section B evidence update (2026-10-19):** The first source-controlled role catalogue is now in `tracker/instrument_mapping.py`, keyed by strategy/role/GB/Trading 212/ISA/`2026-10-19.1`. It retains LQQ3.L (growth, **raw GBX**) and ERNS.L (safe, **raw GBP**) with reviewed issuer/broker Invest evidence, immutable dataclasses and explicit unverified **personal Stocks ISA approval** and **Yahoo feed** flags. Read `docs/instrument-research.md` before changing any identity; independent data-quality and version-pinning runtime flows remain Sections C/F.
+
 ## Fixed strategy and instrument catalogues
 
 Strategies and mapping rows are **frozen source-controlled Python manifests**, not admin-editable database tables. Registry keys are `strategy_key + semantic_version`; never alter released v1 behaviour without publishing v2. All role weights, parameters, market series needs, schedule, plain-language rules and eligibility rules come from code.
