@@ -9,8 +9,14 @@ fi
 archive=$1
 command -v docker >/dev/null || { echo "Docker is required" >&2; exit 2; }
 if [[ -f "$archive.sha256" ]]; then
-  (cd "$(dirname "$archive")" && sha256sum -c "$(basename "$archive").sha256" >/dev/null) ||
-    { echo "Backup checksum mismatch: refusing recovery" >&2; exit 3; }
+  # Sidecars created inside Compose may contain a container absolute path.
+  # Verify the checksum for the *supplied host file*, not that stored path.
+  expected="$(head -n 1 "$archive.sha256" | awk '{print $1}')"
+  actual="$(sha256sum "$archive" | awk '{print $1}')"
+  if [[ ! "$expected" =~ ^[a-f0-9]{64}$ || "$actual" != "$expected" ]]; then
+    echo "Backup checksum mismatch: refusing recovery" >&2
+    exit 3
+  fi
 elif [[ "${WEALTHARR_ALLOW_LEGACY_BACKUP:-}" != "YES" ]]; then
   echo "No checksum sidecar; refuse unverified legacy archive (set WEALTHARR_ALLOW_LEGACY_BACKUP=YES only after manual trust verification)" >&2
   exit 3
