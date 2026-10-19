@@ -30,7 +30,7 @@ Updated 2026-10-19. **No broker link, API, order placement, simulated transactio
 
 ## Supported tests, limitations and next steps
 
-- `tracker/test_g_single_fill.py`: actual partial quantities, owner isolation, UUID idempotency, excessive fill rollback, externally modified ledger, source-backed actual reset, no reset without flag, post-fill market-evidence holds.
+- `tracker/test_g_single_fill.py`: actual partial quantities, owner isolation, UUID idempotency, excessive fill rollback, simulated `SignalFill` persistence failure **rolls back the ledger event too**, externally modified ledger, source-backed actual reset, no reset without flag, post-fill market-evidence holds.
 - `tracker/test_cockpit.py`: prior all-at-once tests updated to use only the single-fill adapter; verifies ordinary vs reset, over-selling and historical signal refusals.
 - `tracker/test_strategy_baseline.py`: historic reset/spike shortcut is now deliberately **non-writing**.
 - Migration `0011_signal_fill.py` adds fill links and baseline provenance. `0012_signal_reset_reason.py` adds explicit rule-produced reset reason; it **does not** backfill questionable old free-text signals.
