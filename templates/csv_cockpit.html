@@ -35,6 +35,13 @@
         <div><strong>{{ duplicate_total }}</strong><span>Already imported / repeated</span></div>
         <div><strong>{{ error_total }}</strong><span>Rows needing attention</span></div>
       </div>
+      {% if duplicate_total %}
+        <details class="ck-disclosure-inline"><summary>Which rows were duplicates?</summary>
+          <p>These records were not staged as new transactions. Repeated CSV row numbers (first 30):
+          {% for line in duplicate_lines %}{{ line }}{% if not forloop.last %}, {% endif %}{% empty %}See the import totals{% endfor %}.
+          Exact historical broker IDs and existing imported events are kept idempotent.</p>
+        </details>
+      {% endif %}
 
       {% if error_total %}
         <div role="alert" class="ck-block-message">
