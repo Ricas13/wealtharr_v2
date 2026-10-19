@@ -1,3 +1,50 @@
-{% extends 'base.html' %}{% block title %}Ledger{% endblock %}{% block content %}<section class="cockpit"><div class="ck-section-head"><h1>Ledger</h1><a class="btn" href="{% url 'cockpit_csv' %}">Import Trading 212 CSV</a></div>
-<p class="ck-muted">Cash £{{ report.cash|floatformat:'2g' }}. Transactions are append-only.</p>
-<div class="panel ck-card table-scroll"><table class="data-table"><caption>Actual recorded deposits, withdrawals and fills</caption><thead><tr><th>Date</th><th>Type</th><th>Instrument</th><th>Quantity</th><th>GBP price</th><th>Amount</th><th>Fees</th></tr></thead><tbody>{% for e in entries %}<tr><td>{{ e.occurred_on }}</td><td>{{ e.kind }}</td><td>{{ e.symbol|default:'—' }}</td><td>{{ e.quantity }}</td><td>{{ e.unit_price }}</td><td>{{ e.amount }}</td><td>{{ e.fee }}</td></tr>{% empty %}<tr><td colspan="7">No ledger entries yet.</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Ledger{% endblock %}
+{% block content %}
+<div class="cockpit ck-v2">
+  <header class="ck-top">
+    <div><p class="ck-overline">{{ strategy.name }} · YOUR RECORDED TRANSACTIONS</p><h1>Ledger</h1>
+      <p class="ck-muted">Deposits and trades you actually recorded. No simulated fills.</p>
+    </div>
+    <a class="btn btn-subtle btn-sm" href="{% url 'cockpit_csv' %}">Import Trading 212 CSV</a>
+  </header>
+  <div class="ck-metrics ck-metrics-two">
+    <section class="panel ck-card">
+      <h2 class="ck-label">Available recorded cash</h2>
+      <p class="ck-number">£{{ report.cash|floatformat:'2g' }}</p>
+      <p class="ck-muted">Calculated from the append-only ledger, not a live broker balance</p>
+    </section>
+    <section class="panel ck-card">
+      <h2 class="ck-label">Net deposits less withdrawals</h2>
+      <p class="ck-number">£{{ report.net_contributed|floatformat:'2g' }}</p>
+      <p class="ck-muted">Buying an instrument is not a new contribution</p>
+    </section>
+  </div>
+  <section class="panel ck-card" aria-labelledby="transactions-title">
+    <div class="ck-section-head"><h2 id="transactions-title">Transactions</h2><span class="ck-muted">Most recent first · up to 200</span></div>
+    <div class="table-scroll"><table class="data-table ck-ledger-table">
+      <caption>Recorded movements, with cash effects in GBP. Trades include their actual fees.</caption>
+      <thead><tr><th>Date</th><th>Event</th><th>Instrument</th><th>Units</th><th>Price (£)</th><th>Cash change (£)</th><th>Fees (£)</th></tr></thead>
+      <tbody>
+      {% for entry in entries %}
+        <tr>
+          <td><time datetime="{{ entry.date|date:'Y-m-d' }}">{{ entry.date|date:'j M Y' }}</time></td>
+          <th scope="row">{{ entry.kind }}</th>
+          <td>{{ entry.symbol|default:'—' }}</td>
+          <td>{% if entry.quantity is not None %}{{ entry.quantity }}{% else %}—{% endif %}</td>
+          <td>{% if entry.unit_price is not None %}{{ entry.unit_price }}{% else %}—{% endif %}</td>
+          <td class="ck-tabular">{{ entry.cash_change|floatformat:'2g' }}</td>
+          <td>{% if entry.fee is not None %}{{ entry.fee|floatformat:'2g' }}{% else %}—{% endif %}</td>
+        </tr>
+        {% if entry.note %}<tr class="ck-ledger-note"><td colspan="7"><small>Entry #{{ entry.id }} · {{ entry.note }}</small></td></tr>{% endif %}
+      {% empty %}
+        <tr><td colspan="7">No actual transactions recorded yet. Import your account history or record a real deposit.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% if entry_limit_reached %}<p class="ck-muted">Showing the latest 200 transactions; older records remain stored.</p>{% endif %}
+    <p class="ck-muted">Cash change = recorded trade proceeds or costs after fees; this is not the instrument’s gain/loss. Records cannot be edited here.</p>
+  </section>
+  <a class="btn btn-subtle" href="{% url 'cockpit_today' %}">Back to Today</a>
+</div>
+{% endblock %}
