@@ -91,6 +91,50 @@ class RealQuarterlySignalTests(TestCase):
         self.assertEqual(digest_dispatch.call_count, 1)
         self.assertIn('quarterly-digest:', digest_dispatch.call_args.args[1])
 
+    def test_provisional_quarterly_tqqq_spike_has_no_executable_reset_orders(self):
+        # Regression: the typed pure evaluator already suppresses orders
+        # based solely on a TQQQ calendar-close proxy; the persisted Django
+        # advisory must not suggest a 60/40 trade on that unverified anchor.
+        self.save(LedgerEntry.DEPOSIT, self.begin, amount=D("1000"))
+        self.save(LedgerEntry.BUY, self.first_trade,
+                  symbol="LQQ3.L", quantity=D("6"), unit_price=D("100"))
+        self.save(LedgerEntry.BUY, self.first_trade,
+                  symbol="ERNS.L", quantity=D("4"), unit_price=D("100"))
+        cached = self.market(D("100"))
+        MarketObservation.objects.filter(
+            symbol="TQQQ", as_of=self.end).update(price=D("160"))
+        cached["TQQQ"].price = D("160")
+        with patch("tracker.market_signals.sync_ticker",
+                   side_effect=lambda symbol: cached[symbol]), \
+             patch("tracker.market_signals.dispatch") as dispatch:
+            result = review_strategy(self.strategy)
+        self.assertEqual(result["status"], "ok")
+        quarter = StrategySignal.objects.get(
+            strategy=self.strategy, kind="QUARTERLY")
+        self.assertEqual(quarter.actions, [])
+        self.assertEqual(quarter.reset_reason, "")
+        self.assertEqual(quarter.strategy_version, NINE_SIG_RULE_VERSION)
+        self.assertIn("No executable reset quantities", quarter.message)
+        warning = StrategySignal.objects.get(
+            strategy=self.strategy, kind="SPIKE_WATCH")
+        self.assertEqual(warning.actions, [])
+        self.assertEqual(warning.strategy_version, NINE_SIG_RULE_VERSION)
+        self.assertIn("actual previous rebalance price", warning.message)
+        self.assertEqual(dispatch.call_count, 1)
+        # Exactly one owner warning and no automatic broker transactions.
+        self.assertEqual(
+            self.strategy.ledger.filter(kind=LedgerEntry.SELL).count(), 0)
+        self.assertEqual(
+            self.strategy.ledger.filter(kind=LedgerEntry.BUY).count(), 2)
+        with patch("tracker.market_signals.sync_ticker",
+                   side_effect=lambda symbol: cached[symbol]), \
+             patch("tracker.market_signals.dispatch") as repeated:
+            result_again = review_strategy(self.strategy)
+        self.assertEqual(result_again["status"], "ok")
+        repeated.assert_not_called()
+        self.assertEqual(
+            StrategySignal.objects.filter(kind="SPIKE_WATCH").count(), 1)
+
     def test_no_action_quarter_is_saved_without_sending_a_rebalance_alert(self):
         self.save(LedgerEntry.DEPOSIT, self.begin, amount=D("1000"))
         self.save(LedgerEntry.BUY, self.first_trade,
