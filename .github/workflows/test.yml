@@ -53,6 +53,8 @@ jobs:
       - name: Validate private deployment and recovery configuration
         run: |
           set -eu
+          bash -n wealtharr.sh
+          bash wealtharr.sh --help
           bash -n scripts/restore_backup.sh
           bash -n scripts/verify_backup.sh
           cp .env.example .env.production
