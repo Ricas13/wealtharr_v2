@@ -190,6 +190,15 @@ def _performance(strategy, summary):
             'net_contributed_gbp': inception.net_contributed_gbp if inception and inception.status == 'ok' else None,
             'metric_reason': (inception.reason_code if inception else
                               'UNVERIFIED_END_OR_INCOMPLETE_PRICE_DATES'),
+            'annual_basis': ('verified_snapshot_twr' if twr is not None
+                             else 'money_weighted_xirr' if irr is not None
+                             else 'unavailable'),
+            'xirr_as_of': end.isoformat() if irr is not None else None,
+            'twr_window': ((snaps[0].as_of.isoformat(),
+                            snaps[-1].as_of.isoformat()) if twr is not None
+                           else None),
+            'twr_reason': ('' if twr is not None else
+                           'NO_PROVEN_FLOW_BOUNDARIES_OR_SNAPSHOT_PERIOD'),
             'chart': [{'date': s.as_of.isoformat(), 'value': str(s.total_value),
                        'contributed': str(s.net_contributed)} for s in snaps]}
 
