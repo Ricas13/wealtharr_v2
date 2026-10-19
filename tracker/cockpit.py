@@ -466,6 +466,7 @@ def setup(request):
                     monthly_target=d['monthly_target'],
                     equity_symbol=manifest['roles']['growth']['yahoo_ticker'],
                     safe_symbol=manifest['roles']['safe']['yahoo_ticker'],
+                    strategy_version=describe_strategy(manifest['strategy_key']).version,
                     mapping_version=manifest['mapping_version'],
                     resolved_instruments=manifest,
                     market_data_enabled=True, contribution_alerts=True)
