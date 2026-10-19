@@ -132,7 +132,8 @@ class OwnerAlertMatrixTests(TestCase):
             subject="Old source warning", message="Already expired",
             next_retry_at=timezone.now() - timedelta(minutes=10))
         self.pref.urgent_email = False
-        self.pref.save(update_fields=["urgent_email"])
+        self.pref.urgent_discord = False
+        self.pref.save(update_fields=["urgent_email", "urgent_discord"])
         with patch("tracker.notification_scheduler.dispatch") as sender:
             self.assertEqual(retry_due_deliveries(), (0, 0))
             sender.assert_not_called()
