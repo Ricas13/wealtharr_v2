@@ -211,3 +211,48 @@ def for_strategy(strategy):
             strategy.safe_symbol != profile.safe.yahoo_ticker):
         return None
     return profile
+
+
+def enrolment_manifest(strategy_slug=STRATEGY_9SIG, *, country="GB",
+                       broker="TRADING212", account_type="ISA"):
+    """Capture only reviewed, exact ISA trading lines as an immutable JSON value.
+
+    An enrolment records the CURRENT code-defined identity and evidence
+    qualifiers. It never asserts personal broker permission or changes the
+    currently supported account type. Historic instances retain their
+    snapshots even if the code-defined catalogue is later revised.
+    """
+    import hashlib
+    import json
+
+    roles = {}
+    for role in ("growth", "safe"):
+        instrument = resolve_curated_isa_role(
+            strategy_slug, role, country, broker, account_type,
+            mapping_version=MAPPING_VERSION)
+        roles[role] = {
+            "name": instrument.name,
+            "issuer": instrument.issuer,
+            "isin": instrument.isin,
+            "broker_ticker": instrument.broker_ticker,
+            "yahoo_ticker": instrument.yahoo_ticker,
+            "trading_line": instrument.trading_line,
+            "raw_quote_unit": instrument.raw_quote_unit,
+            "normalised_currency": instrument.currency,
+            "raw_to_gbp_factor": str(instrument.raw_to_gbp_factor),
+            "issuer_says_isa_eligible": instrument.issuer_says_isa_eligible,
+            "broker_invest_listed": instrument.broker_invest_listed,
+            "broker_isa_confirmed": instrument.broker_isa_confirmed,
+            "owner_product_permission_confirmed": instrument.owner_product_permission_confirmed,
+            "yahoo_price_unit_confirmed": instrument.yahoo_price_unit_confirmed,
+            "issuer_url": instrument.issuer_url,
+            "broker_evidence_url": instrument.broker_evidence_url,
+        }
+    manifest = {
+        "strategy_key": strategy_slug, "mapping_version": MAPPING_VERSION,
+        "country": country, "broker": broker, "account_type": account_type,
+        "roles": roles,
+    }
+    serialised = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+    manifest["sha256"] = hashlib.sha256(serialised.encode("utf-8")).hexdigest()
+    return manifest
