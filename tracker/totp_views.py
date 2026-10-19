@@ -5,6 +5,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.cache import never_cache
 from django.utils import timezone
 
 from .models import OwnerTOTP
@@ -15,6 +16,7 @@ SESSION_FLAG = "wealtharr_totp_verified_uid"
 ENROLL_SECRET = "wealtharr_pending_totp"
 
 
+@never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 def challenge(request):
@@ -31,6 +33,7 @@ def challenge(request):
     return render(request, "totp_challenge.html")
 
 
+@never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 def configure(request):
