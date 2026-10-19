@@ -2,6 +2,7 @@
 
 Repository: `Ricas13/wealtharr_v2`  
 Working branch: `feature/owner-9sig-cockpit-resumable`  
+Pull request: https://github.com/Ricas13/wealtharr_v2/pull/11  
 Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)  
 
 ## Objective

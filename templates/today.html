@@ -22,7 +22,11 @@
     <section class="panel ck-card ck-next" aria-labelledby="next-title">
       <div class="ck-section-head"><h2 id="next-title">Next action</h2>
         <span class="ck-chip {% if fresh %}ck-ok{% else %}ck-blocked{% endif %}">Prices: {% if price_date %}Yahoo close {{ price_date|date:'d M Y' }}{% else %}not verified{% endif %} · {% if fresh %}fresh{% else %}check needed{% endif %}</span></div>
-      {% if blocking_reason %}
+      {% if signal and signal.kind != 'QUARTERLY' %}
+        <p class="ck-action-text">{{ signal.title }}</p><p>{{ signal.message }}</p>
+        {% if blocking_reason %}<p class="ck-muted">Data check: {{ blocking_reason }}</p>{% endif %}
+        <a href="{% url 'cockpit_history' %}" class="btn">Review warning</a>
+      {% elif blocking_reason %}
         <div class="ck-block-message" role="alert"><strong>Cannot calculate a safe instruction.</strong><p>{{ blocking_reason }}</p></div>
         <form action="{% url 'cockpit_refresh' %}" method="post" class="ck-refresh-form" data-loading-form>{% csrf_token %}<button class="btn" type="submit" data-loading-text="Checking Yahoo prices…">Check prices again</button></form>
       {% elif actionable %}
@@ -32,9 +36,6 @@
         {% endfor %}</ol>
         <p class="ck-muted">Estimated using {{ signal.as_of|date:'d M Y' }} quarter-end closes. Check live executable prices and fees.</p>
         <a class="btn btn-primary ck-primary" href="{% url 'cockpit_rebalance' signal.pk %}">Review trades &amp; record actual fills</a>
-      {% elif signal and signal.kind != 'QUARTERLY' %}
-        <p class="ck-action-text">{{ signal.title }}</p><p>{{ signal.message }}</p>
-        <a href="{% url 'cockpit_history' %}" class="btn">Review warning</a>
       {% else %}
         <p class="ck-action-text">Nothing to trade right now.</p><p class="ck-muted">Wealtharr will check the next completed-quarter close and notify you if action is required.</p>
       {% endif %}

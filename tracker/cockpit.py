@@ -134,7 +134,10 @@ def _performance(strategy, summary):
     end = min((m.as_of for m in held_marks), default=timezone.localdate())
     # End valuation uses the EXACT date of latest verified marks (no future flows).
     # Else XIRR remains unavailable rather than mislabel today's holdings as an old close.
-    valid_end = bool(held_marks) and len(held_marks) == sum(q > ZERO for q in summary['positions'].values()) and (
+    valid_end = bool(held_marks) and len(held_marks) == sum(q > ZERO for q in summary['positions'].values()) and all(
+        mark.source == 'yahoo' and MarketObservation.objects.filter(
+            symbol=mark.symbol, as_of=mark.as_of, currency='GBP', price=mark.price).exists()
+        for mark in held_marks) and (
         max(m.as_of for m in held_marks) - end).days <= 1 and not strategy.ledger.filter(occurred_on__gt=end).exists()
     irr = xirr([(e.occurred_on, -e.amount if e.kind == 'DEPOSIT' else e.amount) for e in entries],
                end, summary['value']) if first and valid_end and summary['value'] is not None else None
