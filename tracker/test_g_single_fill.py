@@ -87,7 +87,7 @@ class ConfirmedSingleFillTests(TestCase):
         self.assertEqual(self.strategy.ledger.filter(kind="SELL").count(), 1)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.signal).exists())
         self.assertFalse(StrategyBaseline.objects.filter(reset_signal=self.signal).exists())
-        self.assertContains(self.client.get(self.url), "0.60000000 still to record")
+        self.assertContains(self.client.get(self.url), "0.6 still to record")
         self.assertContains(self.client.get(reverse("cockpit_today")),
                             "Continue your recorded partial fills")
         self.assertEqual(self.client.post(self.url, {"intent": "finalize"}).status_code, 200)
