@@ -76,7 +76,7 @@ LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "Europe/London"
 USE_I18N = True
 USE_TZ = True
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Project-owned CSS/JS lives in BASE_DIR/static, outside installed apps.
 # Without this, collectstatic only copies Django admin assets and production
