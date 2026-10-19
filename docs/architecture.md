@@ -154,6 +154,20 @@ class FixedStrategy(Protocol):
 
 The engine reports money and shares with explicit rounding/precision and a named intermediate set (signal line, equity valuation, gap, buying power, throttle, 30 Down window, spike reference, reset flags). Persist a stable, CSV-exportable ordered intermediate representation with Decimal values serialised as **strings**, alongside snapshot fingerprints and source dates. A minor downstream UI change cannot silently recalculate an old signal.
 
+## One-reason user refusals
+
+A `cannot_compute` evaluation returns the highest-priority reason only. Core interpolates values from recorded facts and never suggests guessing or executing old trades.
+
+| Code | Plain-language Today message |
+| --- | --- |
+| `STALE_PRICE` | "The latest approved price for {instrument} is dated {date}. I can't give you a trade instruction until prices are refreshed." |
+| `MISSING_HISTORY` | "I need your starting holdings or a missing earlier transaction before I can calculate this review. Import or record the actual history first." |
+| `OUTSIDE_STRATEGY` | "{instrument} is held in this account but isn't part of this strategy. Reconcile it before I suggest trades." |
+| `NEGATIVE_CASH` | "Your recorded cash is £{amount} below zero. Check for a missing deposit, trade or fee before continuing." |
+| `PRICE_ON_HOLD` | "The price for {instrument} is on hold because {brief_reason}. I won't use it to calculate a trade until it's verified." |
+
+When a price is on hold, show its raw source date/currency under the expandable data explanation, not a guessed fallback price.
+
 ## Transaction, data quality and notifications
 
 - Prices: pluggable source primary + independent fallback; raw observations are retained, sanity checks fail closed on stale/mismatched date, large moves and GBP/GBX confusion, and a human-reviewed release is an append-only decision. A fallback quote is **not** automatically trustworthy merely because Yahoo failed.
