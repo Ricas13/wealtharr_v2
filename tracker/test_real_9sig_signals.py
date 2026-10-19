@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from tracker.market_signals import quarter_end_before, review_strategy
+from tracker.market_signals import NINE_SIG_RULE_VERSION, quarter_end_before, review_strategy
 from tracker.cockpit_notifications import send_due_cockpit_notices
 from tracker.models import (
     Account, LedgerEntry, MarketObservation, NotificationPreference,
@@ -81,6 +81,7 @@ class RealQuarterlySignalTests(TestCase):
         alert = StrategySignal.objects.get(
             strategy=self.strategy, kind="QUARTERLY")
         self.assertIn("£904.00", alert.message)
+        self.assertEqual(alert.strategy_version, NINE_SIG_RULE_VERSION)
         self.assertTrue(any(x["side"] == "BUY" for x in alert.actions))
         # No instant duplicate quarterly alert; the reconciled instruction
         # is sent once by the scheduled digest instead.
