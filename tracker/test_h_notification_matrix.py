@@ -167,3 +167,77 @@ class ScheduledOwnerNoticeTests(TestCase):
         with patch("tracker.notification_scheduler.dispatch") as send:
             call_command("retry_notifications", verbosity=0)
             send.assert_not_called()
+
+
+class ScheduledDigestBehaviourTests(TestCase):
+    def setUp(self):
+        from tracker.models import Account, StrategyInstance, StrategyPreset, StrategySignal
+        from tracker.market_signals import quarter_end_before
+        self.owner = get_user_model().objects.create_user(
+            "digest_owner", password="test-notification-password")
+        NotificationPreference.objects.create(
+            owner=self.owner, email_enabled=True, discord_enabled=False,
+            monthly_reminders=False)
+        account = Account.objects.create(
+            owner=self.owner, name="My ISA", kind="ISA",
+            country="GB", broker="TRADING212")
+        preset, _ = StrategyPreset.objects.get_or_create(
+            slug="nasdaq-quarterly-target",
+            defaults={"name": "9Sig", "summary": "", "risk": "HIGH"})
+        self.strategy = StrategyInstance.objects.create(
+            owner=self.owner, account=account, preset=preset,
+            name="My strategy", equity_symbol="LQQ3.L", safe_symbol="ERNS.L",
+            market_data_enabled=True, monthly_target=0)
+        self.today = timezone.localdate()
+        self.signal = StrategySignal.objects.create(
+            strategy=self.strategy, signal_key="quarter:test:alert",
+            kind="QUARTERLY", as_of=quarter_end_before(self.today),
+            title="Quarterly review", message="Review only", actions=[
+                {"side": "BUY", "symbol": "ERNS.L", "quantity": "2",
+                 "estimated_gbp": "100"},
+            ])
+
+    def test_one_quarterly_digest_no_second_send_on_repeated_tick(self):
+        from tracker.cockpit_notifications import send_due_cockpit_notices
+        with (patch("tracker.cockpit_notifications._price_status",
+                    return_value=(True, "", [])),
+              patch("tracker.cockpit_notifications.ledger_summary",
+                    return_value={"positions": {}}),
+              patch("tracker.services._send_message") as transport):
+            self.assertEqual(send_due_cockpit_notices(today=self.today), 1)
+            self.assertEqual(send_due_cockpit_notices(today=self.today), 0)
+        self.assertEqual(transport.call_count, 1)
+        self.assertEqual(NotificationDelivery.objects.filter(
+            owner=self.owner, status="SENT").count(), 1)
+
+    def test_one_weekly_source_problem_no_executable_quarterly_notice(self):
+        from tracker.cockpit_notifications import send_due_cockpit_notices
+        with (patch("tracker.cockpit_notifications._price_status",
+                    return_value=(False, "GBP quote on hold", [])),
+              patch("tracker.cockpit_notifications.ledger_summary",
+                    return_value={"positions": {"LQQ3.L": 1}}),
+              patch("tracker.services._send_message") as transport):
+            self.assertEqual(send_due_cockpit_notices(today=self.today), 1)
+            self.assertEqual(send_due_cockpit_notices(today=self.today), 0)
+        self.assertEqual(transport.call_count, 1)
+        event = NotificationDelivery.objects.get(owner=self.owner)
+        self.assertTrue(event.event_key.startswith("data:"))
+        self.assertIn("Do not trade", event.message)
+
+    def test_no_market_monitoring_still_reminds_about_real_contribution_plan(self):
+        from decimal import Decimal as D
+        from tracker.cockpit_notifications import send_due_cockpit_notices
+        self.strategy.market_data_enabled = False
+        self.strategy.monthly_target = D("500")
+        self.strategy.save(update_fields=["market_data_enabled", "monthly_target"])
+        pref = NotificationPreference.objects.get(owner=self.owner)
+        pref.monthly_reminders = True
+        pref.save(update_fields=["monthly_reminders"])
+        target_day = self.today.replace(day=3)
+        with patch("tracker.services._send_message") as transport:
+            self.assertEqual(send_due_cockpit_notices(today=target_day), 1)
+            self.assertEqual(send_due_cockpit_notices(today=target_day), 0)
+        self.assertEqual(transport.call_count, 1)
+        event = NotificationDelivery.objects.get(owner=self.owner)
+        self.assertTrue(event.event_key.startswith("monthly:"))
+        self.assertIn("not an automatic transfer", event.message)
