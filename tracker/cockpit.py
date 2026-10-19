@@ -24,6 +24,7 @@ from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
                      StrategySignal, StrategyValueSnapshot, YahooSync)
 from .performance import snapshot_twr_ready, annualized_return, max_drawdown
 from .core.metrics import ExternalFlow, VerifiedValuation, evaluate_inception
+from .core.isa_allowance import estimate_allowance, tax_year_bounds
 from .strategies.registry import describe_strategy
 from .services import ledger_summary, validate_and_record
 from .core.presentation import (
@@ -425,6 +426,25 @@ def deposit_shortcut(request):
                 occurred_on=form.cleaned_data['occurred_on'], amount=form.cleaned_data['amount'],
                 note='Owner confirmed Trading 212 deposit'))
             messages.success(request, 'Deposit recorded.')
+            # Advisory only: count actual recorded deposits inside the relevant
+            # UK tax year. We cannot see subscriptions to other ISAs, transfers
+            # or whether this broker account supports flexible replacements.
+            date_added = form.cleaned_data['occurred_on']
+            start, end = tax_year_bounds(date_added)
+            rows = strategy.ledger.filter(
+                kind='DEPOSIT', occurred_on__range=(start, end)
+            ).values_list('occurred_on', 'amount')
+            try:
+                estimate = estimate_allowance(
+                    as_of=date_added, recorded_deposits=tuple(rows),
+                    other_isa_subscriptions=form.cleaned_data.get(
+                        'other_isa_subscriptions'))
+            except ValueError:
+                messages.info(request,
+                    'The ISA allowance policy for this deposit year is not verified. Check HMRC.')
+            else:
+                if estimate.status in ('approaching', 'limit_reached'):
+                    messages.warning(request, estimate.warning)
         except ValidationError as e:
             messages.error(request, '; '.join(e.messages))
     return redirect('cockpit_today')
