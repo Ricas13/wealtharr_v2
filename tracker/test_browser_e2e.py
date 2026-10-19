@@ -87,7 +87,7 @@ class OwnerChromiumJourneys(StaticLiveServerTestCase):
         self.page.locator('input[name="username"]').fill(username)
         self.page.locator('input[name="password"]').fill(password or self.password)
         self.page.get_by_role("button", name=re.compile("Sign in")).click()
-        self.page.wait_for_url(re.compile(r"/cockpit/(?:start/|$|security/verify/)"))
+        self.page.wait_for_url(re.compile(r"/(?:cockpit/(?:start/|$)|security/verify/)"))
 
     def seed_portfolio(self):
         account = Account.objects.create(
