@@ -126,7 +126,6 @@ jobs:
     env:
       DEBUG: "1"
       SECRET_KEY: "github-actions-browser-synthetic-only"
-      PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
