@@ -1,5 +1,6 @@
 """Independent boundary tests for the advisory engine and Yahoo normalization."""
 import json
+from calendar import monthrange
 from datetime import date
 from decimal import Decimal as D
 from unittest.mock import MagicMock, patch
@@ -149,25 +150,27 @@ class MarketWorkflowTests(TestCase):
                                                password="A-long-test-password-123")
         self.other = user.objects.create_user(username="monitor-other", email="other@example.com",
                                                password="A-long-test-password-123")
-        self.account = Account.objects.create(owner=self.owner, name="ISA monitoring", kind="ISA")
+        self.account = Account.objects.create(
+            owner=self.owner, name="ISA monitoring", kind="ISA",
+            country="GB", broker="TRADING212")
         self.preset = StrategyPreset.objects.get(slug="nasdaq-quarterly-target")
         self.strategy = StrategyInstance.objects.create(
             owner=self.owner, account=self.account, preset=self.preset,
-            name="9Sig monitored", equity_symbol="LQQ3.L", safe_symbol="AGBP.L", market_data_enabled=True,
+            name="9Sig monitored", equity_symbol="LQQ3.L", safe_symbol="ERNS.L", market_data_enabled=True,
         )
 
     def test_only_owner_can_update_monitoring_settings_or_acknowledge(self):
         url = reverse("save_automation", args=[self.strategy.pk])
         self.client.force_login(self.other)
         response = self.client.post(url, {
-            "equity_symbol": "CHANGED.L", "safe_symbol": "AGBP.L", "market_data_enabled": "on",
+            "equity_symbol": "CHANGED.L", "safe_symbol": "ERNS.L", "market_data_enabled": "on",
         })
         self.assertEqual(response.status_code, 404)
         self.strategy.refresh_from_db()
         self.assertEqual(self.strategy.equity_symbol, "LQQ3.L")
         self.client.force_login(self.owner)
         response = self.client.post(url, {
-            "equity_symbol": " LQQ3.L ", "safe_symbol": " AGBP.L ",
+            "equity_symbol": " LQQ3.L ", "safe_symbol": " ERNS.L ",
             "market_data_enabled": "on",
         })
         self.assertEqual(response.status_code, 302)
@@ -185,11 +188,22 @@ class MarketWorkflowTests(TestCase):
             kind="BUY", occurred_on=start, symbol="LQQ3.L", quantity=D("10"), unit_price=D("50"),
         ))
         validate_and_record(self.strategy, LedgerEntry(
-            kind="BUY", occurred_on=start, symbol="AGBP.L", quantity=D("5"), unit_price=D("80"),
+            kind="BUY", occurred_on=start, symbol="ERNS.L", quantity=D("5"), unit_price=D("80"),
         ))
         from tracker.market_signals import quarter_end_before
         end = quarter_end_before(now)
         previous_end = quarter_end_before(end)
+        # Use the supported UK ERNS line and the complete SPY rolling
+        # eight-quarter reference; old AGBP/two-close fixtures were not
+        # eligible to issue real-market 9Sig trading suggestions.
+        from tracker.market_signals import quarter_number
+        review_q = quarter_number(end)
+        for offset in range(2, 9):
+            year, q_index = divmod(review_q - offset, 4)
+            month = (q_index + 1) * 3
+            prior = date(year, month, monthrange(year, month)[1])
+            MarketObservation.objects.create(
+                symbol="SPY", as_of=prior, price=D("100"), currency="USD")
         MarketObservation.objects.create(
             symbol="SPY", as_of=previous_end, price=D("100"), currency="USD")
         MarketObservation.objects.create(
@@ -203,7 +217,7 @@ class MarketWorkflowTests(TestCase):
         MarketObservation.objects.create(
             symbol="LQQ3.L", as_of=end, price=D("48"), currency="GBP")
         MarketObservation.objects.create(
-            symbol="AGBP.L", as_of=end, price=D("81"), currency="GBP")
+            symbol="ERNS.L", as_of=end, price=D("81"), currency="GBP")
         reference = MarketObservation.objects.create(
             symbol="TQQQ", as_of=now, price=D("65"), currency="USD")
         spy = MarketObservation.objects.create(
@@ -211,9 +225,9 @@ class MarketWorkflowTests(TestCase):
         equity = MarketObservation.objects.create(
             symbol="LQQ3.L", as_of=now, price=D("48"), currency="GBP")
         safe = MarketObservation.objects.create(
-            symbol="AGBP.L", as_of=now, price=D("81"), currency="GBP")
+            symbol="ERNS.L", as_of=now, price=D("81"), currency="GBP")
         mapped = {"TQQQ": reference, "SPY": spy,
-                  "LQQ3.L": equity, "AGBP.L": safe}
+                  "LQQ3.L": equity, "ERNS.L": safe}
         from tracker.models import NotificationPreference
         NotificationPreference.objects.update_or_create(
             owner=self.owner,
