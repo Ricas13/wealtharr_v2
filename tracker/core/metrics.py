@@ -84,6 +84,30 @@ class PeriodMetrics:
     max_drawdown: Decimal | None
     audit: tuple[MetricAudit, ...] = ()
 
+    def audit_rows(self) -> tuple[dict[str, str], ...]:
+        """Stable, CSV/JSON-ready valuation and unit issuance evidence."""
+        return tuple({
+            "stage": point.stage, "as_of": point.as_of.isoformat(),
+            "portfolio_gbp": str(point.portfolio_gbp),
+            "net_external_flow_gbp": str(point.net_external_flow_gbp),
+            "unit_nav": "" if point.unit_nav is None else str(point.unit_nav),
+            "observation_ids": "|".join(point.observation_ids),
+            "units_outstanding": ("" if point.units_outstanding is None
+                                  else str(point.units_outstanding)),
+            "units_issued": str(point.units_issued),
+        } for point in self.audit)
+
+    def summary_row(self) -> dict[str, str]:
+        """Missing metrics are empty rather than zero or fabricated returns."""
+        keys = ("opening_gbp", "closing_gbp", "net_external_flows_gbp",
+                "cash_gain_gbp", "xirr_annual", "cumulative_return",
+                "annualized_twr", "max_drawdown")
+        return {
+            "status": self.status, "reason_code": self.reason_code,
+            **{key: "" if getattr(self, key) is None
+               else str(getattr(self, key)) for key in keys},
+        }
+
 
 @dataclass(frozen=True)
 class InceptionMetrics:
@@ -94,6 +118,14 @@ class InceptionMetrics:
     xirr_annual: Decimal | None
     simple_cumulative_return: Decimal | None  # only a SINGLE funding deposit
     cash_flows: tuple[ExternalFlow, ...] = ()
+
+    def audit_rows(self) -> tuple[dict[str, str], ...]:
+        return tuple({
+            "event_id": flow.event_id,
+            "occurred_on": flow.occurred_on.isoformat(),
+            "signed_external_flow_gbp": str(flow.amount_gbp),
+            "source_sequence": str(flow.sequence),
+        } for flow in self.cash_flows)
 
 
 @dataclass(frozen=True)
