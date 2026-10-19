@@ -9,6 +9,22 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 Make Wealtharr a single-owner 9Sig investment cockpit: Today (value, contributed, gains, a reliable next action), History, Ledger, Settings, one guided manual rebalance, Trading 212 CSV preview/import, one-screen setup, money-weighted returns, concise reminders. Do not place broker orders or invent prices. Existing append-only ledger, immutable reset baseline, and hard refusals must remain intact.
 
+## New product brief — lettered redesign (2026-10-19)
+
+- [x] **Section A architecture/documentation only:** committed `docs/architecture.md` and root `CLAUDE.md` to this existing branch. These describe a *target*, not running refactored code; current PR #11 cockpit and its tests are still in place.
+- [ ] **B** independently verify exact Trading 212 UK ISA instrument mapping, evidence/dated flags and alternatives; do not treat current LQQ3/ERNS mapping as definitively ISA-verified.
+- [ ] **C** pure version-pinned 9Sig module, spreadsheet parity/irregular contributions, quote providers/quality holds.
+- [ ] **D** audited universal metrics with exact flow-boundary tests.
+- [ ] **E** strategy-independent Today / History / Ledger / Strategy info presentation.
+- [ ] **F** one-screen onboarding, contributions and conservative T212 import.
+- [ ] **G** safe single-transaction owner-confirmed fills and actual-baseline handling.
+- [ ] **H** owner destination/alert matrix, idempotent digest, scheduler diagnostics.
+- [ ] **I** secure Traefik deployment, optional TOTP, backups/restore.
+- [ ] **J** CI/Playwright and incremental ship plan.
+- **Instruction:** user wants **one lettered section per turn**. Stop after A now; proceed with B **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
+- **Architecture decision:** no broker/API integration of any kind, no editable preset/ticker/rule UI, no paper account, no billing or public signup. Fixed code-defined strategy versions; role-based evidence-backed exact lines pinned at enrolment. See `docs/architecture.md` and `CLAUDE.md`.
+- **Outstanding verification remains outstanding:** workbook parity, ISA/broker eligibility, real CSV, CI/migrations/browser checks, and deployment. Section A did not test or deploy runtime changes.
+
 ## State / checkpoints
 
 - [x] Dedicated new branch created; `main` deliberately untouched.
