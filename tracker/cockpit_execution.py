@@ -25,6 +25,24 @@ ONE = D("1")
 CENTS = D("0.01")
 
 
+
+def verified_quote_evidence(marks):
+    """Capture exact accepted GBP observation identities, not estimated prices."""
+    result = {}
+    for role, mark in zip(("growth", "safe"), marks):
+        observation = MarketObservation.objects.filter(
+            symbol=mark.symbol, as_of=mark.as_of, currency="GBP",
+            price=mark.price).values_list("pk", flat=True).first()
+        if observation is None:
+            raise ValidationError("Missing persisted GBP price observation for the reset.")
+        result[role] = {
+            "observation_id": observation, "symbol": mark.symbol,
+            "as_of": mark.as_of.isoformat(), "price_gbp": str(mark.price),
+            "currency": "GBP", "price_mark_source": mark.source,
+        }
+    return result
+
+
 def proposed_actions(signal):
     return tuple(a for a in signal.actions if a.get("side") in ("BUY", "SELL"))
 
@@ -217,7 +235,10 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
                 equity_value=actual_equity.quantize(CENTS),
                 equity_quantity=before["positions"].get(locked.equity_symbol, ZERO),
                 safe_value=actual_safe.quantize(CENTS),
-                cash_value=before["cash"])
+                cash_value=before["cash"],
+                strategy_version=locked.strategy_version,
+                mapping_version=locked.mapping_version,
+                quote_evidence=verified_quote_evidence(marks))
         completed = RebalanceExecution.objects.create(
             signal=signal, strategy=locked, executed_on=last_day,
             baseline=baseline)
