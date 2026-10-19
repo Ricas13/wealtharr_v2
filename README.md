@@ -2,6 +2,22 @@
 
 Private-first personal investment tracking with a responsive dark interface inspired by Infinidysk and Radarr.
 
+## Current private-owner cockpit (PR #11)
+
+The active redesign is documented in [RESUME.md](docs/RESUME.md) and
+[Section J private ship checklist](docs/private-ship-checklist.md).
+It supports **one UK owner tracking a fixed, version-pinned 9Sig strategy in
+a Trading 212 Stocks & Shares ISA**, with actual dated contributions, manual
+owner-confirmed fills, fail-closed GBP market observations and read-only audit
+history. It never connects to Trading 212 (including read-only APIs),
+executes broker trades, invents backtests, or offers public signup/billing.
+The general-purpose account and preset flows below are retained as
+historical foundation documentation, **not** the supported onboarding path.
+
+Local browser test commands and outstanding production/financial acceptance
+gates are in the Section J ship checklist. Production deployment and
+independent workbook parity are **not automatically verified by CI**.
+
 ## Included in this first foundation
 
 - Public homepage, owner-only login, responsive user dashboard, account pages and user settings.
