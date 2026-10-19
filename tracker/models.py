@@ -154,6 +154,9 @@ class SystemIntegration(models.Model):
 class NotificationDelivery(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     channel = models.CharField(max_length=12)
+    # Fixed-category provenance lets due retries honor changed owner preferences.
+    # Empty for legacy one-off notices which must not be guessed as a category.
+    category = models.CharField(max_length=16, blank=True, default="")
     event_key = models.CharField(max_length=160)
     status = models.CharField(max_length=12, default="PENDING")
     created_at = models.DateTimeField(auto_now_add=True)
