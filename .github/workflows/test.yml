@@ -126,6 +126,9 @@ jobs:
     env:
       DEBUG: "1"
       SECRET_KEY: "github-actions-browser-synthetic-only"
+      # Playwright sync starts an event loop in this synthetic test process.
+      # Never set this on Gunicorn, reminders, or production.
+      DJANGO_ALLOW_ASYNC_UNSAFE: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
