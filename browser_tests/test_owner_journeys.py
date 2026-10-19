@@ -149,7 +149,16 @@ class OwnerCockpitBrowserTests(BrowserHarness):
                     ("cockpit_settings", "Notifications"),
                 ):
                     self.visit(name)
-                    self.page.get_by_role("heading", name=title, exact=False).first.wait_for()
+                    if name == "cockpit_strategy":
+                        # The strategy page correctly uses its versioned 9Sig
+                        # title, not a generic "Strategy" H1.
+                        self.page.get_by_text(
+                            "READ-ONLY STRATEGY GUIDE", exact=True).wait_for()
+                        self.page.get_by_role(
+                            "heading", name="What you are following").wait_for()
+                    else:
+                        self.page.get_by_role(
+                            "heading", name=title, exact=False).first.wait_for()
                     self.assert_reachable_mobile()
                     self.assertNotIn("UNRELATED_SECRET_OWNER", self.page.content())
                     self.assertNotIn("98765.43", self.page.content())
