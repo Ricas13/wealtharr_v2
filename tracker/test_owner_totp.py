@@ -82,6 +82,17 @@ class OwnerAuthenticatorTests(TestCase):
         with patch("tracker.totp.time.time", return_value=TIME_A + 30):
             self.assertFalse(verify_account_code(self.user, current_code(secret)))
 
+    def test_unreadable_factor_secret_does_not_bypass_or_500(self):
+        self.enroll()
+        OwnerTOTP.objects.filter(owner=self.user).update(
+            secret_ciphertext="unreadable-rotated-key-ciphertext")
+        self.client.logout()
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("totp_challenge"), {"code": "123456"})
+        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(self.client.get(reverse("cockpit_settings")),
+                             reverse("totp_challenge"))
+
     def test_setup_requires_password_and_valid_code(self):
         response = self.client.get(reverse("totp_setup"))
         secret = decrypt_secret(self.client.session["wealtharr_pending_totp"])
