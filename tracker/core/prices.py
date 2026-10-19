@@ -15,7 +15,7 @@ from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from tracker.strategies.nine_sig.v1 import NormalizedQuote
+from tracker.strategies.nine_sig.v1 import NormalizedQuote, quarter_number
 
 STOOQ_REFERENCE_MAP = {"TQQQ": "tqqq.us", "SPY": "spy.us"}
 MAX_REFERENCE_DIFFERENCE = Decimal("0.01")
@@ -110,8 +110,19 @@ def reference_with_fallback(symbol: str, since: date, through: date, *,
                 q.price.is_finite() and q.price > 0 and
                 q.raw_close == q.price and q.observation_id and
                 since <= q.as_of <= through)
-    if yahoo_quotes and all(valid(q) for q in yahoo_quotes):
+    needed_quarters = set(range(quarter_number(since), quarter_number(through) + 1))
+    def covers(quotes):
+        present = {quarter_number(q.as_of) for q in quotes}
+        return (needed_quarters.issubset(present) and
+                max(q.as_of for q in quotes) >= through - timedelta(days=6))
+    if yahoo_quotes and all(valid(q) for q in yahoo_quotes) and covers(yahoo_quotes):
         return tuple(sorted(yahoo_quotes, key=lambda q: q.as_of))
     if yahoo_anchor is None:
         raise QuoteUnavailable("An existing independently verified Yahoo anchor is required")
-    return fallback_fetch(symbol, since, through, yahoo_anchor=yahoo_anchor)
+    independent = fallback_fetch(symbol, since, through, yahoo_anchor=yahoo_anchor)
+    if not independent or any(not (q.source == "stooq" and
+            q.symbol == symbol and q.currency == q.unit == q.raw_unit == "USD" and
+            q.raw_unit_verified and q.raw_close == q.price and q.observation_id)
+            for q in independent) or not covers(independent):
+        raise QuoteUnavailable("Independent reference series lacks required quarter closes")
+    return independent
