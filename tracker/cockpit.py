@@ -389,6 +389,9 @@ def guided_rebalance(request, signal_id):
                     'fee': ZERO,
                     'idempotency_key': uuid4(),
                 }))
+        for field_name in ('executed_on', 'quantity', 'unit_price', 'fee'):
+            form.fields[field_name].widget.attrs['id'] = (
+                'actual-fill-%s-%s' % (item['index'], field_name))
         rows.append((item, form))
     return render(request, 'rebalance.html', {
         'strategy': strategy, 'signal': notice,
