@@ -117,20 +117,32 @@ def sync_ticker(symbol, *, force=False):
             state.save(update_fields=["last_error"])
             LOG.warning("Market price on hold for %s (%s)", symbol, checked.code)
             return None
+        # A revised feed close may indicate a split, wrong units or source
+        # restatement. Never silently overwrite accepted history.
+        previous_values = dict(MarketObservation.objects.filter(
+            symbol=symbol, as_of__in=[day for day, _ in series]
+        ).values_list("as_of", "price"))
+        if any(previous_values[day] != price for day, price in series
+               if day in previous_values):
+            state.last_error = "PRICE_HOLD:REVISED_HISTORICAL_CLOSE"
+            state.save(update_fields=["last_error"])
+            LOG.warning("Market price revision on hold for %s", symbol)
+            return None
         observations = [
             MarketObservation(symbol=symbol, as_of=day, price=price, currency=currency)
             for day, price in series
         ]
         MarketObservation.objects.bulk_create(
-            observations, batch_size=250, update_conflicts=True,
-            update_fields=["price", "currency"], unique_fields=["symbol", "as_of"],
+            observations, batch_size=250, ignore_conflicts=True,
         )
         state.last_success = timezone.now()
         state.last_error = ""
         state.save(update_fields=["last_success", "last_error"])
     except Exception as exc:
         # Network errors are surfaced as a status, never replaced with invented data.
-        state.last_error = type(exc).__name__[:80]
+        detail = str(exc)
+        state.last_error = (detail[:80] if detail.startswith("PRICE_HOLD:")
+                            else type(exc).__name__[:80])
         state.save(update_fields=["last_error"])
         LOG.warning("Yahoo quote unavailable for %s (%s)", symbol, type(exc).__name__)
         return None
