@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Mapping
 
+from tracker.core.metrics import allocation_drift
+
 
 @dataclass(frozen=True)
 class NextStep:
@@ -63,10 +65,15 @@ def visible_performance(performance: Mapping) -> tuple[dict, ...]:
     fields = (
         ("xirr", "Money-weighted return", "%", "Annualised since first recorded deposit"),
         ("twr", "Time-weighted return", "%", "Only the verified snapshot period; not since inception"),
-        ("drawdown", "Sampled drawdown", "%", "Only flow-safe unitised valuations"),
+        ("drawdown", "Sampled drawdown", "%", "Only supported by evidenced, flow-safe unitised valuations"),
+        ("annual_twr", "Annualised time-weighted", "%",
+         "Only over the verified time-weighted period"),
     )
     for key, title, suffix, help_text in fields:
-        value = performance.get(key)
+        value = (performance.get("annual") if
+                 key == "annual_twr" and
+                 performance.get("annual_basis") == "verified_snapshot_twr"
+                 else None if key == "annual_twr" else performance.get(key))
         result.append({"key": key, "title": title, "value": value,
                        "suffix": suffix, "help": help_text,
                        "available": value is not None})
@@ -133,3 +140,59 @@ def signal_display_rows(signals) -> tuple[dict, ...]:
         "has_proposals": any(a.get("side") in ("BUY", "SELL")
                              for a in (signal.actions or ())),
     } for signal in signals)
+
+
+@dataclass(frozen=True)
+class AllocationRow:
+    role: str
+    actual_pct: Decimal
+    reference_pct: Decimal
+    drift_pp: Decimal
+    value_gbp: Decimal
+
+
+def allocation_comparison(report: Mapping, *, instrument_roles: Mapping[str, str],
+                          fixed_targets: Mapping[str, Decimal],
+                          verified: bool) -> tuple[AllocationRow, ...] | None:
+    """Presentation of today's sleeves against a *labelled baseline reference*.
+
+    Used only after a trustworthy complete portfolio valuation; no silent
+    dropping of unmapped holdings or pretending 60/40 is a quarterly signal.
+    Cash is an explicit 0% reference role.
+    """
+    if not verified or not instrument_roles or not fixed_targets:
+        return None
+    try:
+        cash = report["cash"]
+        positions = report["positions"]
+        marks = report["marks"]
+        total = report["value"]
+        if (not isinstance(cash, Decimal) or cash < 0 or
+                not isinstance(total, Decimal) or total <= 0 or
+                set(fixed_targets) != set(instrument_roles.values())):
+            return None
+        actual = {role: Decimal("0") for role in fixed_targets}
+        actual["Cash"] = cash
+        for symbol, quantity in positions.items():
+            if quantity <= 0:
+                if quantity < 0:
+                    return None
+                continue
+            role = instrument_roles.get(symbol)
+            mark = marks.get(symbol)
+            if role not in actual or mark is None or mark.price <= 0:
+                return None
+            actual[role] += quantity * mark.price
+        if sum(actual.values(), Decimal("0")) != total:
+            return None
+        targets = {**fixed_targets, "Cash": Decimal("0")}
+        drift = allocation_drift(actual, targets)
+        if drift is None:
+            return None
+        return tuple(AllocationRow(
+            role=row.role, actual_pct=row.actual_weight * 100,
+            reference_pct=row.target_weight * 100,
+            drift_pp=row.drift_percentage_points, value_gbp=actual[row.role])
+            for row in drift)
+    except (KeyError, TypeError, AttributeError, ArithmeticError):
+        return None
