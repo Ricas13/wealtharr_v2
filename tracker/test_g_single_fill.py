@@ -92,6 +92,8 @@ class ConfirmedSingleFillTests(TestCase):
         self.assertEqual(remaining_response.context["single_rows"][0][0]["remaining"], D("0.6"))
         self.assertContains(self.client.get(reverse("cockpit_today")),
                             "Continue your recorded partial fills")
+        self.assertContains(self.client.get(reverse("cockpit_history")),
+                            "Partial: 1 actual fill(s) recorded")
         self.assertEqual(self.client.post(self.url, {"intent": "finalize"}).status_code, 200)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.signal).exists())
         self.assertEqual(self.client.post(self.url, first).status_code, 302)
