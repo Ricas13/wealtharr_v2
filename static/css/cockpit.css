@@ -209,3 +209,15 @@
   .ck-single-fill-form .ck-setup-fresh-fields{grid-template-columns:1fr}
   .ck-single-fill-form button,.ck-finalize-panel button{width:100%}
 }
+
+/* Section H — compact accessible owner notification matrix. */
+.ck-route-table{width:100%;min-width:340px}
+.ck-route-table th:first-child{text-align:left;min-width:145px}
+.ck-route-table th:not(:first-child),.ck-route-table td{text-align:center}
+.ck-route-table input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:var(--cyan)}
+.ck-route-table label{display:inline-flex;align-items:center;justify-content:center;min-height:40px;min-width:44px}
+.ck-notify-masters{display:flex;flex-wrap:wrap;gap:14px 22px;padding-block:12px}
+.ck-notify-masters label,.ck-notify-monthly{display:inline-flex;align-items:center;gap:9px}
+.ck-notify-monthly{margin:13px 0}
+.ck-notify-masters input,.ck-notify-monthly input{accent-color:var(--cyan)}
+.ck-v2 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
