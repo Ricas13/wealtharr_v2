@@ -1,0 +1,2 @@
+# Separate from production; use only in Section J browser CI.
+playwright==1.55.0
