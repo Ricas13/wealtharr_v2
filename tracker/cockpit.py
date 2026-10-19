@@ -5,7 +5,7 @@ is submitted as *confirmed historical executions* by the owner.
 """
 from datetime import timedelta
 import csv
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal
 from uuid import uuid4
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -16,7 +16,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .cockpit_forms import FillForm, SingleSignalFillForm, DepositShortcutForm, OneScreenSetupForm, ExecutionDateForm
+from .cockpit_forms import SingleSignalFillForm, DepositShortcutForm, OneScreenSetupForm
 from .instrument_mapping import enrolment_manifest, InstrumentMappingUnavailable, for_strategy
 from .market_signals import quarter_end_before, settlement_close, signal_line_value
 from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
@@ -302,197 +302,101 @@ def today(request):
 @login_required
 @require_http_methods(['GET', 'POST'])
 def guided_rebalance(request, signal_id):
-    """GET instructions; POST actual fills + conditional immutable baseline atomically."""
+    """Record ONE actual owner fill per POST, then verify completion separately.
+
+    The removed legacy all-at-once handler could create a reset from submitted
+    hypothetical fills without source-verified post-execution closes. It is not
+    available as a second write path.
+    """
     strategy, blocked = _strategy(request.user)
     if blocked or not strategy:
         raise Http404
-    signal = StrategySignal.objects.filter(pk=signal_id, strategy=strategy, kind='QUARTERLY').first()
-    if not signal:
+    notice = StrategySignal.objects.filter(
+        pk=signal_id, strategy=strategy, kind='QUARTERLY').first()
+    if not notice:
         raise Http404
-    actions = [a for a in signal.actions if a.get('side') in ('BUY', 'SELL')]
-    if not actions or len(actions) > 4 or RebalanceExecution.objects.filter(signal=signal).exists():
-        messages.error(request, 'This notice has no executable orders or is already completed.')
-        return redirect('cockpit_today')
-    if signal.review_outcome in ('FALSE_POSITIVE', 'NOT_APPLICABLE'):
-        messages.error(request, 'This signal was marked invalid and cannot be executed.')
-        return redirect('cockpit_today')
-    if signal.as_of != quarter_end_before(timezone.localdate()):
-        messages.error(request, 'This quarterly signal is historical. Do not execute old instructions.')
-        return redirect('cockpit_today')
-    # Section G: one actual fill per submission, separately auditable. No
-    # confirmed review or reset is created by a partial fill.
     from .cockpit_execution import (
         record_single_fill, finalize_manual_review, completion_rows,
         proposed_actions,
     )
-    if request.method == 'POST' and request.POST.get('intent') in ('record_one', 'finalize'):
-        intent = request.POST['intent']
-        try:
-            if intent == 'record_one':
-                fill_form = SingleSignalFillForm(request.POST)
-                if not fill_form.is_valid():
-                    raise ValidationError('Enter the actual fill date, units, GBP price and fee.')
-                data = fill_form.cleaned_data
-                result, receipt = record_single_fill(
-                    owner=request.user, strategy_id=strategy.pk,
-                    signal_id=signal.pk, action_index=data['action_index'],
-                    executed_on=data['executed_on'],
-                    quantity=data['quantity'], unit_price=data['unit_price'],
-                    fee=data['fee'], idempotency_key=data['idempotency_key'])
-                messages.success(request, (
-                    'That exact fill was already recorded; nothing was duplicated.'
-                    if result == 'duplicate' else
-                    'Actual fill recorded. The quarterly review is still PARTIAL until you confirm completion.'))
+    actions = proposed_actions(notice)
+    if (not actions or len(actions) > 4 or
+            RebalanceExecution.objects.filter(signal=notice).exists() or
+            notice.review_outcome in ('FALSE_POSITIVE', 'NOT_APPLICABLE') or
+            notice.as_of != quarter_end_before(timezone.localdate())):
+        messages.error(request, 'This quarterly review is completed, invalid, or historical.')
+        return redirect('cockpit_today')
+
+    posted_form = None
+    intent = request.POST.get('intent') if request.method == 'POST' else None
+    if request.method == 'POST':
+        if intent == 'record_one':
+            posted_form = SingleSignalFillForm(request.POST)
+            if not posted_form.is_valid():
+                messages.error(request, 'Enter an actual execution date, quantity, GBP unit price and fee.')
             else:
-                finalize_manual_review(owner=request.user, strategy_id=strategy.pk,
-                                       signal_id=signal.pk)
-                messages.success(request,
-                    'Your fully recorded review is confirmed. No broker order was placed.')
-                return redirect('cockpit_today')
-            return redirect('cockpit_rebalance', signal_id=signal.pk)
-        except (ValidationError, IntegrityError, ValueError) as exc:
-            messages.error(request, '; '.join(exc.messages)
-                           if isinstance(exc, ValidationError) else str(exc))
-            # Failed POST is rendered with its current input rather than
-            # erasing the broker fill the owner needs to reconcile.
-            posted_form = SingleSignalFillForm(request.POST) if intent == 'record_one' else None
-        else:
-            posted_form = None
-    else:
-        posted_form = None
-    recorded_fills = list(SignalFill.objects.filter(
-        signal=signal, strategy=strategy).select_related('ledger_entry'))
-    try:
-        progress = completion_rows(signal, recorded_fills)
-    except ValidationError:
-        progress = ()
-    if recorded_fills and request.method == 'POST' and request.POST.get('intent') not in ('record_one', 'finalize'):
-        messages.error(request,
-            'Partial fills already exist; use single-fill recording instead of the legacy all-at-once form.')
-        return redirect('cockpit_rebalance', signal_id=signal.pk)
-    selected_index = None
-    if posted_form and posted_form.is_valid():
-        selected_index = posted_form.cleaned_data['action_index']
-    elif posted_form:
-        try:
-            selected_index = int(request.POST.get('action_index', '-1'))
-        except (TypeError, ValueError):
-            selected_index = None
-    single_rows = []
-    for item in progress:
-        row_form = (posted_form if posted_form and selected_index == item['index']
-                    else SingleSignalFillForm(initial={
-                        'action_index': item['index'],
-                        'executed_on': timezone.localdate(),
-                        'quantity': item['remaining'],
-                        'fee': ZERO,
-                        'idempotency_key': uuid4(),
-                    }))
-        single_rows.append((item, row_form))
-    initial = []
-    for action in actions:
-        q = D(action['quantity'])
-        quote = settlement_close(action['symbol'], signal.as_of)
-        initial.append({'quantity': q, 'unit_price': quote.price if quote and quote.currency=='GBP' else None,
-                        'fee': ZERO})
-    forms = [FillForm(request.POST or None, prefix='fill%s' % i, initial=item)
-             for i, item in enumerate(initial)]
-    if request.method == 'POST' and request.POST.get('intent') not in ('record_one', 'finalize'):
-        when_form = ExecutionDateForm({'executed_on': request.POST.get('executed_on', '')})
-        ok = when_form.is_valid() and all(f.is_valid() for f in forms)
-        if ok:
+                try:
+                    data = posted_form.cleaned_data
+                    status, fill = record_single_fill(
+                        owner=request.user, strategy_id=strategy.pk,
+                        signal_id=notice.pk, action_index=data['action_index'],
+                        executed_on=data['executed_on'], quantity=data['quantity'],
+                        unit_price=data['unit_price'], fee=data['fee'],
+                        idempotency_key=data['idempotency_key'])
+                except (ValidationError, IntegrityError, ValueError) as exc:
+                    messages.error(request, '; '.join(exc.messages)
+                                   if isinstance(exc, ValidationError) else str(exc))
+                else:
+                    messages.success(request,
+                        'That same fill was already saved; no duplicate was added.'
+                        if status == 'duplicate' else
+                        'Actual fill saved in the ledger. Review remains partial until final verification.')
+                    return redirect('cockpit_rebalance', signal_id=notice.pk)
+        elif intent == 'finalize':
             try:
-                with transaction.atomic():
-                    locked = StrategyInstance.objects.select_for_update().get(pk=strategy.pk, owner=request.user)
-                    notice = StrategySignal.objects.select_for_update().get(pk=signal.pk, strategy=locked)
-                    if RebalanceExecution.objects.filter(signal=notice).exists():
-                        raise ValidationError('Already recorded. Refresh the Today page.')
-                    if (notice.as_of != quarter_end_before(timezone.localdate()) or
-                            notice.review_outcome in ('FALSE_POSITIVE', 'NOT_APPLICABLE')):
-                        raise ValidationError('This signal is no longer a valid current-quarter instruction.')
-                    before = ledger_summary(locked)
-                    fresh, why, marks = _price_status(locked, before)
-                    if not fresh:
-                        raise ValidationError(why)
-                    if locked.ledger.filter(occurred_on__gt=notice.as_of).exists():
-                        raise ValidationError('Transactions after this quarter-end make the instruction outdated.')
-                    execution_day = when_form.cleaned_data['executed_on']
-                    if execution_day <= notice.as_of:
-                        raise ValidationError('The execution must be after this quarter-end notice.')
-                    if any(mark.as_of < execution_day for mark in marks):
-                        raise ValidationError('Wait for verified Yahoo closes dated on or after your actual fills.')
-                    # Preserve original signal action sequence; the ledger cannot go negative.
-                    for action, form in zip(actions, forms):
-                        fields = form.cleaned_data
-                        entry = LedgerEntry(kind=action['side'], occurred_on=execution_day,
-                                            symbol=action['symbol'], amount=ZERO,
-                                            quantity=fields['quantity'], unit_price=fields['unit_price'],
-                                            fee=fields['fee'], note='Confirmed execution for 9Sig signal %s' % notice.pk)
-                        entry.full_clean(exclude=['strategy'])
-                        validate_and_record(locked, entry)
-                    after = ledger_summary(locked)
-                    # Validate target within 5 portfolio percentage points.
-                    if after['value'] is None or after['value'] <= ZERO:
-                        raise ValidationError('Cannot verify portfolio total after the recorded fills.')
-                    eq_mark = after['marks'].get(locked.equity_symbol)
-                    safe_mark = after['marks'].get(locked.safe_symbol)
-                    if not eq_mark or not safe_mark:
-                        raise ValidationError('Both mapped instruments need verified GBP quotes.')
-                    actual_equity = after['positions'].get(locked.equity_symbol, ZERO)*eq_mark.price
-                    is_reset = 'review a reset to 60%' in notice.message.lower()
-                    if is_reset:
-                        target = after['value']*D('0.60')
-                    else:
-                        expected_qty = before['positions'].get(locked.equity_symbol, ZERO)
-                        for item in actions:
-                            if item['symbol'] == locked.equity_symbol:
-                                expected_qty += D(item['quantity']) * (ONE if item['side'] == 'BUY' else -ONE)
-                        target = expected_qty*eq_mark.price
-                        expected_safe_qty = before['positions'].get(locked.safe_symbol, ZERO)
-                        for item in actions:
-                            if item['symbol'] == locked.safe_symbol:
-                                expected_safe_qty += D(item['quantity']) * (
-                                    ONE if item['side'] == 'BUY' else -ONE)
-                        actual_safe_value = after['positions'].get(locked.safe_symbol, ZERO)*safe_mark.price
-                        expected_safe_value = expected_safe_qty*safe_mark.price
-                        if abs(actual_safe_value-expected_safe_value)/after['value'] > D('0.05'):
-                            raise ValidationError('Safe-asset fills differ by over 5 portfolio percentage points from the proposed instructions.')
-                    if abs(actual_equity-target)/after['value'] > D('0.05'):
-                        raise ValidationError('Equity differs by over 5 percentage points from the proposed target.')
-                    if after['cash'] < ZERO or any(s not in (locked.equity_symbol, locked.safe_symbol)
-                                                    for s in after['positions']):
-                        raise ValidationError('Negative cash or unsupported holding after fills.')
-                    baseline = None
-                    if is_reset:
-                        as_of = min(eq_mark.as_of, safe_mark.as_of)
-                        if as_of <= notice.as_of or (max(eq_mark.as_of, safe_mark.as_of)-as_of).days > 1:
-                            raise ValidationError('Reset requires matching GBP closes after the notice.')
-                        if locked.baselines.filter(as_of__gt=notice.as_of).exists():
-                            raise ValidationError('A newer reset baseline already exists.')
-                        baseline = StrategyBaseline.objects.create(
-                            strategy=locked, reset_signal=notice, as_of=as_of,
-                            equity_value=actual_equity.quantize(CENTS),
-                            equity_quantity=after['positions'].get(locked.equity_symbol, ZERO),
-                            safe_value=(after['positions'].get(locked.safe_symbol, ZERO)*safe_mark.price).quantize(CENTS),
-                            cash_value=after['cash'])
-                    RebalanceExecution.objects.create(signal=notice, strategy=locked,
-                                                      executed_on=execution_day, baseline=baseline)
-                    notice.review_outcome = 'CONFIRMED'
-                    notice.acknowledged_at = timezone.now()
-                    notice.save(update_fields=['review_outcome', 'acknowledged_at'])
-                messages.success(request, 'Your actual fills are recorded. No broker trades were placed by Wealtharr.')
-                return redirect('cockpit_today')
+                finalize_manual_review(owner=request.user, strategy_id=strategy.pk,
+                                       signal_id=notice.pk)
             except (ValidationError, IntegrityError, ValueError) as exc:
-                messages.error(request, '; '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc))
+                messages.error(request, '; '.join(exc.messages)
+                               if isinstance(exc, ValidationError) else str(exc))
+            else:
+                messages.success(request,
+                    'Recorded actual fills verified and review completed. No broker order was placed.')
+                return redirect('cockpit_today')
         else:
-            messages.error(request, 'Check the execution date, quantities, prices and fees.')
-    return render(request, 'rebalance.html', {'strategy': strategy, 'signal': signal,
-        'rows': list(zip(actions, forms)), 'single_rows': single_rows,
-        'has_partial_fills': bool(recorded_fills),
-        'ready_to_finalize': bool(progress) and all(r['complete'] for r in progress),
-        'today': timezone.localdate(),
-        'execution_date': request.POST.get('executed_on', timezone.localdate().isoformat()),
-        'reset': 'review a reset to 60%' in signal.message.lower()})
+            messages.error(request,
+                'The old all-at-once fill form is retired. Record each actual fill separately.')
+            return redirect('cockpit_rebalance', signal_id=notice.pk)
+
+    existing = list(SignalFill.objects.filter(
+        signal=notice, strategy=strategy).select_related('ledger_entry'))
+    try:
+        progress = completion_rows(notice, existing)
+    except ValidationError as exc:
+        messages.error(request, '; '.join(exc.messages))
+        progress = ()
+    selected = None
+    if posted_form:
+        try:
+            selected = int(request.POST.get('action_index', '-1'))
+        except (TypeError, ValueError):
+            pass
+    rows = []
+    for item in progress:
+        form = (posted_form if posted_form and selected == item['index']
+                else SingleSignalFillForm(initial={
+                    'action_index': item['index'],
+                    'fee': ZERO,
+                    'idempotency_key': uuid4(),
+                }))
+        rows.append((item, form))
+    return render(request, 'rebalance.html', {
+        'strategy': strategy, 'signal': notice,
+        'single_rows': rows,
+        'has_partial_fills': bool(existing),
+        'ready_to_finalize': bool(progress) and all(p['complete'] for p in progress),
+        'reset': bool(notice.reset_reason),
+    })
 
 
 @login_required
