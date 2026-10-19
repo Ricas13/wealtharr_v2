@@ -15,7 +15,7 @@
     <h2>What you are following</h2>
     {% if description %}
       <p>{{ description.summary }}</p>
-      <p><strong>Released rules version:</strong> <code>{{ description.version }}</code></p>
+      <p><strong>Released rules version:</strong> <code>{{ strategy.strategy_version|default:description.version }}</code></p>
       <p><strong>Review schedule:</strong> {{ description.cadence }}</p>
       <details class="ck-disclosure-inline" open><summary>Fixed strategy rules (read-only)</summary>
         <ol class="ck-rule-list">{% for rule in description.rules %}<li>{{ rule }}</li>{% endfor %}</ol>
