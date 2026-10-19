@@ -7,7 +7,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ## IMPORTANT: LETTERED PRODUCT REDESIGN — resume checkpoint 2026-10-19
 
-**Current milestone: Sections A–G committed as scoped branch deliverables. The next section is H only when the owner says “next”.** Section G implements one actual owner-confirmed transaction per request, separately linked append-only fill receipts, resumable partial progress, explicit completion, and source-backed post-fill reset evidence. No broker connectivity or automatic trading.
+**Current milestone: Sections A–H committed as scoped branch deliverables. The next section is I only when the owner says “next”.** Section H implements per-category owner alert routing, an idempotent quarterly digest, urgent/data/follow-up/contribution advisory notifications, bounded retries with preference-aware cancellation and scheduler diagnostics. No broker connectivity, automated trading or invented valuations.
 
 - **Same active branch:** `feature/owner-9sig-cockpit-resumable` (PR **#11**). No competing branch, no restart. Before edits, fetch current PR HEAD and check concurrent commits.
 - **Section B artefacts:** `docs/instrument-research.md`, `tracker/instrument_mapping.py` (immutable `CURATED_ISA_ROLE_MAP`, `MAPPING_VERSION=2026-10-19.1`, reviewed issuer/Invest evidence with explicit pending owner ISA permission and Yahoo feed flags), `tracker/test_instrument_catalogue.py`, updated `CLAUDE.md`, `docs/architecture.md` and superseded old broker-API proposal.
@@ -20,7 +20,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ### Paste this in a NEW ChatGPT chat to resume
 
-> Continue Wealtharr v2 on existing **PR #11** / `feature/owner-9sig-cockpit-resumable`. **Read `docs/RESUME.md` first** and inspect current branch head; preserve all Section A–G commits. Do **ONLY Section H**: owner notification route and alert matrix, idempotent quarterly digest, urgent/data-problem/contribution delivery preferences, scheduler state/diagnostics and safe retries. No brokerage APIs, broker orders, synthetic prices, further onboarding redesign or financial strategy rewrites. Existing owner external evidence is requested only in `docs/OWNER_TODO.md` and must not block building. Commit to the same PR/branch; update the handoff once at the end; stop until the owner says “next”.
+> Continue Wealtharr v2 on existing **PR #11** / `feature/owner-9sig-cockpit-resumable`. **Read `docs/RESUME.md` first** and inspect current branch head; preserve all Section A–H commits. Do **ONLY Section I**: secure private deployment behind Traefik, optional TOTP, backup/restore safety, least-privilege configuration and operational readiness. No brokerage APIs, broker orders, synthetic prices, financial rule changes or a new branch. Existing owner external evidence is requested only in `docs/OWNER_TODO.md` and must not block building. Commit to the same PR/branch; update the handoff once at the end; stop until the owner says “next”.
 ## Objective
 
 Make Wealtharr a strategy-agnostic **tracking and notification** platform for a private owner, with fixed 9Sig as its first (and only currently implemented) strategy. Today shows performance and one next action; the owner manually makes and confirms any broker trades. The product never places orders, never connects to brokers (including read-only APIs), and never invents prices, trades or backtests. Preserve the append-only ledger, immutable confirmed reset baselines and financial refusal rules throughout the refactor.
@@ -34,10 +34,10 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [x] **E** strategy-neutral read-only strategy registry and presentation models; redesigned Today / History / Ledger / Strategy pages, one-next-action framing, provenance/disclosures, source-grounded metrics, real transactions with ledger filtering/export, responsive styling and focused owner-isolated UI tests.
 - [x] **F** new one-screen UK ISA-only setup, recorded actual starting GBP cash only, per-owner version/issuer identity snapshot in migration 0010, £500 optional monthly reminder target, true-date contribution shortcut in Ledger, conservative T212 CSV three-stage preview and confirmation, legacy GIA entrypoint redirect, and focused tests.
 - [x] **G** one actual manual fill per POST, source-ledger-linked partial execution receipts and idempotent retries, explicit completed review only after original quantities and verified post-fill GBP closes; structured signal reset reason, source/strategy-version pinned immutable reset baseline, old text-only shortcut retired, Today/History partial status and focused tests.
-- [ ] **H** owner destination/alert matrix, idempotent digest, scheduler diagnostics.
+- [x] **H** owner email/Discord destination matrix, idempotent quarterly digest, urgent warnings, weekly data/review alerts, monthly contribution reminder, preference-aware bounded retries and owner/staff diagnostics; see `docs/notification-operations.md`.
 - [ ] **I** secure Traefik deployment, optional TOTP, backups/restore.
 - [ ] **J** CI/Playwright and incremental ship plan.
-- **Instruction:** user wants **one lettered section per turn**. Stop after G now; proceed with H **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
+- **Instruction:** user wants **one lettered section per turn**. Stop after H now; proceed with I **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
 - **Architecture decision:** no broker/API integration of any kind, no editable preset/ticker/rule UI, no paper account, no billing or public signup. Fixed code-defined strategy versions; role-based evidence-backed exact lines pinned at enrolment. See `docs/architecture.md` and `CLAUDE.md`.
 - **Outstanding verification remains outstanding:** workbook parity, ISA/broker eligibility, real CSV, CI/migrations/browser checks, and deployment. Section A did not test or deploy runtime changes.
 
@@ -123,6 +123,22 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - **Additional CI evidence:** [run #601](https://github.com/Ricas13/wealtharr_v2/actions/runs/39299372701) passed at `b8445e6541f2f9d53aa87f176f115e90ba597ba7`, covering earlier Section G source, migrations, owner routes, presentation and adapted regression tests. Later failure-injection and docs commits generated new pending runs; do not label those green until observed.
 - [ ] Section **H** next. Do not redo completed G work; external reconciliation input stays only in `docs/OWNER_TODO.md`.
 
+## Section H delivery — 2026-10-19
+
+- [x] **Typed owner alert preferences:** additive migration `0013_notification_matrix_scheduler.py`; five source-defined categories × email/Discord checkbox choices and top-level destination switches in `NotificationForm` and `templates/settings_cockpit.html`. Unconfigured destinations remain disabled; contribution reminders also obey a separate monthly switch. No push provider/device notification claimed.
+- [x] **Idempotent routed messages:** `tracker/notification_routing.py` gates quarterly digests, urgent 30 Down/provisional TQQQ reference warnings, missing-data holds, outstanding-review follow-ups and actual-vs-planned monthly funding reminders. Quarter-end quantities are dated indicative advice, never live orders. Old historical/partial review cases do not resurrect as actionable trading instructions.
+- [x] **Queued delivery provenance:** additive migration `0014_notification_delivery_category.py`; `NotificationDelivery` stores the fixed category and original immutable subject/body. Rechecks do not alter a queued recommendation or resend a `SENT` event. At most three transient network attempts with persisted backoff; any remote-acknowledgement loss can still cause at-least-once duplicate **advisory** delivery, not exactly-once messaging.
+- [x] **Preference-aware retries:** `tracker/notification_scheduler.py` checks owner and category choices on each retry. Opting out marks previously queued alerts `CANCELLED` to prevent an old review notification reappearing on re-enabling. A stale `SENDING` record is retryable only after 15 minutes; legacy unknown events never bypass a disabled master destination.
+- [x] **One scheduler and diagnostics:** `send_cockpit_notifications` is canonical (the old `send_due_notifications` command delegates). The Compose reminders service already runs hourly; `NotificationSchedulerRun` records success/failure, timestamps, attempts and counts with generic error codes. Owners see only their own delivery receipts; staff see scheduler heartbeat and secure SMTP/Discord transport settings. **Production scheduler uptime and real end-to-end transport delivery have not been verified**.
+- [x] **Tests and operator handoff:** `tracker/test_h_notification_matrix.py`, `tracker/test_h_delivery_integrity.py`, and `docs/notification-operations.md` cover owner isolation, category choices, immutable retry messages, duplicate suppression, preference cancellation, scheduler counters and generic error reporting. Existing synthetic market-signal tests may require expectation updates for opted-in routing; do not treat their older direct-dispatch assumptions as proof of delivered alerts.
+- **CI:** GitHub Actions run statuses at latest Section H source/doc commit must be read from PR #11 before asserting a fully green branch. Earlier test runs had legacy direct-dispatch expectations; no external delivery claim without a real configured SMTP/Discord test.
+
+**Next: Section I ONLY, after owner says “next”.** Secure private deployment and recovery are separate. Do not revisit Section H implementation merely because live notification secrets or real workbook inputs remain owner-controlled; these are external operational checks.
+
+### Paste into a NEW ChatGPT chat — Section I
+
+> Continue Wealtharr v2 from `Ricas13/wealtharr_v2`, existing PR #11 and `feature/owner-9sig-cockpit-resumable`. Read `docs/RESUME.md` first, then `CLAUDE.md`, `docs/architecture.md`, `docs/notification-operations.md` and the deployment files. Sections A–H are committed. Implement **Section I only**: secure owner-only Traefik deployment, environment and secret safety, optional TOTP, backup/restore verification and operational diagnostics. Preserve the completed notification scheduler and all financial safeguards. No broker connections, trades, public signup, subscriptions or new branch. Commit code/docs/tests to the existing PR, update `docs/RESUME.md` for Section J, then stop.
+
 ## State / checkpoints
 
 - [x] Dedicated new branch created; `main` deliberately untouched.
@@ -161,7 +177,7 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 ## First commands in a NEW CHAT
 
 1. Read this handoff and inspect latest PR #11 branch head; concurrent edits exist, so do not overwrite existing Section G.
-2. Implement **Section H only**: owner-specific destinations/alert matrix, idempotent quarterly digest and independently useful urgent/data/reminder notice routing, scheduler status and retry diagnostics.
+2. Implement **Section I only**: private Traefik/Docker operations, authentication hardening, optional TOTP and reproducible backup/restore verification; no broker or payments integration.
 3. Preserve append-only ledger, partial execution receipts, typed reset reason, verified post-fill reset baseline and the existing no-broker/no-auto-trade boundary.
 4. Request real owner evidence only via `docs/OWNER_TODO.md`, commit on the **same** branch and PR, update this handoff once and wait for "next".
 
@@ -176,4 +192,4 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## User prompt for a new chat
 
-**Use the Section H-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
+**Use the Section I-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
