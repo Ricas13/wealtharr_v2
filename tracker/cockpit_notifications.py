@@ -52,7 +52,8 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
         fresh, why, marks = _price_status(strategy, report)
         # A recurring source issue is never converted to a trade instruction.
         # One digest per calendar week and problem identity until resolved.
-        if strategy.market_data_enabled and not fresh and report["positions"]:
+        if (strategy.market_data_enabled and not fresh and report["positions"]
+                and not why.startswith("Your newest transaction is later than")):
             fingerprint = sha256(why.encode("utf-8")).hexdigest()[:12]
             week = today.isocalendar()
             key = "data:%s:%04d-W%02d:%s" % (
