@@ -50,6 +50,27 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [x] All five required owner-supplied input types, including exact worksheet columns, dates and fixture formats, live in `docs/OWNER_TODO.md` **once**; not blockers for the next build section.
 - [ ] Section **D** next. No automatic broker trades, no broker integration, no extra cockpit-hardening work in this milestone.
 
+## Section C follow-through — price quality, audit and CI (2026-10-19)
+
+**Scoped source changes on existing PR #11**:
+- `tracker/strategies/nine_sig/v1.py`: exact selected line guard (`LQQ3.L` / `ERNS.L`), required TQQQ and SPY closes within six days of each historical quarter end, explicit reset-reason and proposed-quantity audit values; unchanged 9%/half-flow, throttle and 30 Down arithmetic.
+- `tracker/core/prices.py`: pure `check_price_series()` returning **APPROVED** or **HOLD** for stale/future/duplicate/nonpositive or anomalous normalized vendor observations. Thresholds are conservative screening thresholds, **not** automatic re-pricing or corporate-action adjustments.
+- `tracker/market_signals.py`: fail closed for Yahoo LQQ3 GBX/ERNS GBP/SPY-TQQQ USD metadata mismatches; persist `YahooSync.last_error=PRICE_HOLD:<code>` and refuse new reviews while a required series is on hold. Never silently rewrite an accepted `MarketObservation` when Yahoo revises an earlier historical close; review first. The legacy Django scheduling adapter still persists old-style signal rows.
+- `tracker/test_section_c_quality.py`: regressions for stale/huge/future/bad quotes, exact pinned lines, early historical quarter lookback, revision holds, and no DB write after rejected data. `tracker/test_nine_sig_audit.py` corrected reason-code assertions.
+- `tracker/test_paper_trial.py` regression now correctly expects **no invented valuation snapshot** from a hand-edited `PriceMark`; unrelated paper-trading implementation remains slated for later removal.
+- `docs/FINANCIAL_QA.md` obsolete read-only broker API allowance removed: **all broker links forbidden**.
+
+**Verified CI:** workflow run [#366](https://github.com/Ricas13/wealtharr_v2/actions/runs/39289526373) succeeded at commit `10078b8167d43c4da47e0f7225f40a76a0a3eff3`: Django tests (except intentionally skipped owner parity), model/migrations check, migration application, collectstatic, public production smoke, Compose/restore-helper syntax and non-gating Yahoo smoke. Later docs or concurrent Section D commits each trigger new checks; do not assume those passed until checked.
+
+**Remaining specific C boundaries (no fabricated assurance):**
+1. **Real six-quarter workbook comparison remains open**; the parity harness skips missing owner fixture fields, and should not be labelled financially verified. `docs/OWNER_TODO.md` lists required real inputs once.
+2. **Owner ISA permission and live Yahoo raw GBP/GBX metadata** remain unverified. Existing recorded historical market observations did not retain raw quote metadata; the typed `NormalizedQuote` adapter/quality gate needs source provenance when the future versioned core orchestration is activated.
+3. **Stooq fallback is a separately testable, corroborated USD reference-only adapter**, not a deployed universal fallback for UK trading lines. The existing scheduler still relies on verified Yahoo/DB prices; a missing UK line correctly refuses rather than substituting Stooq. Never treat two Yahoo hosts as independent providers.
+4. **The eventual immutable `PriceDecision`/audit model and generic core orchestrator** described in `docs/architecture.md` have not been migrated into the current DB schema. Current YahooSync hold is an interim persisted safety signal; no manual hold-clear UI exists yet. Do not mark such plumbing complete.
+5. The TQQQ 100%-up comparison is a provisional calendar-close warning, **not** the owner's executed rebalance reference; never issue GBP trade orders from it.
+
+**Next scope:** Section **D only** when the owner says "next"; retain this C evidence and do not redo it. Refresh live PR HEAD before editing because another continuation may add changes on the same branch.
+
 ## State / checkpoints
 
 - [x] Dedicated new branch created; `main` deliberately untouched.
