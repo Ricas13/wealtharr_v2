@@ -128,19 +128,22 @@ def ledger_display_rows(entries) -> tuple[dict, ...]:
     } for entry in entries)
 
 
-def signal_display_rows(signals, *, executions=None) -> tuple[dict, ...]:
+def signal_display_rows(signals, *, executions=None, partial_counts=None) -> tuple[dict, ...]:
     """Historical event presentation, with separately confirmed manual fills.
 
     An execution marker certifies an owner-recorded act but it cannot justify
     reconstructed execution prices; users inspect actual ledger rows instead.
     """
     executions = executions or {}
+    partial_counts = partial_counts or {}
     return tuple({
         "id": signal.pk, "date": signal.as_of,
         "title": signal.title, "message": signal.message,
         "kind": signal.kind,
         "outcome": (signal.get_review_outcome_display()
                     if signal.review_outcome else
+                    "Partial: %s actual fill(s) recorded" % partial_counts[signal.pk]
+                    if partial_counts.get(signal.pk) else
                     "Acknowledged" if signal.acknowledged_at else "Not reviewed"),
         "executed_on": executions.get(signal.pk),
         "has_proposals": any(a.get("side") in ("BUY", "SELL")
