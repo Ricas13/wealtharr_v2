@@ -114,9 +114,12 @@ class SectionEPageTests(TestCase):
         for name in ("cockpit_today", "cockpit_history", "cockpit_ledger",
                      "cockpit_strategy"):
             response = self.client.get(reverse(name))
-            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, "£345.00")
+            self.assertNotContains(response, "Owner ISA")
         response = self.client.get(reverse("cockpit_ledger"), {"format": "csv"})
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("345.00", response.content.decode())
 
     def test_no_uncertain_allocation_and_manual_warning_never_trade(self):
         not_ready = select_next_step(
