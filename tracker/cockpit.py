@@ -29,7 +29,7 @@ from .core.isa_allowance import estimate_allowance, tax_year_bounds
 from .strategies.registry import describe_strategy
 from .services import ledger_summary, validate_and_record
 from .core.presentation import (
-    account_value, allocation_comparison, holding_rows, ledger_display_rows, select_next_step,
+    NextStep, account_value, allocation_comparison, holding_rows, ledger_display_rows, select_next_step,
     signal_display_rows, visible_performance,
 )
 
@@ -226,9 +226,11 @@ def today(request):
     report = ledger_summary(strategy)
     fresh, reason, marks = _price_status(strategy, report)
     signal = _last_action(strategy)
+    pending_fills = bool(signal and SignalFill.objects.filter(
+        strategy=strategy, signal=signal).exists())
     next_review = _next_end(timezone.localdate())
     # Historical notices are NOT executable if post-quarter transactions changed balances.
-    if signal and strategy.ledger.filter(occurred_on__gt=signal.as_of).exists():
+    if signal and not pending_fills and strategy.ledger.filter(occurred_on__gt=signal.as_of).exists():
         fresh = False
         reason = 'Transactions occurred since this signal. Reconcile and obtain an updated instruction before trading.'
     if fresh and not signal:
@@ -245,7 +247,8 @@ def today(request):
                 fresh, reason = False, 'Quarterly rules have not produced a verified review yet.'
     perf = _performance(strategy, report)
     actions = [a for a in signal.actions if a.get('side') in ('BUY', 'SELL')] if signal else []
-    actionable = bool(signal and signal.kind == 'QUARTERLY' and actions and fresh)
+    actionable = bool(signal and signal.kind == 'QUARTERLY' and actions and
+                      (fresh or pending_fills))
     needs_review = bool(signal and signal.kind in ('SPIKE_WATCH', 'THIRTY_DOWN'))
     status = ('Action needed' if actionable or needs_review else
               'Cannot compute instructions' if not fresh else
@@ -258,6 +261,12 @@ def today(request):
         proposed_actions=tuple(actions), price_ready=fresh,
         unavailable_reason=reason if not fresh else '',
         next_review_label=next_review.strftime('%d %b %Y'))
+    if pending_fills and signal.kind == 'QUARTERLY':
+        step = NextStep(
+            "trade", "Continue your recorded partial fills",
+            "Some actual broker transactions are already in your ledger. "
+            "Continue recording what you did, or finish after the verified "
+            "post-fill close is available. No new broker order is placed.")
     held = bool(report['positions'])
     profile = for_strategy(strategy)
     description = describe_strategy(strategy.preset.slug)
@@ -274,7 +283,8 @@ def today(request):
         'price_date': latest,
         'comparison': _line_comparison(strategy, signal) if signal else None,
         'target': strategy.monthly_target,
-        'next_step': step, 'display_value': display_value,
+        'next_step': step, 'has_partial_fills': pending_fills,
+        'display_value': display_value,
         'display_gain': perf['gain_gbp'] if fresh else None,
         'holdings': holding_rows(report, roles=roles, show_quotes=fresh),
         'description': description,
