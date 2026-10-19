@@ -399,6 +399,40 @@ def review_strategy(strategy):
         prior_skipped_sells=skipped, prior_drawdown=bool(active_down_signal),
         down_age_quarters=down_age,
     )
+    # A 100%-up TQQQ close compared with a calendar-quarter proxy is
+    # NOT proof of the owner's actual previous rebalance fill reference.
+    # The pure typed v2 evaluator already refuses executable reset quantities
+    # in this situation. Apply the same rule to persisted Django signals.
+    provisional_spike = any(
+        row["kind"] == "QUARTERLY" and
+        row.get("reset_reason", "").startswith("The TQQQ reference doubled")
+        for row in alerts
+    )
+    if provisional_spike:
+        alerts = [
+            dict(row, actions=[], reset_reason="",
+                 message=row["message"] +
+                 " Provisional TQQQ quarter-close proxy ONLY: its actual prior "
+                 "rebalance execution anchor is not confirmed. No executable "
+                 "reset quantities can be offered; review the reference first.")
+            if row["kind"] == "QUARTERLY" else row
+            for row in alerts
+        ]
+        review_q = quarter_number(quarter_end)
+        crossing_key = "spike:%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
+        if not strategy.signals.filter(signal_key=crossing_key).exists():
+            alerts.append({
+                "kind": "SPIKE_WATCH",
+                "key": "spike-quarter:%04d-Q%d" % (review_q // 4, review_q % 4 + 1),
+                "title": "Possible TQQQ 100%-up: verify prior execution anchor",
+                "message": (
+                    "TQQQ more than doubled versus a calendar-quarter closing "
+                    "proxy. The actual previous rebalance price has not been "
+                    "verified. No GBP reset trades or quantities are available "
+                    "until independently reviewed. No broker order was placed."
+                ),
+                "actions": [],
+            })
     created = 0
     for alert in alerts:
         signal, new = StrategySignal.objects.get_or_create(
@@ -416,9 +450,9 @@ def review_strategy(strategy):
                 for a in alert["actions"])
             # No-action quarterly reviews remain in history without
             # triggering rebalance alerts or cluttering the Overview.
-            actionable = alert["kind"] == "THIRTY_DOWN" or any(
+            actionable = alert["kind"] in ("THIRTY_DOWN", "SPIKE_WATCH") or any(
                 action.get("side") in ("BUY", "SELL") for action in alert["actions"])
-            if actionable and alert["kind"] == "THIRTY_DOWN":
+            if actionable and alert["kind"] in ("THIRTY_DOWN", "SPIKE_WATCH"):
                 route_notice(strategy.owner, "urgent",
                              "signal:%s:%s" % (strategy.pk, signal.signal_key),
                              "Wealtharr — " + signal.title,
