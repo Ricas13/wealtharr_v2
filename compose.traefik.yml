@@ -1,0 +1,21 @@
+# OPTIONAL when the existing Traefik runs in Docker on an external network.
+# Verify docker compose -f compose.yml -f compose.traefik.yml config
+# BEFORE starting; require Docker Compose supporting !reset (v2.24+).
+# This removes the base Compose localhost port publication entirely.
+services:
+  web:
+    ports: !reset []
+    networks: [default, traefik_private]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_DOCKER_NETWORK:?set network name}
+      - traefik.http.routers.wealtharr.rule=Host(`${WEALTHARR_HOST:?set hostname}`)
+      - traefik.http.routers.wealtharr.entrypoints=websecure
+      - traefik.http.routers.wealtharr.tls=true
+      - traefik.http.routers.wealtharr.tls.certresolver=${TRAEFIK_CERT_RESOLVER:?set certificate resolver}
+      - traefik.http.services.wealtharr.loadbalancer.server.port=8000
+      - traefik.http.services.wealtharr.loadbalancer.server.scheme=http
+networks:
+  traefik_private:
+    name: ${TRAEFIK_DOCKER_NETWORK:?set Traefik Docker network}
+    external: true
