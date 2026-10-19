@@ -58,10 +58,10 @@ class ReleasedAuditTests(TestCase):
         history, prices = sample()
         self.assertEqual(evaluate(
             replace(history, equity_symbol="QQQ3.L"), prices).reason_code,
-            "UNSUPPORTED_MAPPING")
+            "INSTRUMENT_MISMATCH")
         spy = (replace(prices.spy[0], as_of=date(2024, 2, 1)),) + prices.spy[1:]
         self.assertEqual(evaluate(history, replace(prices, spy=spy)).reason_code,
-                         "STALE_PRICE")
+                         "MISSING_HISTORY")
         self.assertEqual(evaluate(history, prices, as_of=date(2026, 6, 30)).reason_code,
                          "AS_OF_MISMATCH")
 
