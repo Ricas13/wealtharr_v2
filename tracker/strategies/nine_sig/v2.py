@@ -79,6 +79,8 @@ class ApprovedPriceBundle:
     safe: NormalizedQuote
     tqqq: tuple[NormalizedQuote, ...]
     spy: tuple[NormalizedQuote, ...]
+    # Optional verified history of the actual GBP growth instrument, information only.
+    growth_history: tuple[NormalizedQuote, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -247,7 +249,7 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
                         starting_equity_cost, reference,
                         spy_reference=None, contributions=(), prior_skipped_sells=0,
                         no_sell_quarters=0, prior_drawdown=False,
-                        down_age_quarters=0):
+                        down_age_quarters=0, growth_history=()):
     """Deterministic owner-review 9Sig action on a completed quarter.
 
     60/40 baseline, 9% per quarter, half of additional contributions, workbook
@@ -377,12 +379,20 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
             note += " Available GBP buying power limits the order size."
 
     growth_drawdown = _growth_reference_drawdown(reference, as_of)
+    actual_growth_drawdown = _growth_reference_drawdown(growth_history, as_of)
+    actual_growth_text = (
+        "%s actual growth-instrument drawdown from observed running high: %s%%. "
+        % (equity_symbol, actual_growth_drawdown)
+        if actual_growth_drawdown is not None else
+        "%s actual growth-instrument drawdown: unavailable without verified history. "
+        % equity_symbol)
     reference_note = (
         "Rule applied: only SPY's quarter-end close versus the preceding eight "
         "SPY closes triggers 30 Down; manual workbook TQQQ flags and mid-quarter "
-        "sell-half overrides do not apply. TQQQ growth-reference drawdown from "
-        "running high: %s%%. %s."
-        % (growth_drawdown if growth_drawdown is not None else "unavailable",
+        "sell-half overrides do not apply. %sTQQQ USD reference drawdown from "
+        "observed running high: %s%%. %s."
+        % (actual_growth_text,
+           growth_drawdown if growth_drawdown is not None else "unavailable",
            INFORMATION_ONLY_NOTICE))
     label = "%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
     alerts.append({
@@ -390,6 +400,7 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
         "reset_reason": reset_reason or "",
         "reserve_empty_review_notice": RESERVE_EMPTY_NOTICE if reserve_empty else "",
         "growth_reference_drawdown_pct": (str(growth_drawdown) if growth_drawdown is not None else ""),
+        "growth_instrument_drawdown_pct": (str(actual_growth_drawdown) if actual_growth_drawdown is not None else ""),
         "rule_applied": ("All-in reserve shortage" if reserve_empty else "SPY-only 30 Down"),
         "title": "9Sig quarterly review — " + label,
         "message": (
@@ -562,6 +573,13 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     buy_budget = (reserve if reserve_shortage else
                   min(gap, reserve * Decimal("0.81")) if throttle else
                   min(gap, reserve) if gap > CENTS else ZERO)
+    # Invalid auxiliary history cannot alter trading decisions or be reported
+    # as verified; omit it rather than returning a fabricated drawdown.
+    verified_growth = tuple(
+        (q.as_of, q.price) for q in prices.growth_history
+        if _price_ok(q, history.equity_symbol, "GBP", day, expected_raw="GBX")
+        and q.as_of <= day and q.source == "yahoo"
+    )
     alerts = advice_for_holdings(
         start_date=history.start_date, as_of=day, currency="GBP",
         equity_symbol=history.equity_symbol, safe_symbol=history.safe_symbol,
@@ -573,7 +591,8 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
         contributions=contributions,
         prior_skipped_sells=history.prior_skipped_sells,
         prior_drawdown=history.prior_drawdown,
-        down_age_quarters=history.down_age_quarters)
+        down_age_quarters=history.down_age_quarters,
+        growth_history=verified_growth)
     if doubled:
         # Calendar-quarter TQQQ close is NOT necessarily the owner's prior
         # execution anchor. Never send executable quantities from this proxy.
@@ -611,7 +630,11 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
             rule_applied=(quarterly_plan.get("rule_applied", "") if quarterly_plan else ""),
             growth_reference_drawdown_pct=_growth_reference_drawdown(
                 ((q.as_of, q.price) for q in tqqq), day),
-            growth_drawdown_label="TQQQ growth reference, not the UK execution instrument",
+            growth_instrument_drawdown_pct=(
+                _growth_reference_drawdown(verified_growth, day)
+                if verified_growth else "unavailable"),
+            growth_drawdown_label=history.equity_symbol + " actual GBP growth instrument; "
+                                  "TQQQ is a separate USD reference",
             growth_drawdown_disclosure=INFORMATION_ONLY_NOTICE,
             proposed_growth_target=(total * PARAMS.reset_equity_fraction
                                     if reset_reason else signal),
