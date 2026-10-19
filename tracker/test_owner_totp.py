@@ -50,6 +50,12 @@ class OwnerAuthenticatorTests(TestCase):
         self.assertRedirects(response, reverse("totp_challenge"))
         self.assertTrue(OwnerTOTP.objects.filter(owner=self.user).exists())
 
+    def test_admin_login_does_not_bypass_primary_security_challenge(self):
+        self.client.logout()
+        response = self.client.get(reverse("admin:login"))
+        self.assertRedirects(response, reverse("login"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+
     def test_unenrolled_owners_remain_password_only(self):
         self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 200)
         self.client.force_login(self.other)
