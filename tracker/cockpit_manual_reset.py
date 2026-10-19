@@ -113,8 +113,8 @@ def choose_manual_reserve_reset(*, owner, strategy_id, signal_id):
         strategy=strategy, signal_key="owner-reset:" + original.signal_key,
         kind="QUARTERLY", as_of=original.as_of,
         title="Owner-selected 60/40 reset review — " + label,
-        message=("Owner expressly chose to review a reset to 60% growth / "
-                 "40% safe and cash after the empty-reserve advisory. "
+        message=("Owner expressly chose to review a reset to 60%% growth / "
+                 "40%% safe and cash after the empty-reserve advisory. "
                  "The normal v2 all-in advice was NOT changed. "
                  "This alternative uses recorded holdings and verified GBP "
                  "quarter-end closes (%s and %s). Every estimated quantity "
