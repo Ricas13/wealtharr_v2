@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block title %}History{% endblock %}{% block content %}<section class="cockpit"><h1>History</h1>
+<section class="ck-metrics"><div class="panel ck-card"><p class="ck-label">XIRR annualised</p><p class="ck-number">{% if performance.xirr is not None %}{{ performance.xirr|floatformat:2 }}%{% else %}—{% endif %}</p></div>
+<div class="panel ck-card"><p class="ck-label">Time-weighted return</p><p class="ck-number">{% if performance.twr is not None %}{{ performance.twr|floatformat:2 }}%{% else %}—{% endif %}</p></div>
+<div class="panel ck-card"><p class="ck-label">Max drawdown</p><p class="ck-number">{% if performance.drawdown is not None %}{{ performance.drawdown|floatformat:2 }}%{% else %}—{% endif %}</p></div></section>
+<p class="ck-muted">TWR and drawdown need cash-flow-aligned valuations. We hide them when your actual snapshots cannot support those calculations. Annualised return: {% if performance.annual is not None %}{{ performance.annual|floatformat:2 }}%{% else %}—{% endif %}.</p>
+<section class="panel ck-card"><h2>Verified reviews and warnings</h2><ul class="ck-history">{% for signal in signals %}<li><strong>{{ signal.as_of }} · {{ signal.title }}</strong><p>{{ signal.message }}</p></li>{% empty %}<li>Waiting for first completed quarter.</li>{% endfor %}</ul></section>
+<section class="panel ck-card"><h2>Data and rule limitations</h2><p>Yahoo data is not guaranteed, UK-listed LQQ3 and ERNS are not identical to TQQQ/AGG, and some 9Sig spreadsheet exception branches remain unverified. Wealtharr will not place broker trades.</p></section>
+</section>{% endblock %}

@@ -155,3 +155,10 @@ The ordinary real-account setup now asks for **strategy, country, broker, accoun
 - Neither recommendation nor creating a portfolio **executes a trade** or manufactures holdings. Actual deposits, fills, commissions and existing real positions must still be entered from Trading 212 records. Rebalances remain manual.
 
 **9Sig methodology research, correction rationale and remaining best-guess boundaries:** see [docs/9sig-methodology.md](docs/9sig-methodology.md). Never claim a GBP daily-reset ETP exactly replicates the US TQQQ fund's historical results.
+
+
+## Owner-only 9Sig cockpit (feature branch)
+
+Authenticated users land at **/cockpit/** with Today, History, Ledger and Settings.
+The guided rebalance only saves actual owner-confirmed fills; CSV imports preview before writing; no broker trading API is used. The legacy /app/ screens remain accessible.
+Read **docs/RESUME.md** to continue this branch in another ChatGPT chat, **docs/INSTALL.md** for database/scheduler wiring, and **docs/FINANCIAL_QA.md** before treating any quarterly signal as verified. The strategy implementation has documented Excel-parity gaps and cannot be assumed certified.

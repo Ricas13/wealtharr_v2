@@ -229,3 +229,25 @@ class StrategyValueSnapshot(models.Model):
             models.UniqueConstraint(fields=["strategy", "as_of"],
                                     name="unique_strategy_value_date")
         ]
+
+
+
+class RebalanceExecution(models.Model):
+    """A confirmed group of manual broker fills; one execution per signal."""
+    signal = models.OneToOneField(StrategySignal, on_delete=models.PROTECT, related_name="execution")
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.PROTECT)
+    executed_on = models.DateField()
+    completed_at = models.DateTimeField(auto_now_add=True)
+    baseline = models.ForeignKey(StrategyBaseline, null=True, blank=True, on_delete=models.PROTECT)
+
+
+class BrokerImportRow(models.Model):
+    """Idempotent identifier for an actual imported broker event."""
+    strategy = models.ForeignKey(StrategyInstance, on_delete=models.PROTECT)
+    fingerprint = models.CharField(max_length=64)
+    ledger_entry = models.OneToOneField(LedgerEntry, on_delete=models.PROTECT)
+    source = models.CharField(max_length=24, default="trading212_csv")
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["strategy", "fingerprint"], name="unique_t212_event")]

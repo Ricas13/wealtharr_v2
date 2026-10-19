@@ -1,11 +1,12 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 from tracker import views
 
 urlpatterns = [
     path("", views.home, name="home"),
     path("login/", views.sign_in, name="login"),
     path("logout/", views.sign_out, name="logout"),
+    path("cockpit/", include("tracker.cockpit_urls")),
     path("app/", views.dashboard, name="dashboard"),
     path("app/accounts/", views.accounts, name="accounts"),
     path("app/strategies/new/", views.new_strategy, name="new_strategy"),

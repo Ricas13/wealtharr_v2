@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Complete quarterly review{% endblock %}
+{% block content %}
+<main class="cockpit ck-narrow"><a href="{% url 'cockpit_today' %}" class="ck-muted">← Today</a>
+  <p class="ck-overline">STEP 1 · REVIEW INSTRUCTIONS</p><h1>Your quarterly rebalance</h1>
+  <p class="ck-muted">These are suggestions using the {{ signal.as_of|date:'d M Y' }} verified quarter-end close, not live execution prices. Make the trades yourself.</p>
+  <section class="panel ck-card"><h2>What to do</h2><ol class="ck-orders">
+    {% for action, form in rows %}<li><strong>{{ action.side }} {{ action.symbol }}</strong> — about £{{ action.estimated_gbp }}, {{ action.quantity }} units</li>{% endfor %}
+  </ol><p>{{ signal.message }}</p></section>
+  <section class="panel ck-card"><h2>Step 2 · I did this</h2>
+    <p class="ck-muted">Only submit once these trades really executed in Trading 212. Replace estimated quantities/prices with actual broker fills, including fees.</p>
+    <form method="post">{% csrf_token %}
+      <div class="form-field"><label for="executed-on">Actual execution date</label><input class="field" type="date" name="executed_on" id="executed-on" required value="{{ execution_date }}" max="{{ today|date:'Y-m-d' }}"></div>
+      {% for action, form in rows %}
+      <fieldset class="ck-fill"><legend>{{ action.side }} {{ action.symbol }}</legend>
+        {% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+      </fieldset>{% endfor %}
+      <p class="ck-muted">Step 3 runs on submission: cash / holdings checks, verified post-fill GBP prices, and allocation tolerance. {% if reset %}A 60/40 reset baseline is created only if all checks pass.{% else %}Ordinary quarterly trades do not reset the 9Sig signal-line baseline.{% endif %} Nothing is saved if a check fails.</p>
+      <button class="btn btn-primary ck-primary" type="submit">I executed these fills — validate &amp; record</button>
+    </form>
+  </section>
+</main>
+{% endblock %}

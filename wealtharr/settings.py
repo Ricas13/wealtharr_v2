@@ -88,7 +88,7 @@ STORAGES = {"staticfiles": {"BACKEND": (
 )}}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/login/"
-LOGIN_REDIRECT_URL = "/app/"
+LOGIN_REDIRECT_URL = "/cockpit/"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG

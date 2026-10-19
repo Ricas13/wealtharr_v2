@@ -24,7 +24,7 @@ from .paper import create_paper_trial, PaperSetupUnavailable, PAPER_NAME
 @require_GET
 def home(request):
     if request.user.is_authenticated:
-        return redirect("dashboard")
+        return redirect("cockpit_today")
     return render(request, "home.html")
 
 def turnstile_verified(request):
@@ -43,14 +43,14 @@ def turnstile_verified(request):
 
 def sign_in(request):
     if request.user.is_authenticated:
-        return redirect("dashboard")
+        return redirect("cockpit_today")
     form = AuthenticationForm(request=request, data=request.POST or None)
     if request.method == "POST":
         valid = form.is_valid()
         turnstile = turnstile_verified(request)
         if valid and turnstile:
             login(request, form.get_user())
-            return redirect("dashboard")
+            return redirect("cockpit_today")
         if not turnstile:
             form.add_error(None, "Security verification failed. Please try again.")
     return render(request, "login.html", {"form": form, "turnstile_site_key": settings.TURNSTILE_SITE_KEY,

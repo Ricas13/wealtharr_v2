@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% block title %}Settings{% endblock %}{% block content %}
+<section class="cockpit ck-narrow"><h1>Settings</h1><p class="ck-muted">My notifications and secure delivery details.</p>
+<section class="panel ck-card"><h2>Notification destinations</h2><form method="post">{% csrf_token %}<input type="hidden" name="save" value="preferences">
+{% for f in pref_form %}<div class="form-field">{{ f.label_tag }}{{ f }}{{ f.errors }}</div>{% endfor %}
+<button class="btn btn-primary" type="submit">Save destinations</button></form></section>
+{% if transport_form %}<section class="panel ck-card"><h2>Delivery setup</h2><p>For email, enter your SMTP server, sender and app password. For the simpler route, create a private Discord channel and paste its webhook URL. A webhook is a secret: anyone with it can send messages to that channel.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="save" value="transport">
+{% for f in transport_form %}<div class="form-field">{{ f.label_tag }}{{ f }}{{ f.errors }}</div>{% endfor %}
+<button class="btn btn-primary" type="submit">Save delivery setup</button></form>
+<div class="ck-test-row">
+<form action="{% url 'cockpit_test' 'email' %}" method="post">{% csrf_token %}<button class="btn" type="submit">Send test email</button></form>
+<form action="{% url 'cockpit_test' 'discord' %}" method="post">{% csrf_token %}<button class="btn" type="submit">Send test Discord alert</button></form>
+</div>
+<p class="ck-muted">Discord webhook: {% if discord_configured %}saved{% else %}not set{% endif %}. SMTP: {% if smtp_configured %}configured{% else %}not configured{% endif %}.</p>
+</section>{% endif %}
+{% if user.is_staff %}<details class="panel ck-card"><summary>Advanced administration</summary><a href="{% url 'control' %}">Admin diagnostics</a> · <a href="{% url 'admin:index' %}">Django admin</a></details>{% endif %}
+</section>{% endblock %}

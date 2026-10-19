@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% block title %}Import Trading 212{% endblock %}{% block content %}
+<section class="cockpit ck-narrow"><h1>Import Trading 212 history</h1><p>From Trading 212: History → Export → select orders, transactions and dividends. Use the full GBP history for this account.</p>
+<form method="post" enctype="multipart/form-data" class="panel ck-card">{% csrf_token %}
+<label for="csv-file">CSV export</label><input id="csv-file" class="field" name="csv_file" type="file" accept=".csv,text/csv" required>
+<button class="btn" type="submit">Preview only (no changes)</button>
+{% if preview or errors or duplicate_total %}
+<h2>Dry-run result</h2><p>{{ total }} new rows · {{ duplicate_total }} already imported · {{ error_total }} errors</p>
+{% if errors %}<div role="alert"><strong>Nothing can be imported until errors are resolved.</strong><ul>{% for line, error in errors %}<li>Row {{ line }}: {{ error }}</li>{% endfor %}</ul></div>{% endif %}
+<ol>{% for row in preview %}<li>{{ row.summary }}</li>{% endfor %}</ol>
+{% if not errors and total %}<p>To confirm, tick the box and re-select the exact same CSV file; it is re-validated against the live ledger.</p>
+<label><input name="apply" type="checkbox" value="yes"> Import these events after re-validation</label>{% endif %}
+{% endif %}
+</form></section>{% endblock %}

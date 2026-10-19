@@ -577,12 +577,12 @@ def review_strategy(strategy):
             # triggering rebalance alerts or cluttering the Overview.
             actionable = alert["kind"] == "THIRTY_DOWN" or any(
                 action.get("side") in ("BUY", "SELL") for action in alert["actions"])
-            if actionable:
+            if actionable and alert["kind"] == "THIRTY_DOWN":
                 dispatch(strategy.owner, "signal:%s:%s" % (strategy.pk, signal.signal_key),
                          "Wealtharr — " + signal.title,
                          strategy.name + "\n" + signal.message + "\n" + details +
                          "\nReview this in Wealtharr. No orders have been placed.")
-            else:
+            elif not actionable:
                 signal.acknowledged_at = timezone.now()
                 signal.save(update_fields=["acknowledged_at"])
     return {"status": "ok", "created": created, "as_of": quarter_end.isoformat()}

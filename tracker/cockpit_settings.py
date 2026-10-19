@@ -1,0 +1,56 @@
+"""User-facing owner notification setup reusing encrypted integrations.
+
+One-user deployment: SystemIntegration is still a global singleton. Never
+allow an ordinary user to write/read its transport configuration.
+"""
+from uuid import uuid4
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_http_methods, require_POST
+from .forms import NotificationForm, IntegrationForm
+from .models import NotificationPreference, SystemIntegration
+from .services import dispatch
+
+
+@login_required
+@require_http_methods(['GET','POST'])
+def owner_settings(request):
+    pref, _ = NotificationPreference.objects.get_or_create(owner=request.user,
+                                defaults={'destination_email': request.user.email})
+    integration = SystemIntegration.current() if request.user.is_staff else None
+    pref_form = NotificationForm(request.POST if request.POST.get('save') == 'preferences' else None,
+                                 instance=pref, prefix='notify')
+    transport_form = IntegrationForm(request.POST if request.POST.get('save') == 'transport' else None,
+                                      instance=integration, prefix='transport') if integration else None
+    if request.method == 'POST':
+        if request.POST.get('save') == 'preferences' and pref_form.is_valid():
+            pref_form.save()
+            messages.success(request, 'Notification preferences saved.')
+            return redirect('cockpit_settings')
+        if request.POST.get('save') == 'transport' and integration and transport_form.is_valid():
+            transport_form.save()
+            messages.success(request, 'Email and Discord transport saved securely.')
+            return redirect('cockpit_settings')
+    return render(request,'settings_cockpit.html',{'pref_form':pref_form,
+        'transport_form': transport_form,
+        'discord_configured': bool(integration and integration.discord_url_ciphertext),
+        'smtp_configured': bool(integration and integration.smtp_host and integration.smtp_sender)})
+
+
+@staff_member_required
+@require_POST
+def test_delivery(request, channel):
+    if channel not in ('email','discord'):
+        messages.error(request, 'Unsupported notification channel.')
+        return redirect('cockpit_settings')
+    # User-initiated only. Never return the webhook or SMTP password in HTML.
+    outcome = dispatch(request.user, 'test:'+uuid4().hex, 'Wealtharr test',
+        'This confirms that your private 9Sig alerts can reach this destination.',
+        channels=(channel,))
+    if outcome.get(channel) == 'sent':
+        messages.success(request, channel.title() + ' test delivered.')
+    else:
+        messages.error(request, channel.title() + ' test unavailable: check destination and transport settings.')
+    return redirect('cockpit_settings')

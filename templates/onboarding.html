@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block title %}Start my 9Sig{% endblock %}{% block content %}
+<section class="cockpit ck-narrow"><h1>Start tracking my 9Sig</h1><p class="ck-muted">One real portfolio. Trading 212, GBP, £500 planned monthly contributions. No trades will be placed.</p>
+{% if blocked %}<div role="alert">{{ blocked }}</div>{% else %}
+<form method="post" class="panel ck-card">{% csrf_token %}{{ form.non_field_errors }}
+{% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
+<p class="ck-muted">Existing holdings require your original broker history. Wealtharr cannot invent opening purchases or their costs. You'll import the CSV next.</p>
+<button type="submit" class="btn btn-primary ck-primary">Create my private cockpit</button></form>
+{% endif %}</section>{% endblock %}
