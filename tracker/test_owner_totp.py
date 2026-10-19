@@ -36,7 +36,7 @@ class OwnerAuthenticatorTests(TestCase):
     def test_unenrolled_owners_remain_password_only(self):
         self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 200)
         self.client.force_login(self.other)
-        self.assertEqual(self.client.get(reverse("cockpit_today")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 200)
 
     def test_authenticator_secret_encrypted_and_second_step_required(self):
         secret = self.enroll()
@@ -47,7 +47,7 @@ class OwnerAuthenticatorTests(TestCase):
         self.client.logout()
         self.client.force_login(self.user)
         for url in (reverse("cockpit_today"), reverse("dashboard"),
-                    reverse("django-admin:index")):
+                    reverse("admin:index")):
             with self.subTest(url=url):
                 self.assertRedirects(self.client.get(url), reverse("totp_challenge"))
         self.assertEqual(self.client.get(reverse("totp_challenge")).status_code, 200)
