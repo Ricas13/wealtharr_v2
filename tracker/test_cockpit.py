@@ -142,7 +142,8 @@ class GuidedRebalanceTests(TestCase):
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
 
     def test_invalidated_signal_never_emits_quarterly_reminder(self):
-        from datetime import datetime
+        self.strategy.monthly_target = D('0')
+        self.strategy.save(update_fields=['monthly_target'])
         StrategySignal.objects.filter(pk=self.sig.pk).update(
             created_at=timezone.now() - timedelta(days=7))
         validate_and_record(self.strategy, LedgerEntry(
