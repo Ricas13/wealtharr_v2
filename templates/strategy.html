@@ -87,7 +87,7 @@
   <section class="panel padded" id="strategy-signals">
   <div class="panel-heading"><div><h2>9Sig market reviews</h2><p>Hourly quote checks when the scheduler is running. Ordinary rebalances follow completed quarters; possible 100%-up TQQQ spike events can be flagged mid-quarter for manual review.</p></div>
   {% if strategy.market_data_enabled %}
-  <form method="post" action="{% url 'refresh_market' strategy.pk %}">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">⟳ Check Yahoo prices</button></form>
+  <form method="post" action="{% url 'refresh_market' strategy.pk %}?tab=signals">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">⟳ Check Yahoo prices</button></form>
   {% else %}<span class="risk-pill">Monitoring off</span>{% endif %}
   </div>
 
@@ -100,7 +100,7 @@
     <p>{{ signal.message }}</p>
     <div class="signal-orders">{% for a in signal.actions %}<div><b>{{ a.side }}</b> {{ a.quantity }} units {{ a.symbol }} — estimated £{{ a.estimated_gbp }}</div>{% empty %}<small>No trade proposed.</small>{% endfor %}</div>
     {% if signal.acknowledged_at and "review a reset to 60%" in signal.message %}
-      <form method="post" action="{% url 'confirm_strategy_reset' strategy.pk %}" class="form-stack">{% csrf_token %}
+      <form method="post" action="{% url 'confirm_strategy_reset' strategy.pk %}?tab=signals" class="form-stack">{% csrf_token %}
         <input name="confirm" type="hidden" value="RESET">
         <p class="micro-note">Only click after recording actual broker reset trades. Both Yahoo GBP prices must be fresh and holdings near 60% equity.</p>
         <button class="btn btn-subtle btn-sm" type="submit">Confirm executed reset and start next 9Sig cycle</button>
@@ -112,7 +112,7 @@
     {% endif %}
     <details class="monitor-settings">
       <summary>{% if signal.review_outcome %}Update review{% else %}Verify or correct this signal{% endif %}</summary>
-      <form method="post" action="{% url 'review_signal' strategy.pk signal.pk %}" class="form-stack">{% csrf_token %}
+      <form method="post" action="{% url 'review_signal' strategy.pk signal.pk %}?tab=signals" class="form-stack">{% csrf_token %}
         <label class="form-field">Your review
           <select class="field" name="outcome" required>
             <option value="CONFIRMED" {% if signal.review_outcome == "CONFIRMED" %}selected{% endif %}>Seems correct after checking</option>
@@ -126,7 +126,7 @@
         <button class="btn btn-subtle btn-sm" type="submit">Save signal review</button>
       </form>
     </details>
-    {% if not signal.acknowledged_at %}<form method="post" action="{% url 'acknowledge_signal' strategy.pk signal.pk %}">{% csrf_token %}<button class="btn btn-subtle btn-sm" type="submit">Mark reviewed without a correction</button></form>{% endif %}
+    {% if not signal.acknowledged_at %}<form method="post" action="{% url 'acknowledge_signal' strategy.pk signal.pk %}?tab=signals">{% csrf_token %}<button class="btn btn-subtle btn-sm" type="submit">Mark reviewed without a correction</button></form>{% endif %}
   </div>
   {% empty %}<p class="muted">No automated recommendations yet. Your review history will appear here after a verified market check and qualifying event.</p>{% endfor %}
 </section>
@@ -139,7 +139,7 @@
     {% empty %}<tr><td colspan="5" class="empty-cell">No activity yet.</td></tr>{% endfor %}
     </tbody></table></div>
     </section></div><div class="ws-stack">    <section class="panel padded"><div class="panel-heading"><div><h2>Record activity</h2><p>First add cash, then record actual trades.</p></div></div>
-      <form method="post" action="{% url 'record_entry' strategy.pk %}" class="form-stack" id="ledger-form">{% csrf_token %}
+      <form method="post" action="{% url 'record_entry' strategy.pk %}?tab=ledger" class="form-stack" id="ledger-form">{% csrf_token %}
         {% include 'partials/form_fields.html' with form=entry_form %}
         <p class="micro-note">Prices and cash amounts must be in GBP. Foreign-currency trading and automatic FX are not supported yet. Enter trades by actual execution date in order.</p>
         <button class="btn btn-primary btn-block" type="submit">Save transaction →</button>
@@ -171,14 +171,14 @@
     {% if strategy.preset.slug == "nasdaq-quarterly-target" %}
   <details>
     <summary>⚙ Configure Yahoo monitoring</summary>
-    <form action="{% url 'save_automation' strategy.pk %}" method="post" class="form-stack">{% csrf_token %}
+    <form action="{% url 'save_automation' strategy.pk %}?tab=setup" method="post" class="form-stack">{% csrf_token %}
       {% include 'partials/form_fields.html' with form=automation_form %}
       <p class="micro-note">{% if instrument_profile %}Your issuer-mapped 9Sig tickers are managed automatically. Only market monitoring can be switched on or off here.{% else %}Exact Yahoo GBP tickers are required; GBp is converted to GBP. Do not assume instrument availability or equivalence.{% endif %}</p>
       <button class="btn btn-primary" type="submit">Save monitoring settings</button>
     </form>
   </details>{% endif %}
   </section>    <section class="panel padded"><h2>About this model</h2><span class="risk-pill {{ strategy.preset.risk|lower }}">{{ strategy.preset.get_risk_display }} risk</span><p class="muted">{{ strategy.preset.summary }}</p><p class="muted">{{ strategy.preset.methodology }}</p><div class="detail-row"><span>Monthly target</span><strong>£{{ strategy.monthly_target|floatformat:2 }}</strong></div><p class="micro-note">Tracking is not trading advice. 9Sig monitoring may suggest reviews, but never executes trades. The model does not yet reproduce all spreadsheet exceptions.</p></section></div><div class="ws-stack">    <section class="panel padded"><div class="panel-heading"><div><h2>Mark a holding price</h2><p>Manually override a holding price when needed; quote source and date remain visible.</p></div></div>
-      <form method="post" action="{% url 'record_price' strategy.pk %}" class="form-stack">{% csrf_token %}
+      <form method="post" action="{% url 'record_price' strategy.pk %}?tab=setup" class="form-stack">{% csrf_token %}
         {% include 'partials/form_fields.html' with form=price_form %}
         <button class="btn btn-subtle btn-block" type="submit">Save price mark</button>
       </form>
