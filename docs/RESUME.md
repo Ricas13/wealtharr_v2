@@ -7,7 +7,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ## IMPORTANT: LETTERED PRODUCT REDESIGN — resume checkpoint 2026-10-19
 
-**Current milestone: Sections A–H committed as scoped branch deliverables. The next section is I only when the owner says “next”.** Section H implements per-category owner alert routing, an idempotent quarterly digest, urgent/data/follow-up/contribution advisory notifications, bounded retries with preference-aware cancellation and scheduler diagnostics. No broker connectivity, automated trading or invented valuations.
+**Current milestone: Sections A–I committed as scoped branch deliverables. The next section is J only when the owner says “next”.** Section I provides a private Docker/Traefik deployment configuration, optional owner TOTP, protected secrets, and isolated archive restore-verification tools. The production Oracle host was NOT accessed, no actual deployment or live restore was performed, and code-based checks are not equivalent to operational sign-off.
 
 - **Same active branch:** `feature/owner-9sig-cockpit-resumable` (PR **#11**). No competing branch, no restart. Before edits, fetch current PR HEAD and check concurrent commits.
 - **Section B artefacts:** `docs/instrument-research.md`, `tracker/instrument_mapping.py` (immutable `CURATED_ISA_ROLE_MAP`, `MAPPING_VERSION=2026-10-19.1`, reviewed issuer/Invest evidence with explicit pending owner ISA permission and Yahoo feed flags), `tracker/test_instrument_catalogue.py`, updated `CLAUDE.md`, `docs/architecture.md` and superseded old broker-API proposal.
@@ -20,7 +20,7 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ### Paste this in a NEW ChatGPT chat to resume
 
-> Continue Wealtharr v2 on existing **PR #11** / `feature/owner-9sig-cockpit-resumable`. **Read `docs/RESUME.md` first** and inspect current branch head; preserve all Section A–H commits. Do **ONLY Section I**: secure private deployment behind Traefik, optional TOTP, backup/restore safety, least-privilege configuration and operational readiness. No brokerage APIs, broker orders, synthetic prices, financial rule changes or a new branch. Existing owner external evidence is requested only in `docs/OWNER_TODO.md` and must not block building. Commit to the same PR/branch; update the handoff once at the end; stop until the owner says “next”.
+> Continue Wealtharr v2 on existing **PR #11** / `feature/owner-9sig-cockpit-resumable`. **Read `docs/RESUME.md` first** and inspect current branch head; preserve all Section A–I commits. Do **ONLY Section J**: CI and Playwright smoke coverage, accessible 360px browser verification and an incremental private ship plan. No brokerage APIs, broker orders, synthetic prices, financial rule changes or a new branch. Existing owner external evidence is requested only in `docs/OWNER_TODO.md` and must not block building. Commit to the same PR/branch; update the handoff once at the end; stop until the owner says “next”.
 ## Objective
 
 Make Wealtharr a strategy-agnostic **tracking and notification** platform for a private owner, with fixed 9Sig as its first (and only currently implemented) strategy. Today shows performance and one next action; the owner manually makes and confirms any broker trades. The product never places orders, never connects to brokers (including read-only APIs), and never invents prices, trades or backtests. Preserve the append-only ledger, immutable confirmed reset baselines and financial refusal rules throughout the refactor.
@@ -35,9 +35,9 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [x] **F** new one-screen UK ISA-only setup, recorded actual starting GBP cash only, per-owner version/issuer identity snapshot in migration 0010, £500 optional monthly reminder target, true-date contribution shortcut in Ledger, conservative T212 CSV three-stage preview and confirmation, legacy GIA entrypoint redirect, and focused tests.
 - [x] **G** one actual manual fill per POST, source-ledger-linked partial execution receipts and idempotent retries, explicit completed review only after original quantities and verified post-fill GBP closes; structured signal reset reason, source/strategy-version pinned immutable reset baseline, old text-only shortcut retired, Today/History partial status and focused tests.
 - [x] **H** owner email/Discord destination matrix, idempotent quarterly digest, urgent warnings, weekly data/review alerts, monthly contribution reminder, preference-aware bounded retries and owner/staff diagnostics; see `docs/notification-operations.md`.
-- [ ] **I** secure Traefik deployment, optional TOTP, backups/restore.
+- [x] **I** private Traefik/Oracle-oriented deployment *configuration*, optional owner-enrolled TOTP, mounted stable secrets, backup/archive integrity and isolated restore verification. Deployment itself remains unverified; see `docs/private-deployment-recovery.md`.
 - [ ] **J** CI/Playwright and incremental ship plan.
-- **Instruction:** user wants **one lettered section per turn**. Stop after H now; proceed with I **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
+- **Instruction:** user wants **one lettered section per turn**. Stop after I now; proceed with J **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
 - **Architecture decision:** no broker/API integration of any kind, no editable preset/ticker/rule UI, no paper account, no billing or public signup. Fixed code-defined strategy versions; role-based evidence-backed exact lines pinned at enrolment. See `docs/architecture.md` and `CLAUDE.md`.
 - **Outstanding verification remains outstanding:** workbook parity, ISA/broker eligibility, real CSV, CI/migrations/browser checks, and deployment. Section A did not test or deploy runtime changes.
 
@@ -139,6 +139,22 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 > Continue Wealtharr v2 from `Ricas13/wealtharr_v2`, existing PR #11 and `feature/owner-9sig-cockpit-resumable`. Read `docs/RESUME.md` first, then `CLAUDE.md`, `docs/architecture.md`, `docs/notification-operations.md` and the deployment files. Sections A–H are committed. Implement **Section I only**: secure owner-only Traefik deployment, environment and secret safety, optional TOTP, backup/restore verification and operational diagnostics. Preserve the completed notification scheduler and all financial safeguards. No broker connections, trades, public signup, subscriptions or new branch. Commit code/docs/tests to the existing PR, update `docs/RESUME.md` for Section J, then stop.
 
+## Section I delivery — private deployment and recovery (2026-10-19)
+
+- [x] **Private topology:** `compose.yml` runs PostgreSQL without any published DB port and application only on 127.0.0.1:8088 for existing host-based Traefik. Optional `compose.traefik.yml` removes even that publication, requires an existing external proxy network, HTTPS certificate resolver and explicit VPN/trusted client CIDR allowlist; untrusted forwarded headers must not defeat that allowlist. No public signup, broker API or auto-dealing was added.
+- [x] **Secrets and least privilege:** production Compose mounts version-stable PostgreSQL and Django keys from untracked `secrets/` files, not a URL or image layer. `.dockerignore` and `.gitignore` exclude real secrets, archives, databases and environments. Gunicorn runs nonroot UID 10001, with dropped capabilities/no-new-privileges and bounded tmpfs. Preserve `SECRET_KEY`: it protects existing encrypted email/Discord/TOTP data as well as sessions.
+- [x] **Runtime health:** `scripts/healthcheck.py` probes Gunicorn's listening socket and actual DB connectivity without being misled by Django's intentional HTTPS redirect. The Compose scheduler runs a single hourly `send_cockpit_notifications` alongside read-only market review; jobs never trade or transfer money.
+- [x] **Optional TOTP:** migration `0015_owner_totp.py`, `tracker/totp.py`, `tracker/totp_views.py`, `tracker/totp_middleware.py`, and server-rendered templates support password-confirmed, optional authenticator enrollment. Pending and enabled seeds are encrypted; private Django/admin endpoints require post-password challenge **only when enabled**. TOTP uses a documented 30-second SHA-1 RFC 6238 code, accepts one adjacent timestep, refuses reused steps, rate-limits failed attempts and requires password plus a fresh TOTP code to disable. Lost factor needs console-authorised recovery; no public reset bypass.
+- [x] **Actual backup recovery tooling:** daily custom-format `pg_dump` with a checksum and 30-day *on-host* retention; `scripts/verify_backup.sh` restores an archive fully into a throwaway isolated PostgreSQL 16 container **without connecting to production**. `scripts/restore_backup.sh` refuses destructive operations absent explicit confirmation, verifies the selected archive before stopping services and applies a transactional restore. Off-host encrypted retention and a **real** rehearsal on Oracle are operator tasks, not performed in this chat.
+- [x] **Tests and operational instructions:** `tracker/test_owner_totp.py` covers opt-in default, RFC 6238 test vector, encrypted seed, unauthorized private POST protection, Django admin gating, replay, lockout and disable. `.github/workflows/test.yml` validates syntax of the restore scripts and both Compose configurations with placeholder secrets. `docs/private-deployment-recovery.md` records migration, Traefik, recovery and operational sign-off instructions. No credentials or real portfolio values are committed.
+- **Verification boundary:** GitHub CI must be observed at the relevant latest commit before claiming green tests. Real Oracle DNS/TLS/TOTP enrollment, live email/Discord delivery, hourly uptime, off-host backups, and an isolated *real-archive* restore drill have **not** been independently verified. Workbook parity, the real T212 CSV and ISA permissions remain separately unverified. Never claim a live go/no-go decision from these source changes.
+
+**Next: Section J only** when the owner says “next”: extend CI/Playwright and responsive 360px keyboard/browser flows, produce an incremental owner-only private ship checklist and make final acceptance claims only where actual tests or evidence exist. Preserve Sections A–I and keep the same branch/PR.
+
+### Copy into a new ChatGPT chat — Section J
+
+> Continue `Ricas13/wealtharr_v2` on the existing PR #11 and `feature/owner-9sig-cockpit-resumable` branch. Read `docs/RESUME.md` first, then `CLAUDE.md`, `docs/architecture.md`, `docs/private-deployment-recovery.md` and current CI. Sections A–I are committed. Implement **Section J only**: CI and Playwright coverage of critical owner paths at 360px and desktop, privacy/authentication, stale-data refusal and owner-confirmed fills, then an incremental private ship/acceptance plan. Do not infer live Oracle deployment, Excel parity, broker eligibility or restored database health from synthetic tests. Do not connect brokers, trade, invent prices, or create a new branch. Commit tests/docs on PR #11, update RESUME for the final handoff, then stop.
+
 ## State / checkpoints
 
 - [x] Dedicated new branch created; `main` deliberately untouched.
@@ -177,7 +193,7 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 ## First commands in a NEW CHAT
 
 1. Read this handoff and inspect latest PR #11 branch head; concurrent edits exist, so do not overwrite existing Section G.
-2. Implement **Section I only**: private Traefik/Docker operations, authentication hardening, optional TOTP and reproducible backup/restore verification; no broker or payments integration.
+2. Implement **Section J only**: CI/Playwright tests, 360px keyboard/browser flows and incremental release plan; do not change the financial strategy or redeploy.
 3. Preserve append-only ledger, partial execution receipts, typed reset reason, verified post-fill reset baseline and the existing no-broker/no-auto-trade boundary.
 4. Request real owner evidence only via `docs/OWNER_TODO.md`, commit on the **same** branch and PR, update this handoff once and wait for "next".
 
@@ -192,4 +208,4 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## User prompt for a new chat
 
-**Use the Section I-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
+**Use the Section J-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
