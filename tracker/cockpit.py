@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .cockpit_forms import FillForm, DepositShortcutForm, OneScreenSetupForm, ExecutionDateForm
-from .instrument_mapping import resolve_instruments, InstrumentMappingUnavailable, for_strategy
+from .instrument_mapping import enrolment_manifest, InstrumentMappingUnavailable, for_strategy
 from .market_signals import quarter_end_before, settlement_close, signal_line_value
 from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
                      NotificationPreference, PriceMark, RebalanceExecution,
@@ -433,49 +433,71 @@ def deposit_shortcut(request):
 @login_required
 @require_http_methods(['GET', 'POST'])
 def setup(request):
+    """One-screen owner enrolment with no fictional opening events.
+
+    Both roles and source/evidence qualifiers are pinned at creation. New
+    enrolments support UK / Trading 212 / ISA only; legacy records survive.
+    """
     existing, blocked = _strategy(request.user)
     if existing:
         return redirect('cockpit_today')
     if blocked:
         return render(request, 'onboarding.html', {'blocked': blocked})
-    form = OneScreenSetupForm(request.POST or None, initial={'start_date': timezone.localdate(),
-                                                              'account_kind': 'ISA', 'position_mode': 'FRESH'})
+    form = OneScreenSetupForm(request.POST or None)
+    try:
+        manifest = enrolment_manifest()
+    except InstrumentMappingUnavailable:
+        return render(request, 'onboarding.html', {
+            'blocked': 'The reviewed UK Trading 212 Stocks ISA instrument mapping is currently unavailable.'})
     if request.method == 'POST' and form.is_valid():
         d = form.cleaned_data
         try:
-            profile = resolve_instruments('nasdaq-quarterly-target', 'GB', d['account_kind'], 'TRADING212')
             with transaction.atomic():
-                # Uniqueness: one account/strategy name. No made-up opening trade.
-                account = Account.objects.create(owner=request.user,
-                    name='Trading 212 '+d['account_kind'], kind=d['account_kind'], country='GB', broker='TRADING212')
+                # No user-selected brokerage, currency, ticker, account type or
+                # strategy rules. The owner alone chooses real funding dates.
+                account = Account.objects.create(
+                    owner=request.user, name='Trading 212 ISA', kind='ISA',
+                    country='GB', broker='TRADING212')
                 strategy = StrategyInstance.objects.create(
                     owner=request.user, account=account,
-                    preset=StrategyPreset.objects.get(slug='nasdaq-quarterly-target', active=True),
-                    name='9Sig', monthly_target=D('500.00'),
-                    equity_symbol=profile.equity.yahoo_ticker,
-                    safe_symbol=profile.safe.yahoo_ticker,
+                    preset=StrategyPreset.objects.get(
+                        slug=manifest['strategy_key'], active=True),
+                    name='9Sig',
+                    monthly_target=d['monthly_target'],
+                    equity_symbol=manifest['roles']['growth']['yahoo_ticker'],
+                    safe_symbol=manifest['roles']['safe']['yahoo_ticker'],
+                    mapping_version=manifest['mapping_version'],
+                    resolved_instruments=manifest,
                     market_data_enabled=True, contribution_alerts=True)
-                # Existing-holdings route: record only verified actual deposits.
-                # User imports full original history next, so do not create a fake position.
-                if d['position_mode'] == 'FRESH':
-                    validate_and_record(strategy, LedgerEntry(kind='DEPOSIT',
-                        occurred_on=d['start_date'], amount=d['starting_cash'],
-                        note='Owner confirmed real opening cash'))
+                actual_cash = d.get('starting_cash')
+                if d['position_mode'] == 'FRESH' and actual_cash is not None:
+                    validate_and_record(strategy, LedgerEntry(
+                        kind='DEPOSIT', occurred_on=d['start_date'],
+                        amount=actual_cash,
+                        note='Owner confirmed actual opening GBP cash'))
                 prefs, _ = NotificationPreference.objects.get_or_create(owner=request.user)
                 prefs.email_enabled = d['destination'] == 'EMAIL'
                 prefs.discord_enabled = d['destination'] == 'DISCORD'
-                prefs.destination_email = d['email'] if d['destination'] == 'EMAIL' else prefs.destination_email
+                if d['destination'] == 'EMAIL':
+                    prefs.destination_email = d['email']
                 prefs.monthly_reminders = True
                 prefs.save()
             if d['position_mode'] == 'EXISTING':
-                messages.info(request, 'Import your complete historical deposits and fills before Wealtharr calculates 9Sig.')
+                messages.info(request,
+                    'Account created with no invented holdings. Preview your complete Trading 212 history next; nothing is imported until you confirm.')
                 return redirect('cockpit_csv')
             if d['destination'] == 'DISCORD':
-                messages.info(request, 'Add your Discord webhook in Settings, then send a test.')
+                messages.info(request,
+                    'Set your Discord destination in Settings and send a test before relying on alerts.')
+            if d.get('starting_cash') is None:
+                messages.info(request,
+                    'No deposit was recorded. Record money only once it has actually reached your ISA.')
             return redirect('cockpit_today')
-        except (InstrumentMappingUnavailable, StrategyPreset.DoesNotExist, IntegrityError, ValidationError) as exc:
+        except (InstrumentMappingUnavailable, StrategyPreset.DoesNotExist,
+                IntegrityError, ValidationError) as exc:
             form.add_error(None, str(exc))
-    return render(request, 'onboarding.html', {'form': form})
+    return render(request, 'onboarding.html', {
+        'form': form, 'manifest': manifest})
 
 
 @login_required
