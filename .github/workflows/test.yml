@@ -83,7 +83,7 @@ jobs:
           trap 'docker rm -f wealtharr-ci-restore-source >/dev/null 2>&1 || true' EXIT
           for attempt in $(seq 1 45); do
             if docker exec wealtharr-ci-restore-source \
-              pg_isready -U postgres -d ci_restore_source >/dev/null 2>&1; then
+              psql -U postgres -d ci_restore_source -Atqc 'SELECT 1' >/dev/null 2>&1; then
               break
             fi
             sleep 1
