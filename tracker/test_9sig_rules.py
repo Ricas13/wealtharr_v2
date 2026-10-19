@@ -113,3 +113,13 @@ class WorkbookArithmeticTests(SimpleTestCase):
             equity_price=D("20"), starting_equity_cost=D("600"))
         self.assertEqual([a["side"] for a in q["actions"]], ["SELL", "BUY"])
         self.assertEqual(q["reset_reason"], "")
+
+    def test_already_empty_reserve_still_has_advisory_notice(self):
+        # The zero-budget corner case cannot propose a buy, but must not
+        # silently lose the manual empty-reserve review notice.
+        q = advise(cash=D("0"), safe_qty=D("0"),
+                   equity_qty=D("1"), equity_price=D("20"),
+                   starting_equity_cost=D("600"))
+        self.assertEqual(q["actions"], [])
+        self.assertEqual(q["reset_reason"], "")
+        self.assertIn("Your reserve is now empty", q["message"])
