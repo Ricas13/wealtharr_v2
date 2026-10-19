@@ -39,7 +39,7 @@ class OwnerPageTests(TestCase):
         self.add_cash()
         response = self.client.get(reverse("cockpit_today"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "What to do next")
+        self.assertContains(response, "Next action")
         self.assertContains(response, "1,000.00")
         self.assertContains(response, "Add your actual purchases")
         self.assertContains(response, "Actual deposit date")
