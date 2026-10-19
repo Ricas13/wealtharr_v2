@@ -124,6 +124,31 @@ class OwnerAlertMatrixTests(TestCase):
             self.assertEqual(retry_due_deliveries(), (0, 0))
             sender.assert_not_called()
 
+    def test_cancelled_notice_never_resumes_when_owner_opts_back_in(self):
+        from tracker.notification_scheduler import retry_due_deliveries
+        delivery = NotificationDelivery.objects.create(
+            owner=self.owner, channel="email", category="urgent",
+            event_key="signal:old:spike", status="FAILED", attempts=1,
+            subject="Old source warning", message="Already expired",
+            next_retry_at=timezone.now() - timedelta(minutes=10))
+        self.pref.urgent_email = False
+        self.pref.save(update_fields=["urgent_email"])
+        with patch("tracker.notification_scheduler.dispatch") as sender:
+            self.assertEqual(retry_due_deliveries(), (0, 0))
+            sender.assert_not_called()
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, "CANCELLED")
+        self.pref.urgent_email = True
+        self.pref.save(update_fields=["urgent_email"])
+        with patch("tracker.services._send_message") as sender:
+            response = route_notice(
+                self.owner, "urgent", "signal:old:spike",
+                "New attempt", "Do not invent old data")
+            sender.assert_not_called()
+        self.assertEqual(response["email"], "cancelled")
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.attempts, 1)
+
     def test_notification_settings_require_login(self):
         self.client.logout()
         self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 302)
