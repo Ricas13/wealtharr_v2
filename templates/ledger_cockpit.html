@@ -20,6 +20,24 @@
       <p class="ck-muted">Buying an instrument is not a new contribution</p>
     </section>
   </div>
+  <details class="panel ck-card ck-disclosure">
+    <summary>Record an actual cash deposit</summary>
+    <div class="ck-details-body">
+      <p class="ck-muted">Enter only money that actually arrived in your Trading 212 ISA. This records a ledger event; Wealtharr never transfers funds.</p>
+      <form method="post" action="{% url 'cockpit_deposit' %}" class="ck-deposit-form">
+        {% csrf_token %}
+        <input type="hidden" name="return_to" value="ledger">
+        <div class="ck-form-pair"><label for="ledger-deposit-amount">Actual amount (£)</label>
+          <input id="ledger-deposit-amount" class="field" name="amount" type="number"
+                 inputmode="decimal" min="0.01" step="0.01" required></div>
+        <div class="ck-form-pair"><label for="ledger-deposit-date">Date money arrived</label>
+          <input id="ledger-deposit-date" class="field" name="occurred_on" type="date"
+                 value="{% now 'Y-m-d' %}" required></div>
+        <button class="btn btn-primary" type="submit">Record this deposit</button>
+      </form>
+      <p class="ck-muted">A planned monthly amount is not a deposit. Your ISA allowance may also depend on contributions outside this portfolio.</p>
+    </div>
+  </details>
   <section class="panel ck-card" aria-labelledby="transactions-title">
     <div class="ck-section-head"><h2 id="transactions-title">Transactions</h2><span class="ck-muted">Up to 200 on-screen; CSV exports all matching entries</span></div>
     <form method="get" action="{% url 'cockpit_ledger' %}" class="ck-ledger-controls" aria-label="Filter and sort ledger entries">
