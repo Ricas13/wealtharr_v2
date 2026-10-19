@@ -447,7 +447,10 @@ def deposit_shortcut(request):
                     messages.warning(request, estimate.warning)
         except ValidationError as e:
             messages.error(request, '; '.join(e.messages))
-    return redirect('cockpit_today')
+    # The owner may record an actual deposit from Today or directly from Ledger.
+    # Only these two fixed internal routes are supported (never an arbitrary URL).
+    return redirect('cockpit_ledger' if request.POST.get('return_to') == 'ledger'
+                    else 'cockpit_today')
 
 
 @login_required
