@@ -76,7 +76,13 @@ Three **owner-approved, intentional differences** explain exceptional rows:
    available cash and sale proceeds, floor to normal 0.0001 precision.
    No automatic shortage reset/HOLD, even if 30 Down is active. Show
    **"Your reserve is now empty. Review whether to reset to 60/40."**
-   That review is advisory; real trades and a reset remain owner-confirmed.
+   The owner may explicitly choose an **alternative manual 60/40 reset review**
+   from the ordinary exhausted-reserve proposal, before recording fills.
+   This preserves the original advice and creates a separately audited
+   reset proposal using verified quarter-end GBP quotes. No trades occur;
+   the original proposal becomes not applicable only by the owner's explicit
+   choice. Completion still requires individual actual fills and later
+   verified GBP prices through the existing reset-confirmation workflow.
    The 81% throttle, 100%-up spike, third-sell reset and eight-quarter
    expiry stay unchanged.
 
