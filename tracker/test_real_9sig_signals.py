@@ -10,8 +10,8 @@ from django.utils import timezone
 from tracker.market_signals import quarter_end_before, review_strategy
 from tracker.cockpit_notifications import send_due_cockpit_notices
 from tracker.models import (
-    Account, LedgerEntry, MarketObservation, StrategyInstance,
-    StrategyPreset, StrategySignal)
+    Account, LedgerEntry, MarketObservation, NotificationPreference,
+    StrategyInstance, StrategyPreset, StrategySignal)
 from tracker.services import validate_and_record
 
 
@@ -26,6 +26,9 @@ class RealQuarterlySignalTests(TestCase):
             preset=StrategyPreset.objects.get(slug="nasdaq-quarterly-target"),
             name="9Sig ISA", equity_symbol="LQQ3.L",
             safe_symbol="ERNS.L", market_data_enabled=True)
+        # Section H routes advisory alerts only to explicitly enabled channels.
+        NotificationPreference.objects.create(
+            owner=self.owner, email_enabled=True, discord_enabled=False)
         self.end = quarter_end_before(timezone.localdate())
         self.begin = date(self.end.year, self.end.month-2, 1)
         self.first_trade = self.begin + timedelta(days=1)
