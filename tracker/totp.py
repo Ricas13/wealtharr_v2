@@ -4,6 +4,7 @@ Pure stdlib generator. Codes are never logged; encrypted secrets stay in the
 database. This is an authentication factor, never a financial-rule input.
 """
 import base64
+import binascii
 import hashlib
 import hmac
 import secrets
@@ -12,6 +13,7 @@ import time
 from datetime import timedelta
 from urllib.parse import quote
 
+from cryptography.fernet import InvalidToken
 from django.db import transaction
 from django.utils import timezone
 
@@ -72,7 +74,7 @@ def verify_account_code(user, code: str) -> bool:
         try:
             secret = decrypt_secret(factor.secret_ciphertext)
             step = matching_step(secret, code, newer_than=factor.last_verified_step)
-        except (ValueError, TypeError, KeyError):
+        except (ValueError, TypeError, KeyError, InvalidToken, binascii.Error):
             step = None
         if step is None:
             factor.failed_attempts = min(factor.failed_attempts + 1, ATTEMPTS_BEFORE_LOCK)
