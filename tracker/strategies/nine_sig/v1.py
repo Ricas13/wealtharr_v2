@@ -48,6 +48,8 @@ class NormalizedQuote:
     source: str  # verified vendor name; not an implicit endorsement of a quote
     raw_unit: str  # captured FROM feed, not inferred by strategy
     raw_unit_verified: bool
+    raw_close: Decimal | None = None
+    observation_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,10 @@ class PortfolioHistory:
     prior_skipped_sells: int = 0
     prior_drawdown: bool = False
     down_age_quarters: int = 0
+    strategy_version: str = VERSION
+    mapping_version: str = "2026-10-19.1"
+    outside_holdings: bool = False
+    pending_unverified_reset: bool = False
 
 
 @dataclass(frozen=True)
@@ -81,12 +87,33 @@ class AuditItem:
 
 
 @dataclass(frozen=True)
+class TradeProposal:
+    role: Literal["growth", "safe"]
+    symbol: str
+    side: Literal["BUY", "SELL"]
+    estimated_gbp: Decimal
+    approximate_shares: Decimal
+    price_gbp: Decimal
+    price_date: date
+
+
+@dataclass(frozen=True)
 class EvaluationResult:
     strategy_version: str
-    status: Literal["READY", "HOLD"]
+    status: Literal["ok", "action_needed", "cannot_compute"]
     reason: str
     alerts: tuple[dict, ...]
     audit: tuple[AuditItem, ...]
+    reason_code: str | None = None
+    trades: tuple[TradeProposal, ...] = ()
+    urgent: bool = False
+    event_code: str | None = None
+
+    def audit_row(self):
+        """Stable ordered values for CSV export; all amounts remain strings."""
+        return {"strategy_version": self.strategy_version, "status": self.status,
+                "reason_code": self.reason_code or "",
+                **{item.name: item.value for item in self.audit}}
 
 
 def _audit(**values):
@@ -155,6 +182,28 @@ def signal_line_value(*, start_date, as_of, starting_equity_cost, contributions=
         if start_date < day <= as_of and first_quarter <= day_q <= review_quarter:
             target += (Decimal(amount) / 2) * Decimal("1.09") ** (review_quarter - day_q)
     return target.quantize(CENTS)
+
+
+def signal_line_trace(*, start_date, as_of, starting_equity_cost, contributions=()):
+    """Ordered per-quarter audit of 1.09 growth + half the ACTUAL dated flows.
+
+    Tuple fields: quarter id, opening line, net in-quarter contribution,
+    ending line before final penny rounding. No monthly schedule assumptions.
+    """
+    from calendar import monthrange
+    at_close = as_of.month % 3 == 0 and as_of.day == monthrange(as_of.year, as_of.month)[1]
+    review_q = quarter_number(as_of) if at_close else quarter_number(as_of) - 1
+    if review_q < quarter_number(start_date):
+        return ()
+    value = Decimal(starting_equity_cost)
+    result = []
+    for q in range(quarter_number(start_date), review_q + 1):
+        in_quarter = sum((Decimal(amount) for day, amount in contributions
+            if start_date < day <= as_of and quarter_number(day) == q), ZERO)
+        opening = value
+        value = opening * Decimal("1.09") + in_quarter / Decimal("2")
+        result.append((q, opening, in_quarter, value))
+    return tuple(result)
 
 
 def _drawdown_from_spy(spy, review_q):
@@ -320,10 +369,19 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
 
 
 def _price_ok(quote, symbol, currency, as_of, *, expected_raw):
+    if (not isinstance(quote, NormalizedQuote) or not isinstance(quote.price, Decimal)
+            or not isinstance(quote.raw_close, Decimal)):
+        return False
+    if not quote.price.is_finite() or not quote.raw_close.is_finite():
+        return False
+    divisor = Decimal("100") if expected_raw == "GBX" else Decimal("1")
+    # Require the captured unnormalised observation and exactly one conversion.
     return (quote.symbol == symbol and quote.currency == currency and
             quote.unit == currency and quote.raw_unit == expected_raw and
             quote.raw_unit_verified is True and quote.source in ("yahoo", "stooq") and
-            quote.price.is_finite() and quote.price > ZERO and
+            bool(quote.observation_id) and quote.price > ZERO and
+            quote.raw_close > ZERO and quote.price == quote.raw_close / divisor and
+            Decimal("0.000001") <= quote.price <= Decimal("1000000") and
             quote.as_of <= as_of)
 
 
@@ -336,16 +394,24 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     execution sleeves must come from the GBP Yahoo vendor path at this stage.
     No broker API, side effects, risk modelling or lookahead.
     """
-    def hold(reason, **audit):
-        return EvaluationResult(VERSION, "HOLD", reason, (), _audit(**audit))
+    def hold(reason, code="CANNOT_COMPUTE", **audit):
+        return EvaluationResult(VERSION, "cannot_compute", reason, (), _audit(**audit),
+                                reason_code=code)
 
+    if history.strategy_version != VERSION or history.mapping_version != "2026-10-19.1":
+        return hold("The pinned strategy or instrument mapping version is unavailable",
+                    code="UNSUPPORTED_VERSION")
+    if history.outside_holdings or history.pending_unverified_reset:
+        return hold("Unsupported holding or unconfirmed previous reset", code="INVALID_HISTORY")
     if params != PARAMS:
         return hold("Unsupported 9Sig parameters/version; no implicit rule changes")
     day = history.as_of
     from calendar import monthrange
     if day.month not in (3, 6, 9, 12) or day.day != monthrange(day.year, day.month)[1]:
         return hold("Evaluation date is not a completed quarter end")
-    if history.start_date > day or history.initial_equity_value <= ZERO:
+    if (not isinstance(history.initial_equity_value, Decimal) or
+            not history.initial_equity_value.is_finite() or
+            history.start_date > day or history.initial_equity_value <= ZERO):
         return hold("Missing or invalid equity starting basis")
     values = (history.equity_qty, history.safe_qty, history.cash, history.initial_equity_value)
     if any(not value.is_finite() for value in values) or (
@@ -354,7 +420,8 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     if history.prior_skipped_sells not in (0, 1, 2) or history.down_age_quarters < 0:
         return hold("Invalid 30 Down state")
     for flow in history.contributions:
-        if (not flow.amount.is_finite() or flow.occurred_on <= history.start_date or
+        if (not isinstance(flow.amount, Decimal) or not flow.amount.is_finite() or
+                flow.occurred_on <= history.start_date or
                 flow.occurred_on > day):
             return hold("Contribution date/amount needs reconciliation")
     if not _price_ok(prices.equity, history.equity_symbol, "GBP", day, expected_raw="GBX"):
@@ -366,6 +433,8 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     # Opposite-market holiday/weekend is permissible within the preceding six days.
     if any(day - q.as_of > timedelta(days=6) for q in (prices.equity, prices.safe)):
         return hold("Missing recent completed-quarter UK closes")
+    if abs((prices.equity.as_of - prices.safe.as_of).days) > 1:
+        return hold("UK quarter-end closing dates do not align", code="MISMATCHED_DATES")
     tqqq = tuple(sorted(prices.tqqq, key=lambda q: q.as_of))
     spy = tuple(sorted(prices.spy, key=lambda q: q.as_of))
     for symbol, seq in (("TQQQ", tqqq), ("SPY", spy)):
@@ -384,6 +453,8 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     if any(day - q.as_of > timedelta(days=6) for q in (tqqq[-1], spy[-1])):
         return hold("Reference closing prices are stale")
     contributions = tuple((flow.occurred_on, flow.amount) for flow in history.contributions)
+    recurrence = signal_line_trace(start_date=history.start_date, as_of=day,
+        starting_equity_cost=history.initial_equity_value, contributions=contributions)
     signal = signal_line_value(start_date=history.start_date, as_of=day,
         starting_equity_cost=history.initial_equity_value, contributions=contributions)
     eq_value = history.equity_qty * prices.equity.price
@@ -394,6 +465,10 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
         return hold("No valid historical portfolio valuation")
     triggered, decline = _drawdown_from_spy(sq, review_q)
     doubled = tq[review_q][1] >= tq[review_q-1][1] * Decimal("2")
+    gap = signal - eq_value
+    throttle = gap > CENTS and gap >= reserve * Decimal("0.90")
+    buy_budget = (min(gap, reserve * Decimal("0.81")) if throttle else
+                  min(gap, reserve) if gap > CENTS else ZERO)
     alerts = advice_for_holdings(
         start_date=history.start_date, as_of=day, currency="GBP",
         equity_symbol=history.equity_symbol, safe_symbol=history.safe_symbol,
@@ -415,11 +490,26 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
                        "title": "Potential 100%-up: manual reference review",
                        "message": "TQQQ doubled versus previous quarter close; actual prior rebalance fill reference is unconfirmed. No automatic reset instructions.",
                        "actions": []})
-    return EvaluationResult(VERSION, "READY", "", tuple(alerts),
+    proposed = tuple(TradeProposal(
+        "growth" if action["symbol"] == history.equity_symbol else "safe",
+        action["symbol"], action["side"], Decimal(action["estimated_gbp"]),
+        Decimal(action["quantity"]),
+        prices.equity.price if action["symbol"] == history.equity_symbol else prices.safe.price,
+        prices.equity.as_of if action["symbol"] == history.equity_symbol else prices.safe.as_of)
+        for alert in alerts if alert["kind"] == "QUARTERLY"
+        for action in alert["actions"] if action.get("side") in ("BUY", "SELL"))
+    warnings = tuple(alert["kind"] for alert in alerts if alert["kind"] != "QUARTERLY")
+    return EvaluationResult(VERSION, "action_needed" if proposed else "ok", "", tuple(alerts),
         _audit(strategy_version=VERSION, review_quarter=review_q,
             source_equity=prices.equity.source, source_safe=prices.safe.source,
             source_tqqq=tqqq[-1].source, source_spy=spy[-1].source,
             normalized_currency="GBP", equity_close_date=prices.equity.as_of,
+            growth_raw_unit=prices.equity.raw_unit, safe_raw_unit=prices.safe.raw_unit,
+            growth_raw_close=prices.equity.raw_close, safe_raw_close=prices.safe.raw_close,
+            growth_quote_id=prices.equity.observation_id,
+            safe_quote_id=prices.safe.observation_id,
+            quarter_recurrence=";".join("%s:%s:%s:%s" % row for row in recurrence),
+            buy_budget=buy_budget, throttle_81pct=throttle,
             safe_close_date=prices.safe.as_of, initial_equity=history.initial_equity_value,
             contributed_this_review=sum((f.amount for f in history.contributions
                 if quarter_number(f.occurred_on)==review_q),ZERO),
@@ -434,4 +524,6 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
             prior_skipped_sells=history.prior_skipped_sells,
             tqqq_previous=tq[review_q-1][1],
             tqqq_current=tq[review_q][1], potential_spike=doubled,
-            provisional_spike_reference="calendar-quarter close, not confirmed execution"))
+            provisional_spike_reference="calendar-quarter close, not confirmed execution"),
+        trades=proposed, urgent=bool(warnings),
+        event_code="9sig:%s:%s" % (day.isoformat(), ",".join(warnings)) if warnings else None)
