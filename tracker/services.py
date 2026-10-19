@@ -147,7 +147,7 @@ def _send_message(channel, owner, cfg, prefs, subject, message):
         raise ValueError("Unsupported notification channel")
 
 
-def dispatch(owner, key, subject, message, channels=None):
+def dispatch(owner, key, subject, message, channels=None, *, category=""):
     """Persist and deliver each alert with bounded, retryable, per-channel status.
 
     A network acknowledgement can be lost after the remote service accepts a
@@ -169,10 +169,14 @@ def dispatch(owner, key, subject, message, channels=None):
         now = timezone.now()
         try:
             with transaction.atomic():
-                record, _ = NotificationDelivery.objects.select_for_update().get_or_create(
+                record, created = NotificationDelivery.objects.select_for_update().get_or_create(
                     owner=owner, channel=channel, event_key=key,
-                    defaults={"subject": subject[:200], "message": message},
+                    defaults={"subject": subject[:200], "message": message,
+                              "category": category},
                 )
+                if record.category and category and record.category != category:
+                    outcomes[channel] = "failed"
+                    continue
                 if record.status == "SENT":
                     outcomes[channel] = "sent"
                     continue
@@ -186,22 +190,28 @@ def dispatch(owner, key, subject, message, channels=None):
                         record.last_attempt_at > now - timedelta(minutes=15)):
                     outcomes[channel] = "pending"
                     continue
-                record.subject = subject[:200]
-                record.message = message
+                # Freeze payload for retries; refreshed advice must not
+                # silently alter a previously queued dated notice.
+                if not record.subject:
+                    record.subject = subject[:200]
+                if not record.message:
+                    record.message = message
+                if category and not record.category:
+                    record.category = category
                 record.attempts += 1
                 record.last_attempt_at = now
                 record.next_retry_at = None
                 record.error = ""
                 record.status = "SENDING"
-                record.save(update_fields=["subject", "message", "attempts",
-                                           "last_attempt_at", "next_retry_at",
-                                           "status", "error"])
+                record.save(update_fields=["subject", "message", "category",
+                                           "attempts", "last_attempt_at",
+                                           "next_retry_at", "status", "error"])
         except Exception:
             # Database failure must not trigger an untracked, duplicate send.
             outcomes[channel] = "failed"
             continue
         try:
-            _send_message(channel, owner, cfg, prefs, subject, message)
+            _send_message(channel, owner, cfg, prefs, record.subject, record.message)
         except Exception:
             record.status = "FAILED"
             record.error = "Delivery failed; check integration and destination settings"
