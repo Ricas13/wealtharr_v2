@@ -23,6 +23,7 @@ D = Decimal
 ZERO = D("0")
 ONE = D("1")
 PERCENT = D("100")
+METRICS_VERSION = "universal.metrics.v1.0.0"
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,7 @@ class PeriodMetrics:
                 "cash_gain_gbp", "xirr_annual", "cumulative_return",
                 "annualized_twr", "max_drawdown")
         return {
+            "metrics_version": METRICS_VERSION,
             "status": self.status, "reason_code": self.reason_code,
             **{key: "" if getattr(self, key) is None
                else str(getattr(self, key)) for key in keys},
