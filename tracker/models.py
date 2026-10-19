@@ -9,25 +9,6 @@ ACCOUNT_TYPES = [
 ]
 RISK_TYPES = [("LOW", "Low"), ("MEDIUM", "Medium"), ("HIGH", "High")]
 
-class OwnerTwoFactor(models.Model):
-    """Owner opt-in TOTP. Secret is Fernet-encrypted with the stable Django key.
-
-    Recovery codes are salted by server key using HMAC-SHA256 and consumed
-    atomically; plaintext codes are displayed only at enrolment.
-    """
-    owner = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-        related_name="wealtharr_two_factor")
-    secret_ciphertext = models.TextField()
-    recovery_hashes = models.JSONField(default=list)
-    enabled_at = models.DateTimeField()
-    last_totp_step = models.BigIntegerField(default=-1)
-    last_used_at = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        return "Owner two-factor authentication"
-
-
 class Account(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="investment_accounts")
     name = models.CharField(max_length=90)
