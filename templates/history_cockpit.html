@@ -22,7 +22,7 @@
     <div class="ck-stat-pairs">
       <div><span>Net money added</span><strong>{% if performance.net_contributed_gbp is not None %}£{{ performance.net_contributed_gbp|floatformat:'2g' }}{% else %}Unavailable{% endif %}</strong></div>
       <div><span>Gain / loss in £</span><strong>{% if performance.gain_gbp is not None %}£{{ performance.gain_gbp|floatformat:'2g' }}{% else %}Unavailable{% endif %}</strong></div>
-      <div><span>Cumulative return</span><strong>{% if performance.cumulative is not None %}{{ performance.cumulative|floatformat:2 }}%{% else %}Unavailable{% endif %}</strong></div>
+      <div><span>Single-funding return</span><strong>{% if performance.cumulative is not None %}{{ performance.cumulative|floatformat:2 }}%{% else %}Unavailable{% endif %}</strong></div>
       <div><span>Annualised return</span><strong>{% if performance.annual is not None %}{{ performance.annual|floatformat:2 }}%{% else %}Unavailable{% endif %}</strong></div>
     </div>
     <p class="ck-muted">
@@ -36,24 +36,7 @@
       <p class="ck-muted">GBP gain is an amount, not a percentage return. Quotes and balances are observations, not executable prices.</p>
     </details>
   </section>
-  <section class="panel ck-card ck-chart-panel" aria-labelledby="history-chart-title">
-    <div class="ck-section-head"><div><h2 id="history-chart-title">Value and deposits over time</h2>
-      <p class="ck-muted">Recorded valuation snapshots · cash flows can change the plotted portfolio value</p></div>
-      <div class="chart-controls" role="group" aria-label="Chart period">
-        <button type="button" class="chip" data-range="1m" aria-pressed="false">1M</button>
-        <button type="button" class="chip" data-range="3m" aria-pressed="false">3M</button>
-        <button type="button" class="chip" data-range="1y" aria-pressed="false">1Y</button>
-        <button type="button" class="chip selected" data-range="all" aria-pressed="true">All</button>
-      </div>
-    </div>
-    <div id="wealth-chart" class="wealth-chart" role="group" aria-label="Recorded GBP portfolio valuations, not total returns"></div>
-    {{ performance.chart|json_script:'wealth-chart-points' }}
-    <details class="ck-disclosure-inline"><summary>View underlying recorded values</summary>
-      <div class="table-scroll"><table class="data-table"><thead><tr><th>Date</th><th>Portfolio value (£)</th><th>Net money added (£)</th></tr></thead>
-      <tbody>{% for point in performance.chart %}<tr><td>{{ point.date }}</td><td>{{ point.value }}</td><td>{{ point.contributed }}</td></tr>
-      {% empty %}<tr><td colspan="3">No completed valuation snapshots yet. The chart will start after source-backed prices are recorded.</td></tr>{% endfor %}</tbody></table></div>
-    </details>
-  </section>
+  {% include 'partials/performance_chart.html' with chart_points=performance.chart %}
   <section class="panel ck-card" aria-labelledby="reviews-title">
     <div class="ck-section-head"><h2 id="reviews-title">Previous reviews and warnings</h2><span class="ck-muted">Latest 60</span></div>
     <ol class="ck-history ck-timeline">
@@ -62,6 +45,11 @@
           <h3>{{ record.title }}</h3>
           <time datetime="{{ record.date|date:'Y-m-d' }}" class="ck-muted">{{ record.date|date:'j M Y' }}</time></div>
           <span class="ck-muted">{{ record.outcome }} · {{ record.kind|title }}</span>
+          {% if record.executed_on %}
+            <p class="ck-history-confirmed">Actual fills recorded on {{ record.executed_on|date:'j M Y' }}.
+              <a href="{% url 'cockpit_ledger' %}">See ledger for actual quantities, prices and fees</a>.
+              Old recommendations are never current instructions.</p>
+          {% endif %}
           <details><summary>Read recorded explanation{% if record.has_proposals %} and historical proposal{% endif %}</summary>
             <p>{{ record.message }}</p>
             <p class="ck-muted">A historical review is not permission to execute old trade quantities. Use Today for your current action.</p>
