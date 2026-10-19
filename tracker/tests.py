@@ -87,15 +87,20 @@ class SiteTests(TestCase):
         self.assertEqual(self.client.post(reverse("record_entry",args=[s.pk]),{}).status_code,404)
     def test_create_account_strategy_deposit_and_snapshot(self):
         self.client.force_login(self.user)
-        p=StrategyPreset.objects.get(slug="nasdaq-quarterly-target")
-        response=self.client.post(reverse("new_strategy"),{"name":"9Sig ISA","account":self.account.pk,
-                          "preset":p.pk,"monthly_target":"500","contribution_alerts":"on"})
+        # Section F uses one supported real ISA flow; the retired generic
+        # strategy editor deliberately redirects rather than creating plans.
+        self.assertRedirects(self.client.get(reverse("new_strategy")),
+                             reverse("cockpit_setup"))
+        response=self.client.post(reverse("cockpit_setup"),{
+            "position_mode":"FRESH", "starting_cash":"1000",
+            "start_date":timezone.localdate().isoformat(),
+            "monthly_target":"500", "destination":"NONE"})
         self.assertEqual(response.status_code,302)
-        s=StrategyInstance.objects.get(name="9Sig ISA")
-        response=self.client.post(reverse("record_entry",args=[s.pk]),{
-                          "kind":"DEPOSIT","occurred_on":timezone.localdate().isoformat(),"amount":"1000"})
-        self.assertEqual(response.status_code,302)
+        s=StrategyInstance.objects.get(name="9Sig")
+        self.assertEqual(s.account.kind,"ISA")
+        self.assertEqual(s.account.broker,"TRADING212")
         self.assertEqual(ledger_summary(s)["cash"],D("1000"))
+        self.assertFalse(s.ledger.filter(kind="BUY").exists())
         self.client.post(reverse("capture_snapshot"))
         self.assertEqual(WealthSnapshot.objects.get(owner=self.user).total_value,D("1000"))
 
@@ -168,11 +173,13 @@ class TemplateAndSecurityTests(TestCase):
         self.assertTrue(response.url.startswith(reverse("login")))
     def test_all_owner_pages_render(self):
         self.client.force_login(self.owner)
-        for url in (reverse("dashboard"),reverse("accounts"),reverse("new_strategy"),
+        for url in (reverse("dashboard"),reverse("accounts"),
                     reverse("strategy_detail",args=[self.strategy.pk]),reverse("user_settings"),
                     reverse("change_password"),reverse("control")):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code,200)
+        self.assertRedirects(self.client.get(reverse("new_strategy")),
+                             reverse("cockpit_setup"))
     def test_snapshot_is_not_saved_when_price_is_missing(self):
         self.client.force_login(self.owner)
         validate_and_record(self.strategy,LedgerEntry(kind="DEPOSIT",amount=D("200"),occurred_on=timezone.localdate()))
