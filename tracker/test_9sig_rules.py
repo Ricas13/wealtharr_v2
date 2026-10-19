@@ -88,11 +88,14 @@ class WorkbookArithmeticTests(SimpleTestCase):
         self.assertIn("doubled", q["message"])
         self.assertIn("reset to 60%", q["message"])
 
-    def test_requested_buy_more_than_entire_safe_sleeve_is_reset(self):
+    def test_requested_buy_more_than_entire_reserve_is_all_in(self):
+        # Decision 3 in v2 deliberately replaces the old shortage reset.
         q = advise(
             cash=D("0"), safe_qty=D("1"), equity_qty=D("1"),
             equity_price=D("20"), starting_equity_cost=D("600"))
-        self.assertIn("more than 100% of safe assets", q["message"])
+        self.assertEqual(q["reset_reason"], "")
+        self.assertIn("Your reserve is now empty", q["message"])
+        self.assertEqual(next(a for a in q["actions"] if a["symbol"] == "ERNS.L")["quantity"], "1")
 
     def test_ninety_percent_safe_asset_throttle_never_sells_entire_sleeve(self):
         q = advise(equity_qty=D("1"), equity_price=D("100"),
@@ -101,10 +104,12 @@ class WorkbookArithmeticTests(SimpleTestCase):
                    if a["side"] == "SELL" and a["symbol"] == "ERNS.L")
         self.assertLessEqual(sold, D("900"))
 
-    def test_under_thirty_down_safe_asset_shortage_is_hold_not_forced_buy(self):
+    def test_under_thirty_down_shortage_continues_with_all_in_buy(self):
+        # Decision 3 in v2: 30 Down skips sells, never buys.
         q = advise(
             spy_reference=[(date(2026, 3, 31), D("100")),
                            (date(2026, 6, 30), D("50"))],
             cash=D("0"), safe_qty=D("1"), equity_qty=D("1"),
             equity_price=D("20"), starting_equity_cost=D("600"))
-        self.assertEqual([a["side"] for a in q["actions"]], ["HOLD"])
+        self.assertEqual([a["side"] for a in q["actions"]], ["SELL", "BUY"])
+        self.assertEqual(q["reset_reason"], "")
