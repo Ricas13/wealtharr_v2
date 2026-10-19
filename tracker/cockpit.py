@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .cockpit_forms import FillForm, DepositShortcutForm, OneScreenSetupForm, ExecutionDateForm
-from .instrument_mapping import resolve_instruments, InstrumentMappingUnavailable
+from .instrument_mapping import resolve_instruments, InstrumentMappingUnavailable, for_strategy
 from .market_signals import quarter_end_before, settlement_close, signal_line_value
 from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
                      NotificationPreference, PriceMark, RebalanceExecution,
@@ -50,6 +50,8 @@ def _price_status(strategy, report):
     today = timezone.localdate()
     if not strategy.market_data_enabled or strategy.account.currency != 'GBP':
         return False, '9Sig monitoring must be enabled for a GBP account before trading.', []
+    if for_strategy(strategy) is None:
+        return False, 'Your broker/account instruments are not mapped to an exact verified GBP trading line.', []
     if any(q < ZERO for q in report['positions'].values()):
         return False, 'A holding is negative. Reconcile the ledger before trading.', []
     if report['cash'] < ZERO:
