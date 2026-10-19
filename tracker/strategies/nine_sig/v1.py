@@ -368,6 +368,22 @@ def advice_for_holdings(*, start_date, as_of, currency, equity_symbol, safe_symb
     return alerts
 
 
+def first_100_up_crossing(*, origin_on, origin_usd, daily_usd, until):
+    """Pure provisional TQQQ 2x threshold; never creates GBP reset orders.
+
+    Caller must first verify USD identity/provenance for each input. The
+    checked executed-reference caveat belongs in the UI warning.
+    """
+    if (not isinstance(origin_usd, Decimal) or not origin_usd.is_finite()
+            or origin_usd <= ZERO or until < origin_on):
+        return None
+    valid = sorted((day, price) for day, price in daily_usd
+                   if origin_on < day <= until and isinstance(price, Decimal)
+                   and price.is_finite() and price > ZERO)
+    return next(((day, price) for day, price in valid
+                 if price >= origin_usd * Decimal("2")), None)
+
+
 def _price_ok(quote, symbol, currency, as_of, *, expected_raw):
     if (not isinstance(quote, NormalizedQuote) or not isinstance(quote.price, Decimal)
             or not isinstance(quote.raw_close, Decimal)):
