@@ -4,12 +4,13 @@ This module never calls a broker or changes prices. All new trading activity
 is submitted as *confirmed historical executions* by the owner.
 """
 from datetime import timedelta
+import csv
 from decimal import Decimal, ROUND_DOWN
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
@@ -23,9 +24,10 @@ from .models import (Account, BrokerImportRow, LedgerEntry, MarketObservation,
                      StrategySignal, StrategyValueSnapshot)
 from .performance import snapshot_twr_ready, annualized_return, max_drawdown
 from .core.metrics import ExternalFlow, VerifiedValuation, evaluate_inception
+from .strategies.registry import describe_strategy
 from .services import ledger_summary, validate_and_record
 from .core.presentation import (
-    account_value, holding_rows, ledger_display_rows, select_next_step,
+    account_value, allocation_comparison, holding_rows, ledger_display_rows, select_next_step,
     signal_display_rows, visible_performance,
 )
 
@@ -252,6 +254,7 @@ def today(request):
         next_review_label=next_review.strftime('%d %b %Y'))
     held = any(qty > ZERO for qty in report['positions'].values())
     profile = for_strategy(strategy)
+    description = describe_strategy(strategy.preset.slug)
     roles = ({profile.equity.yahoo_ticker: 'Growth',
               profile.safe.yahoo_ticker: 'Defensive'} if profile else {})
     display_value = account_value(
@@ -268,6 +271,15 @@ def today(request):
         'next_step': step, 'display_value': display_value,
         'display_gain': perf['gain_gbp'] if fresh else None,
         'holdings': holding_rows(report, roles=roles, show_quotes=fresh),
+        'description': description,
+        'allocation': allocation_comparison(
+            report,
+            instrument_roles=(
+                {profile.equity.yahoo_ticker: 'growth',
+                 profile.safe.yahoo_ticker: 'safe'} if profile else {}),
+            fixed_targets=(
+                dict(description.role_targets) if description else {}),
+            verified=fresh),
     })
 
 
@@ -483,15 +495,47 @@ def history(request):
 @login_required
 @require_http_methods(['GET'])
 def ledger(request):
+    """Filtered owner-only event ledger with safe, source-faithful CSV export."""
     strategy, blocked = _strategy(request.user)
     if not strategy:
         return redirect('cockpit_today')
-    entries = list(strategy.ledger.order_by('-occurred_on', '-pk')[:200])
-    report = ledger_summary(strategy)
+    kind = request.GET.get('kind', '')
+    ordering = request.GET.get('order', 'newest')
+    output = request.GET.get('format', 'html')
+    valid_kinds = {k for k, _ in LedgerEntry.TYPES}
+    if kind not in valid_kinds:
+        kind = ''
+    if ordering not in ('newest', 'oldest'):
+        ordering = 'newest'
+    qs = strategy.ledger.all()
+    if kind:
+        qs = qs.filter(kind=kind)
+    qs = qs.order_by('occurred_on', 'pk') if ordering == 'oldest' else qs.order_by('-occurred_on', '-pk')
+    if output == 'csv':
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="wealtharr-ledger.csv"'
+        writer = csv.writer(response)
+        writer.writerow(('entry_id', 'date', 'kind', 'symbol', 'quantity',
+                         'unit_price_gbp', 'amount_gbp', 'fee_gbp', 'note',
+                         'recorded_at'))
+        for row in qs.iterator(chunk_size=500):
+            # Prevent spreadsheet formula injection in user-controlled text;
+            # Decimal values remain numeric without unsafe coercion.
+            def safe_text(value):
+                value = str(value or '')
+                return "'" + value if value.lstrip().startswith(('=', '+', '-', '@')) else value
+            writer.writerow((row.pk, row.occurred_on.isoformat(), row.kind,
+                             safe_text(row.symbol), str(row.quantity), str(row.unit_price),
+                             str(row.amount), str(row.fee), safe_text(row.note),
+                             row.created_at.isoformat()))
+        return response
+    entries = list(qs[:200])
     return render(request, 'ledger_cockpit.html', {
         'strategy': strategy, 'entries': ledger_display_rows(entries),
-        'report': report,
-        'entry_limit_reached': len(entries) == 200,
+        'report': ledger_summary(strategy),
+        'entry_limit_reached': qs.count() > 200,
+        'filter_kind': kind, 'sort_order': ordering,
+        'kind_choices': LedgerEntry.TYPES,
     })
 
 
@@ -511,9 +555,11 @@ def strategy_info(request):
     return render(request, 'strategy_info.html', {
         'strategy': strategy,
         'profile': profile,
+        'description': describe_strategy(strategy.preset.slug),
         'instruments': instruments,
-        'mapping_status': ('Recorded broker/account mapping' if profile else
-                           'No validated instrument profile for this account'),
+        'mapping_status': ('Issuer / catalogue evidence reviewed; personal ISA access not confirmed'
+                           if profile else
+                           'No reviewed instrument profile for this account'),
     })
 
 
