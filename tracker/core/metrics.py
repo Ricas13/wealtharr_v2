@@ -66,6 +66,8 @@ class MetricAudit:
     net_external_flow_gbp: Decimal
     unit_nav: Decimal | None
     observation_ids: tuple[str, ...]
+    units_outstanding: Decimal | None = None
+    units_issued: Decimal = ZERO
 
 
 @dataclass(frozen=True)
@@ -208,8 +210,10 @@ def _exact_unit_nav(period: PortfolioPeriod, flows):
 
     audit = [MetricAudit("opening", period.opening.as_of,
                          period.opening.value_gbp, ZERO, ONE,
-                         period.opening.observation_ids)]
+                         period.opening.observation_ids,
+                         units_outstanding=period.opening.value_gbp)]
     nav = ONE
+    units = period.opening.value_gbp
     prior = period.opening.value_gbp
     with localcontext() as ctx:
         ctx.prec = 40
@@ -220,25 +224,32 @@ def _exact_unit_nav(period: PortfolioPeriod, flows):
                 nav *= item.value_gbp / prior
                 prior = item.value_gbp
                 audit.append(MetricAudit("daily", day, prior, ZERO, +nav,
-                                         item.observation_ids))
+                                         item.observation_ids,
+                                         units_outstanding=+units))
             else:
                 if prior <= ZERO:
                     return None, (), "UNDEFINED_UNIT_NAV"
                 nav *= item.before.value_gbp / prior
                 audit.append(MetricAudit("pre_flow:" + item.flow.event_id,
                     day, item.before.value_gbp, ZERO, +nav,
-                    item.before.observation_ids))
-                # Funds create/redeem units at this same unchanged NAV.
+                    item.before.observation_ids, units_outstanding=+units))
+                # Funds create/redeem units at the same valuation, rather than
+                # incorrectly counting contributions as investment returns.
+                delta_units = item.flow.amount_gbp / nav
+                units += delta_units
+                if units <= ZERO:
+                    return None, (), "UNDEFINED_UNIT_NAV"
                 prior = item.after.value_gbp
                 audit.append(MetricAudit("post_flow:" + item.flow.event_id,
                     day, prior, item.flow.amount_gbp, +nav,
-                    item.after.observation_ids))
+                    item.after.observation_ids,
+                    units_outstanding=+units, units_issued=+delta_units))
         if prior <= ZERO:
             return None, (), "UNDEFINED_UNIT_NAV"
         nav *= period.closing.value_gbp / prior
         audit.append(MetricAudit("closing", period.closing.as_of,
             period.closing.value_gbp, ZERO, +nav,
-            period.closing.observation_ids))
+            period.closing.observation_ids, units_outstanding=+units))
         return +nav, tuple(audit), ""
 
 
