@@ -58,6 +58,9 @@
       {% elif next_step.state == 'trade' and actionable %}
         <p class="ck-action-text">{{ next_step.title }}</p>
         <p>{{ next_step.explanation }}</p>
+        {% if has_partial_fills %}
+          <p class="ck-muted">Partial status: previously recorded transactions stay in the ledger. Do not record them a second time.</p>
+        {% else %}
         <ol class="ck-orders">
           {% for action in actions %}
           <li>
@@ -67,6 +70,7 @@
           {% endfor %}
         </ol>
         <p class="ck-muted">This is a dated recommendation, not a broker quote or order. Confirm actual fills, prices and fees.</p>
+        {% endif %}
         <a class="btn btn-primary ck-primary" href="{% url 'cockpit_rebalance' signal.pk %}">Review and record what I did</a>
       {% else %}
         <p class="ck-action-text">{{ next_step.title }}</p>
