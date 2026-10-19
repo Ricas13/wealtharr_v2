@@ -33,6 +33,22 @@ class OwnerAuthenticatorTests(TestCase):
         self.assertRedirects(res, reverse("totp_setup"))
         return secret
 
+    def test_known_rfc6238_sha1_six_digit_vector(self):
+        # RFC 6238 20-byte SHA1 seed, 8-digit value 94287082 at t=59.
+        # Its configured six-digit truncation must equal 287082.
+        secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+        self.assertEqual(current_code(secret, at_time=59), "287082")
+        self.assertEqual(matching_step(secret, "287082", at_time=59), 1)
+
+    def test_unverified_private_post_never_reaches_accounting(self):
+        secret = self.enroll()
+        self.client.logout()
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("cockpit_deposit"), {
+            "amount": "100.00", "occurred_on": "2026-10-19"})
+        self.assertRedirects(response, reverse("totp_challenge"))
+        self.assertTrue(OwnerTOTP.objects.filter(owner=self.user).exists())
+
     def test_unenrolled_owners_remain_password_only(self):
         self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 200)
         self.client.force_login(self.other)
