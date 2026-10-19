@@ -48,7 +48,7 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [x] Strict GBP/GBX price-unit/source/date validation and pinned instrument/strategy identity. An optional independent **Stooq USD TQQQ/SPY reference** adapter requires actual overlap with an independently identified Yahoo observation; never substitutes UK execution prices and never silently persists fallback data. The adapter is a new-source interface, not a guarantee that any independent feed is available.
 - [x] Six intentionally empty case rows in `tracker/strategies/nine_sig/fixtures/workbook_parity.csv`; separate quote and external-flow fixtures; automated test compares genuine case data when filled, otherwise explicitly skips only the owner-parity test. Synthetic engine/provider tests added but new CI result not asserted.
 - [x] All five required owner-supplied input types, including exact worksheet columns, dates and fixture formats, live in `docs/OWNER_TODO.md` **once**; not blockers for the next build section.
-- [ ] Section **D** next. No automatic broker trades, no broker integration, no extra cockpit-hardening work in this milestone.
+- [x] Section **D** universal metrics delivered separately from Section C. No automatic broker trades, no broker integration or extra cockpit-hardening work in this milestone.
 
 ## Section C follow-through — price quality, audit and CI (2026-10-19)
 
@@ -69,7 +69,7 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 4. **The eventual immutable `PriceDecision`/audit model and generic core orchestrator** described in `docs/architecture.md` have not been migrated into the current DB schema. Current YahooSync hold is an interim persisted safety signal; no manual hold-clear UI exists yet. Do not mark such plumbing complete.
 5. The TQQQ 100%-up comparison is a provisional calendar-close warning, **not** the owner's executed rebalance reference; never issue GBP trade orders from it.
 
-**Next scope:** Section **D only** when the owner says "next"; retain this C evidence and do not redo it. Refresh live PR HEAD before editing because another continuation may add changes on the same branch.
+**Next scope:** Section **E only** when the owner says "next"; retain this C evidence and do not redo it. Refresh live PR HEAD before editing because another continuation may add changes on the same branch.
 
 ## Section D delivery — 2026-10-19
 
@@ -81,6 +81,24 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [ ] Exact portfolio TWR across real owner contributions is **not retroactively computable** from legacy date-only `StrategyValueSnapshot` totals: they do not contain verified pre/post external-flow values. The **calculation engine is ready**; future workflows can supply evidenced boundaries rather than hallucinating them.
 - **CI evidence:** PR #11 head run #397 was *in progress* at the single status observation during Section D. No CI success is claimed and this is not a build blocker.
 - [ ] Next section: **E**, strategy-agnostic Today / History / Ledger / Strategy-information presentation only.
+
+## Section D delivery — universal accounting and metrics (2026-10-19)
+
+- [x] **Pure and strategy-agnostic:** `tracker/core/metrics.py` now exposes typed verified valuation, external funding flow, before/after cashflow boundary, portfolio period, allocation-role drift and auditable metric results. **No DB schema change, broker access, or view rewrite in Section D.**
+- [x] **Financial definitions:** `cash gain = closing value - opening value - signed external flows`; inception gain is `closing value - total net contributed`. XIRR is dated money-weighted annual return; exact TWR removes funding distortion using approved valuations bracketing every external movement, then annualises and derives **sampled** max unit-NAV drawdown. Arbitrary strategy roles (and cash as an explicit role where relevant) have target-vs-actual drift.
+- [x] **Separate descriptive ratio:** `gain_vs_net_contributions_pct` is defined only when net invested capital is positive. It must be labelled **gain divided by net contributions, not an investment return**. Single-funding simple return is unavailable if later deposits/withdrawals exist.
+- [x] **Refuse rather than invent:** missing/invalid observations, non-GBP values, malformed flow objects/dates, conflicting source sequence IDs, gaps in same-price pre/post-flow evidence, ambiguous closing-day deposit ordering and unsupported allocation roles do not produce fake TWR. A verified full loss reports -100% TWR/annualised TWR and 100% sampled drawdown. XIRR may be undefined.
+- [x] **Excel-compatible XIRR day count:** `tracker/performance.py` uses ACT/365, not 365.25, for XIRR; annualised TWR uses a separately documented ACT/365.25 calendar-average basis. See `docs/metrics.md`.
+- [x] **Tests:** `tracker/test_core_metrics.py` and `tracker/test_core_metrics_integrity.py` include no data, initial-only contribution, irregular deposits and withdrawals, exact unit NAV, multiple same-day events, incomplete funding boundaries, currency and evidence failures, loss, allocation drift and date/basis precision. Fixture numbers are **synthetic unit cases**, not an investment backtest.
+- [x] **CI:** [GitHub Actions run #397](https://github.com/Ricas13/wealtharr_v2/actions/runs/39291192519) succeeded on commit `7f77830150f7c20c08af2f29d0b791899db093c3` with all current source/test changes through that SHA. Later documentation commits run CI separately; check latest live HEAD before claiming full-branch verification.
+
+**Known boundary:** `VerifiedValuation(verified=True, observation_ids=...)` is a trusted *input contract*, not automatic proof that a live Trading 212 portfolio was reconciled. The current cockpit still has legacy presentation paths and the pure universal results are **not yet wired into the redesigned Today/History pages**; that is Section E. Sparse verified marks support only an *observed* max drawdown, not an assertion of the absolute intraday worst loss. Original broker/spreadsheet evidence stays recorded **once** in `docs/OWNER_TODO.md`, not a development blocker.
+
+**Next section: E ONLY**, when owner says "next": build generic Today, History, Ledger and Strategy info presentation, mobile-first chart and reusable partials; use the `EvaluationResult` and Section D metric types. Do not add new 9Sig calculations or repeat Section C guards. Update this RESUME handoff for Section F once E is done.
+
+### Copy to NEW ChatGPT chat (Section E)
+
+> Continue `Ricas13/wealtharr_v2` on existing PR #11 and `feature/owner-9sig-cockpit-resumable` branch. Read `docs/RESUME.md`, `CLAUDE.md`, `docs/architecture.md`, and `docs/metrics.md`. Sections A–D are committed. Implement **ONLY Section E** of the lettered redesign: core strategy-independent Today, History, Ledger and Strategy info views/templates/responsive accessible dark UI/chart. Consume the typed strategy evaluation and Section D metrics, never invent historical returns or bypass stale/missing-data refusal. Preserve previous financial safeguards, reuse existing Django/vanilla JS/WhiteNoise architecture, no broker integration/trades, no alternate branch. Add appropriate tests and commit to PR #11; update `docs/RESUME.md` with honest completion status and exact next-chat instructions, then stop and wait for "next".
 
 ## State / checkpoints
 
