@@ -7,20 +7,20 @@ Base: `main` (at start of work: `628a22f2b08930c36549bcaf4c61e4584dee1949`)
 
 ## IMPORTANT: LETTERED PRODUCT REDESIGN — resume checkpoint 2026-10-19
 
-**Current milestone: Sections A–E implemented as scoped branch deliverables. The next section is F only when the owner says “next”.** Section E introduced strategy-neutral owner-page presenters, read-only released strategy explanations and simplified Today / History / Ledger presentation on this branch. Only the already-supported 9Sig strategy is selectable today; Section F handles the new one-screen onboarding and fixed product mapping.
+**Current milestone: Sections A–F implemented as scoped branch deliverables. The next section is G only when the owner says “next”.** Section F implemented single-screen UK Trading 212 Stocks ISA enrolment, real-only opening cash/contributions, evidence-labelled per-portfolio pinned strategy/instrument versions, and an explicit conservative Trading 212 preview/import journey. No broker connection, invented funding, or automatic orders.
 
 - **Same active branch:** `feature/owner-9sig-cockpit-resumable` (PR **#11**). No competing branch, no restart. Before edits, fetch current PR HEAD and check concurrent commits.
 - **Section B artefacts:** `docs/instrument-research.md`, `tracker/instrument_mapping.py` (immutable `CURATED_ISA_ROLE_MAP`, `MAPPING_VERSION=2026-10-19.1`, reviewed issuer/Invest evidence with explicit pending owner ISA permission and Yahoo feed flags), `tracker/test_instrument_catalogue.py`, updated `CLAUDE.md`, `docs/architecture.md` and superseded old broker-API proposal.
 - **Reviewed candidates:** `growth` = WisdomTree **LQQ3.L**, **IE00BLRPRL42**, LSE raw **GBX** (divide 100 to GBP); `safe` = iShares **ERNS.L**, **IE00BCRY6441**, LSE raw **GBP**. Both issuers show ISA eligibility and Trading 212 lists them in Invest. **The user's specific Stocks ISA buying permission and live Yahoo quote units were NOT independently confirmed.** No assertion of full ISA/broker approval is permitted.
 - **Alternatives docs-only, NOT auto substitutions:** Leverage Shares `3QQQ` (**XS2472197065**) separate product; WisdomTree USD `QQQ3.L` same ISIN/different line; accumulating iShares `ERAN` (**IE000V5JWFM0**, 2026-only history); Amundi GBP-hedged `CSH2` (**LU1230136894**, broker availability unconfirmed).
-- **Compatibility:** old `resolve_instruments` and GIA legacy profile remain for existing implementation/tests. New `resolve_curated_isa_role()` **only accepts UK / TRADING212 / ISA**, exact role and mapping version. Section F removes old GIA onboarding. No strategy versioned-instance migration has been performed yet; that remains forthcoming architecture implementation.
+- **Compatibility:** the old `resolve_instruments` GIA lookup stays for reading previously recorded accounts; however the legacy `/app/9sig/start/` and generic new-strategy entrypoints now redirect to canonical ISA-only `/cockpit/start/`. Additive migration `0010_enrolled_instrument_manifest` records each **new** instance's released strategy version, mapping version and exact hash-pinned issuer/ISIN/line/GBX/GBP evidence snapshot. Legacy instances retain empty pinning fields; full historical `StrategyRevision` lifecycle is future scope.
 - **Strict product rule:** absolutely NO broker link/API (including read-only), no automated trading, no runtime instrument substitution, no editable strategies, no fabricated prices/fills. `docs/TRADING212_READONLY_API.md` is historical/superseded.
 - **Section B validations:** evidence links reviewed 2026-10-19; regression tests added but **GitHub CI was still queued** on latest research commits at last observation. Not a claim of green tests or personal eligibility. Latest previously observed queued runs: #289/#290 at commit `e4ae963`, 2026-10-19 16:25 UTC; check actual latest on next turn.
 - **Financial holds:** last completed-quarter historical prices and real ledger replay only, correct GBP/GBX scaling, exact UK instruments ≠ TQQQ/AGG, 30 Down/SPY and provisional TQQQ spike require worksheet parity, no confirmed reset baseline without real post-fill evidence. No live production deployment assumed.
 
 ### Paste this in a NEW ChatGPT chat to resume
 
-> Continue Wealtharr v2 from **PR #11**, the existing `feature/owner-9sig-cockpit-resumable` branch. **Read `docs/RESUME.md` first**, then `docs/architecture.md`, `tracker/core/presentation.py`, `tracker/cockpit.py` and the current templates. Sections A–E are implemented in this branch; the latest is Section E's owner-only, source-grounded Today / History / Ledger / Strategy guide, with a fixed-version read-only description, clear one-next-action states, recorded valuation explanations, historical review evidence, and cash-ledger filtering/export. Implement **ONLY Section F**: one-screen onboarding, actual owner contributions and conservative Trading 212 CSV import UX, preserving prior import integrity and using the exact UK ISA role catalogue without any broker API. Do not revisit or re-harden prior safeguards or fake fills/prices/eligibility. Work on this **same PR and branch**, commit the Section F change, update the handoff at the end, and stop until “next”.
+> Continue Wealtharr v2 on the existing **PR #11** and `feature/owner-9sig-cockpit-resumable` branch. Read `docs/RESUME.md` **first**, then `docs/architecture.md`, `tracker/cockpit.py`, `tracker/models.py`, `tracker/strategies/registry.py` and Section F files. **Sections A–F are implemented on this branch. Do ONLY Section G:** safe owner-confirmed single-transaction fill capture, partial and complete execution handling, and immutable *actual* post-fill baseline / reset semantics. Preserve Django/vanilla JS, exact pinned UK ISA lines, historical source dates and ledger safety; never connect a broker or place a trade. Do not revisit completed cockpit/import/notification hardening or redo Sections A–F. Owner evidence is already itemized once in `docs/OWNER_TODO.md` and does not stop building. Commit to the **same PR and branch**, update this handoff at the end, then stop until “next”.
 ## Objective
 
 Make Wealtharr a strategy-agnostic **tracking and notification** platform for a private owner, with fixed 9Sig as its first (and only currently implemented) strategy. Today shows performance and one next action; the owner manually makes and confirms any broker trades. The product never places orders, never connects to brokers (including read-only APIs), and never invents prices, trades or backtests. Preserve the append-only ledger, immutable confirmed reset baselines and financial refusal rules throughout the refactor.
@@ -32,12 +32,12 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - [x] **C** pure pinned `tracker/strategies/nine_sig/v1.py` engine (v1.0.0), immutable inputs/results and audit trace, irregular dated cashflows, 30 Down/100%-up warning, quote refusal; independent, USD-reference-only Stooq fallback in `tracker/core/prices.py`, plus synthetic unit coverage and deliberately empty six-quarter owner parity fixtures.
 - [x] **D** pure `tracker/core/metrics.py` v1 universal portfolio returns, verified GBP endpoints, signed irregular external flows, pre/post cash-flow unitisation, exact-period cash gain and XIRR, time-weighted return, annualisation, sampled unit NAV drawdown, role drift and CSV-ready metric audit; Django owner cockpit money-weighted adapter and focused tests.
 - [x] **E** strategy-neutral read-only strategy registry and presentation models; redesigned Today / History / Ledger / Strategy pages, one-next-action framing, provenance/disclosures, source-grounded metrics, real transactions with ledger filtering/export, responsive styling and focused owner-isolated UI tests.
-- [ ] **F** one-screen onboarding, contributions and conservative T212 import.
+- [x] **F** new one-screen UK ISA-only setup, recorded actual starting GBP cash only, per-owner version/issuer identity snapshot in migration 0010, £500 optional monthly reminder target, true-date contribution shortcut in Ledger, conservative T212 CSV three-stage preview and confirmation, legacy GIA entrypoint redirect, and focused tests.
 - [ ] **G** safe single-transaction owner-confirmed fills and actual-baseline handling.
 - [ ] **H** owner destination/alert matrix, idempotent digest, scheduler diagnostics.
 - [ ] **I** secure Traefik deployment, optional TOTP, backups/restore.
 - [ ] **J** CI/Playwright and incremental ship plan.
-- **Instruction:** user wants **one lettered section per turn**. Stop after E now; proceed with F **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
+- **Instruction:** user wants **one lettered section per turn**. Stop after F now; proceed with G **only** when user says "next". Preserve branch, commit history, PR and safety until tested replacements exist.
 - **Architecture decision:** no broker/API integration of any kind, no editable preset/ticker/rule UI, no paper account, no billing or public signup. Fixed code-defined strategy versions; role-based evidence-backed exact lines pinned at enrolment. See `docs/architecture.md` and `CLAUDE.md`.
 - **Outstanding verification remains outstanding:** workbook parity, ISA/broker eligibility, real CSV, CI/migrations/browser checks, and deployment. Section A did not test or deploy runtime changes.
 
@@ -96,6 +96,17 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 - **Section E honesty:** No live Trading 212 positions or workbook values have been verified. Responsive CSS includes 360px rules but an interactive mobile/keyboard/Playwright visual check has **not** been performed. A self-hosted Inter font asset is not included yet; avoid claiming this requirement complete. Existing `_strategy()` is still deliberately 9Sig-specific until Section F's new setup and registry integration. Exact portfolio TWR requires documented flow-aligned valuations, not historical chart points.
 - [ ] Next section: **F**, one-screen real ISA onboarding, recorded contributions and conservative Trading 212 import experience only.
 
+## Section F delivery — 2026-10-19
+
+- [x] One-screen `OneScreenSetupForm` and `templates/onboarding.html` now accept only the fixed UK / Trading 212 / Stocks & Shares ISA product profile and exact curated issuer roles. User inputs are starting fresh vs existing investments, **optional real cash already deposited and actual deposit date**, planned monthly reminder amount (£500 initially, never a fictional deposit), plus optional alert destination.
+- [x] `tracker/instrument_mapping.enrolment_manifest()` pins a deterministic SHA-256 manifest including fixed role/ISIN/issuer, Yahoo and broker symbols, GBX→GBP unit factor, strategy/account identity and explicit *unverified* personal Stocks ISA/market-unit flags. Additive `tracker/migrations/0010_enrolled_instrument_manifest.py` stores `strategy_version`, `mapping_version` and `resolved_instruments` on newly enrolled `StrategyInstance`. Existing rows default to empty pinning fields; **no automatic historical migration or substitution**.
+- [x] New enrolment records an opening `DEPOSIT` only when the owner **explicitly states the actual GBP amount and real past date**. “Already invested” begins with no fabricated positions or cash and routes to the conservative import preview. Legacy `start_real_9sig` and generic `new_strategy` creation URLs redirect to this canonical setup, preventing another GIA-capable enrolment path; existing GIA records remain readable (no destructive changes).
+- [x] Existing Trading 212 CSV ingestion remains exact-file-session-bound, idempotent and all-or-nothing. Reworked `csv_cockpit.html` into three clear phases: original export guidance, counts/errors/first-100 candidate ledger entries with no writes, then deliberate reselect-same-file and server-side complete revalidation. Unsupported CSV rows still refuse import; the UI does not claim broker-balance reconciliation.
+- [x] Ledger has a shortcut to record a **dated actual deposit** through the existing validated transaction service and safely return to Ledger, with an explicit warning that planned contributions are not cash. `tracker/test_owner_enrolment_f.py` covers non-fictitious funding, unsupported profile injection, immutable mapping fields, old/new route semantics, contribution dates, and file-preview/no-write/import. `tracker/test_real_9sig_setup.py` now tests the legacy redirection instead of the retired form.
+- [ ] Owner-specific real CSV reconciliation remains requested only in `docs/OWNER_TODO.md`; **not** a Section G development blocker. No trading broker API, price invention, new reset baseline, or production deployment was undertaken here.
+- **CI status:** run **#507** was `in_progress` at the single observed Section F branch head; later Section F commits were not checked. Do not report a green latest HEAD without actual evidence.
+- [ ] Next scope: **Section G only** (single-transaction manual fills, partial executions and verified actual reset baselines). Do not rebuild imports, performance metrics or redesign.
+
 ## State / checkpoints
 
 - [x] Dedicated new branch created; `main` deliberately untouched.
@@ -133,10 +144,10 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## First commands in a NEW CHAT
 
-1. Read this handoff and `docs/architecture.md` first; inspect latest PR #11 files before changing anything because the branch has been edited concurrently.
-2. Implement **Section F only**: one-screen UK ISA/Trading 212 onboarding, real recorded contributions and cautious existing CSV preview/import UI. No broker connection or silent instrument substitution.
-3. All external owner evidence is already requested once in `docs/OWNER_TODO.md`; it does not block development.
-4. Keep existing commits, then update this document once at the end and stop for "next".
+1. Read this file first and inspect the latest PR #11 branch head to avoid overwriting concurrent work.
+2. Follow **Section G only**: trustworthy recorded manual fills and verified post-fill baseline/reset handling; source/permission and execution semantics never bypassed.
+3. Preserve the new Section F owner ISA-only enrolment, deterministic mapping snapshot, existing import preview, ledger and unitised metrics. Owner evidence is requested in `docs/OWNER_TODO.md`, not here.
+4. Commit to this SAME branch/PR, update the handoff once at the end, then await "next".
 
 ## Critical financial semantics
 
@@ -149,4 +160,4 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 
 ## User prompt for a new chat
 
-**Use the Section F-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
+**Use the Section G-only pasteable prompt at the top of this file.** Keep the user's letter-by-letter stop condition. Later progress may update the next section; never infer sections complete from queued CI.
