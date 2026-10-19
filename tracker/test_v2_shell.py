@@ -11,9 +11,9 @@ class NewShellTests(TestCase):
         User = get_user_model()
         self.owner = User.objects.create_user("v2owner", password="valid-test-password-12345")
         self.other = User.objects.create_user("v2other", password="valid-test-password-12345")
-        self.preset = StrategyPreset.objects.create(
-            slug="nasdaq-quarterly-target", name="9Sig", summary="Fixed rules",
-            risk="HIGH", active=True,
+        self.preset, _ = StrategyPreset.objects.get_or_create(
+            slug="nasdaq-quarterly-target",
+            defaults={"name": "9Sig", "summary": "Fixed rules", "risk": "HIGH", "active": True},
         )
         a = Account.objects.create(
             owner=self.owner, name="My ISA", kind="ISA", broker="TRADING212"

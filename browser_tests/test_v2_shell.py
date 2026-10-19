@@ -107,7 +107,7 @@ class V2ShellBrowserTests(BrowserHarness):
 
                 if width == 390:
                     self.visit("v2_overview")
-                    menu = self.page.get_by_role("button", name="Open navigation")
+                    menu = self.page.locator("#v2-mobile-nav")
                     menu.click()
                     self.assertEqual(menu.get_attribute("aria-expanded"), "true")
                     self.page.get_by_role("navigation", name="Primary navigation").get_by_role(
@@ -122,7 +122,7 @@ class V2ShellBrowserTests(BrowserHarness):
                     self.assertEqual(menu.get_attribute("aria-expanded"), "false")
                 else:
                     self.visit("v2_overview")
-                    collapse = self.page.get_by_role("button", name="Collapse sidebar")
+                    collapse = self.page.locator("#v2-collapse")
                     collapse.click()
                     self.assertEqual(collapse.get_attribute("aria-pressed"), "true")
                     self.page.reload()
