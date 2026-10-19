@@ -1,5 +1,7 @@
 # Optional Trading 212 read-only integration (decision note)
 
+> **SUPERSEDED — 2026-10-19:** Wealtharr v2's current product definition expressly forbids **any broker connection**, including read-only APIs. This is historical decision context only and **must not be implemented**. Trading 212 data arrives solely through user-uploaded CSV and manually confirmed events. See `docs/architecture.md`, `docs/instrument-research.md` and `CLAUDE.md`.
+
 **Recommendation:** ship the CSV importer first. Add a broker sync only after a real export has validated the instrument / fee / FX mapping. Do not request trading permissions, and never send broker orders from Wealtharr.
 
 ## Why add it later?
