@@ -108,7 +108,7 @@ def _decimal(value):
 
 def _approved(point):
     return (isinstance(point, VerifiedValuation) and
-            isinstance(point.as_of, date) and _decimal(point.value_gbp) and
+            type(point.as_of) is date and _decimal(point.value_gbp) and
             point.value_gbp >= ZERO and point.currency == "GBP" and
             point.verified is True and
             isinstance(point.observation_ids, tuple) and
@@ -125,8 +125,8 @@ def _valid_flows(flows, start, end, *, include_start=False):
     for flow in flows:
         if (not isinstance(flow, ExternalFlow) or
                 not isinstance(flow.event_id, str) or not flow.event_id.strip() or
-                not isinstance(flow.occurred_on, date) or
-                not isinstance(flow.sequence, int) or flow.sequence < 0 or
+                type(flow.occurred_on) is not date or
+                type(flow.sequence) is not int or flow.sequence < 0 or
                 not _decimal(flow.amount_gbp) or flow.amount_gbp == ZERO or
                 not (start <= flow.occurred_on if include_start else start < flow.occurred_on) or
                 flow.occurred_on > end or
@@ -164,8 +164,14 @@ def _exact_unit_nav(period: PortfolioPeriod, flows):
     ONLY the flow. No same-date daily observation is accepted: daily data do
     not identify its position relative to an intraday funding event.
     """
+    if not isinstance(period.boundaries, (list, tuple)) or not isinstance(
+            period.observations, (list, tuple)):
+        return None, (), "INVALID_RETURN_OBSERVATIONS"
     if len(period.boundaries) != len(flows):
         return None, (), "MISSING_FLOW_BOUNDARIES"
+    if any(not isinstance(b, FlowBoundary) or
+           not isinstance(b.flow, ExternalFlow) for b in period.boundaries):
+        return None, (), "FLOW_BOUNDARY_MISMATCH"
     by_id = {b.flow.event_id: b for b in period.boundaries}
     if len(by_id) != len(flows) or set(by_id) != {f.event_id for f in flows}:
         return None, (), "FLOW_BOUNDARY_MISMATCH"
@@ -191,6 +197,14 @@ def _exact_unit_nav(period: PortfolioPeriod, flows):
             return None, (), "FLOW_BOUNDARY_NOT_EXACT"
         events.append((flow.occurred_on, flow.sequence, "flow", boundary))
     events.sort(key=lambda event: (event[0], event[1]))
+    # Closing-day flow order is only provable when the end snapshot uses the
+    # very same price evidence as the final post-flow valuation. Otherwise
+    # date-only records cannot establish that the closing price came later.
+    closing_day_flows = [b for _, _, kind, b in events
+                         if kind == "flow" and b.flow.occurred_on == period.closing.as_of]
+    if closing_day_flows and (
+            period.closing.observation_ids != closing_day_flows[-1].after.observation_ids):
+        return None, (), "AMBIGUOUS_CLOSING_DAY_FLOW_ORDER"
 
     audit = [MetricAudit("opening", period.opening.as_of,
                          period.opening.value_gbp, ZERO, ONE,
@@ -235,15 +249,17 @@ def evaluate_period(period: PortfolioPeriod) -> PeriodMetrics:
     endpoint values. Exact TWR, annualized TWR and sampled unit-NAV drawdown
     additionally require every pre/post flow boundary and ordered marks.
     """
+    if not isinstance(period, PortfolioPeriod):
+        return _result("INVALID_PORTFOLIO_PERIOD")
     if (not _approved(period.opening) or not _approved(period.closing) or
             period.opening.value_gbp <= ZERO or
             period.opening.as_of >= period.closing.as_of):
         return _result("UNVERIFIED_VALUATION_ENDPOINTS")
     open_value = period.opening.value_gbp
     close_value = period.closing.value_gbp
-    flows = sorted(period.flows, key=lambda f: (f.occurred_on, f.sequence))
-    if not _valid_flows(flows, period.opening.as_of, period.closing.as_of):
+    if not _valid_flows(period.flows, period.opening.as_of, period.closing.as_of):
         return _result("INVALID_EXTERNAL_FLOW_LEDGER")
+    flows = sorted(period.flows, key=lambda f: (f.occurred_on, f.sequence))
     signed = sum((flow.amount_gbp for flow in flows), ZERO)
     gain = close_value - open_value - signed
     investor_flows = [(period.opening.as_of, -open_value)]
@@ -254,8 +270,9 @@ def evaluate_period(period: PortfolioPeriod) -> PeriodMetrics:
         return _result(error, open_value, close_value, signed, gain, rate)
     cumulative = unit_nav - ONE
     return PeriodMetrics("ok", "", open_value, close_value, signed, gain, rate,
-        cumulative, annualized_return(cumulative, period.opening.as_of,
-                                      period.closing.as_of),
+        cumulative, (-ONE if cumulative == -ONE else
+                     annualized_return(cumulative, period.opening.as_of,
+                                       period.closing.as_of)),
         _drawdown_from_nav([p.unit_nav for p in audit]), audit)
 
 
@@ -270,7 +287,12 @@ def evaluate_inception(flows: tuple[ExternalFlow, ...],
     if not _approved(closing) or not flows:
         return InceptionMetrics("cannot_compute", "UNVERIFIED_END_OR_NO_FUNDING",
                                 None, None, None, None)
-    opening_day = min((f.occurred_on for f in flows), default=closing.as_of)
+    if not isinstance(flows, (tuple, list)) or any(
+            not isinstance(f, ExternalFlow) or
+            type(f.occurred_on) is not date for f in flows):
+        return InceptionMetrics("cannot_compute", "INVALID_EXTERNAL_FLOW_LEDGER",
+                                None, None, None, None)
+    opening_day = min(f.occurred_on for f in flows)
     if not _valid_flows(flows, opening_day, closing.as_of, include_start=True):
         return InceptionMetrics("cannot_compute", "INVALID_EXTERNAL_FLOW_LEDGER",
                                 None, None, None, None)
