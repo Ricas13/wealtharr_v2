@@ -31,17 +31,26 @@ def retry_due_deliveries(*, as_of=None):
     attempted = 0
     sent = 0
     for row in rows:
-        category = category_for_event_key(row.event_key)
+        category = row.category or category_for_event_key(row.event_key)
+        pref, _ = NotificationPreference.objects.get_or_create(owner=row.owner)
         if category:
-            pref, _ = NotificationPreference.objects.get_or_create(owner=row.owner)
-            if row.channel not in selected_channels(pref, category):
-                # Muting a category also mutes its existing pending deliveries.
-                continue
+            try:
+                permitted = row.channel in selected_channels(pref, category)
+            except ValueError:
+                permitted = False
+        else:
+            permitted = bool(getattr(pref, row.channel + "_enabled", False))
+        if not permitted:
+            # Audit remains, but opt-out permanently retires the old dated
+            # notice rather than delivering it after preferences change again.
+            NotificationDelivery.objects.filter(pk=row.pk, status=row.status).update(
+                status="CANCELLED", next_retry_at=None, error="Owner opt-out")
+            continue
         if not row.subject or not row.message:
             continue
         outcome = dispatch(
             row.owner, row.event_key, row.subject, row.message,
-            channels=(row.channel,))
+            channels=(row.channel,), category=category or "")
         if outcome.get(row.channel) in ("sent", "failed", "retrying"):
             attempted += 1
         if outcome.get(row.channel) == "sent":
