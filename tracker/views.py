@@ -158,6 +158,16 @@ def dashboard(request):
     snapshots = WealthSnapshot.objects.filter(owner=request.user).order_by("as_of")
     chart = [{"date": s.as_of.isoformat(), "value": float(s.total_value),
               "contributed": float(s.net_contributed)} for s in snapshots]
+    # A simple gain-to-net-contributions ratio is not a time-weighted return.
+    # Withdrawals make even that basic ratio misleading, so omit it.
+    withdrawals = LedgerEntry.objects.filter(
+        strategy__owner=request.user, kind=LedgerEntry.WITHDRAW,
+    ).exclude(strategy__account__kind="PAPER").exists()
+    data["gain_pct"] = (
+        (data["gain"] / data["net_contributed"] * 100)
+        if (data["gain"] is not None and data["net_contributed"] > 0 and not withdrawals)
+        else None
+    )
     data.update(chart=chart, paper_trial=StrategyInstance.objects.filter(owner=request.user,
                 account__kind="PAPER", account__name=PAPER_NAME).first(),
                 accounts=Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies")),
@@ -259,8 +269,27 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
                     for snap in strategy.value_snapshots.order_by("as_of")]
     from .instrument_mapping import for_strategy
     instrument_profile = for_strategy(strategy)
+    tab = request.GET.get("tab", "overview")
+    if tab not in ("overview", "signals", "ledger", "setup"):
+        tab = "overview"
+    withdrawals = strategy.ledger.filter(kind=LedgerEntry.WITHDRAW).exists()
+    result_pct = (
+        (report["profit"] / report["net_contributed"] * 100)
+        if (report["profit"] is not None and report["net_contributed"] > 0 and not withdrawals)
+        else None
+    )
+    equity_qty = report["positions"].get(strategy.equity_symbol, 0)
+    equity_mark = report["marks"].get(strategy.equity_symbol)
+    equity_weight = (
+        (equity_qty * equity_mark.price / report["value"] * 100)
+        if (equity_qty > 0 and equity_mark is not None and report["value"] is not None
+            and report["value"] > 0 and not report["missing"]) else None
+    )
+    pending_signals = strategy.signals.filter(acknowledged_at__isnull=True).count()
     return render(request, "strategy.html", {
         "strategy": strategy, "report": report, "holdings": holdings,
+        "active_tab": tab, "result_pct": result_pct, "equity_weight": equity_weight,
+        "pending_signals": pending_signals,
         "instrument_profile": instrument_profile,
         "chart_points": chart_points,
         "monitoring_status": _monitoring_status(strategy),
