@@ -180,6 +180,11 @@ def dispatch(owner, key, subject, message, channels=None, *, category=""):
                 if record.status == "SENT":
                     outcomes[channel] = "sent"
                     continue
+                if record.status == "CANCELLED":
+                    # Owner explicitly opted out after the notice was queued.
+                    # Re-enabling a category never resurrects stale advice.
+                    outcomes[channel] = "cancelled"
+                    continue
                 if record.attempts >= 3:
                     outcomes[channel] = "failed"
                     continue
