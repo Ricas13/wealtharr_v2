@@ -129,6 +129,9 @@ class OwnerChromiumJourneys(StaticLiveServerTestCase):
         self.page.keyboard.press("Tab")
         self.assertIn("Skip to main content",
                       self.page.evaluate("document.activeElement.textContent"))
+        # Activate the skip link before using pointer navigation; while it
+        # owns focus it intentionally overlays the mobile header controls.
+        self.page.keyboard.press("Enter")
         self.page.get_by_role("button", name="Open navigation").click()
         self.page.get_by_role("navigation", name="Primary").get_by_role(
             "link", name="Ledger").click()
