@@ -48,6 +48,10 @@ def _next_end(day):
 
 def _price_status(strategy, report):
     today = timezone.localdate()
+    if not strategy.market_data_enabled or strategy.account.currency != 'GBP':
+        return False, '9Sig monitoring must be enabled for a GBP account before trading.', []
+    if any(q < ZERO for q in report['positions'].values()):
+        return False, 'A holding is negative. Reconcile the ledger before trading.', []
     if report['cash'] < ZERO:
         return False, 'Cash is negative. Reconcile missing deposits, charges, or trades.', []
     held = [s for s, q in report['positions'].items() if q > ZERO]
@@ -132,13 +136,14 @@ def _performance(strategy, summary):
     held_marks = [summary['marks'].get(sym) for sym, qty in summary['positions'].items() if qty > ZERO]
     held_marks = [m for m in held_marks if m is not None]
     end = min((m.as_of for m in held_marks), default=timezone.localdate())
-    # End valuation uses the EXACT date of latest verified marks (no future flows).
-    # Else XIRR remains unavailable rather than mislabel today's holdings as an old close.
+    # Exact money-weighted returns require all held sleeve marks to share one
+    # valuation date. A one-day mismatch is fine for an advisory freshness
+    # warning, NOT for claiming an exact dated liquidation value.
     valid_end = bool(held_marks) and len(held_marks) == sum(q > ZERO for q in summary['positions'].values()) and all(
         mark.source == 'yahoo' and MarketObservation.objects.filter(
             symbol=mark.symbol, as_of=mark.as_of, currency='GBP', price=mark.price).exists()
         for mark in held_marks) and (
-        max(m.as_of for m in held_marks) - end).days <= 1 and not strategy.ledger.filter(occurred_on__gt=end).exists()
+        max(m.as_of for m in held_marks) == end) and not strategy.ledger.filter(occurred_on__gt=end).exists()
     irr = xirr([(e.occurred_on, -e.amount if e.kind == 'DEPOSIT' else e.amount) for e in entries],
                end, summary['value']) if first and valid_end and summary['value'] is not None else None
     # Simple cumulative ratio is shown only for precisely one initial cash movement.
@@ -222,6 +227,9 @@ def guided_rebalance(request, signal_id):
     if signal.review_outcome in ('FALSE_POSITIVE', 'NOT_APPLICABLE'):
         messages.error(request, 'This signal was marked invalid and cannot be executed.')
         return redirect('cockpit_today')
+    if signal.as_of != quarter_end_before(timezone.localdate()):
+        messages.error(request, 'This quarterly signal is historical. Do not execute old instructions.')
+        return redirect('cockpit_today')
     initial = []
     for action in actions:
         q = D(action['quantity'])
@@ -240,6 +248,9 @@ def guided_rebalance(request, signal_id):
                     notice = StrategySignal.objects.select_for_update().get(pk=signal.pk, strategy=locked)
                     if RebalanceExecution.objects.filter(signal=notice).exists():
                         raise ValidationError('Already recorded. Refresh the Today page.')
+                    if (notice.as_of != quarter_end_before(timezone.localdate()) or
+                            notice.review_outcome in ('FALSE_POSITIVE', 'NOT_APPLICABLE')):
+                        raise ValidationError('This signal is no longer a valid current-quarter instruction.')
                     before = ledger_summary(locked)
                     fresh, why, marks = _price_status(locked, before)
                     if not fresh:
