@@ -33,6 +33,8 @@ def xirr(flows, end_date: date, ending_value: D):
     flows: [(date, investor_cash_flow)] with deposits NEGATIVE and withdrawals
     POSITIVE. Add positive ending liquidation value internally. Multiple sign
     changes are declined because multiple IRRs can exist.
+    Use actual elapsed days / 365, matching the Excel XIRR convention;
+    annualized TWR/CAGR uses a separately documented day-count convention.
     """
     if ending_value is None or ending_value < ZERO or not flows:
         return None
@@ -51,7 +53,7 @@ def xirr(flows, end_date: date, ending_value: D):
     origin = ordered[0][0]
     with localcontext() as ctx:
         ctx.prec = 38
-        times = [(D((day - origin).days) / D('365.25'), amt) for day, amt in ordered]
+        times = [(D((day - origin).days) / D('365'), amt) for day, amt in ordered]
         def npv(rate):
             base = ONE + rate
             return sum((amt / (base ** years) for years, amt in times), ZERO)
