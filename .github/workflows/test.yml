@@ -30,28 +30,25 @@ jobs:
       - name: Compile assets
         run: python manage.py collectstatic --noinput
       - name: Production-mode public page smoke (real manifest and HTTPS)
+        env:
+          DEBUG: "0"
+          DATABASE_URL: "postgresql://ci:ci@localhost:5432/wealtharr"
+          ALLOWED_HOSTS: "wealtharr.vpn4u.cc"
+          CSRF_TRUSTED_ORIGINS: "https://wealtharr.vpn4u.cc"
         run: |
+          # Build the manifest in a fresh process where DEBUG=0 at startup.
+          python manage.py collectstatic --noinput --clear
           python - <<'PY'
           import os
           os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wealtharr.settings")
           import django
           django.setup()
-          from django.test import Client, override_settings
-          from django.core.management import call_command
-          with override_settings(
-              DEBUG=False,
-              STORAGES={"staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}},
-              ALLOWED_HOSTS=["wealtharr.vpn4u.cc"],
-              CSRF_TRUSTED_ORIGINS=["https://wealtharr.vpn4u.cc"],
-          ):
-              # CI collected development static earlier; build a real
-              # production hashed manifest before testing production URLs.
-              call_command("collectstatic", interactive=False, clear=True, verbosity=0)
-              client = Client(raise_request_exception=True)
-              for path in ("/", "/login/"):
-                  response = client.get(path, secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
-                  print(path, response.status_code)
-                  assert response.status_code == 200, (path, response.status_code)
+          from django.test import Client
+          client = Client(raise_request_exception=True)
+          for path in ("/", "/login/"):
+              response = client.get(path, secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
+              print(path, response.status_code)
+              assert response.status_code == 200, (path, response.status_code)
           PY
       - name: Validate Compose and restore helper
         run: |
