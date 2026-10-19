@@ -15,7 +15,7 @@ from tracker.strategies.nine_sig.v1 import (
     PARAMS, VERSION, ApprovedPriceBundle, CashFlow, NormalizedQuote,
     PortfolioHistory, evaluate,
 )
-from tracker.core.prices import QuoteUnavailable, fetch_stooq_reference
+from tracker.core.prices import QuoteUnavailable, fetch_stooq_reference, reference_with_fallback
 
 FIXTURE_DIR = Path(__file__).parent / "strategies" / "nine_sig" / "fixtures"
 PARITY_FIELDS = (
@@ -132,6 +132,21 @@ class IndependentReferenceTests(TestCase):
         self.assertEqual(got[-1].price, D("61"))
         self.assertEqual(got[-1].source, "stooq")
         self.assertTrue(got[-1].raw_unit_verified)
+
+    def test_stale_primary_reference_uses_corrobated_backup(self):
+        anchor = quote("SPY", date(2026, 3, 30), "100", "USD")
+        stale = quote("SPY", date(2026, 3, 1), "99", "USD")
+        backup = (replace(anchor, source="stooq"),
+                  quote("SPY", date(2026, 3, 31), "101", "USD", source="stooq"))
+        with patch("tracker.core.prices.fetch_stooq_reference", return_value=backup):
+            # Use an explicitly injected fetcher so source choice is testable.
+            def fake_fetch(*args, **kwargs):
+                return backup
+            selected = reference_with_fallback(
+                "SPY", date(2026, 3, 1), date(2026, 3, 31),
+                yahoo_quotes=(stale,), yahoo_anchor=anchor,
+                fallback_fetch=fake_fetch)
+        self.assertEqual(selected[-1].source, "stooq")
 
     def test_uk_execution_ticker_refused_as_fallback(self):
         with self.assertRaises(QuoteUnavailable):
