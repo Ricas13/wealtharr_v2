@@ -58,6 +58,12 @@ class UniversalMetricTests(TestCase):
                           "post_flow:deposit:2", "closing"])
         self.assertEqual(result.audit[1].unit_nav, result.audit[2].unit_nav)
         self.assertEqual(result.audit[2].net_external_flow_gbp, D("100"))
+        self.assertGreater(result.audit[2].units_issued, D("0"))
+        self.assertGreater(result.audit[2].units_outstanding,
+                           result.audit[1].units_outstanding)
+        self.assertEqual(result.summary_row()["cumulative_return"], "0.21")
+        self.assertEqual(result.audit_rows()[2]["net_external_flow_gbp"], "100")
+        self.assertEqual(result.audit_rows()[2]["observation_ids"], "quote:mid")
 
     def test_withdrawal_is_not_a_negative_return(self):
         f = event("cash-out", MID, "-40")
@@ -187,6 +193,8 @@ class InceptionMetricTests(TestCase):
         self.assertEqual(result.cash_gain_gbp, D("200"))
         self.assertIsNotNone(result.xirr_annual)
         self.assertIsNone(result.simple_cumulative_return)
+        self.assertEqual(result.audit_rows()[1]["signed_external_flow_gbp"], "200")
+        self.assertEqual(result.audit_rows()[2]["signed_external_flow_gbp"], "-100")
 
     def test_end_without_verified_evidence_and_missing_start(self):
         self.assertEqual(evaluate_inception(
