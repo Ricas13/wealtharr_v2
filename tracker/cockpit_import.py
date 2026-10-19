@@ -233,8 +233,13 @@ def csv_import(request):
                 if applying and request.session.get('cockpit_t212_preview') != preview_key:
                     raise ValueError('Preview this exact CSV successfully before confirming import')
                 entries, errors, duplicates = inspect_csv(uploaded, strategy)
-                ctx.update(preview=entries[:100], total=len(entries), errors=errors[:100],
-                           error_total=len(errors), duplicate_total=len(duplicates))
+                ctx.update(
+                    preview_ran=True, preview_ready=not errors,
+                    preview=entries[:100], total=len(entries), errors=errors[:100],
+                    error_total=len(errors), duplicate_total=len(duplicates),
+                    preview_truncated=len(entries) > 100,
+                    reviewed_file_name=uploaded.name.rsplit('/', 1)[-1][:120],
+                )
                 if not applying:
                     if errors:
                         request.session.pop('cockpit_t212_preview', None)
