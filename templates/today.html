@@ -48,7 +48,11 @@
         <p class="ck-action-text">{{ next_step.title }}</p>
         <p>{{ next_step.explanation }}</p>
         {% if next_step.details %}<p class="ck-muted" role="alert">Data check: {{ next_step.details }}</p>{% endif %}
+        {% if signal and signal.kind == 'QUARTERLY' and "Your reserve is now empty" in signal.message %}
+        <a href="{% url 'cockpit_rebalance' signal.pk %}" class="btn">Review optional 60/40 reset</a>
+        {% else %}
         <a href="{% url 'cockpit_history' %}" class="btn">Review warning</a>
+        {% endif %}
       {% elif next_step.state == 'blocked' %}
         <div class="ck-block-message" role="alert"><strong>{{ next_step.title }}</strong><p>{{ next_step.explanation }}</p></div>
         <form action="{% url 'cockpit_refresh' %}" method="post" class="ck-refresh-form" data-loading-form>
