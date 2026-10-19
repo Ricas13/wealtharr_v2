@@ -15,3 +15,5 @@
 /.coverage
 /.DS_Store
 /secrets
+*.dump
+*.dump.sha256
