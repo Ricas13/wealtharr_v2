@@ -1,71 +1,87 @@
 {% extends 'base.html' %}
 {% block title %}Overview{% endblock %}
 {% block content %}
-<div class="page-heading"><div><div class="eyebrow">MY PORTFOLIO</div><h1>Overview</h1><p>One clear view across all your investment strategies.</p></div><a class="btn btn-primary" href="{% url 'new_strategy' %}">＋ Add strategy</a></div>
-<section class="panel padded" style="margin-bottom:16px;border:1px solid #2b8992">
-  <div class="panel-heading"><div><h2>Track a real 9Sig account</h2>
-    <p>Start with your actual GBP deposit, enter manual fills, and receive quarterly rebalance alerts.</p></div>
-    <a class="btn btn-primary btn-sm" href="{% url 'start_real_9sig' %}">Track my real 9Sig →</a>
-  </div>
-  <p class="micro-note">No Trading 212 connection or automatic trades. Your actual ISA/GIA portfolio is kept separate from virtual paper accounts.</p>
+<header class="ws-page-head">
+  <div><p class="ws-eyebrow">YOUR PORTFOLIO · GBP</p><h1>Overview</h1><p class="muted">Your real investments, your progress, your next step.</p></div>
+  <a class="btn btn-primary" href="{% url 'start_real_9sig' %}">{% include 'partials/icon.html' with name='plus' %} Track 9Sig</a>
+</header>
+<section class="ws-stat-grid" aria-label="Real portfolio summary">
+  <article class="panel ws-stat"><p class="ws-stat-title">Real portfolio value</p>
+    <p class="ws-stat-number">{% if total is not None %}£{{ total|floatformat:2 }}{% else %}<span class="value-warning">Prices needed</span>{% endif %}</p>
+    <p class="ws-stat-detail">GBP · excludes paper accounts</p>
+  </article>
+  <article class="panel ws-stat"><p class="ws-stat-title">Net money added</p>
+    <p class="ws-stat-number">£{{ net_contributed|floatformat:2 }}</p><p class="ws-stat-detail">Deposits minus withdrawals</p>
+  </article>
+  <article class="panel ws-stat"><p class="ws-stat-title">Investment result</p>
+    <p class="ws-stat-number {% if gain is not None %}{% if gain < 0 %}ws-negative{% elif gain > 0 %}ws-positive{% endif %}{% endif %}">{% if gain is not None %}{% if gain > 0 %}↑ {% elif gain < 0 %}↓ {% endif %}£{{ gain|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="ws-stat-detail">{% if gain_pct is not None %}{{ gain_pct|floatformat:1 }}% of net deposits · simple ratio{% else %}Value less net contributions · no reliable %{% endif %}</p>
+  </article>
+  <article class="panel ws-stat"><p class="ws-stat-title">Real strategies</p>
+    <p class="ws-stat-number">{{ items|length }}</p><p class="ws-stat-detail">Independently tracked portfolios</p>
+  </article>
 </section>
-<details style="margin-bottom:16px">
-  <summary class="micro-note" style="cursor:pointer">Optional: virtual paper trial (not real investments)</summary>
-<section class="panel padded" style="margin-bottom:16px;border:1px solid #2b8992">
-  <div class="panel-heading">
-    <div><h2>9Sig paper tracker</h2>
-      <p>Real closing prices and quarterly alerts. Virtual holdings only; no Trading 212 connection and no order execution.</p></div>
-    <span class="risk-pill high">LIVE TRIAL</span>
-  </div>
+{% if missing %}<div class="alert-warning" role="status"><strong>Prices needed for an accurate portfolio value.</strong> Missing marks: {% for item in missing %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}. The total and result are deliberately withheld until the prices are recorded.</div>{% endif %}
+<div class="ws-main-grid">
+  <section class="panel ws-chart-panel" aria-labelledby="ws-growth-title">
+    <div class="ws-section-heading"><div><h2 id="ws-growth-title">Portfolio growth</h2><p class="muted">Recorded value compared with money added</p></div>
+      <div class="chart-controls" aria-label="Portfolio chart date range">
+        <button class="chip" type="button" data-range="1m" aria-pressed="false">1M</button>
+        <button class="chip" type="button" data-range="3m" aria-pressed="false">3M</button>
+        <button class="chip" type="button" data-range="1y" aria-pressed="false">1Y</button>
+        <button class="chip selected" type="button" data-range="all" aria-pressed="true">All</button>
+      </div>
+    </div>
+    <div id="wealth-chart" class="wealth-chart" role="group" aria-label="Recorded portfolio and contribution chart"></div>
+    {{ chart|json_script:"wealth-chart-points" }}
+    <div class="chart-bottom"><span><i class="legend-dot" aria-hidden="true"></i>Real portfolio</span><span><i class="legend-dot secondary" aria-hidden="true"></i>Net contributions</span>
+      <form action="{% url 'capture_snapshot' %}" method="post">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">Save valuation</button></form>
+    </div>
+    <p class="chart-caption">Based only on saved actual valuations; no simulated performance. Missing price data is never filled in.</p>
+    <details class="ws-chart-table"><summary>View chart values as a table</summary>
+      <div class="table-scroll"><table class="data-table"><thead><tr><th scope="col">Date</th><th scope="col" class="num">Value (GBP)</th><th scope="col" class="num">Net added (GBP)</th></tr></thead><tbody>
+      {% for point in chart %}<tr><td>{{ point.date }}</td><td class="num">£{{ point.value|floatformat:2 }}</td><td class="num">£{{ point.contributed|floatformat:2 }}</td></tr>
+      {% empty %}<tr><td colspan="3">No saved valuations yet.</td></tr>{% endfor %}</tbody></table></div>
+    </details>
+  </section>
+  <aside class="panel ws-action-panel" aria-labelledby="ws-actions-title">
+    <div class="ws-section-heading"><div><h2 id="ws-actions-title">Needs your review</h2><p class="muted">Advisory signals only · no trades placed</p></div><span class="ws-pill ws-pill-info">{{ open_signals|length }} recent</span></div>
+    {% for signal in open_signals %}
+      <a class="ws-action-item" href="{% url 'strategy_detail' signal.strategy_id %}?tab=signals">
+        <span class="ws-action-title">{{ signal.title }} {% if signal.strategy.account.kind == 'PAPER' %}<span class="ws-pill ws-pill-paper">Paper</span>{% endif %}</span>
+        <span class="ws-action-desc">{{ signal.strategy.name }} · {{ signal.message|truncatechars:125 }}</span>
+      </a>
+    {% empty %}
+      <div class="ws-quiet-state">{% include 'partials/icon.html' with name='check' %}<strong>All caught up</strong><span>No signals currently need a review.</span></div>
+    {% endfor %}
+    <p class="ws-disclaimer">Review every signal against your strategy rules and actual broker positions before trading.</p>
+  </aside>
+</div>
+<div class="ws-section-heading ws-strategy-header">
+  <div><h2>Your real strategies</h2><p class="muted">Independent GBP ledgers, with real holdings only</p></div>
+  <a href="{% url 'new_strategy' %}" class="btn btn-subtle btn-sm">{% include 'partials/icon.html' with name='plus' %} Add strategy</a>
+</div>
+<div class="ws-strategy-grid">
+  {% for item in items %}
+    <a class="panel ws-strategy-card" href="{% url 'strategy_detail' item.strategy.pk %}">
+      <div class="ws-card-meta"><span class="ws-pill">{{ item.strategy.account.get_kind_display }}</span><span class="risk-pill {{ item.strategy.preset.risk|lower }}">{{ item.strategy.preset.get_risk_display }} risk</span></div>
+      <h3>{{ item.strategy.name }}</h3><p class="muted">{{ item.strategy.account.name }} · {{ item.strategy.preset.name }}</p>
+      <p class="ws-strategy-value">{% if item.value is not None %}£{{ item.value|floatformat:2 }}{% else %}Needs prices{% endif %}</p>
+      <div class="ws-card-footer"><span>Cash £{{ item.cash|floatformat:2 }}</span><span>Open {% include 'partials/icon.html' with name='arrow-up-right' %}</span></div>
+    </a>
+  {% empty %}
+    <section class="panel ws-empty" aria-label="Getting started"><h3>Start with your real account</h3><p>Choose 9Sig, confirm the UK Trading 212 instruments and record your actual starting deposit. No broker connection is required.</p><a class="btn btn-primary" href="{% url 'start_real_9sig' %}">Track my real 9Sig</a></section>
+  {% endfor %}
+</div>
+<section class="panel ws-paper-panel" aria-label="Optional virtual investments">
+  <div class="ws-section-heading"><div><span class="ws-pill ws-pill-paper">{% include 'partials/icon.html' with name='flask' %} Simulation only</span><h2>Paper portfolio</h2><p class="muted">Virtual positions never appear in your real portfolio totals.</p></div>
+  {% if paper_trial %}<a class="btn btn-subtle" href="{% url 'strategy_detail' paper_trial.pk %}">Open paper tracker</a>{% endif %}</div>
   {% if paper_trial %}
-    <p class="muted">Your £1,000 virtual 60/40 starting allocation is tracked separately from real portfolio totals. Virtual value: <strong>{% if paper_summary.value is not None %}£{{ paper_summary.value|floatformat:2 }}{% else %}awaiting prices{% endif %}</strong>. Review all suggestions before acting.</p>
-    <a class="btn btn-primary btn-sm" href="{% url 'strategy_detail' paper_trial.pk %}">Open my 9Sig paper trial →</a>
+    <p>Virtual value: <strong>{% if paper_summary.value is not None %}£{{ paper_summary.value|floatformat:2 }}{% else %}Awaiting verified prices{% endif %}</strong>. All quantities and signals here are simulated.</p>
   {% else %}
-    <p class="muted">Start with £1,000 virtual capital, £500/month planned contributions, 60% LQQ3.L and 40% ERNS.L at verified Yahoo GBP closing prices. This does not buy real securities; virtual fractional shares are used.</p>
-    <form method="post" action="{% url 'start_paper_trial' %}">
-      {% csrf_token %}<input type="hidden" name="confirm_paper" value="PAPER_ONLY">
-      <button class="btn btn-primary" type="submit">Start isolated 9Sig paper trial →</button>
-    </form>
+    <details><summary>Try a separate 9Sig paper simulation</summary><p>Optional £1,000 simulated starting balance; no real cash or trades.</p>
+      <form method="post" action="{% url 'start_paper_trial' %}">{% csrf_token %}<input type="hidden" name="confirm_paper" value="PAPER_ONLY"><button type="submit" class="btn btn-subtle">Start virtual paper trial</button></form>
+    </details>
   {% endif %}
 </section>
-</details>
-<div class="stat-grid">
-  <div class="panel stat-card"><div class="stat-label">Real portfolio value <span>◈</span></div><div class="stat-value">{% if total is not None %}£{{ total|floatformat:2 }}{% else %}<span class="value-warning">Needs prices</span>{% endif %}</div><div class="stat-help">Paper accounts excluded from real capital</div></div>
-  <div class="panel stat-card"><div class="stat-label">Net added <span>↳</span></div><div class="stat-value">£{{ net_contributed|floatformat:2 }}</div><div class="stat-help">Real deposits minus withdrawals (paper excluded)</div></div>
-  <div class="panel stat-card"><div class="stat-label">Investment result <span>⌁</span></div><div class="stat-value {% if gain is not None and gain < 0 %}negative{% endif %}">{% if gain is not None %}£{{ gain|floatformat:2 }}{% else %}—{% endif %}</div><div class="stat-help">Wealth minus net money added</div></div>
-  <div class="panel stat-card"><div class="stat-label">Active strategies <span>▤</span></div><div class="stat-value">{{ items|length }}</div><div class="stat-help">Paper trial tracked separately below</div></div>
-</div>
-{% if missing %}<div class="alert-warning"><strong>Prices needed for an accurate total.</strong> Add a GBP price on these strategy tabs: {% for item in missing %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}. Until then, the total and return are hidden rather than understated.</div>{% endif %}
-<div class="panel chart-panel">
-  <div class="panel-heading"><div><h2>Wealth growth</h2><p>Saved portfolio values over time · £ GBP</p></div><div class="chart-controls"><button type="button" class="chip" data-range="1m">1m</button><button type="button" class="chip" data-range="3m">3m</button><button type="button" class="chip" data-range="1y">1y</button><button type="button" class="chip selected" data-range="all">All</button></div></div>
-  <div id="wealth-chart" class="wealth-chart" role="img" aria-label="Chart of saved wealth snapshots"></div>
-  {{ chart|json_script:"wealth-chart-points" }}
-  <div class="chart-bottom"><span><i class="legend-dot"></i>Portfolio value</span><span><i class="legend-dot secondary"></i>Net contributions</span><form action="{% url 'capture_snapshot' %}" method="post">{% csrf_token %}<button type="submit" class="btn btn-subtle btn-sm">◷ Save today's valuation</button></form></div>
-  <div class="chart-caption">Valuations can be saved manually or captured by the scheduled Yahoo monitor when all required holdings have fresh marks. No backtests or fabricated quotes.</div>
-</div>
-<section class="panel padded" id="actions-needed">
-  <div class="panel-heading"><div><h2>Interventions needed</h2><p>Open 9Sig advisory notices — review before making any actual trade.</p></div></div>
-  {% for signal in open_signals %}<div class="signal-review"><a href="{% url 'strategy_detail' signal.strategy_id %}#strategy-signals"><strong>{{ signal.title }}</strong> — {{ signal.strategy.name }} →</a><p>{{ signal.message|truncatechars:240 }}</p></div>
-  {% empty %}<p class="muted">Nothing needs review right now. Verified market checks will create notices when applicable.</p>{% endfor %}
-</section>
-<div class="section-title"><h2>My strategies</h2><span>{{ items|length }} tracked</span></div>
-<div class="strategy-grid">
-  {% for item in items %}
-  <a href="{% url 'strategy_detail' item.strategy.pk %}" class="panel strategy-tile">
-    <div class="tile-top"><span class="risk-pill {{ item.strategy.preset.risk|lower }}">{{ item.strategy.preset.get_risk_display }} risk</span><span>↗</span></div>
-    <h3>{{ item.strategy.name }}</h3><p class="tile-sub">{{ item.strategy.account.name }} · {{ item.strategy.preset.name }}</p>
-    <div class="tile-value">{% if item.value is not None %}£{{ item.value|floatformat:2 }}{% else %}Add prices{% endif %}</div>
-    <div class="tile-foot"><span>Cash: £{{ item.cash|floatformat:2 }}</span><span>View details →</span></div>
-  </a>
-  {% empty %}
-  <div class="panel empty-strategies"><div class="empty-symbol">＋</div>
-  {% if paper_trial %}<h3>Paper trial active — real accounts separate</h3>
-  <p>Your virtual 9Sig strategy appears above. Add a real ISA/GIA only when you choose; paper balances are not real wealth.</p>
-  {% else %}<h3>Your first strategy starts here</h3>
-  <p>Create an account and a strategy tab, or try the paper-only option above. No brokerage connection required.</p>{% endif %}
-  <a class="btn btn-primary" href="{% url 'new_strategy' %}">Create a strategy →</a>
-</div>
-  {% endfor %}
-  {% if items %}<a class="panel add-tile" href="{% url 'new_strategy' %}"><span>＋</span><b>New strategy tab</b><small>Same model, different account? No problem.</small></a>{% endif %}
-</div>
 {% endblock %}
