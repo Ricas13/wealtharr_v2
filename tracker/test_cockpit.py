@@ -16,6 +16,7 @@ from .services import ledger_summary, validate_and_record
 from .cockpit_import import inspect_csv
 from .cockpit import _performance
 from .management.commands.sync_market_and_signals import save_verified_strategy_snapshot
+from .cockpit_notifications import send_due_cockpit_notices
 from .market_signals import quarter_end_before
 
 class PerformanceSafetyTests(TestCase):
@@ -139,6 +140,16 @@ class GuidedRebalanceTests(TestCase):
         self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.payload())
         self.assertEqual(self.strategy.ledger.count(), count)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
+
+    def test_invalidated_signal_never_emits_quarterly_reminder(self):
+        from datetime import datetime
+        StrategySignal.objects.filter(pk=self.sig.pk).update(
+            created_at=timezone.now() - timedelta(days=7))
+        validate_and_record(self.strategy, LedgerEntry(
+            kind='DEPOSIT', occurred_on=self.today, amount=D('100')))
+        with patch('tracker.cockpit_notifications.dispatch') as delivery:
+            send_due_cockpit_notices(today=self.today)
+        delivery.assert_not_called()
 
     def test_owner_isolation(self):
         stranger = get_user_model().objects.create_user('stranger', password='strong-password')
