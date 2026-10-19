@@ -1,7 +1,7 @@
 case_id,quarter_end,start_date,starting_equity_gbp,equity_qty,safe_qty,cash_gbp,lqq3_close_gbp,erns_close_gbp,prior_30down,30down_age_quarters,prior_skipped_sells,expected_signal_line_gbp,expected_equity_value_gbp,expected_buy_equity_qty,expected_sell_equity_qty,expected_buy_safe_qty,expected_sell_safe_qty,expected_30down,expected_spike_warning,expected_reset_review,expected_cash_after_estimated_orders_gbp
-Q1,,,,,,,,,,,,,,,,,,,,,,
-Q2,,,,,,,,,,,,,,,,,,,,,,
-Q3,,,,,,,,,,,,,,,,,,,,,,
-Q4,,,,,,,,,,,,,,,,,,,,,,
-Q5,,,,,,,,,,,,,,,,,,,,,,
-Q6,,,,,,,,,,,,,,,,,,,,,,
+Q1,,,,,,,,,,,,,,,,,,,,,
+Q2,,,,,,,,,,,,,,,,,,,,,
+Q3,,,,,,,,,,,,,,,,,,,,,
+Q4,,,,,,,,,,,,,,,,,,,,,
+Q5,,,,,,,,,,,,,,,,,,,,,
+Q6,,,,,,,,,,,,,,,,,,,,,
