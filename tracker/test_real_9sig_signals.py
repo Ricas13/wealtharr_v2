@@ -20,7 +20,7 @@ class RealQuarterlySignalTests(TestCase):
         self.owner = get_user_model().objects.create_user(
             "quarter-owner", password="long-quarter-test-password")
         acc = Account.objects.create(
-            owner=self.owner, name="Real 212 ISA", kind="ISA")
+            owner=self.owner, name="Real 212 ISA", kind="ISA", country="GB", broker="TRADING212")
         self.strategy = StrategyInstance.objects.create(
             owner=self.owner, account=acc,
             preset=StrategyPreset.objects.get(slug="nasdaq-quarterly-target"),
