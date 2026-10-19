@@ -317,6 +317,13 @@ def render_strategy(request, strategy, entry_form=None, price_form=None):
         "automation_form": AutomationForm(instance=strategy),
     })
 
+def _return_to_strategy_tab(request, pk, tab):
+    """Preserve the active view after normal form submissions."""
+    if request.GET.get("tab") == tab:
+        return redirect(reverse("strategy_detail", kwargs={"pk": pk}) + "?tab=" + tab)
+    return redirect("strategy_detail", pk=pk)
+
+
 @login_required
 def strategy_detail(request, pk):
     strategy = get_object_or_404(StrategyInstance.objects.select_related("account", "preset"), pk=pk, owner=request.user)
@@ -332,7 +339,7 @@ def record_entry(request, pk):
         try:
             validate_and_record(strategy, entry)
             messages.success(request, "Transaction recorded. Values update from your actual ledger.")
-            return redirect("strategy_detail", pk=pk)
+            return _return_to_strategy_tab(request, pk, "ledger")
         except ValidationError as exc:
             form.add_error(None, exc)
     return render_strategy(request, strategy, entry_form=form)
@@ -348,7 +355,7 @@ def save_automation(request, pk):
         messages.success(request, "Monitoring settings saved. Check Yahoo prices to verify your tickers.")
     else:
         messages.error(request, "Invalid settings. Use two distinct exact Yahoo tickers and enable only on 9Sig.")
-    return redirect("strategy_detail", pk=pk)
+    return _return_to_strategy_tab(request, pk, "setup")
 
 
 @login_required
@@ -366,7 +373,7 @@ def refresh_market(request, pk):
                 messages.warning(request, "Market update unavailable: " + result["status"])
         except Exception:
             messages.error(request, "Price check could not complete. No estimates or trading instructions were invented.")
-    return redirect("strategy_detail", pk=pk)
+    return _return_to_strategy_tab(request, pk, "signals")
 
 
 @login_required
@@ -384,38 +391,38 @@ def confirm_strategy_reset(request, pk):
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of", "-pk").first()
     if request.POST.get("confirm") != "RESET":
         messages.error(request, "Confirmation required: no strategy baseline changed.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     if not reset_notice or reset_notice.acknowledged_at is None:
         messages.error(request, "Review and acknowledge the latest 60/40 reset notice first.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     existing = strategy.baselines.filter(as_of__gt=reset_notice.as_of).exists()
     if existing:
         messages.error(request, "That reset has already been anchored.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     latest_fill = strategy.ledger.filter(
         kind__in=(LedgerEntry.BUY, LedgerEntry.SELL),
         occurred_on__gt=reset_notice.as_of
     ).order_by("-occurred_on", "-pk").first()
     if latest_fill is None:
         messages.error(request, "Record your actual post-reset trades before confirming the new baseline.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     report = ledger_summary(strategy)
     symbols = (strategy.equity_symbol, strategy.safe_symbol)
     if any(symbol not in symbols for symbol in report["positions"]):
         messages.error(request, "Remove unsupported positions from this strategy before re-anchoring.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     marks = [report["marks"].get(symbol) for symbol in symbols]
     today = timezone.localdate()
     if any(mark is None or mark.source != "yahoo" or
            mark.as_of < today - timedelta(days=8) for mark in marks):
         messages.error(request, "Refresh both GBP Yahoo price marks before confirming the reset.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     as_of = min(mark.as_of for mark in marks)
     if ((max(mark.as_of for mark in marks) - as_of).days > 1 or
             latest_fill.occurred_on > as_of or
             as_of <= reset_notice.as_of):
         messages.error(request, "The confirmed fills require a later, matching settlement quote.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     equity_qty = report["positions"].get(strategy.equity_symbol, Decimal("0"))
     safe_qty = report["positions"].get(strategy.safe_symbol, Decimal("0"))
     equity_value = equity_qty * marks[0].price
@@ -424,7 +431,7 @@ def confirm_strategy_reset(request, pk):
     if (total <= 0 or equity_qty <= 0 or report["cash"] < 0 or
             abs(equity_value / total - Decimal("0.60")) > Decimal("0.05")):
         messages.error(request, "Actual recorded holdings are not near a 60/40 reset (within 5 percentage points).")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     try:
         with transaction.atomic():
             locked = StrategyInstance.objects.select_for_update().get(
@@ -440,9 +447,9 @@ def confirm_strategy_reset(request, pk):
             )
     except (ValidationError, Exception):
         messages.error(request, "The reset baseline could not be safely recorded.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     messages.success(request, "New 9Sig cycle anchored to your actual recorded holdings; no trade was placed.")
-    return redirect("strategy_detail", pk=pk)
+    return _return_to_strategy_tab(request, pk, "signals")
 
 
 @login_required
@@ -455,10 +462,10 @@ def review_signal(request, pk, signal_pk):
     note = request.POST.get("review_note", "").strip()[:2000]
     if outcome not in ("CONFIRMED", "FALSE_POSITIVE", "NOT_APPLICABLE"):
         messages.error(request, "Choose a valid review outcome.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     if outcome == "FALSE_POSITIVE" and not note:
         messages.error(request, "Add a short correction note when reporting a false 9Sig signal.")
-        return redirect("strategy_detail", pk=pk)
+        return _return_to_strategy_tab(request, pk, "signals")
     with transaction.atomic():
         record = StrategySignal.objects.select_for_update().get(pk=signal.pk)
         record.review_outcome = outcome
@@ -466,7 +473,7 @@ def review_signal(request, pk, signal_pk):
         record.acknowledged_at = timezone.now()
         record.save(update_fields=["review_outcome", "review_note", "acknowledged_at"])
     messages.success(request, "Strategy notice reviewed. No holdings, cash or broker orders were changed.")
-    return redirect("strategy_detail", pk=pk)
+    return _return_to_strategy_tab(request, pk, "signals")
 
 
 @login_required
@@ -477,7 +484,7 @@ def acknowledge_signal(request, pk, signal_pk):
     if signal.acknowledged_at is None:
         signal.acknowledged_at = timezone.now()
         signal.save(update_fields=["acknowledged_at"])
-    return redirect("strategy_detail", pk=pk)
+    return _return_to_strategy_tab(request, pk, "signals")
 
 
 @login_required
@@ -499,7 +506,7 @@ def record_price(request, pk):
                     "price": form.cleaned_data["price"], "as_of": form.cleaned_data["as_of"], "source": "manual",
                 })
                 messages.success(request, "Price saved. Record a wealth snapshot on the overview to add a chart point.")
-                return redirect("strategy_detail", pk=pk)
+                return _return_to_strategy_tab(request, pk, "setup")
     return render_strategy(request, strategy, price_form=form)
 
 @login_required
