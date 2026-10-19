@@ -417,6 +417,9 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     if history.strategy_version != VERSION or history.mapping_version != "2026-10-19.1":
         return hold("The pinned strategy or instrument mapping version is unavailable",
                     code="UNSUPPORTED_VERSION")
+    if (history.equity_symbol != "LQQ3.L" or history.safe_symbol != "ERNS.L"):
+        return hold("Strategy version does not contain these exact trading lines",
+                    code="UNSUPPORTED_MAPPING")
     if history.outside_holdings or history.pending_unverified_reset:
         return hold("Unsupported holding or unconfirmed previous reset", code="INVALID_HISTORY")
     if params != PARAMS:
@@ -433,8 +436,10 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
             history.start_date > day or history.initial_equity_value <= ZERO):
         return hold("Missing or invalid equity starting basis")
     values = (history.equity_qty, history.safe_qty, history.cash, history.initial_equity_value)
-    if any(not value.is_finite() for value in values) or (
-            history.equity_qty <= ZERO or history.safe_qty < ZERO or history.cash < ZERO):
+    if any(not isinstance(value, Decimal) or not value.is_finite()
+           for value in values):
+        return hold("Invalid portfolio monetary input", code="INVALID_HISTORY")
+    if (history.equity_qty <= ZERO or history.safe_qty < ZERO or history.cash < ZERO):
         return hold("Invalid portfolio quantities or cash")
     if history.prior_skipped_sells not in (0, 1, 2) or history.down_age_quarters < 0:
         return hold("Invalid 30 Down state")
@@ -469,8 +474,17 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
     # A 30 Down cannot be declared clear without its eight-quarter lookback.
     if any(q not in sq for q in range(review_q - 8, review_q + 1)):
         return hold("SPY eight-quarter reference history incomplete")
+    from calendar import monthrange
+    for seq in (tqqq, spy):
+        for q in seq:
+            quarter_month = (q.as_of.month - 1) // 3 * 3 + 3
+            quarter_end = date(q.as_of.year, quarter_month,
+                               monthrange(q.as_of.year, quarter_month)[1])
+            if (quarter_end - q.as_of).days > 6:
+                return hold("Reference history contains a mid-quarter price",
+                            code="STALE_PRICE")
     if any(day - q.as_of > timedelta(days=6) for q in (tqqq[-1], spy[-1])):
-        return hold("Reference closing prices are stale")
+        return hold("Reference closing prices are stale", code="STALE_PRICE")
     contributions = tuple((flow.occurred_on, flow.amount) for flow in history.contributions)
     recurrence = signal_line_trace(start_date=history.start_date, as_of=day,
         starting_equity_cost=history.initial_equity_value, contributions=contributions)
