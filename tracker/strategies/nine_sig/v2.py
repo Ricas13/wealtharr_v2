@@ -233,7 +233,8 @@ def _growth_reference_drawdown(reference, as_of):
     """
     observations = sorted((day, price) for day, price in reference
                           if day <= as_of and price > ZERO)
-    if not observations:
+    if len({day for day, _ in observations}) < 2:
+        # One available close does not establish a meaningful running peak.
         return None
     high = max(price for _, price in observations)
     return ((Decimal("1") - observations[-1][1] / high) *
@@ -580,6 +581,11 @@ def evaluate(history: PortfolioHistory, prices: ApprovedPriceBundle,
         if _price_ok(q, history.equity_symbol, "GBP", day, expected_raw="GBX")
         and q.as_of <= day and q.source == "yahoo"
     )
+    # Without the exact actual closing observation, a previous-quarter
+    # drawdown would be misleadingly presented as today's review.
+    if (not verified_growth or
+            (prices.equity.as_of, prices.equity.price) not in verified_growth):
+        verified_growth = ()
     alerts = advice_for_holdings(
         start_date=history.start_date, as_of=day, currency="GBP",
         equity_symbol=history.equity_symbol, safe_symbol=history.safe_symbol,
