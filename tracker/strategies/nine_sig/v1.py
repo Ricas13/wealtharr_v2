@@ -113,14 +113,6 @@ def quarter_end_before(day):
     return date(day.year, 9, 30)
 
 
-def settlement_close(symbol, quarter_end, *, days=6):
-    """Use last verified daily close on/before quarter end, never later data."""
-    return MarketObservation.objects.filter(
-        symbol=symbol, as_of__lte=quarter_end,
-        as_of__gte=quarter_end - timedelta(days=days),
-    ).order_by("-as_of").first()
-
-
 def _quarterly_closes(reference, until):
     closes = {}
     for day, price in sorted(reference):
