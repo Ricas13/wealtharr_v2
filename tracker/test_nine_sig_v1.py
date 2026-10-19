@@ -33,7 +33,9 @@ PARITY_FIELDS = (
 
 def quote(symbol, day, price, currency, raw=None, source="yahoo"):
     return NormalizedQuote(symbol, day, D(str(price)), currency, currency,
-                           source, raw or currency, True)
+                           source, raw or currency, True,
+                           raw_close=D(str(price)) * (D("100") if raw == "GBX" else D("1")),
+                           observation_id="fixture:%s:%s" % (symbol, day))
 
 
 def sample():
@@ -72,7 +74,7 @@ class PureEvaluationTests(TestCase):
     def test_irregular_cashflows_added_half_at_each_quarter_close(self):
         history, prices = sample()
         result = evaluate(history, prices)
-        self.assertEqual(result.status, "READY")
+        self.assertIn(result.status, ("ok", "action_needed"))
         self.assertEqual(result.strategy_version, VERSION)
         # 1000*1.09^2 + ((120+80)/2)*1.09 + (50/2) = 1322.10
         self.assertEqual(D(audit_map(result)["signal_line"]), D("1322.10"))
@@ -84,7 +86,7 @@ class PureEvaluationTests(TestCase):
         history, prices = sample()
         spy = prices.spy[:-1] + (replace(prices.spy[-1], price=D("65")),)
         result = evaluate(history, replace(prices, spy=spy))
-        self.assertEqual(result.status, "READY")
+        self.assertIn(result.status, ("ok", "action_needed"))
         self.assertEqual(audit_map(result)["thirty_down_triggered"], "True")
         self.assertEqual(len([a for a in result.alerts
                               if a["kind"] == "THIRTY_DOWN"]), 1)
@@ -93,7 +95,7 @@ class PureEvaluationTests(TestCase):
         history, prices = sample()
         tqqq = prices.tqqq[:-1] + (replace(prices.tqqq[-1], price=D("100")),)
         result = evaluate(history, replace(prices, tqqq=tqqq))
-        self.assertEqual(result.status, "READY")
+        self.assertIn(result.status, ("ok", "action_needed"))
         self.assertEqual(audit_map(result)["potential_spike"], "True")
         self.assertTrue(any(a["kind"] == "SPIKE_WATCH" for a in result.alerts))
         quarterly = next(a for a in result.alerts if a["kind"] == "QUARTERLY")
@@ -102,15 +104,15 @@ class PureEvaluationTests(TestCase):
     def test_unverified_gbx_gbp_and_rule_changes_refused(self):
         history, prices = sample()
         self.assertEqual(evaluate(history, replace(prices,
-            equity=replace(prices.equity, unit="GBX"))).status, "HOLD")
+            equity=replace(prices.equity, unit="GBX"))).status, "cannot_compute")
         self.assertEqual(evaluate(history, replace(prices,
-            equity=replace(prices.equity, raw_unit_verified=False))).status, "HOLD")
+            equity=replace(prices.equity, raw_unit_verified=False))).status, "cannot_compute")
         self.assertEqual(evaluate(history, prices, replace(
-            PARAMS, quarterly_growth=D("1.10"))).status, "HOLD")
+            PARAMS, quarterly_growth=D("1.10"))).status, "cannot_compute")
 
     def test_incomplete_spy_lookback_refused(self):
         history, prices = sample()
-        self.assertEqual(evaluate(history, replace(prices, spy=prices.spy[-2:])).status, "HOLD")
+        self.assertEqual(evaluate(history, replace(prices, spy=prices.spy[-2:])).status, "cannot_compute")
 
 
 class IndependentReferenceTests(TestCase):
@@ -195,12 +197,15 @@ class OwnerSpreadsheetParityTests(TestCase):
                         sym, date.fromisoformat(q["verified_close_date"]),
                         D(q["close_price"]), q["normalized_currency"],
                         q["normalized_currency"], q["source"],
-                        q["raw_vendor_quote_unit"], True))
+                        q["raw_vendor_quote_unit"], True,
+                        raw_close=(D(q["close_price"]) * (D("100") if
+                            q["raw_vendor_quote_unit"] == "GBX" else D("1"))),
+                        observation_id="owner:%s:%s:%s" % (key, sym, q["verified_close_date"])))
             prices = ApprovedPriceBundle(
                 quotes["LQQ3.L"][-1], quotes["ERNS.L"][-1],
                 tuple(quotes["TQQQ"]), tuple(quotes["SPY"]))
             actual = evaluate(history, prices)
-            self.assertEqual(actual.status, "READY", (key, actual.reason))
+            self.assertIn(actual.status, ("ok", "action_needed"), (key, actual.reason))
             audit = audit_map(actual)
             self.assertAlmostEqual(D(audit["signal_line"]),
                 number("expected_signal_line_gbp"), delta=D("0.01"), msg=key)
