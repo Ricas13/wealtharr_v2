@@ -164,6 +164,19 @@ class OwnerCockpitBrowserTests(BrowserHarness):
                     self.assertNotIn("98765.43", self.page.content())
                 self.assertEqual(self.browser_errors, [])
 
+    def test_logged_out_browser_cannot_read_owner_pages(self):
+        self.new_page(360)
+        for route in (
+            "cockpit_today", "cockpit_history", "cockpit_ledger",
+            "cockpit_strategy", "cockpit_settings",
+        ):
+            with self.subTest(route=route):
+                self.visit(route)
+                self.assertIn("/login/", self.page.url)
+                self.page.get_by_role("heading", name="Welcome back.").wait_for()
+                self.assertNotIn("Only my 9Sig", self.page.content())
+                self.assertNotIn("UNRELATED_SECRET_OWNER", self.page.content())
+
     def test_mobile_keyboard_navigation_escape_and_main_skip(self):
         self.new_page(360)
         self.sign_in()
