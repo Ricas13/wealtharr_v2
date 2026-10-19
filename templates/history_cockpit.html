@@ -50,7 +50,7 @@
               <a href="{% url 'cockpit_ledger' %}">See ledger for actual quantities, prices and fees</a>.
               Old recommendations are never current instructions.</p>
           {% endif %}
-          <details><summary>Read recorded explanation{% if record.has_proposals %} and historical proposal{% endif %}</summary>
+          <details><summary>Breakdown — rule applied{% if record.has_proposals %} and historical proposal{% endif %}</summary>
             <p>{{ record.message }}</p>
             <p class="ck-muted">A historical review is not permission to execute old trade quantities. Use Today for your current action.</p>
           </details>
