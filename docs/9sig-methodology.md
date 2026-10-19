@@ -16,9 +16,9 @@ accessed. The owner can mark an incorrect alert and arrange a code PR.
 | Rebalance | Sell stock value above the signal line, buy the shortfall below it, funded by stock/safe reservoir | https://jasonkelly.com/2017/01/how-my-signal-system-works/ |
 | When to rebalance | Only completed calendar quarters with verified GBP close for the actual holdings, verified USD reference closes, recorded REAL owner fills | Owner tracking policy; no guessed past fills, no broker connection. |
 | Buying throttle | When normal stock buy shortfall is below 90% of current cash + bonds, fund full amount. For larger purchases under the reservoir's value, cap the buy budget at 90% × (1 − 10%) = **81% of total buying power** | Uploaded workbook **BF4** references BR3+BA4+BV4 and C11 (0.1). This is NOT simply 90% of safe assets on every purchase. |
-| Shortfall exceeding 100% available buying power | Workbook flags a reset to 60/40, unless 30 Down is active, when HOLD takes priority | v1.07 **Y** flag and **Z** order logic. Public summaries differ on how to handle exhausted bond reserves. Kept as a *workbook-specific* rule, not an independently certified Kelly Letter instruction. |
+| Shortfall exceeding 100% available buying power | **Owner-approved v2:** sell ALL safe units, spend all existing cash and buy as much growth equity as possible, flooring to the existing unit precision. No shortage-induced 60/40 reset, even during 30 Down; prompt an advisory reset review. | Deliberate divergence from workbook v1.07 Y/Z reset/HOLD. Below-90% full funding and 90%-100% 81% throttle remain unchanged. |
 | 30 Down trigger | SPY's quarter-ending close at or below 70% of the highest quarter close of the **preceding 8 quarters** (not the UK LETP and not TQQQ). It needn't have fallen from the immediately preceding quarter. | Jason Kelly 30 Down video https://jasonkelly.com/2020/04/the-30-down-rule/ ; research https://bestfolio.app/blog/kelly-signal-danger |
-| 30 Down response | Skip next TWO would-be equity sells while ordinary buys continue. At third sell, review the 60/40 reset; after eight quarters, review the 60/40 safety reset. | Jason Kelly's **2023** https://jasonkelly.com/2023/02/tqqq-and-volatility-decay/ explicitly says two. **2020** public video describes a different earlier one-skip revision; older 3Sig sources use four. Default to the newer 2023 rule; not pretending no historical variations exist. |
+| 30 Down response | Skip next TWO would-be equity sells while ordinary buys continue. **No mid-quarter sell-half rule.** On the third would-be sell, review a 60/40 reset; review a reset on eight-quarter expiry. | Jason Kelly's **2023** https://jasonkelly.com/2023/02/tqqq-and-volatility-decay/ explicitly says two. **2020** public video describes a different earlier one-skip revision; older 3Sig sources use four. Default to the newer 2023 rule; not pretending no historical variations exist. |
 | 100%-up spike | Use daily USD **TQQQ** closes to detect at least 2× the **previous completed calendar quarter** price (provisional reference), during the quarter. Alert owner immediately to review a potential 60/40 reset. | Community mid-quarter discussions https://www.reddit.com/r/KellyLetter/comments/1t4pi9j/9sig_100_spike_reset_trigger/ and https://www.reddit.com/r/KellyLetter/comments/1tv3zt3/hit_my_spike_reset_trigger_at_8718_today/ . **Important:** Kelly Letter uses the actual prior quarterly rebalance execution reference price; exact price may differ from the quarter close, as explained https://www.reddit.com/r/KellyLetter/comments/1td0a4r/100_spike_reset/ . The app therefore raises a WARNING rather than inventing an executable GBP order. |
 | Confirmed 60/40 reset | The owner must actually trade; after real fills and updated quotes the owner confirms a new immutable 60/40 baseline. Future target growth is computed from that new baseline. | Workbook AV4 has a REBALANCE conditional; existing verified Wealtharr baseline controls. |
 | Notifications | Only action-worthy completed-quarter reviews, newly detected 30 Down, and provisional mid-quarter spike warnings are dispatched. No-trade reviews are saved without alerting. | Wealtharr product choice. Actual delivery requires configured SMTP/Discord and working scheduler. |
@@ -46,3 +46,43 @@ accessed. The owner can mark an incorrect alert and arrange a code PR.
 - Do **not** mistake an S&P 500 or Nasdaq daily market reference for the listed GBP instrument that must actually be bought or sold.
 
 **Independent risk context:** https://bestfolio.app/blog/kelly-signal-danger shows much deeper drawdowns in long synthetic TQQQ periods than in its 2010-onward actual-data sample. Those synthetic stress results are NOT actual owner returns. 9Sig's leveraged equity sleeve can experience severe or effectively total losses.
+
+## Workbook comparison (DEMO 2010++)
+
+The uploaded **signal strategy simulation sheet v1.07** has only
+**DEMO 2010++** values; its main sheet is an empty template. Ordinary
+completed-quarter signal lines agree with the demo, and suggested amounts
+follow the engine's existing fractional-share precision.
+
+Three **owner-approved, intentional differences** explain exceptional rows:
+
+1. **SPY-only 30 Down:** use the quarter-end SPY close at or below 70%
+   of its highest preceding eight SPY quarter closes. Hand-typed
+   workbook TQQQ-based 30% flags are not adopted. The TQQQ growth
+   reference's drawdown from its running high is visible as
+   **"Information only, doesn't affect the advice."** This does not
+   claim to measure the UK's LQQ3 drawdown. Crash-quarter results that
+   relied on handwritten demo flags intentionally differ from SPY-based
+   recommendations.
+2. **No sell-half:** P2 (7 May 2010) is a manual mid-quarter
+   half-position sale and is not replayed or adopted. During genuine
+   SPY 30 Down, skip two would-be sells, review 60/40 on the third
+   would-be sell and on eight-quarter expiry; buys continue.
+3. **All-in reserve shortage:** when a required growth buy exceeds cash
+   plus safe-asset value, sell **all** safe units and buy growth with
+   available cash and sale proceeds, floor to normal 0.0001 precision.
+   No automatic shortage reset/HOLD, even if 30 Down is active. Show
+   **"Your reserve is now empty. Review whether to reset to 60/40."**
+   That review is advisory; real trades and a reset remain owner-confirmed.
+   The 81% throttle, 100%-up spike, third-sell reset and eight-quarter
+   expiry stay unchanged.
+
+**Version history:** `nine-sig@2` (`nine_sig.v2.0.0`) keeps the SPY
+trigger and no-sell-half policy, adds all-in shortage advice and an
+informational growth-reference drawdown. `nine-sig@1`
+(`nine_sig.v1.0.0`) remains frozen with its historical reserve
+reset/HOLD behaviour. New signals are pinned to the new version.
+
+P1 and P3–P13 are independently replayed from each preceding workbook
+row. P2 is deliberately excluded; real-quarter parity is not yet
+established from the demo alone.
