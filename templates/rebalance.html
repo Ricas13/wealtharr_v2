@@ -12,6 +12,15 @@
     <h2>1. Compare the proposal with actual fills</h2>
     <p>{{ signal.message }}</p>
     <p class="ck-muted">Only transactions already executed in your broker should be recorded. You can split one proposal into several partial fills on different actual dates. Amounts are in GBP, including actual fees.</p>
+    {% if can_choose_manual_reset %}
+    <details class="ck-disclosure-inline">
+      <summary>Optional: review a manual 60/40 reset instead</summary>
+      <p>The ordinary strategy advice is to spend the remaining reserve on growth equity. If you explicitly prefer a 60/40 reset, you may request a separate review of estimated trades based on recorded holdings and verified quarter-end GBP prices. This will mark the original all-in proposal not applicable. No trades occur, and an actual reset is only confirmed after individually recorded fills and verified post-fill prices.</p>
+      <form method="post">{% csrf_token %}
+        <button class="btn btn-subtle" type="submit" name="intent" value="request_manual_reset">Choose manual 60/40 reset review</button>
+      </form>
+    </details>
+    {% endif %}
     <ol class="ck-orders">
       {% for row, form in single_rows %}
         <li>
