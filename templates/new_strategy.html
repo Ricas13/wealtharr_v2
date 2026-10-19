@@ -2,7 +2,7 @@
 {% block title %}Create strategy{% endblock %}
 {% block content %}
 <div class="page-heading"><div><div class="eyebrow">MY STRATEGIES</div><h1>Create a strategy tab</h1><p>Choose an investing approach, then the account where you follow it.</p></div><a href="{% url 'dashboard' %}" class="btn btn-subtle">← Overview</a></div>
-<section class="panel padded" style="margin-bottom:16px;border:1px solid #2b8992">
+<section class="panel padded ws-feature-block">
   <h2>Want to try 9Sig without real investments?</h2>
   <p class="muted">Start a standalone £1,000 paper tracker with real Yahoo GBP closing prices and review-only alerts. No brokerage access required.</p>
   <form method="post" action="{% url 'start_paper_trial' %}">{% csrf_token %}
@@ -10,7 +10,7 @@
     <button class="btn btn-primary" type="submit">Start virtual 9Sig trial →</button>
   </form>
 </section>
-<section class="panel padded" style="margin-bottom:16px;border:1px solid #2b8992">
+<section class="panel padded ws-feature-block">
   <h2>9Sig — Wealtharr picks the instruments for you</h2>
   <p class="muted">For a UK Trading 212 Stocks & Shares ISA or Invest account, see the issuer-verified LQQ3 (60%) + ERNS (40%) strategy mapping, ISINs and important differences before recording real holdings.</p>
   <a class="btn btn-primary" href="{% url 'start_real_9sig' %}">Select 9Sig and my account →</a>
@@ -21,7 +21,7 @@
     <p class="muted">For example: “9Sig — ISA” and “9Sig — Trading” are independent, even though they use the same strategy model.</p>
     <form method="post" class="form-stack">{% csrf_token %}
       {% include 'partials/form_fields.html' with form=form %}
-      <div class="hint-box" style="margin-bottom:14px">
+      <div class="hint-box ws-hint-spaced">
       <strong>UK example ticker research (not a preselected trade)</strong><br>
       Equity: <b>LQQ3.L</b> — WisdomTree Nasdaq 100 3× Daily Leveraged, LSE GBp line.
       Safe sleeve: <b>ERNS.L</b> — iShares GBP Ultrashort Bond (GBP). Both issuers indicate UK ISA eligibility, but confirm the specific securities are available in your Trading 212 account. Neither exactly matches the US TQQQ/AGG pair.<br>

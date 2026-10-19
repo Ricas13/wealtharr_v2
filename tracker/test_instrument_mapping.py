@@ -47,7 +47,10 @@ class InstrumentMappingWorkflowTests(TestCase):
         detail = self.client.get(reverse("strategy_detail", args=[self.strategy.pk]))
         self.assertContains(detail, "IE00BLRPRL42")
         self.assertContains(detail, "ERNS")
-        self.assertContains(detail, '<option value="LQQ3.L"', html=False)
+        # The account-specific trading selector now lives in the Ledger tab,
+        # rather than cluttering the strategy Overview.
+        ledger_tab = self.client.get(reverse("strategy_detail", args=[self.strategy.pk]) + "?tab=ledger")
+        self.assertContains(ledger_tab, '<option value="LQQ3.L"', html=False)
         data = {
             "kind": "BUY", "occurred_on": str(self.day),
             "symbol": "LQQ3.L", "quantity": "1", "unit_price": "300",
