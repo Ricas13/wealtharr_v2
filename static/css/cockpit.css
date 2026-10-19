@@ -191,3 +191,21 @@
   .ck-import-counts strong{font-size:1.3rem}
   .ck-import-form button{width:100%;justify-self:stretch}
 }
+
+/* G: single actual broker fill; visually separate recorded from proposed. */
+.ck-single-fill{padding-block:18px;border-top:1px solid var(--stroke-soft)}
+.ck-single-fill:first-of-type{border-top:0}
+.ck-single-fill>.ck-section-head{margin-bottom:10px}
+.ck-single-fill>.ck-section-head h3{margin:0}
+.ck-single-fill-form{display:grid;gap:12px}
+.ck-single-fill-form .ck-setup-fresh-fields{margin:0}
+.ck-single-fill-form button{justify-self:start;max-width:100%}
+.ck-fill-history{padding-left:1.4rem;display:grid;gap:10px}
+.ck-fill-history li{line-height:1.5;overflow-wrap:anywhere}
+.ck-fill-history .ck-muted{display:inline-block;margin-left:6px}
+.ck-finalize-panel{border-color:var(--stroke)}
+.ck-finalize-panel p{margin-top:10px}
+@media(max-width:649px){
+  .ck-single-fill-form .ck-setup-fresh-fields{grid-template-columns:1fr}
+  .ck-single-fill-form button,.ck-finalize-panel button{width:100%}
+}
