@@ -82,7 +82,36 @@ def fetch_stooq_reference(symbol: str, since: date, through: date,
     match = next((value for day, value in quotes if day == yahoo_anchor.as_of), None)
     if match is None or abs(match / yahoo_anchor.price - Decimal("1")) > MAX_REFERENCE_DIFFERENCE:
         raise QuoteUnavailable("Yahoo and independent reference scales conflict")
-    return tuple(
-        NormalizedQuote(symbol, day, value, "USD", "USD", "stooq", "USD", True)
+    accepted = tuple(
+        NormalizedQuote(symbol, day, value, "USD", "USD", "stooq", "USD", True,
+                        raw_close=value, observation_id="stooq:%s:%s" % (symbol, day))
         for day, value in sorted(quotes) if since <= day <= through
     )
+    if not accepted:
+        raise QuoteUnavailable("Independent provider has no observations in the requested period")
+    return accepted
+
+
+def reference_with_fallback(symbol: str, since: date, through: date, *,
+                            yahoo_quotes: tuple[NormalizedQuote, ...],
+                            yahoo_anchor: NormalizedQuote | None = None,
+                            fallback_fetch=fetch_stooq_reference) -> tuple[NormalizedQuote, ...]:
+    """Select primary USD reference history or independently corroborated Stooq.
+
+    Fallback never guesses UK GBX/GBP, never writes MarketObservation/PriceMark,
+    and never relabels Stooq observations as Yahoo.
+    """
+    if symbol not in STOOQ_REFERENCE_MAP:
+        raise QuoteUnavailable("Only pinned USD references can use this fallback")
+    def valid(q):
+        return (q.symbol == symbol and q.source == "yahoo" and
+                q.currency == q.unit == q.raw_unit == "USD" and
+                q.raw_unit_verified and isinstance(q.price, Decimal) and
+                q.price.is_finite() and q.price > 0 and
+                q.raw_close == q.price and q.observation_id and
+                since <= q.as_of <= through)
+    if yahoo_quotes and all(valid(q) for q in yahoo_quotes):
+        return tuple(sorted(yahoo_quotes, key=lambda q: q.as_of))
+    if yahoo_anchor is None:
+        raise QuoteUnavailable("An existing independently verified Yahoo anchor is required")
+    return fallback_fetch(symbol, since, through, yahoo_anchor=yahoo_anchor)
