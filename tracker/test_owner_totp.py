@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from tracker.models import OwnerTOTP
 from tracker.totp import current_code, matching_step, verify_account_code
+from tracker.services import decrypt_secret
 
 
 TIME_A = 1_000_000_000
@@ -24,7 +25,7 @@ class OwnerAuthenticatorTests(TestCase):
     def enroll(self):
         res = self.client.get(reverse("totp_setup"))
         self.assertEqual(res.status_code, 200)
-        secret = self.client.session["wealtharr_pending_totp"]
+        secret = decrypt_secret(self.client.session["wealtharr_pending_totp"])
         with patch("tracker.totp.time.time", return_value=TIME_A):
             res = self.client.post(reverse("totp_setup"), {
                 "intent": "enable", "password": "secure-setup-password-123",
@@ -77,7 +78,7 @@ class OwnerAuthenticatorTests(TestCase):
 
     def test_setup_requires_password_and_valid_code(self):
         response = self.client.get(reverse("totp_setup"))
-        secret = self.client.session["wealtharr_pending_totp"]
+        secret = decrypt_secret(self.client.session["wealtharr_pending_totp"])
         with patch("tracker.totp.time.time", return_value=TIME_A):
             response = self.client.post(reverse("totp_setup"), {
                 "intent": "enable", "password": "wrong-password",
