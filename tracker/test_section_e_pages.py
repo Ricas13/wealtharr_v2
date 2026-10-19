@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from tracker.core.presentation import allocation_comparison, select_next_step
-from tracker.models import Account, LedgerEntry, StrategyInstance, StrategyPreset
+from tracker.models import Account, LedgerEntry, StrategyInstance, StrategyPreset, YahooSync
 from tracker.services import validate_and_record
 
 
@@ -54,6 +54,16 @@ class SectionEPageTests(TestCase):
         self.assertNotContains(response, "money-weighted equivalent")
         self.assertNotContains(response, "Review and record what I did")
         self.assertContains(response, 'aria-current="page"')
+
+    def test_today_blocks_when_market_source_puts_quote_on_hold(self):
+        self.deposit(self.strategy, "200", date(2026, 2, 3))
+        YahooSync.objects.create(
+            symbol="LQQ3.L", last_error="PRICE_HOLD:RAW_UNIT_MISMATCH")
+        response = self.client.get(reverse("cockpit_today"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "market price is on hold")
+        self.assertNotContains(response, "Review and record what I did")
+        self.assertContains(response, 'role="alert"')
 
     def test_strategy_rules_source_is_fixed_not_editable_preset(self):
         response = self.client.get(reverse("cockpit_strategy"))
