@@ -352,6 +352,11 @@ def review_strategy(strategy):
         symbol="SPY", as_of__lte=quarter_end,
         as_of__gte=quarter_end - timedelta(days=760),
     ).order_by("as_of").values_list("as_of", "price"))
+    # Separate from USD TQQQ: use only persisted normalized GBP observations
+    # of the owner's actual growth trading line for information-only drawdown.
+    growth_history = list(MarketObservation.objects.filter(
+        symbol=strategy.equity_symbol, currency="GBP", as_of__lte=quarter_end,
+    ).order_by("as_of").values_list("as_of", "price"))
     # The 30 Down clock starts with a detected 30 Down notice, not
     # with a period of no sales. Previous unrelated HOLDs do not count.
     active_down_signal = strategy.signals.filter(
@@ -390,6 +395,7 @@ def review_strategy(strategy):
         safe_qty=safe_qty, safe_price=closing[strategy.safe_symbol].price,
         cash=cash, starting_equity_cost=initial_equity_cost,
         contributions=injected, reference=ref_tqqq, spy_reference=ref_spy,
+        growth_history=growth_history,
         prior_skipped_sells=skipped, prior_drawdown=bool(active_down_signal),
         down_age_quarters=down_age,
     )
