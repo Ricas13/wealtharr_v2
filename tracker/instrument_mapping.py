@@ -210,6 +210,25 @@ def for_strategy(strategy):
     if (strategy.equity_symbol != profile.equity.yahoo_ticker or
             strategy.safe_symbol != profile.safe.yahoo_ticker):
         return None
+    # New enrolments carry an immutable-at-creation manifest. Fail closed if
+    # runtime mapping rules changed or the stored exact-line snapshot differs.
+    # Older instances without a manifest retain the pre-F legacy pathway;
+    # migrate them only via a separately approved, audited upgrade.
+    snapshot = strategy.resolved_instruments or {}
+    if snapshot:
+        if (not isinstance(snapshot, dict) or
+                strategy.mapping_version != snapshot.get("mapping_version") or
+                strategy.mapping_version != MAPPING_VERSION):
+            return None
+        try:
+            released = enrolment_manifest(
+                strategy.preset.slug, country=strategy.account.country,
+                account_type=strategy.account.kind,
+                broker=strategy.account.broker)
+        except InstrumentMappingUnavailable:
+            return None
+        if snapshot != released:
+            return None
     return profile
 
 
