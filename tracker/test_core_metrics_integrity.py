@@ -103,6 +103,7 @@ class MetricIntegrityTests(TestCase):
         result = evaluate_inception(flows, approved(END, "1400"))
         self.assertEqual(result.net_contributed_gbp, D("1400"))
         self.assertEqual(result.cash_gain_gbp, D("0"))
+        self.assertEqual(result.gain_vs_net_contributions_pct, D("0"))
         self.assertIsNone(result.simple_cumulative_return)
         self.assertIsNotNone(result.xirr_annual)
         self.assertAlmostEqual(result.xirr_annual, D("0"),
@@ -115,3 +116,27 @@ class MetricIntegrityTests(TestCase):
         self.assertIsNone(allocation_drift(
             {"growth": D("0"), "safe": D("0")},
             {"growth": D("0.6"), "safe": D("0.4")}))
+
+    def test_gain_percentage_is_descriptive_not_twr(self):
+        flows = (
+            ExternalFlow("initial", START, D("1000"), 0),
+            ExternalFlow("later", date(2025, 6, 20), D("200"), 0),
+            ExternalFlow("withdraw", date(2025, 10, 20), D("-100"), 0),
+        )
+        result = evaluate_inception(flows, approved(END, D("1300")))
+        self.assertEqual(result.cash_gain_gbp, D("200"))
+        self.assertEqual(result.net_contributed_gbp, D("1100"))
+        self.assertAlmostEqual(result.gain_vs_net_contributions_pct,
+                               D("18.1818181818"), delta=D("0.00000001"))
+        self.assertIsNone(result.simple_cumulative_return)
+
+    def test_gain_percentage_unavailable_when_net_funding_zero_or_negative(self):
+        flows = (
+            ExternalFlow("first", START, D("100"), 0),
+            ExternalFlow("cash-out", date(2025, 6, 1), D("-100"), 0),
+        )
+        result = evaluate_inception(flows, approved(END, "10"))
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.net_contributed_gbp, D("0"))
+        self.assertIsNone(result.gain_vs_net_contributions_pct)
+        self.assertIsNone(result.simple_cumulative_return)
