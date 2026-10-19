@@ -1,83 +1,121 @@
-"""Single-user concise notices; user trades manually. Idempotent dispatch keys.
+"""Owner notification scheduler: one digest, typed warnings and planned reminders.
 
-Use this in place of the old monthly command after suppressing instant
-QUARTERLY dispatch in review_strategy (see INSTALL.md). SPIKE_WATCH and
-THIRTY_DOWN remain immediate mid-quarter alerts from market_signals.py.
+This module never calculates signals, mutates holdings or executes trades.
+The delivery layer retains persistent per-channel idempotency and retries.
 """
 from datetime import timedelta
 from decimal import Decimal
+from hashlib import sha256
+
 from django.utils import timezone
-from .models import (LedgerEntry, NotificationPreference, RebalanceExecution,
-                     StrategyInstance, StrategySignal)
-from .services import dispatch
+from .models import (
+    LedgerEntry, NotificationPreference, RebalanceExecution,
+    SignalFill, StrategyInstance, StrategySignal,
+)
+from .services import dispatch, ledger_summary
+from .notification_routing import route_notice, newly_delivered
 from .cockpit import _price_status
 from .market_signals import quarter_end_before
-from .services import ledger_summary
 
 D = Decimal
 
 
 def trade_lines(signal):
     lines = []
-    for a in signal.actions:
-        if a.get('side') not in ('BUY', 'SELL'):
+    for action in signal.actions:
+        if action.get("side") not in ("BUY", "SELL"):
             continue
-        lines.append('%s approx. £%s of %s (%s units at %s close)' % (
-            a['side'].title(), a['estimated_gbp'], a['symbol'], a['quantity'], signal.as_of))
+        lines.append("%s approximately £%s of %s (%s units at %s close)" % (
+            action["side"].title(), action["estimated_gbp"],
+            action["symbol"], action["quantity"], signal.as_of))
     return lines
 
 
+def _send(owner, category, key, subject, message):
+    return newly_delivered(route_notice(
+        owner, category, key, subject, message, sender=dispatch))
+
+
 def send_due_cockpit_notices(today=None, remind_after_days=3):
+    """Send owner-selected, deterministic advisory notices only once per key.
+
+    Previously recorded partial fills suppress stale trade quantities, but
+    a review may still get one weekly reminder to complete reconciliation.
+    """
     today = today or timezone.localdate()
     count = 0
-    for strategy in StrategyInstance.objects.select_related('owner', 'account').filter(
-            preset__slug='nasdaq-quarterly-target', market_data_enabled=True).exclude(account__kind='PAPER'):
-        pref, _ = NotificationPreference.objects.get_or_create(owner=strategy.owner)
+    for strategy in StrategyInstance.objects.select_related("owner", "account").filter(
+            preset__slug="nasdaq-quarterly-target",
+            market_data_enabled=True).exclude(account__kind="PAPER"):
+        owner = strategy.owner
+        pref, _ = NotificationPreference.objects.get_or_create(owner=owner)
         report = ledger_summary(strategy)
         fresh, why, marks = _price_status(strategy, report)
-        signals = StrategySignal.objects.filter(strategy=strategy, kind='QUARTERLY').exclude(
-            review_outcome__in=('FALSE_POSITIVE', 'NOT_APPLICABLE')).filter(
-                as_of=quarter_end_before(today)).order_by('-as_of', '-pk')[:1]
-        for sig in signals:
-            if RebalanceExecution.objects.filter(signal=sig).exists():
-                continue
-            orders = trade_lines(sig)
-            # Do not send older trade instructions when newer broker events
-            # have changed the portfolio since the signal's valuation date.
-            reconciled = fresh and not strategy.ledger.filter(occurred_on__gt=sig.as_of).exists()
-            if orders and reconciled:
-                subject = 'Wealtharr 9Sig — quarterly action (%s)' % sig.as_of
-                body = ('Quarter-end review %s\n\n%s\n\nOpen Wealtharr → Today → Review trades. '
-                        'Verify live prices, quantities and fees at Trading 212. '
-                        'No orders have been placed.') % (sig.as_of, '\n'.join(orders))
-                outcomes = dispatch(strategy.owner, 'quarterly-digest:%s:%s' % (strategy.pk, sig.signal_key),
-                                    subject, body)
-                count += sum(x == 'sent' for x in outcomes.values())
-            elif orders and not reconciled:
-                # An older review should not become a fresh executable notice.
-                # Today shows exactly why instructions are unavailable.
-                continue
-            if (orders and reconciled and sig.created_at.date() <= today - timedelta(days=remind_after_days)
-                    and not RebalanceExecution.objects.filter(signal=sig).exists()):
-                subject = '9Sig review still waiting'
-                body = ('The %s quarterly review has not been confirmed in Wealtharr. '
-                        'Open Today to check freshness and either record actual fills '
-                        'or mark the signal as not applicable. Do not trade from an old email.') % sig.as_of
-                key = 'rebalance-reminder:%s:%s:%s' % (strategy.pk, sig.signal_key, today.isocalendar().week)
-                outcomes = dispatch(strategy.owner, key, subject, body)
-                count += sum(x == 'sent' for x in outcomes.values())
-        if pref.monthly_reminders and strategy.monthly_target > 0 and today.day >= 3:
-            contributed = sum((x.amount for x in strategy.ledger.filter(
-                kind='DEPOSIT', occurred_on__year=today.year, occurred_on__month=today.month)), D('0'))
+        # A recurring source issue is never converted to a trade instruction.
+        # One digest per calendar week and problem identity until resolved.
+        if not fresh and report["positions"]:
+            fingerprint = sha256(why.encode("utf-8")).hexdigest()[:12]
+            week = today.isocalendar()
+            key = "data:%s:%04d-W%02d:%s" % (
+                strategy.pk, week.year, week.week, fingerprint)
+            count += _send(owner, "data", key,
+                "Wealtharr — review market data",
+                "%s: an accurate review is currently unavailable. %s "
+                "Open Today to see the data status. Do not trade from old "
+                "recommendations." % (strategy.name, why))
+
+        recent = StrategySignal.objects.filter(
+            strategy=strategy, kind="QUARTERLY",
+            as_of=quarter_end_before(today)).exclude(
+                review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"),
+            ).order_by("-as_of", "-pk").first()
+        if recent and not RebalanceExecution.objects.filter(signal=recent).exists():
+            actions = trade_lines(recent)
+            existing = SignalFill.objects.filter(strategy=strategy, signal=recent)
+            partial = existing.exists()
+            # A proposal must not be sent with invented or stale quantities
+            # after any unrelated broker event. Stored partials are factual.
+            reconciled = (fresh and not strategy.ledger.filter(
+                occurred_on__gt=recent.as_of).exists())
+            if actions and reconciled and not partial:
+                count += _send(owner, "quarterly",
+                    "quarterly-digest:%s:%s" % (strategy.pk, recent.signal_key),
+                    "Wealtharr — quarterly review (%s)" % recent.as_of,
+                    "Recorded review %s\n\n%s\n\n"
+                    "Open Wealtharr → Today. Check broker availability, actual "
+                    "prices, quantities and fees. No orders have been placed." % (
+                        recent.as_of, "\n".join(actions)))
+            if (actions and recent.created_at.date() <= today - timedelta(
+                    days=remind_after_days) and (partial or reconciled)):
+                week = today.isocalendar()
+                label = ("You have saved actual partial fills. Complete the "
+                         "review only after all broker fills and verified "
+                         "post-fill GBP closing values are available."
+                         if partial else
+                         "This review is not confirmed. Open Today, verify "
+                         "freshness and record only actual broker fills.")
+                count += _send(owner, "followup",
+                    "rebalance-reminder:%s:%s:%04d-W%02d" % (
+                        strategy.pk, recent.signal_key, week.year, week.week),
+                    "Wealtharr — outstanding quarterly review",
+                    "%s: %s No automatic trades are placed." % (
+                        strategy.name, label))
+
+        if (pref.monthly_reminders and strategy.contribution_alerts and
+                strategy.monthly_target > 0 and today.day >= 3):
+            contributed = sum((row.amount for row in strategy.ledger.filter(
+                kind="DEPOSIT", occurred_on__year=today.year,
+                occurred_on__month=today.month)), D("0"))
             if contributed < strategy.monthly_target:
-                outstanding = strategy.monthly_target - contributed
-                subject = 'Wealtharr — monthly £%s contribution' % strategy.monthly_target
-                body = ('Planned this month: £%s. Recorded: £%s. '
-                        'Remaining planned: £%s.\n\nAfter depositing in Trading 212, '
-                        'open Wealtharr → Today → I deposited this. '
-                        'No money has been moved automatically.') % (
-                            strategy.monthly_target, contributed, outstanding)
-                key = 'monthly:%s:%04d-%02d' % (strategy.pk, today.year, today.month)
-                outcomes = dispatch(strategy.owner, key, subject, body)
-                count += sum(x == 'sent' for x in outcomes.values())
+                count += _send(owner, "contribution",
+                    "monthly:%s:%04d-%02d" % (
+                        strategy.pk, today.year, today.month),
+                    "Wealtharr — planned monthly £%s contribution" % (
+                        strategy.monthly_target),
+                    "Your plan this month: £%s. Actual recorded: £%s. "
+                    "Amount still planned: £%s. After depositing in "
+                    "Trading 212, record it in Wealtharr. This is a "
+                    "reminder, not an automatic transfer." % (
+                        strategy.monthly_target, contributed,
+                        strategy.monthly_target - contributed))
     return count
