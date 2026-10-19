@@ -51,7 +51,7 @@ class V2OnboardingBrowserTests(BrowserHarness):
                         self.assertTrue(target.is_file())
 
                     self.visit("v2_catalogue")
-                    self.page.get_by_role("heading", name="Instrument catalogue").wait_for()
+                    self.page.get_by_role("heading", name="Instrument catalogue", level=1).wait_for()
                     self.page.get_by_text("Account check pending").first.wait_for()
                     self.assertTrue(
                         self.page.get_by_text("IE00BLRPRL42").count() >= 1

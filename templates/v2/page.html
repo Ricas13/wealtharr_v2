@@ -109,6 +109,11 @@
   <p class="w2-muted">Recorded as a snapshot, NOT as purchases or verified current valuations. Reconcile these against the ledger in Phase 3.</p>
   {% if selected_instance.opening_snapshot %}
     <p class="w2-note">Opening cash: £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:2 }} · as reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }}.</p>
+    <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Role</th><th>Trading line</th><th>Shares reported</th><th>Average cost reported (£)</th></tr></thead><tbody>
+    {% for role, holding in selected_instance.opening_snapshot.positions.items %}
+      <tr><td>{{ role|capfirst }}</td><td>{{ holding.ticker }}</td><td class="w2-number">{{ holding.shares }}</td><td class="w2-number">{{ holding.average_cost_gbp }}</td></tr>
+    {% endfor %}
+    </tbody></table></div>
   {% endif %}
 </section>
 {% endif %}
