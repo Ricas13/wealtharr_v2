@@ -47,6 +47,10 @@ class StrategyInstance(models.Model):
     monthly_target = models.DecimalField(max_digits=16, decimal_places=2, default=Decimal("0"))
     equity_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the 3× equity trading line")
     safe_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the safe asset")
+    # Source-controlled, owner-enrolment instrument manifest; empty for legacy
+    # instances until an explicit, owner-approved migration is implemented.
+    mapping_version = models.CharField(max_length=40, blank=True, default="", editable=False)
+    resolved_instruments = models.JSONField(blank=True, default=dict, editable=False)
     market_data_enabled = models.BooleanField(default=False, help_text="Fetch Yahoo closes and enable advisory strategy reviews")
     contribution_alerts = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
