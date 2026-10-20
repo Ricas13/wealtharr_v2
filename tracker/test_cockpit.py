@@ -19,6 +19,7 @@ from .cockpit import _performance
 from .management.commands.sync_market_and_signals import save_verified_strategy_snapshot
 from .cockpit_notifications import send_due_cockpit_notices
 from .market_signals import quarter_end_before
+from .core.catalogue import CATALOGUE_VERSION, onboarding_manifest, released_version
 
 class PerformanceSafetyTests(TestCase):
     def test_no_data_and_undefined_cases(self):
@@ -89,11 +90,11 @@ class GuidedRebalanceTests(TestCase):
             'intent': 'record_one', 'action_index': str(index),
             'executed_on': self.fill_day.isoformat(),
             'quantity': str(quantity), 'unit_price': str(price),
-            'fee': str(fee), 'idempotency_key': str(uuid4()),
+            'fee': str(fee), 'idempotency_key': str(uuid4()), 'actual_confirmation': 'yes',
         }
 
     def record_both_actual_fills(self):
-        uri = reverse('cockpit_rebalance', args=[self.sig.pk])
+        uri = reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk])
         a = self.client.post(uri, self.single_payload(0, quantity='1', price='100'))
         b = self.client.post(uri, self.single_payload(1, quantity='2', price='50'))
         self.assertEqual(a.status_code, 302)
@@ -102,7 +103,7 @@ class GuidedRebalanceTests(TestCase):
     def test_atomic_fills_and_reset_baseline(self):
         self.record_both_actual_fills()
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
-        response = self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]),
+        response = self.client.post(reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk]),
                                     {'intent': 'finalize'})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(RebalanceExecution.objects.filter(signal=self.sig).count(), 1)
@@ -111,7 +112,7 @@ class GuidedRebalanceTests(TestCase):
 
     def test_overselling_rolls_back_all_rows_and_baseline(self):
         previous = self.strategy.ledger.count()
-        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]),
+        self.client.post(reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk]),
                          self.single_payload(0, quantity='100', price='100'))
         self.assertEqual(self.strategy.ledger.count(), previous)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
@@ -121,8 +122,8 @@ class GuidedRebalanceTests(TestCase):
         self.sig.as_of = self.qend - timedelta(days=1)
         self.sig.save(update_fields=['as_of'])
         previous = self.strategy.ledger.count()
-        self.assertEqual(self.client.get(reverse('cockpit_rebalance', args=[self.sig.pk])).status_code, 302)
-        self.assertEqual(self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]), self.single_payload(0, quantity='1', price='100')).status_code, 302)
+        self.assertEqual(self.client.get(reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk])).status_code, 200)
+        self.assertEqual(self.client.post(reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk]), self.single_payload(0, quantity='1', price='100')).status_code, 302)
         self.assertEqual(self.strategy.ledger.count(), previous)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
 
@@ -152,7 +153,7 @@ class GuidedRebalanceTests(TestCase):
         self.account.broker = 'UNKNOWN'
         self.account.save(update_fields=['broker'])
         count = self.strategy.ledger.count()
-        self.client.post(reverse('cockpit_rebalance', args=[self.sig.pk]),
+        self.client.post(reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk]),
                          self.single_payload(0, quantity='1', price='100'))
         self.assertEqual(self.strategy.ledger.count(), count)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
@@ -171,7 +172,7 @@ class GuidedRebalanceTests(TestCase):
     def test_owner_isolation(self):
         stranger = get_user_model().objects.create_user('stranger', password='strong-password')
         self.client.force_login(stranger)
-        self.assertEqual(self.client.get(reverse('cockpit_rebalance', args=[self.sig.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk])).status_code, 404)
 
 class ImportSafetyTests(TestCase):
     def setUp(self):
@@ -180,7 +181,14 @@ class ImportSafetyTests(TestCase):
         preset, _ = StrategyPreset.objects.get_or_create(slug='nasdaq-quarterly-target', defaults={
             'name':'9Sig', 'summary':'', 'risk':'HIGH', 'methodology':'', 'active':True})
         self.strategy = StrategyInstance.objects.create(owner=self.user, account=account,preset=preset,
-            name='9Sig', equity_symbol='LQQ3.L', safe_symbol='ERNS.L')
+            name='9Sig', equity_symbol='LQQ3.L', safe_symbol='ERNS.L',
+            strategy_key='nasdaq-quarterly-target', platform_code='TRADING212',
+            account_type_code='ISA', started_on=date(2026, 1, 1),
+            owner_checked_on=date(2026, 1, 1), tracking_only=True,
+            strategy_version=released_version('nasdaq-quarterly-target'),
+            mapping_version=CATALOGUE_VERSION,
+            resolved_instruments=onboarding_manifest(
+                'nasdaq-quarterly-target', 'TRADING212', 'ISA'))
     def file(self, text):
         return SimpleUploadedFile('history.csv', text.encode('utf-8'), content_type='text/csv')
     def test_preview_duplicate_in_same_file(self):
@@ -200,7 +208,7 @@ class ImportSafetyTests(TestCase):
         self.client.force_login(self.user)
         csv = ('Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
                'Currency conversion,2026-01-02 12:01:00,10,bad\n')
-        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(csv), 'apply':'yes'})
+        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(csv), 'apply':'yes'})
         self.assertEqual(self.strategy.ledger.count(), 0)
         self.assertEqual(BrokerImportRow.objects.count(), 0)
 
@@ -211,17 +219,17 @@ class CSVImportCommitTests(ImportSafetyTests):
                     'Currency (Price / share),ISIN,ID\n'
                     'Deposit,2026-01-02 12:00:00,1000,,,,,,d1\n'
                     'Market buy,2026-01-03 12:00:00,500,LQQ3,5,100,GBP,IE00BLRPRL42,o1\n')
-        preview = self.client.post(reverse('cockpit_csv'),
+        preview = self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]),
             {'csv_file': self.file(csv_data)})
         self.assertEqual(preview.status_code, 200)
-        first = self.client.post(reverse('cockpit_csv'),
+        first = self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]),
             {'csv_file': self.file(csv_data), 'apply': 'yes'})
         self.assertEqual(first.status_code, 302)
         self.assertEqual(self.strategy.ledger.count(), 2)
         self.assertEqual(BrokerImportRow.objects.count(), 2)
         self.assertEqual(ledger_summary(self.strategy)['cash'], D('500.00'))
-        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(csv_data)})
-        self.client.post(reverse('cockpit_csv'),
+        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(csv_data)})
+        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]),
             {'csv_file': self.file(csv_data), 'apply': 'yes'})
         self.assertEqual(self.strategy.ledger.count(), 2)
 
@@ -229,7 +237,7 @@ class NonResetQuarterTests(GuidedRebalanceTests):
     def test_ordinary_safe_asset_fill_remains_partial_until_all_real_units(self):
         self.sig.reset_reason = ''
         self.sig.save(update_fields=['reset_reason'])
-        url = reverse('cockpit_rebalance', args=[self.sig.pk])
+        url = reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk])
         self.client.post(url, self.single_payload(0, quantity='1', price='100'))
         self.client.post(url, self.single_payload(1, quantity='0.5', price='50'))
         self.client.post(url, {'intent': 'finalize'})
@@ -241,7 +249,7 @@ class NonResetQuarterTests(GuidedRebalanceTests):
         self.sig.save(update_fields=['reset_reason'])
         self.record_both_actual_fills()
         response = self.client.post(
-            reverse('cockpit_rebalance', args=[self.sig.pk]),
+            reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk]),
             {'intent': 'finalize'})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(RebalanceExecution.objects.filter(signal=self.sig).count(), 1)
@@ -256,15 +264,16 @@ class CashOnlyTodayTests(TestCase):
             name='9Sig', equity_symbol='LQQ3.L', safe_symbol='ERNS.L', market_data_enabled=True)
         validate_and_record(strategy, LedgerEntry(kind='DEPOSIT', occurred_on=timezone.localdate(), amount=D('1000')))
         self.client.force_login(user)
-        response = self.client.get(reverse('cockpit_today'))
-        self.assertContains(response, '1,000.00')
-        self.assertContains(response, 'Add your actual purchases')
+        response = self.client.get(reverse('v2_instance_page', args=[strategy.pk, 'today']))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['today_cash'], D('1000.00'))
+        self.assertEqual(strategy.ledger.filter(kind='BUY').count(), 0)
 
 class ImportPreviewGateTests(ImportSafetyTests):
     def test_direct_apply_without_preview_does_not_write(self):
         self.client.force_login(self.user)
         csv_data = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
-        response = self.client.post(reverse('cockpit_csv'),
+        response = self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]),
             {'csv_file': self.file(csv_data), 'apply': 'yes'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.strategy.ledger.count(), 0)
@@ -273,17 +282,17 @@ class ImportPreviewGateTests(ImportSafetyTests):
         self.client.force_login(self.user)
         a = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
         b = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,600,d1\n'
-        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(a)})
-        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(b), 'apply': 'yes'})
+        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(a)})
+        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(b), 'apply': 'yes'})
         self.assertEqual(self.strategy.ledger.count(), 0)
 
     def test_manual_overlap_after_preview_aborts_import(self):
         self.client.force_login(self.user)
         csv_data = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
-        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(csv_data)})
+        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(csv_data)})
         validate_and_record(self.strategy, LedgerEntry(kind='DEPOSIT',
             occurred_on=date(2026, 1, 2), amount=D('500')))
-        self.client.post(reverse('cockpit_csv'), {'csv_file': self.file(csv_data), 'apply': 'yes'})
+        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(csv_data), 'apply': 'yes'})
         self.assertEqual(self.strategy.ledger.count(), 1)
         self.assertFalse(BrokerImportRow.objects.exists())
 
