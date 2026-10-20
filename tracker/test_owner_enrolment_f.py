@@ -68,7 +68,9 @@ class OwnerEnrollmentTests(TestCase):
         return instance
 
     def test_one_screen_fixed_isa_scope_and_named_issuer_evidence(self):
-        self.to_start()
+        self.client.get(self.url + "?restart=1")
+        self.client.post(self.url, {"step": "1", "strategy": "nasdaq-quarterly-target"})
+        self.client.post(self.url, {"step": "2", "platform": "TRADING212", "account_type": "ISA"})
         page = self.client.get(self.url)
         self.assertContains(page, "IE00BLRPRL42")
         self.assertContains(page, "IE00BCRY6441")
