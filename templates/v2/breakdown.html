@@ -20,6 +20,7 @@
     <div class="w2-empty">No completed-quarter 9Sig review has been saved for this strategy. Calculations and proposed trades have not been invented.</div>
   {% else %}
     <div class="w2-notice"><strong>Saved advice vs verified evidence:</strong> the recorded review below is historical advice. Arithmetic shown here is a separately reconstructed trace, not a new rule evaluation or an executable recommendation. Without captured original raw quote units, the engine cannot produce an approved price bundle from this database.</div>
+    <h3 class="w2-breakdown-period-title">{{ breakdown_current.title }}</h3>
     <div class="w2-review-metadata">
       <div><span>Review</span><strong>{{ breakdown_current.as_of|date:"j M Y" }}</strong></div>
       <div><span>Saved event</span><strong>{{ breakdown_current.kind }} · #{{ breakdown_current.pk }}</strong></div>

@@ -539,3 +539,5 @@ body.v2 {
 .w2-breakdown-checks>div{flex-direction:column;gap:8px}
 .w2-breakdown-checks .w2-badge{max-width:none}
 }
+
+.w2-breakdown-period-title{font-size:1rem;font-weight:600;color:var(--w2-text);margin:14px 0 0}

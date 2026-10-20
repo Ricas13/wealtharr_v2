@@ -84,7 +84,7 @@ class Phase5BreakdownBrowserTests(BrowserHarness):
                     self.page.get_by_role(
                         "heading", name="Quarterly decision evidence"
                     ).wait_for()
-                    self.page.get_by_text("Saved Q3 audit").first.wait_for()
+                    self.page.get_by_role("heading", name="Saved Q3 audit").wait_for()
                     self.page.get_by_text("981.52").first.wait_for()
                     self.assertNotIn("SECRET_OTHER_OWNER_PORTFOLIO", self.page.content())
                     self.assertNotIn("OTHER_SECRET_QUARTER", self.page.content())
@@ -102,7 +102,7 @@ class Phase5BreakdownBrowserTests(BrowserHarness):
                     self.page.get_by_role("button", name="Inspect review").click()
                     self.page.get_by_role("heading", name="Quarterly decision evidence").wait_for()
                     self.assertIn("quarter=2025-06-30", self.page.url)
-                    self.page.get_by_text("Saved Q2 audit").first.wait_for()
+                    self.page.get_by_role("heading", name="Saved Q2 audit").wait_for()
                     self.assertEqual(self.browser_errors, [])
 
     def test_export_audit_with_zero_side_effects(self):
