@@ -14,8 +14,22 @@ Playwright captures login, overview, Today, History, Ledger, Strategy, Breakdown
 
 Known differences: v2 standard panel radius 8px versus prototype 14px; v2 accent #6ea8fe versus prototype desaturated cyan #9aa8bd. Login/TOTP/Turnstile and data-quality refusal states have no equivalent static prototype. Actual screenshots should be visually approved after CI artifacts are captured.
 
+## Verified CI evidence and visual artifacts
+
+The first draft-head run (commit `6450085`, Application checks run 39435300722)
+**failed**: 385 Django tests run, seven expected skips, 74 failures and
+three errors; the Chromium suite ran 29 tests with two failures and 13 errors.
+Most regressions are tests still targeting removed legacy forms/routes.
+Do not treat the old green-main test result as approval of this PR.
+
+The new browser workflow first runs the Phase 8 visual capture suite with
+`WEALTHARR_CAPTURE_V2_BASELINES=1`, then uploads the resulting real
+1440px/390px PNGs as artifact `wealtharr-phase8-v2-screenshots` even
+when the historic test suite remains red. This is evidence capture, not a
+claim that the visual test or subsequent CI has passed.
+
 ## Important remaining dependency
 
 The v2 Today read-only adapter still imports _price_status, _last_action and _next_end from tracker.cockpit. Removing that module would require extracting its logic and independently proving financial parity, which is explicitly outside layout scope. Its old endpoints are no longer routed. Some existing financial safeguard tests POST legacy cockpit handlers and expect legacy HTML. Do not delete or skip those tests before equivalent v2-endpoint cases are established. If these tests fail in CI, the draft PR is **not merge-ready**; a separate safe test-porting change is necessary.
 
-Baseline (merged main): 395 Django tests, 7 expected skips, and 27 Chromium tests. No local Django is installed, so before/after local execution counts are unavailable. CI is checked once on the draft head; queued is not a failure but not proof of success. No production DB reset, migration execution or deployment was performed.
+Baseline (merged main): 395 Django tests, 7 expected skips, and 27 Chromium tests. No executable local Django checkout/runtime is available in this session, so local before/after counts are **not measured**. PR-head first-run test counts appear above; changes since that run have not been reverified. No production DB reset, migration execution or deployment was performed.
