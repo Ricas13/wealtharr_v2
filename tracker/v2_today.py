@@ -11,11 +11,11 @@ from uuid import uuid4
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .cockpit import _last_action, _next_end, _price_status
 from .cockpit_execution import (
@@ -24,7 +24,7 @@ from .cockpit_execution import (
 from .cockpit_forms import SingleSignalFillForm
 from .core.presentation import account_value, holding_rows
 from .instrument_mapping import for_strategy
-from .market_signals import quarter_end_before
+from .market_signals import NINE_SIG_RULE_VERSION, quarter_end_before
 from .models import (
     LedgerRevision, RebalanceExecution, SignalFill, StrategyInstance,
     StrategySignal, StrategyValueSnapshot,
@@ -199,7 +199,7 @@ def today_page(request, instance_id):
         instance=strategy, section="today",
         today_status=status, today_headline=headline,
         today_explanation=explanation, today_blocking_reason=reason,
-        today_ready=ready, today_signal=notice, today_partial=partial,
+        today_ready=ready, today_signal=notice, today_partial=partial, today_executed=executed,
         today_progress=progress if (status in ("trade", "record")) else (),
         today_value=display_value, today_gain=gain,
         today_cash=report["cash"], today_contributed=report["net_contributed"],
@@ -235,11 +235,17 @@ def _review_context(strategy, notice, *, form=None, error=""):
         not current or completed or
         notice.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")
     )
+    can_manual_reset = bool(
+        not blocked and not partial_fills and not notice.reset_reason
+        and notice.strategy_version == NINE_SIG_RULE_VERSION
+        and "Your reserve is now empty. Review whether to reset to 60/40." in notice.message
+    )
     return {
         "review_signal": notice, "review_rows": rows,
         "review_completed": completed, "review_is_current": current,
         "review_blocked": blocked,
         "review_can_submit": not blocked and bool(rows),
+        "review_can_manual_reset": can_manual_reset,
         "review_can_finalize": not blocked and bool(rows)
                                and all(r["complete"] for r in rows),
         "review_form": form, "review_error": error,
@@ -268,6 +274,19 @@ def guided_review(request, instance_id, signal_id):
             )
         intent = request.POST.get("intent", "")
         try:
+            if intent == "request_manual_reset":
+                if not context["review_can_manual_reset"]:
+                    raise ValidationError("This saved review cannot offer a manual reset.")
+                from .cockpit_manual_reset import choose_manual_reserve_reset
+                chosen = choose_manual_reserve_reset(
+                    owner=request.user, strategy_id=strategy.pk, signal_id=notice.pk,
+                )
+                messages.success(
+                    request, "Separate 60/40 review created. No trade or reset was executed."
+                )
+                return redirect(
+                    "v2_guided_review", instance_id=strategy.pk, signal_id=chosen.pk,
+                )
             if intent == "record_one":
                 form = SingleSignalFillForm(request.POST)
                 if not form.is_valid():
@@ -325,3 +344,40 @@ def guided_review(request, instance_id, signal_id):
         page_title="Record actual trades", instance=strategy,
         section="today", guided_review=True, **context,
     )
+
+
+@login_required
+@require_POST
+def notice_feedback(request, instance_id, signal_id):
+    """Record owner assessment of saved advice; NEVER treat it as a broker fill.
+
+    Historical alerts remain intact. A signal with actual linked fills or
+    confirmed execution cannot be reclassified by this lightweight feedback.
+    The strategy row is locked first, matching the execution service order.
+    """
+    strategy = _owned(request, instance_id)
+    outcome = request.POST.get("outcome", "")
+    note = request.POST.get("review_note", "").strip()[:2000]
+    if outcome not in ("CONFIRMED", "FALSE_POSITIVE", "NOT_APPLICABLE"):
+        messages.error(request, "Choose a valid review outcome.")
+        return redirect("v2_instance_page", instance_id=strategy.pk, section="today")
+    if outcome == "FALSE_POSITIVE" and not note:
+        messages.error(request, "Give a short reason for a false positive.")
+        return redirect("v2_instance_page", instance_id=strategy.pk, section="today")
+    with transaction.atomic():
+        locked = _owned(request, instance_id)
+        StrategyInstance.objects.select_for_update().get(pk=locked.pk)
+        signal = get_object_or_404(
+            StrategySignal.objects.select_for_update(),
+            pk=signal_id, strategy=locked,
+        )
+        if (SignalFill.objects.filter(strategy=locked, signal=signal).exists()
+                or RebalanceExecution.objects.filter(strategy=locked, signal=signal).exists()):
+            messages.error(request, "Actual fills exist. Review them through the audited trade record.")
+            return redirect("v2_instance_page", instance_id=locked.pk, section="today")
+        signal.review_outcome = outcome
+        signal.review_note = note
+        signal.acknowledged_at = timezone.now()
+        signal.save(update_fields=["review_outcome", "review_note", "acknowledged_at"])
+    messages.success(request, "Review recorded. No trades or balances changed.")
+    return redirect("v2_instance_page", instance_id=strategy.pk, section="today")

@@ -4,7 +4,7 @@
 
   <section class="w2-panel" aria-labelledby="w2-destination-title">
     <h2 id="w2-destination-title">Notification destinations</h2>
-    <p class="w2-muted">Master destination switches apply to every account. Categories and each strategy can only narrow them further. No message places a trade.</p>
+    <p class="w2-muted">Global channels and per-strategy choices. No broker orders.</p>
     <form method="post" action="{% url 'v2_settings' %}" class="w2-settings-form">
       {% csrf_token %}
       <input type="hidden" name="form_kind" value="owner">
@@ -32,7 +32,7 @@
         Remind me about an uncompleted review after
         <span><input id="w2-review-delay" class="field" type="number" name="followup_delay_days" min="1" max="30" step="1" required value="{{ followup_delay }}"> days</span>
       </label>
-      <p class="w2-muted">If still relevant, at most one review follow-up is sent each week. Notifications stop when the review is completed or no longer supports action.</p>
+      <p class="w2-muted">Reminders stop when action is completed.</p>
       <h3>Choose categories per destination</h3>
       <div class="w2-table-wrap">
         <table class="w2-table w2-alert-matrix">
@@ -61,7 +61,7 @@
 
   <section class="w2-panel" aria-labelledby="w2-strategy-notification-title">
     <h2 id="w2-strategy-notification-title">Your strategies &amp; accounts</h2>
-    <p class="w2-muted">Choose separate destinations for each strategy. Unchecked channels do not receive that strategy's scheduled alerts or urgent warnings. These options cannot enable a globally disabled destination.</p>
+    <p class="w2-muted">Choose email or Discord for each strategy.</p>
     {% for group in strategy_routes %}
       <div id="strategy-{{ group.instance.pk }}" class="w2-settings-instance">
         <div class="w2-setting-row">
@@ -93,7 +93,7 @@
       <div class="w2-empty">No active strategies yet. <a href="{% url 'v2_add_strategy' %}">Add a strategy</a> to choose alert routing.</div>
     {% endfor %}
     <div class="w2-setting-row"><div><strong>Base currency</strong><p class="w2-muted">This UK private tracker presents GBP values; no hidden FX assumptions.</p></div><strong>GBP</strong></div>
-    <p class="w2-muted">ISA information uses actual recorded contributions. It is not a complete broker-wide ISA allowance check.</p>
+    <p class="w2-muted">ISA totals cover only recorded contributions.</p>
   </section>
 
   <div class="w2-two-columns w2-settings-columns">
@@ -101,7 +101,7 @@
       <h2 id="w2-security-title">Security</h2>
       <div class="w2-setting-row"><div><strong>Password</strong><p class="w2-muted">Existing Django account login</p></div><a class="w2-button" href="{% url 'change_password' %}">Change password</a></div>
       <div class="w2-setting-row"><div><strong>Two-factor authentication</strong><p class="w2-muted">{% if has_authenticator %}Authenticator enrolled{% else %}Not enrolled{% endif %}; changes require password and a real code</p></div><a class="w2-button" href="{% url 'totp_setup' %}">{% if has_authenticator %}Manage 2FA{% else %}Enable 2FA{% endif %}</a></div>
-      <p class="w2-muted">No instant session-revocation action is provided here. Use Sign out to end this session.</p>
+      <p class="w2-muted">Sign out to end this session.</p>
     </section>
     <section class="w2-panel" aria-labelledby="w2-diagnostics-title">
       <h2 id="w2-diagnostics-title">Data &amp; health</h2>
@@ -122,7 +122,7 @@
 
   <section class="w2-panel" aria-labelledby="w2-receipts-title">
     <h2 id="w2-receipts-title">Your recent notification receipts</h2>
-    <p class="w2-muted">Private delivery attempts and retry status. Transport acknowledgments are not proof of inbox or device receipt. Message contents and credentials are not displayed.</p>
+    <p class="w2-muted">Transport status only; receipt on your device is unverified.</p>
     <div class="w2-table-wrap">
       <table class="w2-table">
         <thead><tr><th scope="col">Created</th><th scope="col">Channel</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col">Attempts</th></tr></thead>

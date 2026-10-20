@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from tracker.core.isa_allowance import estimate_allowance, tax_year_bounds
+from tracker.core.catalogue import CATALOGUE_VERSION, onboarding_manifest, released_version
 from tracker.cockpit_forms import OneScreenSetupForm
 from tracker.cockpit_import import inspect_csv
 from tracker.instrument_mapping import enrolment_manifest, for_strategy
@@ -100,20 +101,48 @@ class OwnerContributionAndImportTests(TestCase):
     def csv_file(self, csv_text):
         return SimpleUploadedFile("trades.csv", csv_text.encode("utf-8"),
                                   content_type="text/csv")
+    def v2_deposit_url(self):
+        # Only an explicitly pinned tracking instance can use the audited v2
+        # deposit flow. Existing legacy data is never silently re-versioned.
+        StrategyInstance.objects.filter(pk=self.strategy.pk).update(
+            strategy_key="nasdaq-quarterly-target",
+            platform_code="TRADING212", account_type_code="ISA",
+            started_on=date(2026, 1, 1),
+            owner_checked_on=timezone.localdate(), tracking_only=True,
+            strategy_version=released_version("nasdaq-quarterly-target"),
+            mapping_version=CATALOGUE_VERSION,
+            resolved_instruments=onboarding_manifest(
+                "nasdaq-quarterly-target", "TRADING212", "ISA"),
+        )
+        return reverse("v2_ledger_add", args=[self.strategy.pk])
+
 
     def test_actual_deposit_above_isa_allowance_warns_but_is_recorded(self):
-        response = self.client.post(reverse("cockpit_deposit"), {
+        url = self.v2_deposit_url()
+        preview = self.client.post(url, {
+            "intent": "preview", "kind": "DEPOSIT",
             "amount": "2000", "occurred_on": "2026-10-19",
-            "other_isa_subscriptions": "19000"})
-        self.assertEqual(response.status_code, 302)
+            "other_isa_subscriptions": "19000",
+        })
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, "ISA allowance")
+        self.assertEqual(self.strategy.ledger.count(), 0)
+        response = self.client.post(url, {"intent": "confirm"})
+        self.assertRedirects(response, reverse(
+            "v2_instance_page", args=[self.strategy.pk, "ledger"]))
         self.assertEqual(self.strategy.ledger.filter(kind="DEPOSIT").count(), 1)
         messages = [str(message) for message in response.wsgi_request._messages]
         self.assertTrue(any("ISA allowance" in m for m in messages))
 
     def test_other_isa_information_never_creates_a_deposit(self):
-        self.client.post(reverse("cockpit_deposit"), {
+        url = self.v2_deposit_url()
+        self.client.post(url, {
+            "intent": "preview", "kind": "DEPOSIT",
             "amount": "100.00", "occurred_on": "2026-10-19",
-            "other_isa_subscriptions": "15000"})
+            "other_isa_subscriptions": "15000",
+        })
+        self.assertEqual(self.strategy.ledger.count(), 0)
+        self.client.post(url, {"intent": "confirm"})
         self.assertEqual(ledger_summary(self.strategy)["net_contributed"], D("100"))
         self.assertEqual(self.strategy.ledger.count(), 1)
 
@@ -143,6 +172,8 @@ class OwnerContributionAndImportTests(TestCase):
 
 
 class OneScreenOwnerEnrolmentTests(TestCase):
+    """Original ISA safety expectations, adapted to v2's account-separated wizard."""
+
     def setUp(self):
         self.owner = get_user_model().objects.create_user(
             username="section-f-enrol-owner", password="test-only-secret")
@@ -151,49 +182,72 @@ class OneScreenOwnerEnrolmentTests(TestCase):
             defaults={"name": "9Sig", "risk": "HIGH",
                       "summary": "", "active": True})
         self.client.force_login(self.owner)
-        self.data = {
-            "position_mode": "FRESH",
-            "starting_cash": "18000.00",
-            "start_date": "2026-10-10",
-            "monthly_target": "500.00",
-            "destination": "NONE",
+        self.url = reverse("v2_add_strategy")
+
+    def enroll(self, *, mode="fresh", name="9Sig ISA", amount="18000.00",
+               cash="0"):
+        self.client.get(self.url + "?restart=1")
+        self.client.post(self.url, {
+            "step": "1", "strategy": "nasdaq-quarterly-target",
+        })
+        self.client.post(self.url, {
+            "step": "2", "platform": "TRADING212", "account_type": "ISA",
+        })
+        self.client.post(self.url, {"step": "3", "ack": "yes"})
+        step = {
+            "step": "4", "mode": mode, "name": name,
+            "start": "2026-10-10",
         }
+        if mode == "fresh":
+            step.update(amount=amount, deposited="yes")
+        else:
+            step.update(cash=cash, shares_growth="0", cost_growth="0",
+                        shares_safe="0", cost_safe="0")
+        self.assertContains(self.client.post(self.url, step), "step 5 of 5")
+        response = self.client.post(self.url, {"step": "5"})
+        strategy = StrategyInstance.objects.get(owner=self.owner, name=name)
+        self.assertRedirects(response, reverse(
+            "v2_instance_page", args=[strategy.pk, "today"]))
+        return strategy
 
     def test_reuses_empty_exact_isa_and_only_records_true_deposit(self):
-        before = Account.objects.create(
+        # v2 deliberately creates an isolated account rather than mutating
+        # an unrelated existing ISA with unknown historical funding.
+        previous = Account.objects.create(
             owner=self.owner, name="Trading 212 ISA", kind="ISA",
             broker="TRADING212", country="GB")
-        response = self.client.post(reverse("cockpit_setup"), self.data)
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(Account.objects.count(), 1)
-        strategy = StrategyInstance.objects.get(owner=self.owner)
-        self.assertEqual(strategy.account_id, before.pk)
+        strategy = self.enroll()
+        self.assertEqual(Account.objects.count(), 2)
+        self.assertNotEqual(strategy.account_id, previous.pk)
         self.assertEqual(strategy.mapping_version, enrolment_manifest()["mapping_version"])
         self.assertEqual(strategy.resolved_instruments, enrolment_manifest())
         self.assertEqual(strategy.ledger.filter(kind="DEPOSIT").count(), 1)
+        self.assertEqual(strategy.ledger.get().amount, D("18000"))
         self.assertFalse(strategy.ledger.filter(kind="BUY").exists())
-        self.assertEqual(strategy.monthly_target, D("500"))
-        messages = [str(msg) for msg in response.wsgi_request._messages]
-        self.assertTrue(any("approaching" in text for text in messages))
-        self.client.post(reverse("cockpit_setup"), self.data)
-        self.assertEqual(strategy.ledger.count(), 1)
+        self.assertTrue(strategy.tracking_only)
+        self.assertEqual(strategy.monthly_target, D("0"))
+        self.assertEqual(Account.objects.get(pk=previous.pk).broker, "TRADING212")
 
     def test_existing_history_creates_no_opening_holdings_and_goes_to_preview(self):
-        data = {**self.data, "position_mode": "EXISTING",
-                "starting_cash": "", "start_date": ""}
-        response = self.client.post(reverse("cockpit_setup"), data)
-        self.assertRedirects(response, reverse("cockpit_csv"))
-        strategy = StrategyInstance.objects.get(owner=self.owner)
+        strategy = self.enroll(mode="hold", cash="175")
         self.assertEqual(strategy.ledger.count(), 0)
         self.assertFalse(strategy.prices.exists())
+        from tracker.models import InstanceOpeningSnapshot
+        self.assertEqual(
+            InstanceOpeningSnapshot.objects.get(strategy=strategy).cash_gbp,
+            D("175"))
+        self.assertEqual(self.client.get(reverse(
+            "v2_ledger_import", args=[strategy.pk])).status_code, 200)
 
     def test_mismatched_existing_account_blocks_without_partial_changes(self):
-        Account.objects.create(
+        prior = Account.objects.create(
             owner=self.owner, name="Trading 212 ISA", kind="GIA",
             broker="OTHER", country="GB")
-        response = self.client.post(reverse("cockpit_setup"), self.data)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "already exists")
-        self.assertEqual(Account.objects.count(), 1)
-        self.assertFalse(StrategyInstance.objects.exists())
-        self.assertFalse(LedgerEntry.objects.exists())
+        strategy = self.enroll(mode="hold", cash="100")
+        prior.refresh_from_db()
+        self.assertEqual(prior.kind, "GIA")
+        self.assertEqual(prior.broker, "OTHER")
+        self.assertNotEqual(strategy.account_id, prior.pk)
+        self.assertEqual(strategy.account.kind, "ISA")
+        self.assertEqual(strategy.account.broker, "TRADING212")
+        self.assertEqual(strategy.ledger.count(), 0)

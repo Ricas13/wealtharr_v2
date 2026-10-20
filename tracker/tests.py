@@ -71,9 +71,11 @@ class SiteTests(TestCase):
         self.account=Account.objects.create(owner=self.user,name="ISA",kind="ISA")
     @override_settings(TURNSTILE_REQUIRED=False)
     def test_login_and_empty_chart(self):
-        self.assertEqual(self.client.get(reverse("dashboard")).status_code,302)
+        self.assertEqual(self.client.get(reverse("v2_overview")).status_code,302)
         self.assertEqual(self.client.post(reverse("login"),{"username":"admin","password":"a-very-long-test-password"}).status_code,302)
-        self.assertContains(self.client.get(reverse("dashboard")),"wealth-chart-points")
+        overview = self.client.get(reverse("v2_overview"))
+        self.assertEqual(overview.status_code, 200)
+        self.assertIsNone(overview.context["overview_total"])
     @override_settings(TURNSTILE_REQUIRED=True,TURNSTILE_SECRET_KEY="",TURNSTILE_SITE_KEY="")
     def test_turnstile_fail_closed(self):
         self.client.post(reverse("login"),{"username":"admin","password":"a-very-long-test-password"})
@@ -83,26 +85,35 @@ class SiteTests(TestCase):
         s=StrategyInstance.objects.create(owner=other,account=Account.objects.create(owner=other,name="Other"),
                                          preset=StrategyPreset.objects.first(),name="Private")
         self.client.force_login(self.user)
-        self.assertEqual(self.client.get(reverse("strategy_detail",args=[s.pk])).status_code,404)
-        self.assertEqual(self.client.post(reverse("record_entry",args=[s.pk]),{}).status_code,404)
+        self.assertEqual(self.client.get(reverse("v2_instance_page", args=[s.pk, "today"])).status_code,404)
+        self.assertEqual(self.client.post(reverse("v2_ledger_add", args=[s.pk]),{}).status_code,404)
     def test_create_account_strategy_deposit_and_snapshot(self):
         self.client.force_login(self.user)
-        # Section F uses one supported real ISA flow; the retired generic
-        # strategy editor deliberately redirects rather than creating plans.
         self.assertRedirects(self.client.get(reverse("new_strategy")),
-                             reverse("cockpit_setup"))
-        response=self.client.post(reverse("cockpit_setup"),{
-            "position_mode":"FRESH", "starting_cash":"1000",
-            "start_date":timezone.localdate().isoformat(),
-            "monthly_target":"500", "destination":"NONE"})
-        self.assertEqual(response.status_code,302)
-        s=StrategyInstance.objects.get(name="9Sig")
-        self.assertEqual(s.account.kind,"ISA")
-        self.assertEqual(s.account.broker,"TRADING212")
-        self.assertEqual(ledger_summary(s)["cash"],D("1000"))
+                             reverse("v2_add_strategy"), status_code=301)
+        url = reverse("v2_add_strategy")
+        self.client.get(url + "?restart=1")
+        self.client.post(url, {"step": "1", "strategy": "nasdaq-quarterly-target"})
+        self.client.post(url, {"step": "2", "platform": "TRADING212", "account_type": "ISA"})
+        self.client.post(url, {"step": "3", "ack": "yes"})
+        self.client.post(url, {
+            "step": "4", "mode": "fresh", "name": "9Sig",
+            "start": timezone.localdate().isoformat(),
+            "amount": "1000", "deposited": "yes",
+        })
+        response = self.client.post(url, {"step": "5"})
+        s = StrategyInstance.objects.get(name="9Sig")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(s.account.kind, "ISA")
+        self.assertEqual(s.account.broker, "TRADING212")
+        self.assertEqual(ledger_summary(s)["cash"], D("1000"))
         self.assertFalse(s.ledger.filter(kind="BUY").exists())
-        self.client.post(reverse("capture_snapshot"))
-        self.assertEqual(WealthSnapshot.objects.get(owner=self.user).total_value,D("1000"))
+        page = self.client.get(reverse("v2_instance_page", args=[s.pk, "today"]))
+        self.assertEqual(page.context["today_cash"], D("1000"))
+        # v2 never fabricates a value snapshot merely by opening a page.
+        self.assertFalse(s.value_snapshots.exists())
+        self.assertFalse(WealthSnapshot.objects.filter(owner=self.user).exists())
+
 
 
 class NotificationTests(TestCase):
@@ -173,17 +184,18 @@ class TemplateAndSecurityTests(TestCase):
         self.assertTrue(response.url.startswith(reverse("login")))
     def test_all_owner_pages_render(self):
         self.client.force_login(self.owner)
-        for url in (reverse("dashboard"),reverse("accounts"),
-                    reverse("strategy_detail",args=[self.strategy.pk]),reverse("user_settings"),
-                    reverse("change_password"),reverse("control")):
+        for url in (reverse("v2_overview"), reverse("v2_catalogue"),
+                    reverse("v2_instance_page", args=[self.strategy.pk, "strategy"]),
+                    reverse("v2_settings"), reverse("change_password"), reverse("control")):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code,200)
         self.assertRedirects(self.client.get(reverse("new_strategy")),
-                             reverse("cockpit_setup"))
+                             reverse("v2_add_strategy"), status_code=301)
     def test_snapshot_is_not_saved_when_price_is_missing(self):
         self.client.force_login(self.owner)
         validate_and_record(self.strategy,LedgerEntry(kind="DEPOSIT",amount=D("200"),occurred_on=timezone.localdate()))
         validate_and_record(self.strategy,LedgerEntry(kind="BUY",symbol="LQQ3",quantity=D("1"),
                                                      unit_price=D("50"),occurred_on=timezone.localdate()))
-        self.client.post(reverse("capture_snapshot"))
+        self.client.get(reverse("v2_instance_page", args=[self.strategy.pk, "today"]))
+        self.assertFalse(self.strategy.value_snapshots.exists())
         self.assertFalse(WealthSnapshot.objects.filter(owner=self.owner).exists())

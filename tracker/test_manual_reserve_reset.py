@@ -75,7 +75,7 @@ class ManualReserveResetChoiceTests(TestCase):
                      quantity="0.5", estimated_gbp="50.00"),
             ],
         )
-        self.url = reverse("cockpit_rebalance", args=[self.original.pk])
+        self.url = reverse("v2_guided_review", args=[self.strategy.pk, self.original.pk])
 
     def request_reset(self):
         response = self.client.post(
@@ -114,7 +114,7 @@ class ManualReserveResetChoiceTests(TestCase):
         self.request_reset()
         reset = StrategySignal.objects.get(
             strategy=self.strategy, signal_key="owner-reset:quarter:reserve-v2")
-        url = reverse("cockpit_rebalance", args=[reset.pk])
+        url = reverse("v2_guided_review", args=[self.strategy.pk, reset.pk])
         self.assertEqual(self.client.post(url, {"intent": "finalize"}).status_code, 200)
         self.assertFalse(StrategyBaseline.objects.exists())
         for index, qty, price in ((0, "3.7", "100"), (1, "7.4", "50")):
@@ -122,7 +122,7 @@ class ManualReserveResetChoiceTests(TestCase):
                 intent="record_one", action_index=str(index),
                 executed_on=self.trade_day.isoformat(),
                 quantity=qty, unit_price=price, fee="0",
-                idempotency_key=str(uuid4()),
+                idempotency_key=str(uuid4()), actual_confirmation="yes",
             ))
             self.assertEqual(response.status_code, 302)
         self.assertFalse(StrategyBaseline.objects.exists())
@@ -158,9 +158,9 @@ class ManualReserveResetChoiceTests(TestCase):
             intent="record_one", action_index="0",
             executed_on=self.trade_day.isoformat(),
             quantity="1", unit_price="50", fee="0",
-            idempotency_key=str(uuid4()),
+            idempotency_key=str(uuid4()), actual_confirmation="yes",
         ))
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(self.request_reset().status_code, 302)
+        self.assertEqual(self.request_reset().status_code, 200)
         self.assertFalse(StrategySignal.objects.filter(
             signal_key__startswith="owner-reset:").exists())

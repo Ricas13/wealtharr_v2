@@ -9,6 +9,7 @@ from django.views.decorators.cache import never_cache
 from django.utils import timezone
 
 from .models import OwnerTOTP
+from .v2_legacy import preferred_url
 from .services import decrypt_secret, encrypt_secret
 from .totp import generate_secret, matching_step, provisioning_uri, verify_account_code
 
@@ -21,16 +22,16 @@ ENROLL_SECRET = "wealtharr_pending_totp"
 @require_http_methods(["GET", "POST"])
 def challenge(request):
     if not OwnerTOTP.objects.filter(owner=request.user).exists():
-        return redirect("cockpit_today")
+        return redirect(preferred_url(request.user))
     if request.session.get(SESSION_FLAG) == request.user.pk:
-        return redirect("cockpit_today")
+        return redirect(preferred_url(request.user))
     if request.method == "POST":
         if verify_account_code(request.user, request.POST.get("code", "")):
             request.session[SESSION_FLAG] = request.user.pk
             request.session.cycle_key()
-            return redirect("cockpit_today")
+            return redirect(preferred_url(request.user))
         messages.error(request, "Code unavailable or invalid. Check your authenticator clock or try later.")
-    return render(request, "totp_challenge.html")
+    return render(request, "v2/totp_challenge.html")
 
 
 @never_cache
@@ -96,7 +97,7 @@ def configure(request):
             request.session[ENROLL_SECRET] = encrypt_secret(secret)
     else:
         secret = None
-    return render(request, "totp_setup.html", {
+    return render(request, "v2/totp_setup.html", {
         "enabled": existing is not None,
         "setup_secret": secret,
         "provisioning_uri": provisioning_uri(request.user.get_username(), secret)

@@ -106,15 +106,15 @@ class OwnerAuthenticatorTests(TestCase):
         signed_in = self.client.post(reverse("login"), {
             "username": self.owner.username, "password": self.password})
         self.assertEqual(signed_in.status_code, 302)
-        for route in (reverse("cockpit_today"), reverse("cockpit_settings"),
+        for route in (reverse("v2_overview"), reverse("v2_settings"),
                       reverse("admin:index")):
             response = self.client.get(route)
             self.assertRedirects(response, reverse("totp_challenge"),
                                  fetch_redirect_response=False)
         unlocked = self.client.post(reverse("totp_challenge"), {"code": current_code(seed)})
-        self.assertRedirects(unlocked, reverse("cockpit_today"),
+        self.assertRedirects(unlocked, reverse("v2_overview"),
                              fetch_redirect_response=False)
-        self.assertNotEqual(self.client.get(reverse("cockpit_settings")).status_code, 302)
+        self.assertNotEqual(self.client.get(reverse("v2_settings")).status_code, 302)
 
     def test_factor_rejects_replay_and_locks_after_invalid_attempts(self):
         from django.utils import timezone
@@ -142,5 +142,5 @@ class OwnerAuthenticatorTests(TestCase):
         with override_settings(TURNSTILE_REQUIRED=False):
             result = self.client.post(reverse("login"), {
                 "username": self.owner.username, "password": self.password})
-        self.assertRedirects(result, reverse("cockpit_today"),
+        self.assertRedirects(result, reverse("v2_overview"),
                              fetch_redirect_response=False)

@@ -1,7 +1,7 @@
 <section class="w2-panel w2-space-top" aria-labelledby="w2-history-heading">
   <div class="w2-section-heading">
     <div><h2 id="w2-history-heading">Recorded investment history</h2>
-    <p class="w2-muted">Only real stored GBP snapshots and replayed actual ledger cash · no modelled backtests</p></div>
+    <p class="w2-muted">Recorded GBP values</p></div>
     <form method="get" aria-label="History date range" class="w2-filterbar">
       <label>Range<select class="w2-input" name="range" onchange="this.form.submit()">
         {% for key, name in history_ranges %}
@@ -19,7 +19,7 @@
     <div class="w2-history-figure">
       <svg class="w2-history-svg" role="img" aria-label="Dated recorded GBP account values, not a return chart"
            viewBox="0 0 720 230" preserveAspectRatio="xMidYMid meet" data-w2-history-chart></svg>
-      <p class="w2-note">This line connects saved observations; it does not represent returns. Deposits and withdrawals change raw GBP value. No interpolation is used to calculate XIRR, TWR or drawdown.</p>
+      <p class="w2-note">Value chart, not a return series. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
     </div>
     {{ history_chart|json_script:"v2-history-samples" }}
   {% else %}
@@ -48,7 +48,7 @@
 </div>
 <section class="w2-panel w2-space-top">
   <h2>Source-labelled observation log</h2>
-  <p class="w2-note">A database snapshot can record a GBP number without retaining its original raw GBX quote source. Cash-only dates matching the ledger, or invested dates rebuilt with contemporaneous owner holdings and captured exact raw GBX/GBP Yahoo source, can be certified. Other rows are recorded only and cannot contribute to reported performance.</p>
+  <p class="w2-note"><span class="w2-badge w2-warning">Data: check needed</span> Only source-matched values count towards returns. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
   <div class="w2-table-wrap">
     <table class="w2-table w2-history-table">
       <thead><tr><th>Date</th><th class="w2-number">GBP value</th><th class="w2-number">Net funded</th><th>Origin</th><th>Verification</th></tr></thead>
@@ -64,5 +64,5 @@
       </tbody>
     </table>
   </div>
-  <p class="w2-note">XIRR is annualised and money-weighted. TWR excludes external funding movements and needs source-matched before/after funding valuations. These are different measures and are never substituted for one another.</p>
+  <p class="w2-note">XIRR: money-weighted. TWR: funding-adjusted. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
 </section>

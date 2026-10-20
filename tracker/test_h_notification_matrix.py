@@ -73,16 +73,14 @@ class OwnerAlertMatrixTests(TestCase):
         self.pref.urgent_discord = True
         self.pref.save()
         params = {
-            "save": "preferences", "notify-destination_email": "owner@example.test",
-            "notify-email_enabled": "on",
-            "notify-quarterly_discord": "on",
-            "notify-urgent_email": "on",
-            "notify-data_discord": "on",
-            "notify-monthly_reminders": "on",
-            "notify-followup_email": "on",
+            "form_kind": "owner", "followup_delay_days": "7",
+            "destination_email": "owner@example.test", "email_enabled": "on",
+            "quarterly_discord": "on", "urgent_email": "on",
+            "data_discord": "on", "monthly_reminders": "on",
+            "followup_email": "on",
         }
-        response = self.client.post(reverse("cockpit_settings"), params)
-        self.assertRedirects(response, reverse("cockpit_settings"))
+        response = self.client.post(reverse("v2_settings"), params)
+        self.assertRedirects(response, reverse("v2_settings"))
         self.pref.refresh_from_db()
         self.assertFalse(self.pref.discord_enabled)
         self.assertFalse(self.pref.quarterly_email)
@@ -99,15 +97,15 @@ class OwnerAlertMatrixTests(TestCase):
             status="FAILED", attempts=1)
         NotificationSchedulerRun.objects.create(
             name="owner_notices", status="SUCCEEDED", new_deliveries=2)
-        response = self.client.get(reverse("cockpit_settings"))
+        response = self.client.get(reverse("v2_settings"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context["recent_deliveries"]), 1)
+        self.assertEqual(len(response.context["last_receipts"]), 1)
         self.assertNotContains(response, "private_other")
-        self.assertNotContains(response, "Scheduler health")
+        self.assertNotContains(response, "Notification scheduler")
         self.owner.is_staff = True
         self.owner.save(update_fields=["is_staff"])
-        response = self.client.get(reverse("cockpit_settings"))
-        self.assertContains(response, "Scheduler health")
+        response = self.client.get(reverse("v2_settings"))
+        self.assertContains(response, "Notification scheduler")
         self.assertContains(response, "2")
 
     def test_turning_off_urgent_email_suspends_its_pending_retry(self):
@@ -152,7 +150,7 @@ class OwnerAlertMatrixTests(TestCase):
 
     def test_notification_settings_require_login(self):
         self.client.logout()
-        self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("v2_settings")).status_code, 302)
 
 
 class ScheduledOwnerNoticeTests(TestCase):

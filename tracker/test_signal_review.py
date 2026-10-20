@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from tracker.models import Account, StrategyInstance, StrategyPreset, StrategySignal
+from tracker.models import Account, RebalanceExecution, StrategyInstance, StrategyPreset, StrategySignal
 
 
 class AdvisoryFeedbackTests(TestCase):
@@ -26,7 +26,7 @@ class AdvisoryFeedbackTests(TestCase):
             kind="QUARTERLY", title="Review", as_of=timezone.localdate()-timedelta(days=15),
             message="Recommendation for review", actions=[{"side":"BUY", "quantity":"4"}],
         )
-        self.url = reverse("review_signal", args=[self.strategy.pk, self.signal.pk])
+        self.url = reverse("v2_notice_feedback", args=[self.strategy.pk, self.signal.pk])
 
     def test_login_and_ownership_are_required(self):
         self.assertEqual(self.client.post(self.url, {"outcome": "CONFIRMED"}).status_code, 302)
@@ -55,3 +55,18 @@ class AdvisoryFeedbackTests(TestCase):
         self.signal.refresh_from_db()
         self.assertEqual(self.signal.review_outcome, "CONFIRMED")
         self.assertEqual(self.signal.review_note, "Verified with Excel")
+
+    def test_completed_actual_review_cannot_be_relabelled_by_feedback(self):
+        self.client.force_login(self.owner)
+        RebalanceExecution.objects.create(
+            signal=self.signal, strategy=self.strategy,
+            executed_on=timezone.localdate(),
+        )
+        response = self.client.post(self.url, {
+            "outcome": "FALSE_POSITIVE", "review_note": "Cannot rewrite execution",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.signal.refresh_from_db()
+        self.assertEqual(self.signal.review_outcome, "")
+        self.assertFalse(self.strategy.ledger.exists())
+        self.assertEqual(self.client.get(self.url).status_code, 405)

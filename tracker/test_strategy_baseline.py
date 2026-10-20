@@ -48,7 +48,7 @@ class ResetBaselineTests(TestCase):
 
     def test_reset_is_not_confirmed_before_any_actual_trades(self):
         response = self.client.post(self.url, {"confirm": "RESET"})
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 405)
         self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
 
     def test_cross_user_cannot_reset_another_owners_strategy(self):
@@ -60,14 +60,14 @@ class ResetBaselineTests(TestCase):
     def test_retired_text_only_reset_does_not_create_baseline(self):
         self.trades_and_quotes()
         response = self.client.post(self.url, {"confirm": "RESET"})
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 405)
         self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
 
     def test_unreviewed_reset_cannot_be_confirmed(self):
         self.trades_and_quotes()
         self.signal.acknowledged_at = None
         self.signal.save(update_fields=["acknowledged_at"])
-        self.client.post(self.url, {"confirm": "RESET"})
+        self.assertEqual(self.client.post(self.url, {"confirm": "RESET"}).status_code, 405)
         self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
 
     def test_provisional_spike_never_anchors_from_text_or_unlinked_trades(self):
@@ -80,7 +80,7 @@ class ResetBaselineTests(TestCase):
             message="possible 100% spike: review a reset to 60% equity / 40% safe",
             actions=[], acknowledged_at=timezone.now())
         response = self.client.post(self.url, {"confirm": "RESET"})
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 405)
         self.assertFalse(StrategyBaseline.objects.filter(strategy=self.strategy).exists())
 
     def test_rejected_spike_cannot_anchor_a_reset(self):
@@ -94,5 +94,5 @@ class ResetBaselineTests(TestCase):
             review_outcome="FALSE_POSITIVE", review_note="reference was wrong")
         self.signal.acknowledged_at = None
         self.signal.save(update_fields=["acknowledged_at"])
-        self.client.post(self.url, {"confirm": "RESET"})
+        self.assertEqual(self.client.post(self.url, {"confirm": "RESET"}).status_code, 405)
         self.assertFalse(StrategyBaseline.objects.exists())

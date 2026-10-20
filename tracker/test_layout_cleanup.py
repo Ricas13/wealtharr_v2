@@ -56,14 +56,15 @@ class RemovedPaperExperienceTests(TestCase):
             kind="QUARTERLY", as_of=date(2026, 3, 31),
             title="HIDDEN_VIRTUAL_REVIEW", message="Historical test only",
         )
-        dashboard = self.client.get(reverse("dashboard"))
+        dashboard = self.client.get(reverse("v2_overview"))
         self.assertEqual(dashboard.status_code, 200)
         self.assertNotContains(dashboard, "Paper portfolio")
         self.assertNotContains(dashboard, "HIDDEN_LEGACY_VIRTUAL")
         self.assertNotContains(dashboard, "HIDDEN_VIRTUAL_REVIEW")
         self.assertNotContains(dashboard, "999999")
-        self.assertEqual(dashboard.context["net_contributed"], Decimal("0"))
-        accounts = self.client.get(reverse("accounts"))
+        self.assertIsNone(dashboard.context["overview_contributed"])
+        self.assertEqual(dashboard.context["overview_rows"], [])
+        accounts = self.client.get(reverse("accounts"), follow=True)
         self.assertNotContains(accounts, "Historical disabled account")
         self.assertTrue(Account.objects.filter(pk=legacy.pk).exists())
         self.assertTrue(LedgerEntry.objects.filter(strategy=instance).exists())
