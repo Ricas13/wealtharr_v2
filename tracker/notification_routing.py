@@ -27,14 +27,36 @@ def selected_channels(pref, category):
                  and (category != "contribution" or pref.monthly_reminders))
 
 
-def route_notice(owner, category, event_key, subject, message, *, sender=None):
+def strategy_channels(pref, category, strategy=None):
+    """Intersect owner-wide choices with the enrolled strategy's explicit routes.
+
+    Legacy strategies without a route matrix preserve existing owner-wide
+    preferences; a v2 enrolment with missing/malformed routes fails closed.
+    """
+    channels = selected_channels(pref, category)
+    if strategy is None:
+        return channels
+    routes = strategy.alert_routes
+    if not isinstance(routes, dict) or not routes:
+        return () if strategy.strategy_key else channels
+    kind = "unacted" if category == "followup" else category
+    selected = routes.get(kind)
+    if not isinstance(selected, dict):
+        return ()
+    return tuple(c for c in channels if selected.get(c) is True)
+
+
+def route_notice(owner, category, event_key, subject, message, *,
+                 sender=None, strategy=None):
     """Return per-channel status, distinguishing old SENT from new delivery.
 
     No false 'sent' results for muted/unconfigured owner channels. Transport
     readiness is handled by dispatch, whose retry status is persisted.
     """
+    if strategy is not None and strategy.owner_id != owner.pk:
+        raise ValueError("Strategy does not belong to notification owner")
     pref, _ = NotificationPreference.objects.get_or_create(owner=owner)
-    channels = selected_channels(pref, category)
+    channels = strategy_channels(pref, category, strategy)
     if not channels:
         return {}
     previous = set(NotificationDelivery.objects.filter(
@@ -45,7 +67,7 @@ def route_notice(owner, category, event_key, subject, message, *, sender=None):
     transport = sender or dispatch
     if transport is dispatch:
         outcomes = transport(owner, event_key, subject, message,
-                             channels=channels, category=category)
+                             channels=channels, category=category, strategy=strategy)
     else:
         outcomes = transport(owner, event_key, subject, message,
                              channels=channels)
