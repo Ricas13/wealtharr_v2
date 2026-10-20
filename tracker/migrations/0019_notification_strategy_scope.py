@@ -10,6 +10,11 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
+            model_name="notificationpreference",
+            name="followup_delay_days",
+            field=models.PositiveSmallIntegerField(default=7),
+        ),
+        migrations.AddField(
             model_name="notificationdelivery",
             name="strategy",
             field=models.ForeignKey(
