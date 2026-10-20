@@ -45,6 +45,13 @@
         </div>
         <label class="w2-field">Private reference / note
           <input class="w2-input" name="note" maxlength="280" value="{{ edit_values.note }}" placeholder="Actual transaction reference"></label>
+        {% if edit_operation == 'new' and selected_instance.account.kind == 'ISA' %}
+        <label class="w2-field">Other ISA subscriptions in this tax year (£, optional)
+          <input class="w2-input" type="number" min="0" step="0.01"
+                 name="other_isa_subscriptions" placeholder="If known, enter amount">
+          <small class="w2-muted">Used only for an advisory warning; not saved as a deposit.</small>
+        </label>
+        {% endif %}
       {% else %}
         <p class="w2-notice">{% if edit_operation == 'delete' %}This entry will be hidden from current balances, but the old values and audit remain in Change history.{% else %}The last recorded financial values will be restored without inventing a new broker transaction.{% endif %}</p>
         <dl class="w2-review-grid">
@@ -71,6 +78,7 @@
       <h3>Reviews requiring recalculation</h3>
       <ul>{% for period in edit_preview.impact.periods %}<li>{{ period.as_of }} · {{ period.title }}{% if period.confirmed %} — already confirmed, cannot change until reconciled{% endif %}</li>{% endfor %}</ul>
       {% else %}<p class="w2-notice">No stored periodic reviews depend on this date.</p>{% endif %}
+      {% if edit_isa_warning %}<p class="w2-notice w2-warning" role="status">{{ edit_isa_warning }}</p>{% endif %}
       <p class="w2-note">A saved change appends an audited version; no confirmed baseline is recalculated automatically.</p>
       <form method="post" class="w2-wizard-form">
         {% csrf_token %}<input type="hidden" name="intent" value="confirm">
