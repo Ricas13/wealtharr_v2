@@ -1,5 +1,15 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+## APPROVED v2 DESIGN — Phase 6 handoff (20 October 2026)
+
+- Phase 6 branch feature/v2-phase6-history-overview is stacked on Phase 5 commit 9308b5e8b082840fbc3a41bc63de15d18c410840. Draft PR targets Phase 5; planned merge order #12 -> #13 -> #15 -> #17 -> #19 -> Phase 6, retargeting after predecessors merge. Keep separate methodology decisions independent.
+- Implemented tracker/v2_history.py: only real owner-scoped ledger entries, StrategyValueSnapshot rows and core Decimal evaluate_inception/evaluate_period. Raw time-series chart is descriptive recorded GBP values, not a return curve. Old invested snapshots cannot be called verified: MarketObservation lacks captured original raw quote unit/source evidence, so they cannot authorize XIRR/TWR/gain/drawdown. No retroactive source assumptions.
+- Certifiable case: GBP cash-only endpoint exactly replayed from dated ledger, zero outstanding securities, consistent ownership, no unreconciled opening, no historical revision invalidation. Return inputs use actual deposits/withdrawals. XIRR and cash gain only if endpoint approved; TWR only if verified opening/closing and every source-matched flow boundary. No XIRR-derived substitute.
+- Overview lists every non-paper owner strategy independently and reports lifetime net contributions; combined value/gain needs each included account valued and certified on today's same date. ISA lifetime funding is informational, not annual allowance.
+- Files: tracker/v2_history.py, templates/v2/history.html, templates/v2/overview.html, view router/page, static/css/v2.css, static/js/v2.js, tracker/test_v2_phase6.py, browser_tests/test_v2_phase6.py and docs/v2-performance-provenance.md. Check latest PR CI; do not claim green until current commit verified.
+- NEXT Phase 7 when requested: secure Settings, per-instance alert routing, operational diagnostics. Owner-only broker confirmation and quote-unit evidence remain in docs/OWNER_TODO.md; no broker connections, fabricated price history or 9Sig engine changes.
+
+---
 ## APPROVED v2 DESIGN — Phase 5 handoff (20 October 2026)
 
 - Branch `feature/v2-phase5-auditable-breakdown` begins at Phase 4 `feature/v2-phase4-today-guided-review-stacked` commit `9fc6a3fb086c14a39534f21b76eceea6521e3b45` (both CI workflows green). Draft PR for this Phase 5 branch MUST target Phase 4; planned merge order #12 -> #13 -> #15 -> #17 -> Phase 5; retarget after predecessor merges. Independently proposed owner 9Sig workbook decisions PR #14 are **NOT** silently merged or used to alter the engine.

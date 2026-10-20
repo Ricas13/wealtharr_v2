@@ -541,3 +541,17 @@ body.v2 {
 }
 
 .w2-breakdown-period-title{font-size:1rem;font-weight:600;color:var(--w2-text);margin:14px 0 0}
+
+/* Phase 6 owner History: recorded values visibly distinct from certified cash. */
+.w2-history-figure{display:grid;gap:8px;margin-top:16px;min-width:0}
+.w2-history-svg{width:100%;height:auto;max-height:260px;overflow:visible}
+.w2-history-svg .w2-chart-axis{stroke:#515f70;stroke-width:1;fill:none}
+.w2-history-svg .w2-chart-line{fill:none;stroke:#86aaf2;stroke-width:3;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:7 5}
+.w2-history-svg .w2-chart-point{fill:#a9bed7;stroke:#19253a;stroke-width:2}
+.w2-history-svg .w2-chart-certified{fill:#36cfac}
+.w2-history-svg text{fill:#a7b7c9;font-size:12px;font-family:inherit}
+.w2-history-reason{max-width:44ch;white-space:normal;display:block;font-size:.78rem;line-height:1.45}
+.w2-history-table td{vertical-align:top}
+.w2-history-table td a{display:block}
+.w2-history-table .w2-number{font-variant-numeric:tabular-nums}
+@media(max-width:550px){.w2-history-table{min-width:640px}.w2-history-figure{gap:5px}}
