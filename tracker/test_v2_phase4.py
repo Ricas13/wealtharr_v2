@@ -118,7 +118,8 @@ class TodayPhase4Tests(TestCase):
         self.strategy.tracking_only = True
         self.strategy.save(update_fields=["tracking_only"])
         p = self.client.get(self._url())
-        self.assertContains(p, "tracking-only")
+        self.assertContains(p, "Not live yet")
+        self.assertContains(p, "#go-live")
         self.assertNotContains(p, "Review proposal / I did this")
         self.assertNotContains(p, "Proposed 1")
         self.assertIsNone(save_verified_strategy_snapshot(self.strategy))

@@ -24,7 +24,7 @@
         <div><dt>Started</dt><dd>{{ selected_instance.started_on|date:"j M Y"|default:"Legacy start not pinned" }}</dd></div>
         <div><dt>Strategy version</dt><dd>{{ selected_instance.strategy_version|default:"Legacy version not pinned" }}</dd></div>
         <div><dt>Mapping version</dt><dd>{{ selected_instance.mapping_version|default:"Legacy mapping not pinned" }}</dd></div>
-        <div><dt>Execution access</dt><dd>{% if strategy_tracking_only %}Tracking only — no trade instructions{% else %}Subject to independently verified data and broker permission{% endif %}</dd></div>
+        <div><dt>Execution access</dt><dd>{% if strategy_tracking_only %}Tracking only — no trade instructions{% else %}Live — instructions when prices and holdings are verified{% endif %}</dd></div>
       </dl>
       <p class="w2-note">Identity is fixed after enrolment.</p>
     </section>
@@ -39,6 +39,23 @@
     </section>
   </div>
   <div class="w2-column">
+    {% if strategy_tracking_only %}
+    <section class="w2-panel w2-go-live" id="go-live">
+      <h2>Go live</h2>
+      <p class="w2-muted">This strategy is tracking-only: no live prices and no instructions. Check the two instruments below in your {{ selected_instance.account.broker }} {{ selected_instance.account.kind }}, then confirm.</p>
+      <form method="post" action="{% url 'v2_go_live' instance_id=selected_instance.pk %}">
+        {% csrf_token %}
+        <label class="w2-check"><input type="checkbox" name="confirm" value="yes" required> <span>{{ strategy_attestation }}</span></label>
+        <button type="submit" class="w2-button w2-button-primary w2-space-top">Go live</button>
+      </form>
+      <p class="w2-note">Live means hourly Yahoo prices and advisory instructions. Stale prices or unreconciled holdings still block instructions.</p>
+    </section>
+    {% elif strategy_go_live %}
+    <section class="w2-panel" id="go-live">
+      <h2>Live</h2>
+      <p class="w2-muted"><span class="w2-badge">Live since {{ strategy_go_live.confirmed_at|date:"j M Y" }}</span> You confirmed: “{{ strategy_go_live.attestation }}”</p>
+    </section>
+    {% endif %}
     <section class="w2-panel">
       <h2>Mapped instruments</h2>
       <p class="w2-muted"><span class="w2-badge w2-warning">Rules: partly verified</span> Check permissions in Trading 212. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>

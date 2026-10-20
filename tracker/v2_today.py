@@ -56,9 +56,8 @@ def _ledger_corrections(strategy):
 def _readiness(strategy, report):
     if strategy.tracking_only:
         return False, (
-            "This strategy is tracking-only: account-level instrument permissions "
-            "and quote units have not been independently verified. No trade "
-            "instructions are available."
+            "This strategy isn't live yet. Confirm the instruments in your "
+            "account to switch on live prices and instructions."
         ), ()
     if _unreconciled(strategy):
         return False, (
@@ -165,7 +164,8 @@ def today_page(request, instance_id):
         explanation = notice.message
     elif not ready:
         status = "blocked"
-        headline = "Cannot compute a reliable instruction"
+        headline = ("Not live yet" if strategy.tracking_only
+                    else "Cannot compute a reliable instruction")
         explanation = reason
     elif ready and notice and notice.kind == "QUARTERLY" and progress and not executed:
         status = "trade"

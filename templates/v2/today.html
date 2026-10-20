@@ -36,6 +36,9 @@
         <a class="w2-button w2-button-primary" href="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=today_signal.pk %}">
           {% if today_status == 'record' %}Continue actual fill record{% else %}Review proposal / I did this{% endif %}</a>
       {% elif today_status == 'blocked' %}
+        {% if selected_instance.tracking_only %}
+          <a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Go live</a>
+        {% endif %}
         {% if selected_instance.onboarding_mode == 'hold' %}
           <a class="w2-button" href="{% url 'v2_ledger_import' instance_id=selected_instance.pk %}">Reconcile broker history</a>
         {% endif %}
