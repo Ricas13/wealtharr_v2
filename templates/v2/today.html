@@ -43,6 +43,25 @@
       {% elif today_status == 'review' %}
         <p class="w2-note">Manual review only.</p>
       {% endif %}
+      {% if today_signal and not today_partial and not today_executed %}
+      <details class="w2-space-top">
+        <summary>Review this saved notice</summary>
+        <form class="w2-space-top" method="post" action="{% url 'v2_notice_feedback' instance_id=selected_instance.pk signal_id=today_signal.pk %}">
+          {% csrf_token %}
+          <label for="w2-notice-outcome">My assessment</label>
+          <select id="w2-notice-outcome" class="w2-input" name="outcome" required>
+            <option value="">Choose an outcome</option>
+            <option value="CONFIRMED">Reviewed the notice</option>
+            <option value="FALSE_POSITIVE">False positive</option>
+            <option value="NOT_APPLICABLE">Not applicable</option>
+          </select>
+          <label for="w2-notice-note">Reason (required for false positive)</label>
+          <textarea id="w2-notice-note" class="w2-input" name="review_note" rows="2" maxlength="2000"></textarea>
+          <button type="submit" class="w2-button">Save assessment</button>
+          <p class="w2-note">This records feedback only; no trades are executed.</p>
+        </form>
+      </details>
+      {% endif %}
       <p class="w2-note">No automated trades. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
     </section>
     <section class="w2-panel" aria-labelledby="w2-quarter-heading">
