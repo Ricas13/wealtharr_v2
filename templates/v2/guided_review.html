@@ -5,6 +5,14 @@
     <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='today' %}">Back to Today</a>
   </div>
   {% if review_error %}<div class="w2-form-error" role="alert">{{ review_error }}</div>{% endif %}
+  {% if review_can_manual_reset %}
+  <form method="post" class="w2-space-top">
+    {% csrf_token %}
+    <input type="hidden" name="intent" value="request_manual_reset">
+    <p class="w2-note">The rules' saved all-in proposal stays unchanged. You may instead request a separate 60/40 review using already verified closing prices.</p>
+    <button type="submit" class="w2-button">Choose manual 60/40 reset review</button>
+  </form>
+  {% endif %}
   {% if review_completed %}
     <div class="w2-notice">Completed and immutable. A confirmed quarterly execution cannot be reopened as a new trade. Corrections require independently audited reconciliation.</div>
   {% elif not review_is_current %}
