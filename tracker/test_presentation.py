@@ -39,6 +39,17 @@ class NextStepPresentationTests(TestCase):
             {"side": "HOLD", "symbol": "X"},)).state, "idle")
         self.assertEqual(self.advice().state, "idle")
 
+    def test_empty_reserve_without_fundable_order_remains_a_review(self):
+        # The information-only / advisory path must not pretend a broker
+        # order exists when there is literally nothing available to spend.
+        step = select_next_step(
+            signal_kind="QUARTERLY", signal_title="9Sig quarterly review",
+            signal_message="Your reserve is now empty. Review whether to reset to 60/40.",
+            proposed_actions=(), price_ready=True, unavailable_reason="",
+            next_review_label="31 Dec 2026")
+        self.assertEqual(step.state, "review")
+        self.assertIn("reserve", step.title.lower())
+
     def test_cash_only_value_is_actual_balance_not_fabricated_quote(self):
         self.assertEqual(account_value(net_cash=D("1000"),
             portfolio_value=D("1000"), prices_verified=False,
