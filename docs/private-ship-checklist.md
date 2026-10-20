@@ -12,7 +12,7 @@ be performed with the owner's actual Trading 212 records or Oracle host.
 |---|---|---|
 | 0. PR #11 code candidate | All Section A–J source committed on one resumable branch | Django regression suite, migrations, production-mode smoke, Docker/Traefik config, synthetic disposable restore and browser jobs **green at the same PR head** |
 | 1. Private synthetic rehearsal | Locally access login, onboarding, Today, History, Ledger, Settings and guided actual-fill forms in an isolated test database | Chromium 360px and desktop flows: readable layout, no page-wide horizontal scrolling, usable keyboard skip/navigation, source-price holds, CSV preview refusal, cross-owner isolation, optional TOTP gate, and partial fills never creating a reset |
-| 2. Owner-only deployed tracker | Secure Oracle host with HTTPS, private VPN/ingress access control, stable secrets, existing PostgreSQL data preserved, one scheduler and backup services | Owner physically verifies Traefik headers/allowlist, authenticates, runs `manage.py check --deploy`, sees heartbeat, receives deliberately triggered email/Discord tests, and verifies **an actual archive** in isolated PostgreSQL plus an encrypted off-host copy |
+| 2. Owner-only deployed tracker | Secure Oracle host with HTTPS, private VPN/ingress access control, stable secrets, existing PostgreSQL data preserved, one scheduler and backup services | Owner verifies HTTPS ingress and owner-only login, authenticates, runs `manage.py check --deploy`, sees heartbeat, receives deliberately triggered email/Discord tests, and verifies **an actual archive** in isolated PostgreSQL plus an encrypted off-host copy |
 | 3. Real portfolio **tracking-only** | Owner imports/reconciles a redacted/actual broker history with exactly mapped GBP securities and true deposits and fills | All missing/duplicate transactions, cash/units/fees and dates reconciled. If unresolved: show **cannot compute**. No guessed position or market price. |
 | 4. 9Sig advisory reliance | Version-pinned strategies and approved source quotes on the live account | Original workbook independent quarter-by-quarter comparisons and owner ISA/product permission confirmed; only then interpret a review as potentially actionable. User still places all broker orders separately |
 | 5. Routine private use | Quarterly cadence with actual fill confirmation, audited notifications and restore rehearsals | At least one observed normal scheduler cycle, failed-data refusal test, re-enabled/disabled notification checks, recent *recoverable* off-host backup and a planned key-rotation/recovery process |
@@ -75,8 +75,9 @@ not fabricated for CI and are not coding blockers, but they limit what
 
 At the actual private hostname, from a VPN-authorised client:
 
-1. Verify valid TLS certificate and a forbidden result from an unauthorised
-   IP/VPN state. Test the same rules against the exact proxy/TLS topology.
+1. Verify a valid TLS certificate and public login-page reachability through
+   the trusted proxy; verify unauthenticated requests cannot read cockpit,
+   ledger, CSV or admin data. The removed Traefik allowlist is not required.
    Health endpoints are **not proof** of account isolation.
 2. Sign in normally; choose whether to enable TOTP; confirm that an existing
    enrolled owner's password-only session cannot access Today, ledger, CSV
@@ -119,7 +120,7 @@ should default to **cannot compute / no trade instruction**, not relaxed checks.
 | Application engine | Deterministic synthetic 9Sig/Decimal/ledger regression suite | Owner's independently calculated 6-quarter workbook parity |
 | Broker account | Fixed researched ISIN mapping; CSV parser refusal behaviour | Owner's specific ISA dealing permission and actual ledger reconciliation |
 | Browser | Chromium synthetic 360px/desktop/keyboard flows once green | Real device/hostname test and production auth/proxy interactions |
-| Ops/security | Production configuration and temporary synthetic PostgreSQL recovery | Live Oracle/TLS/VPN test, stable secrets, actual off-host recovery proof |
+| Ops/security | Production configuration and temporary synthetic PostgreSQL recovery | Live Oracle/TLS/public-login security test, stable secrets, actual off-host recovery proof |
 | Notifications | Preference/cancellation/dedup tests | Real SMTP/Discord delivery and observed single scheduler |
 | Real-money action | Only manually entered true fills; incomplete market data blocks | **Not independently certified** as reliable real-money advice |
 
