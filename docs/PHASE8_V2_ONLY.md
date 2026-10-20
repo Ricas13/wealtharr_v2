@@ -1,3 +1,45 @@
+## Phase 8 continuation — retired-browser replacement and remaining CI gate
+
+The old UI's two Chromium modules (`browser_tests/test_owner_journeys.py` and
+`tracker/test_browser_e2e.py`) are deleted, **not skipped**, because their
+screens and form expectations no longer exist. The common browser harness
+was extracted into `browser_tests/harness.py`, with all Phase 1–8 v2
+browser suites importing it. The mapping of regression obligations is:
+
+- Login, anonymous access, cross-owner URLs, optional TOTP, mobile keyboard,
+  overflow and account isolation: `browser_tests/test_v2_security.py`
+  (two new browser tests), `browser_tests/test_v2_phase8.py`, plus
+  `tracker/test_owner_totp.py` and `tracker/test_v2_phase8.py`.
+- Genuine onboarding cash versus owner-reported opening balances:
+  `browser_tests/test_v2_phase2.py`, `tracker/test_v2_phase2.py`,
+  `tracker/test_owner_enrolment_f.py`, `tracker/test_section_f_isa.py`.
+- Broker CSV preview/re-upload and audited deposit/edit history:
+  `browser_tests/test_v2_phase3.py`, `tracker/test_v2_phase3.py`,
+  `tracker/test_cockpit.py`; bad files remain all-or-nothing.
+- Quarter-end partial fills, reset choice, and verified post-fill baseline:
+  `browser_tests/test_v2_phase4.py`, `tracker/test_g_single_fill.py`,
+  `tracker/test_manual_reserve_reset.py`; the calculation engine is intact.
+- History, strategy rules, breakdown, notifications, and geometry:
+  `browser_tests/test_v2_phase5.py` through `test_v2_phase8.py`
+  plus phase-specific Django suites.
+
+The retained `tracker/test_ui_refresh.py`, instrument-mapping,
+market-notice and ISA tests now target v2 routes instead of accepting old
+GET/POST behaviour. New v2 Ledger deposit previews provide a non-blocking
+ISA allowance warning using the existing 2026/27 policy helper and a
+preview-bound optional total for other ISA subscriptions; that number does
+**not** create a funding entry or certify available allowance.
+
+Baseline merged `main`: **395 Django tests, 27 Chromium tests** passing.
+An intermediate draft run `39445434466` completed **386 Django tests,
+33 failures / 1 error / 7 skips**, plus 29 Chromium, failing; it predates
+the latest changes. The planned v2-only browser suite now includes 2 new
+owner-security tests after retiring 16 obsolete UI journeys. **CI for
+the latest head has not yet passed.** No local before/after execution count,
+production migration run or deployment was performed. Do not merge yet.
+
+---
+
 ## Continuation: reset choice and TOTP redirect
 
 - Reused existing `choose_manual_reserve_reset` service from `tracker.cockpit_manual_reset` inside v2 guided review. Only current versioned exhausted-reserve notices can offer the owner-elected alternative; the original all-in proposal stays intact. A separate review never creates trades or a baseline; actual fills and verified later GBP closes remain required. `tracker/test_manual_reserve_reset.py` now exercises this v2 path without relaxing financial assertions.
