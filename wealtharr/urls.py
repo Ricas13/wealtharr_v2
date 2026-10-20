@@ -16,7 +16,6 @@ urlpatterns = [
     path("app/accounts/", views.accounts, name="accounts"),
     path("app/strategies/new/", views.new_strategy, name="new_strategy"),
     path("app/9sig/start/", views.start_real_9sig, name="start_real_9sig"),
-    path("app/paper/start/", views.start_paper_trial, name="start_paper_trial"),
     path("app/strategies/<int:pk>/", views.strategy_detail, name="strategy_detail"),
     path("app/strategies/<int:pk>/ledger/", views.record_entry, name="record_entry"),
     path("app/strategies/<int:pk>/price/", views.record_price, name="record_price"),

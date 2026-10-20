@@ -1,5 +1,17 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+## Layout cleanup after the seven merged phases (20 October 2026)
+
+- This is a **new cleanup PR branched from the latest main**. The original PR #11, the A–J work and all seven layout phases remain intact. This cleanup does not rewrite or reuse their branches.
+- Per owner decision, removed the old paper-trial module, dedicated test, POST route, dashboard and legacy creation controls, styling, and obsolete broker API research document. No broker connector is introduced.
+- Account form no longer offers `PAPER` (migration 0020). The historical `0005_paper_account` migration is retained for Django migration dependency integrity. Existing historical paper rows are deliberately **not deleted or turned into real money** and remain excluded from real-owner dashboards; resetting the database is an optional operator choice, never performed by this PR.
+- No strategy engine, metrics, workbook fixtures, market pricing logic, performance logic or financial arithmetic was changed.
+- Test baseline: main at 6a4f31ea: 398 Django tests (7 skipped), 27 Chromium tests. **No local Django environment is available in this execution container**; report CI separately and do not claim local tests have run. Final PR CI results must be recorded when available.
+- For any further layout-only change, branch from current main; consume the standard strategy result through read-only adapters, never change financial calculations; record local before/after test counts if an executable local Django environment exists.
+
+---
+
+
 Release integration (20 October 2026): PRs #12, #13, #15, #17, #19 and #22 were sequentially integrated with current main (including approved nine_sig.v2.0.0 and deployment corrections). Phase 7 must preserve verified Yahoo raw GBX/GBP provenance and the StrategySignal rule-version field while binding all notifications to their original strategy. This code/CI release gate is NOT proof of live owner Trading 212 access, outbound email/Discord receipt, or off-host restored backups. Do not deploy to production without separate infrastructure acceptance.
 
 
