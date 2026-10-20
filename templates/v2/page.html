@@ -7,7 +7,63 @@
       {% if selected_instance %}{{ selected_instance.name }}
         <span class="w2-account-label">{{ selected_instance.account.kind }} · {{ selected_instance.account.broker|default:"Platform not set" }}</span>
       {% elif page_key == 'overview' %}All strategies
-      {% elif page_key == 'settings' %}
+      {% elif page_key == 'settings' %}Applies to all strategies
+      {% elif page_key == 'catalogue' %}Read-only mappings
+      {% else %}Fixed, code-defined strategies{% endif %}
+    </p>
+    <h1>{{ page_title }}</h1>
+  </div>
+  {% if page_key == 'overview' %}
+    <a class="w2-button w2-button-primary" href="{% url 'v2_add_strategy' %}">{% include 'partials/icon.html' with name='plus' %} Add strategy</a>
+  {% endif %}
+</header>
+
+{% if page_key == 'overview' %}
+{% include 'v2/overview.html' %}
+
+{% elif page_key == 'instance' %}
+{% if section == 'today' %}
+{% if guided_review %}{% include 'v2/guided_review.html' %}
+{% else %}{% include 'v2/today.html' %}{% endif %}
+{% elif section == 'history' %}
+{% include 'v2/history.html' %}
+{% elif section == 'ledger' %}
+{% if ledger_edit %}{% include 'v2/ledger_edit.html' %}
+{% elif ledger_import %}{% include 'v2/ledger_import.html' %}
+{% else %}{% include 'v2/ledger.html' %}{% endif %}
+{% elif section == 'strategy' %}
+<section class="w2-panel w2-space-top"><h2>How it works</h2>
+  <p class="w2-muted">Fixed strategy rules and version information will be displayed here, read-only.</p>
+  {% if selected_instance.strategy_version %}<p class="w2-note">Recorded strategy version: {{ selected_instance.strategy_version }}</p>{% endif %}
+</section>
+{% if selected_instance.onboarding_mode == 'hold' %}
+<section class="w2-panel w2-space-top"><h2>Owner-reported opening holdings</h2>
+  <p class="w2-muted">Recorded as a snapshot, NOT as purchases or verified current valuations. Reconcile these against the ledger in Phase 3.</p>
+  {% if selected_instance.opening_snapshot %}
+    <p class="w2-note">Opening cash: £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:2 }} · as reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }}.</p>
+    <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Role</th><th>Trading line</th><th>Shares reported</th><th>Average cost reported (£)</th></tr></thead><tbody>
+    {% for role, holding in selected_instance.opening_snapshot.positions.items %}
+      <tr><td>{{ role|capfirst }}</td><td>{{ holding.ticker }}</td><td class="w2-number">{{ holding.shares }}</td><td class="w2-number">{{ holding.average_cost_gbp }}</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% endif %}
+</section>
+{% endif %}
+<section class="w2-panel w2-space-top"><h2>Instruments</h2>
+  <p class="w2-muted">Instrument mapping version: {{ selected_instance.mapping_version|default:"Legacy mapping not pinned" }}.</p>
+  <p><a href="{% url 'v2_catalogue' %}">View the fixed read-only catalogue →</a></p>
+</section>
+<section class="w2-panel w2-space-top"><h2>Alerts for this strategy</h2>
+  <p class="w2-muted">Choose which enabled email/Discord destinations receive this strategy's alerts. You can opt out separately from account-wide settings.</p>
+  <p class="w2-note"><a href="{% url 'v2_settings' %}#strategy-{{ selected_instance.pk }}">Edit alerts for this strategy →</a></p></section>
+{% elif section == 'breakdown' %}
+{% include 'v2/breakdown.html' %}
+{% endif %}
+
+{% elif page_key == 'catalogue' %}
+{% include 'v2/catalogue.html' %}
+
+{% elif page_key == 'settings' %}
 {% include 'v2/settings.html' %}
 
 {% else %}
