@@ -79,7 +79,7 @@
 {% elif ledger_tab == 'rebalances' %}
 <section class="w2-panel w2-space-top">
   <h2>Recorded quarterly rebalances</h2>
-  <p class="w2-note">Historical recommendations are dated guidance, not executable broker orders. Recorded fills always use the owner's real executions. Any completed reset retains its verified post-fill baseline.</p>
+  <p class="w2-note">Historical advice; only actual fills are recorded.</p>
   {% for item in ledger_rebalances %}
     <article class="w2-rebalance">
       <div class="w2-section-heading">
@@ -96,7 +96,7 @@
               <td>{% for fill in line.fills %}{{ fill.ledger_entry.occurred_on|date:"j M Y" }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td></tr>
         {% empty %}<tr><td colspan="6" class="w2-muted">No recorded execution quantities for this review.</td></tr>{% endfor %}</tbody>
       </table></div>
-      <p class="w2-note">A source-linked fill cannot be overwritten here. Corrections to an executed past review need source evidence and an audited reconciliation; a confirmed baseline is never recalculated silently. Latest-period reopening and the guided fill workflow are completed in Phase 4.</p>
+      <p class="w2-note">Completed fills remain immutable; correction requires audited evidence.</p>
     </article>
   {% empty %}<div class="w2-empty">No genuine recorded rebalance reviews for this strategy.</div>{% endfor %}
 </section>
@@ -104,7 +104,7 @@
 {% elif ledger_tab == 'history' %}
 <section class="w2-panel w2-space-top">
   <h2>Immutable change history</h2>
-  <p class="w2-note">Original entries are kept. Each revision captures the before/after values, owner and reviews potentially affected. Import provenance is also stored against the original broker ID.</p>
+  <p class="w2-note">Original entries and revision history are retained.</p>
   <div class="w2-table-wrap"><table class="w2-table w2-history-table">
     <thead><tr><th>Recorded at</th><th>Entry</th><th>Action</th><th>Version</th><th>Before</th><th>After</th><th>Review impact</th></tr></thead>
     <tbody>

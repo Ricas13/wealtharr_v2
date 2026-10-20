@@ -26,7 +26,7 @@
         <div><dt>Mapping version</dt><dd>{{ selected_instance.mapping_version|default:"Legacy mapping not pinned" }}</dd></div>
         <div><dt>Execution access</dt><dd>{% if strategy_tracking_only %}Tracking only — no trade instructions{% else %}Subject to independently verified data and broker permission{% endif %}</dd></div>
       </dl>
-      <p class="w2-note">These identities cannot be edited. Changing broker or account type requires a separate strategy instance.</p>
+      <p class="w2-note">Identity is fixed after enrolment.</p>
     </section>
     <section class="w2-panel">
       <h2>Recorded rule and baseline history</h2>
@@ -41,7 +41,7 @@
   <div class="w2-column">
     <section class="w2-panel">
       <h2>Mapped instruments</h2>
-      <p class="w2-muted">Read-only trading lines, with explicit source checks. Issuer eligibility does not establish Trading 212 permissions in your account.</p>
+      <p class="w2-muted"><span class="w2-badge w2-warning">Rules: partly verified</span> Check permissions in Trading 212. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
       <div class="w2-table-wrap"><table class="w2-table">
         <thead><tr><th>Role</th><th>Instrument</th><th>Trading line</th><th>Status</th></tr></thead>
         <tbody>{% for line in strategy_catalogue_rows %}
@@ -57,7 +57,7 @@
     {% if selected_instance.onboarding_mode == 'hold' %}
     <section class="w2-panel">
       <h2>Owner-reported opening holdings</h2>
-      <p class="w2-note">Historical average cost is not a market quote. Reconciliation requires original broker transaction evidence.</p>
+      <p class="w2-note">Opening positions need broker-history reconciliation.</p>
       {% if selected_instance.opening_snapshot %}
       <p class="w2-muted">Reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }} · cash £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:2 }}</p>
       <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Role</th><th>Shares</th><th>Reported GBP cost</th></tr></thead><tbody>
@@ -68,10 +68,10 @@
     </section>{% endif %}
     <section class="w2-panel">
       <h2>Alerts for this strategy</h2>
-      <p class="w2-muted">Email and Discord destinations are configured centrally. Each strategy can narrow those choices independently without changing its rules or holdings.</p>
+      <p class="w2-muted">Manage strategy alerts centrally.</p>
       <p><a class="w2-button" href="{% url 'v2_settings' %}#strategy-{{ selected_instance.pk }}">Edit strategy alert preferences</a></p>
       {% if not selected_instance.strategy_key %}
-      <p class="w2-note">Legacy instances without a pinned alert matrix retain their existing account-wide routing until explicitly configured.</p>
+      <p class="w2-note">Legacy alert routing needs review.</p>
       {% endif %}
     </section>
   </div>

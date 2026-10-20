@@ -599,3 +599,22 @@ body.v2 {
 .w2-settings-details dt{font-size:.85rem;color:var(--w2-muted)}
 .w2-settings-details dd{margin:0;max-width:60%;overflow-wrap:anywhere;text-align:right;font-size:.85rem}
 @media(max-width:500px){.w2-settings-details>div{align-items:flex-start;flex-direction:column;gap:4px}.w2-settings-details dd{max-width:100%;text-align:left}}
+
+/* Phase 8: owner login, authenticator, admin use the same approved v2 tokens. */
+.w2-auth-screen{min-height:100vh;background:var(--w2-bg,#0c0e12)}
+.w2-auth-outer{width:min(100%,520px);margin:0 auto;padding:7vh 18px 48px;box-sizing:border-box}
+.w2-auth-card{display:grid;gap:14px;padding:30px;min-width:0}
+.w2-auth-card h1{font-size:1.65rem;letter-spacing:-.025em;margin:0}
+.w2-auth-card .w2-overline{font-size:.75rem;letter-spacing:.1em}
+.w2-auth-form{display:grid;gap:10px}
+.w2-auth-form label{font-size:.87rem;font-weight:600}
+.w2-auth-form input:not([type=hidden]),.w2-auth-form select,.w2-auth-form textarea{
+ width:100%;max-width:100%;box-sizing:border-box;border:1px solid #313b48;border-radius:9px;
+ padding:12px 13px;min-height:42px;background:#0e141d;color:#e6e8eb}
+.w2-auth-form .w2-button{justify-content:center;margin-top:8px}
+.w2-auth-card details{border:1px solid #2d3440;border-radius:8px;padding:12px}
+.w2-auth-card summary{cursor:pointer}
+.w2-auth-card code{word-break:break-all}
+.w2-status-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px}
+.w2-status-line .w2-note{margin:0}
+@media(max-width:420px){.w2-auth-outer{padding:26px 12px}.w2-auth-card{padding:20px}}

@@ -10,7 +10,7 @@
     <p class="w2-muted">Withheld unless valuation verified</p></div>
   <div class="w2-stat"><p class="w2-label">Next calendar review</p>
     <p class="w2-stat-value">{{ today_next_review|date:"j M Y" }}</p>
-    <p class="w2-muted">In {{ today_days_to_review }} day{{ today_days_to_review|pluralize }} · schedule, not an instruction</p></div>
+    <p class="w2-muted">In {{ today_days_to_review }} day{{ today_days_to_review|pluralize }}</p></div>
 </section>
 <div class="w2-two-columns">
   <div class="w2-column">
@@ -41,13 +41,13 @@
         {% endif %}
         <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}">Check strategy setup</a>
       {% elif today_status == 'review' %}
-        <p class="w2-note">This is a manual warning. It is not an instruction to buy or sell.</p>
+        <p class="w2-note">Manual review only.</p>
       {% endif %}
-      <p class="w2-note">No broker connection. Wealtharr never places an order. All quantities, data quality and suitability must be checked independently before deciding whether to trade.</p>
+      <p class="w2-note">No automated trades. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
     </section>
     <section class="w2-panel" aria-labelledby="w2-quarter-heading">
       <h2 id="w2-quarter-heading">Quarter by quarter</h2>
-      <p class="w2-note">Saved reviews only, not a synthetic backtest.</p>
+      <p class="w2-note">Saved reviews</p>
       <div class="w2-table-wrap">
         <table class="w2-table">
           <thead><tr><th>Period</th><th>Review</th><th>Actual execution</th></tr></thead>
@@ -64,7 +64,7 @@
     </section>
     <section class="w2-panel">
       <h2>Actual holdings</h2>
-      <p class="w2-note">Holdings are reconstructed from recorded transactions. Quotes are shown only with verified matching-date evidence.</p>
+      <p class="w2-note">Recorded holdings and verified quotes.</p>
       <div class="w2-table-wrap"><table class="w2-table">
         <thead><tr><th>Role</th><th>Line</th><th>Units</th><th>Verified value</th></tr></thead>
         <tbody>{% for holding in today_holdings %}
@@ -72,7 +72,7 @@
               <td>{{ holding.quantity }}</td><td>{% if holding.value_gbp is not None %}£{{ holding.value_gbp|floatformat:2 }}{% else %}—{% endif %}</td></tr>
         {% empty %}<tr><td colspan="4"><div class="w2-empty">No bought holdings in the real ledger.</div></td></tr>{% endfor %}
         </tbody></table></div>
-      <p class="w2-note">Recorded cash: £{{ today_cash|floatformat:2 }}. The original 60/40 is an initial/reset reference, NOT a standing quarterly allocation target.</p>
+      <p class="w2-note">Cash £{{ today_cash|floatformat:2 }} · 60/40 applies only to initial/confirmed resets.</p>
     </section>
   </div>
   <div class="w2-column">

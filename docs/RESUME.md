@@ -1,3 +1,9 @@
+# Phase 8 handoff (20 October 2026)
+
+Phase 8 works from latest main, with shared models and data link migration 0021, v2-only owner entrypoints, secure 301 GET bookmarks, no legacy writes, restyled authentication, compact status copy and requested browser screenshot tests. Financial engine and 9Sig parity fixtures unchanged. See docs/PHASE8_V2_ONLY.md for data limits, visual differences and the old HTTP test dependency. Do not merge a failing CI draft or reset the database.
+
+---
+
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
 ## Layout cleanup after the seven merged phases (20 October 2026)
