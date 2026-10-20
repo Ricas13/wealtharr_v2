@@ -80,8 +80,8 @@ jobs:
               cfg = json.load(f)
           cmd = cfg["services"]["backups"]["command"]
           script = cmd[-1] if isinstance(cmd, list) else cmd
-          expected = 'sha256sum "wealtharr-$stamp.dump" > "wealtharr-$stamp.dump.sha256"'
-          assert expected in script, "Backup checksum filenames must retain shell $stamp"
+          expected = 'sha256sum "$completed" > "$completed.sha256"'
+          assert expected in script, "Backup checksum filenames must retain shell $completed"
           print("Backup filename shell variables survived Compose interpolation")
           PY
           WEALTHARR_HOST=wealtharr.vpn4u.cc \
