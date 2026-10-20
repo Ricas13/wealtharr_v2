@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from .models import NotificationDelivery, NotificationSchedulerRun
 from .services import dispatch
-from .notification_routing import category_for_event_key, selected_channels
+from .notification_routing import category_for_event_key, selected_channels, strategy_channels
 from .models import NotificationPreference
 from .cockpit_notifications import send_due_cockpit_notices
 
@@ -20,7 +20,7 @@ MAX_RETRY_ROWS = 100
 
 def retry_due_deliveries(*, as_of=None):
     now = as_of or timezone.now()
-    rows = NotificationDelivery.objects.select_related("owner").filter(
+    rows = NotificationDelivery.objects.select_related("owner", "strategy").filter(
         attempts__lt=3
     ).filter(
         Q(status__in=("FAILED", "PENDING")) |
@@ -33,11 +33,19 @@ def retry_due_deliveries(*, as_of=None):
     for row in rows:
         category = row.category or category_for_event_key(row.event_key)
         pref, _ = NotificationPreference.objects.get_or_create(owner=row.owner)
-        if category:
+        if row.strategy_id and row.strategy.owner_id != row.owner_id:
+            permitted = False
+        elif category:
             try:
-                permitted = row.channel in selected_channels(pref, category)
+                permitted = row.channel in strategy_channels(
+                    pref, category, row.strategy
+                )
             except ValueError:
                 permitted = False
+        elif row.strategy_id:
+            # Scoped legacy receipt without a recognizable category has no
+            # trustworthy routing permission: never guess its destination.
+            permitted = False
         else:
             permitted = bool(getattr(pref, row.channel + "_enabled", False))
         if not permitted:
@@ -50,7 +58,7 @@ def retry_due_deliveries(*, as_of=None):
             continue
         outcome = dispatch(
             row.owner, row.event_key, row.subject, row.message,
-            channels=(row.channel,), category=category or "")
+            channels=(row.channel,), category=category or "", strategy=row.strategy)
         if outcome.get(row.channel) in ("sent", "failed", "retrying"):
             attempted += 1
         if outcome.get(row.channel) == "sent":
