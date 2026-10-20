@@ -199,7 +199,7 @@ def today_page(request, instance_id):
         instance=strategy, section="today",
         today_status=status, today_headline=headline,
         today_explanation=explanation, today_blocking_reason=reason,
-        today_ready=ready, today_signal=notice, today_partial=partial,
+        today_ready=ready, today_signal=notice, today_partial=partial, today_executed=executed,
         today_progress=progress if (status in ("trade", "record")) else (),
         today_value=display_value, today_gain=gain,
         today_cash=report["cash"], today_contributed=report["net_contributed"],
