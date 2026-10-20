@@ -1,3 +1,11 @@
+## Phase 8 handoff update — v2-only regression continuation (20 October 2026)
+
+Continue existing **draft PR #26** on `feature/phase8-v2-only-app`; never merge or deploy until checks pass. Newest continuation: removed obsolete cockpit browser modules after extracting `browser_tests/harness.py`; wired every v2 phase browser suite to it and added `browser_tests/test_v2_security.py` to cover anonymous/private owner isolation, TOTP, 390px navigation and skip link. Ported `tracker/test_owner_enrolment_f.py`, `tracker/test_section_f_isa.py`, `tracker/test_ui_refresh.py`, `tracker/test_instrument_mapping.py`, `tracker/test_market_signals.py`, and `tracker/test_strategy_baseline.py` to v2 workflows, preserving critical accounting and financial refusal checks. Added preview-bound non-blocking UK ISA allowance guidance in v2 Ledger when the owner records a deposit. No 9Sig engine or pricing calculation changes. See `docs/PHASE8_V2_ONLY.md` for exact test mapping.
+
+Latest checked commit `a1e5125`: workflow run `39447148733` is **queued**, not passed. Earlier draft run `39445434466` had 386 Django tests with 33 failures and 1 error, seven skips (before the ports above). Baseline merged main passed 395 Django / 27 Chromium. Local before/after executions unavailable in this environment. PR remains draft and all latest CI results must be reviewed before declaring completion.
+
+---
+
 ## Phase 8 continuation — v2-only tests (20 October 2026)
 
 Continue **draft** PR #26 on `feature/phase8-v2-only-app` (not merged or deployed). `docs/PHASE8_V2_ONLY.md` documents the additional ported safety tests, preserved shared strategy/ledger links, safe v2 feedback on saved signals, screenshot artifact and remaining legacy-regression failures. Do not change the financial engine or merge until CI passes and the old financial/browser assertions are matched on v2. No local before/after test count was possible. Phase 8 is **not** complete.
