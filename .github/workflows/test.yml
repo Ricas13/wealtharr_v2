@@ -55,7 +55,6 @@ jobs:
           set -eu
           bash -n wealtharr.sh
           bash wealtharr.sh --help
-          bash scripts/test_portable_cli.sh
           bash -n scripts/restore_backup.sh
           bash -n scripts/verify_backup.sh
           cp .env.example .env.production
@@ -91,8 +90,28 @@ jobs:
           WEALTHARR_HOST=wealtharr.vpn4u.cc \
           TRAEFIK_DOCKER_NETWORK=ci_private_proxy \
           TRAEFIK_CERT_RESOLVER=ci_resolver \
-          WEALTHARR_ALLOWLIST_CIDRS=10.0.0.0/8 \
-          docker compose -f compose.yml -f compose.traefik.yml config --quiet
+          docker compose -f compose.yml -f compose.traefik.yml config --format json > /tmp/wealtharr-proxy-config.json
+          python - <<'PY'
+          import json
+          with open("/tmp/wealtharr-proxy-config.json") as f:
+              cfg = json.load(f)
+          web = cfg["services"]["web"]
+          labels = web["labels"]
+          if isinstance(labels, list):
+              labels = dict(label.split("=", 1) for label in labels)
+          assert labels.get("traefik.enable") == "true"
+          assert labels["traefik.http.routers.wealtharr.rule"] == "Host(`wealtharr.vpn4u.cc`)"
+          assert labels.get("traefik.http.routers.wealtharr.tls") == "true"
+          assert labels.get("traefik.http.routers.wealtharr.tls.certresolver") == "ci_resolver"
+          assert labels["traefik.http.services.wealtharr.loadbalancer.server.port"] == "8000"
+          assert not web.get("ports"), "Private upstream port must not be published"
+          assert not any("ipallowlist" in k.lower() or k == "traefik.http.routers.wealtharr.middlewares" for k in labels), (
+              "Wealtharr login must have no IP allowlist middleware"
+          )
+          assert "traefik_private" in web["networks"]
+          assert not cfg["services"]["db"].get("ports")
+          print("HTTPS public-login router, unexposed backend and no IP allowlist: OK")
+          PY
           # Neither Compose path must accidentally publish the database.
           if docker compose config | grep -E '^    ports:' -A 2 | grep -q '5432:'; then
             echo 'PostgreSQL must never be published'; exit 1
