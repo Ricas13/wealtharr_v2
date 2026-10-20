@@ -8,7 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.test import override_settings
-from browser_tests.test_owner_journeys import BrowserHarness
+from browser_tests.harness import BrowserHarness
 from tracker.models import Account, StrategyInstance, StrategyPreset
 
 
