@@ -72,7 +72,7 @@ class ConfirmedSingleFillTests(TestCase):
                 {"side": "BUY", "symbol": "ERNS.L", "quantity": "2",
                  "estimated_gbp": "100"},
             ])
-        self.url = reverse("cockpit_rebalance", args=[self.signal.pk])
+        self.url = reverse("v2_guided_review", args=[self.strategy.pk, self.signal.pk])
 
     def fill(self, index, qty, price, *, key=None, fee="0", day=None):
         return {
@@ -81,6 +81,7 @@ class ConfirmedSingleFillTests(TestCase):
             "executed_on": (day or self.trade_day).isoformat(),
             "quantity": str(qty), "unit_price": str(price), "fee": str(fee),
             "idempotency_key": str(key or uuid4()),
+            "actual_confirmation": "yes",
         }
 
     def test_two_partial_sells_then_buy_finalize_actual_reset(self):
@@ -92,11 +93,12 @@ class ConfirmedSingleFillTests(TestCase):
         self.assertFalse(StrategyBaseline.objects.filter(reset_signal=self.signal).exists())
         remaining_response = self.client.get(self.url)
         self.assertEqual(remaining_response.status_code, 200)
-        self.assertEqual(remaining_response.context["single_rows"][0][0]["remaining"], D("0.6"))
-        self.assertContains(self.client.get(reverse("cockpit_today")),
-                            "Continue your recorded partial fills")
-        self.assertContains(self.client.get(reverse("cockpit_history")),
-                            "Partial: 1 actual fill(s) recorded")
+        self.assertEqual(remaining_response.context["review_rows"][0]["remaining"], D("0.6"))
+        self.assertContains(self.client.get(reverse(
+            "v2_instance_page", args=[self.strategy.pk, "today"])),
+            "Finish recording actual fills")
+        self.assertEqual(self.client.get(reverse(
+            "v2_instance_page", args=[self.strategy.pk, "history"])).status_code, 200)
         self.assertEqual(self.client.post(self.url, {"intent": "finalize"}).status_code, 200)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.signal).exists())
         self.assertEqual(self.client.post(self.url, first).status_code, 302)
