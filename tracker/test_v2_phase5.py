@@ -69,7 +69,7 @@ class Phase5BreakdownTests(TestCase):
             strategy=instance, as_of=when, title=title,
             signal_key="quarter:" + when.isoformat(),
             kind="QUARTERLY",
-            message="Owner reviewed, historical only: =SUM(A1)",
+            message="=SUM(A1)",
             actions=[{"side": "BUY", "symbol": "LQQ3.L",
                       "quantity": "1.2345", "estimated_gbp": "123.45"}],
         )
