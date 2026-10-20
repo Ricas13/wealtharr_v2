@@ -518,3 +518,26 @@ body.v2 {
 .w2-today-action .w2-button,.w2-review-form button{width:100%;justify-self:stretch}
 .w2-today-checks>div{align-items:flex-start}
 }
+
+/* Phase 5: auditable, read-only quarterly Breakdown. */
+.w2-review-metadata{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.w2-review-metadata>div{min-width:0;border:1px solid var(--w2-stroke);background:#10141a;padding:11px 13px;border-radius:7px}
+.w2-review-metadata span{display:block;font-size:.77rem;color:var(--w2-muted)}
+.w2-review-metadata strong{font-size:.91rem;font-weight:650;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.w2-breakdown-disclosure{margin-top:14px;padding:10px 0;border-top:1px solid var(--w2-stroke-soft)}
+.w2-breakdown-disclosure summary{cursor:pointer;color:var(--w2-accent);font-size:.87rem;font-weight:550}
+.w2-breakdown-disclosure[open] summary{margin-bottom:12px}
+.w2-breakdown-checks{display:grid;margin-top:12px}
+.w2-breakdown-checks>div{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;border-top:1px solid var(--w2-stroke-soft);padding:11px 0}
+.w2-breakdown-checks>div strong{display:block;font-size:.86rem}
+.w2-breakdown-checks>div small{display:block;font-size:.77rem;color:var(--w2-muted);line-height:1.5;max-width:50ch}
+.w2-breakdown-checks .w2-badge{max-width:150px;white-space:normal;text-align:center;line-height:1.4;justify-content:center}
+.w2-breakdown-disclosure .w2-table-wrap{margin-top:10px}
+.w2-breakdown-data .w2-table td{white-space:normal}
+@media(max-width:580px){
+.w2-review-metadata{grid-template-columns:1fr}
+.w2-breakdown-checks>div{flex-direction:column;gap:8px}
+.w2-breakdown-checks .w2-badge{max-width:none}
+}
+
+.w2-breakdown-period-title{font-size:1rem;font-weight:600;color:var(--w2-text);margin:14px 0 0}

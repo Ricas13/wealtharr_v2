@@ -63,6 +63,9 @@ def instance_page(request, instance_id, section):
     if section == "today":
         from .v2_today import today_page
         return today_page(request, instance_id)
+    if section == "breakdown":
+        from .v2_breakdown import breakdown_page
+        return breakdown_page(request, instance_id)
     instance = get_object_or_404(
         StrategyInstance.objects.select_related("account", "preset"),
         pk=instance_id,

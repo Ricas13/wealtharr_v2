@@ -104,14 +104,7 @@
 <section class="w2-panel w2-space-top"><h2>Alerts for this strategy</h2>
   <div class="w2-empty">Routing is configured in Phase 7.</div></section>
 {% elif section == 'breakdown' %}
-<div class="w2-two-columns w2-space-top">
-  <section class="w2-panel"><h2>Calculation</h2><div class="w2-empty">Period-by-period auditable calculations will be shown in Phase 5.</div></section>
-  <div class="w2-column">
-    <section class="w2-panel"><h2>Recommended vs recorded</h2><div class="w2-empty">No recommendation inferred.</div></section>
-    <section class="w2-panel"><h2>Data used</h2><div class="w2-empty">Source dates and quote units will be shown here.</div></section>
-    <section class="w2-panel"><h2>Safety checks</h2><div class="w2-empty">No successful price or workbook check is asserted.</div></section>
-  </div>
-</div>
+{% include 'v2/breakdown.html' %}
 {% endif %}
 
 {% elif page_key == 'catalogue' %}
