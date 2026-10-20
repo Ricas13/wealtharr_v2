@@ -1,5 +1,8 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+Integration checkpoint: Phase 6 combines the original Yahoo raw GBP/GBX evidence-capture pipeline with the already approved nine_sig.v2.0.0 live adapter (#14). The v2 advisor's reserve/reset/spike behaviour and persisted StrategySignal.strategy_version field are preserved. The source provenance migration is 0018 and earlier observations are not retro-certified. Combined release CI is required before owner production deployment.
+
+
 ## APPROVED v2 DESIGN — Phase 6 handoff (20 October 2026)
 
 - Phase 6 branch feature/v2-phase6-history-overview is stacked on Phase 5 commit 9308b5e8b082840fbc3a41bc63de15d18c410840. Draft PR targets Phase 5; planned merge order #12 -> #13 -> #15 -> #17 -> #19 -> Phase 6, retargeting after predecessors merge. Keep separate methodology decisions independent.

@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from tracker.market_signals import _alert_intraperiod_spike, quarter_end_before
+from tracker.market_signals import NINE_SIG_RULE_VERSION, _alert_intraperiod_spike, quarter_end_before
 from tracker.models import (
     Account, LedgerEntry, MarketObservation, StrategyBaseline,
     StrategyInstance, StrategyPreset, StrategySignal,
@@ -64,6 +64,7 @@ class IntraperiodSpikeTests(TestCase):
         second.assert_not_called()
         signal = StrategySignal.objects.get(strategy=self.strategy)
         self.assertEqual(signal.kind, "SPIKE_WATCH")
+        self.assertEqual(signal.strategy_version, NINE_SIG_RULE_VERSION)
         self.assertEqual(signal.actions, [])
         self.assertIn("review a reset to 60%", signal.message)
         self.assertIn("preceding calendar-quarter", signal.message)

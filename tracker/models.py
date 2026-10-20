@@ -377,6 +377,8 @@ class StrategySignal(models.Model):
     actions = models.JSONField(default=list)
     # Explicit rule output; never detect a financial reset from free-text.
     reset_reason = models.CharField(max_length=240, blank=True, default="")
+    # Immutable ruleset provenance on every newly generated review.
+    strategy_version = models.CharField(max_length=48, blank=True, default="")
     as_of = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True)

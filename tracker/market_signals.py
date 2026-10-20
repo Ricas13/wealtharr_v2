@@ -6,6 +6,7 @@ signal strategy simulation v1.07 workbook. Suggestions never place orders.
 import json
 import logging
 import re
+from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone as utc_timezone
 from decimal import Decimal, ROUND_DOWN
 from dataclasses import dataclass
@@ -188,7 +189,7 @@ def sync_ticker(symbol, *, force=False):
 
 
 # Pure, immutable versioned rule implementation (Django-free).
-from .strategies.nine_sig.v1 import (
+from .strategies.nine_sig.v2 import (
     VERSION as NINE_SIG_RULE_VERSION, quarter_number, prior_quarter_name,
     quarter_end_before, _quarterly_closes, _drawdown_from_spy,
     signal_line_value, advice_for_holdings, first_100_up_crossing,
@@ -277,7 +278,8 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
         strategy=strategy, signal_key=key,
         defaults={"kind": "SPIKE_WATCH",
                   "title": "9Sig 100%-up spike: manual reset review",
-                  "message": message, "as_of": crossed.as_of, "actions": []})
+                  "message": message, "as_of": crossed.as_of, "actions": [],
+                  "strategy_version": NINE_SIG_RULE_VERSION})
     if created:
         route_notice(strategy.owner, "urgent",
                      "signal:%s:%s" % (strategy.pk, key),
@@ -292,11 +294,19 @@ def review_strategy(strategy):
         return {"status": "disabled"}
     if strategy.preset.slug != "nasdaq-quarterly-target":
         return {"status": "unsupported"}
+    # Never run v2 against an old pinned v1 owner portfolio implicitly.
+    if strategy.strategy_version and strategy.strategy_version != NINE_SIG_RULE_VERSION:
+        return {"status": "cannot_compute", "reason": "Pinned 9Sig rule version differs; owner review required"}
     if (not TICKER.fullmatch(strategy.equity_symbol) or
             not TICKER.fullmatch(strategy.safe_symbol)):
         return {"status": "invalid symbol"}
     if strategy.account.currency != "GBP":
         return {"status": "unsupported account currency"}
+    # The live adapter must enforce the exact pinned UK trading lines just
+    # as the pure evaluator, cockpit and single-fill path already do.
+    from .instrument_mapping import for_strategy
+    if for_strategy(strategy) is None:
+        return {"status": "cannot_compute", "reason": "Unverified instrument mapping or account trading line"}
     report = ledger_summary(strategy)
     if not report["positions"]:
         return {"status": "waiting for first purchase"}
@@ -376,13 +386,19 @@ def review_strategy(strategy):
     safe_qty = positions.get(strategy.safe_symbol, ZERO)
     if stock_qty <= ZERO or safe_qty < ZERO or cash < ZERO:
         return {"status": "historical holdings cannot support an advisory review"}
+    # Full observed TQQQ history is informational for the running-high
+    # drawdown; the trade rules still use only completed-quarter references.
     ref_tqqq = list(MarketObservation.objects.filter(
         symbol="TQQQ", as_of__lte=quarter_end,
-        as_of__gte=start_date - timedelta(days=100),
     ).order_by("as_of").values_list("as_of", "price"))
     ref_spy = list(MarketObservation.objects.filter(
         symbol="SPY", as_of__lte=quarter_end,
         as_of__gte=quarter_end - timedelta(days=760),
+    ).order_by("as_of").values_list("as_of", "price"))
+    # Separate from USD TQQQ: use only persisted normalized GBP observations
+    # of the owner's actual growth trading line for information-only drawdown.
+    growth_history = list(MarketObservation.objects.filter(
+        symbol=strategy.equity_symbol, currency="GBP", as_of__lte=quarter_end,
     ).order_by("as_of").values_list("as_of", "price"))
     # The 30 Down clock starts with a detected 30 Down notice, not
     # with a period of no sales. Previous unrelated HOLDs do not count.
@@ -399,10 +415,26 @@ def review_strategy(strategy):
             as_of__gte=active_down_signal.as_of,
         ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("as_of")
         skipped = count_skipped_equity_sells(earlier)
-    if len(_quarterly_closes(ref_spy, quarter_end)) < 2:
-        return {"status": "insufficient SPY quarter-end reference history"}
-    if len(_quarterly_closes(ref_tqqq, quarter_end)) < 2:
-        return {"status": "insufficient TQQQ quarter-end reference history"}
+    # An eight-quarter SPY window must be complete and quarter-close-dated,
+    # not inferred from two convenient samples. A missing previous peak
+    # could silently turn a genuine 30 Down into a normal buy/sell signal.
+    review_q = quarter_number(quarter_end)
+    def settled_end(q):
+        year, quarter_index = divmod(q, 4)
+        month = 3 * (quarter_index + 1)
+        return date(year, month, monthrange(year, month)[1])
+    spy_closes = _quarterly_closes(ref_spy, quarter_end)
+    if any(q not in spy_closes or
+           (settled_end(q) - spy_closes[q][0]).days > 6
+           for q in range(review_q - 8, review_q + 1)):
+        return {"status": "cannot_compute",
+                "reason": "SPY eight-quarter verified quarter-end history incomplete"}
+    tqqq_closes = _quarterly_closes(ref_tqqq, quarter_end)
+    if any(q not in tqqq_closes or
+           (settled_end(q) - tqqq_closes[q][0]).days > 6
+           for q in (review_q - 1, review_q)):
+        return {"status": "cannot_compute",
+                "reason": "TQQQ preceding/current verified quarter-end history incomplete"}
     # Initial equity baseline includes the first purchase date only.
     # Subsequent buys in the first calendar quarter must not silently
     # inflate the baseline and double-count their funding contributions.
@@ -422,9 +454,44 @@ def review_strategy(strategy):
         safe_qty=safe_qty, safe_price=closing[strategy.safe_symbol].price,
         cash=cash, starting_equity_cost=initial_equity_cost,
         contributions=injected, reference=ref_tqqq, spy_reference=ref_spy,
+        growth_history=growth_history,
         prior_skipped_sells=skipped, prior_drawdown=bool(active_down_signal),
         down_age_quarters=down_age,
     )
+    # A 100%-up TQQQ close compared with a calendar-quarter proxy is
+    # NOT proof of the owner's actual previous rebalance fill reference.
+    # The pure typed v2 evaluator already refuses executable reset quantities
+    # in this situation. Apply the same rule to persisted Django signals.
+    provisional_spike = any(
+        row["kind"] == "QUARTERLY" and
+        row.get("reset_reason", "").startswith("The TQQQ reference doubled")
+        for row in alerts
+    )
+    if provisional_spike:
+        alerts = [
+            dict(row, actions=[], reset_reason="",
+                 message=row["message"] +
+                 " Provisional TQQQ quarter-close proxy ONLY: its actual prior "
+                 "rebalance execution anchor is not confirmed. No executable "
+                 "reset quantities can be offered; review the reference first.")
+            if row["kind"] == "QUARTERLY" else row
+            for row in alerts
+        ]
+        review_q = quarter_number(quarter_end)
+        crossing_key = "spike:%04d-Q%d" % (review_q // 4, review_q % 4 + 1)
+        if not strategy.signals.filter(signal_key=crossing_key).exists():
+            alerts.append({
+                "kind": "SPIKE_WATCH",
+                "key": "spike-quarter:%04d-Q%d" % (review_q // 4, review_q % 4 + 1),
+                "title": "Possible TQQQ 100%-up: verify prior execution anchor",
+                "message": (
+                    "TQQQ more than doubled versus a calendar-quarter closing "
+                    "proxy. The actual previous rebalance price has not been "
+                    "verified. No GBP reset trades or quantities are available "
+                    "until independently reviewed. No broker order was placed."
+                ),
+                "actions": [],
+            })
     created = 0
     for alert in alerts:
         signal, new = StrategySignal.objects.get_or_create(
@@ -432,6 +499,7 @@ def review_strategy(strategy):
             defaults={"kind": alert["kind"], "title": alert["title"],
                       "message": alert["message"], "actions": alert["actions"],
                       "reset_reason": alert.get("reset_reason", ""),
+                      "strategy_version": NINE_SIG_RULE_VERSION,
                       "as_of": quarter_end})
         if new:
             created += 1
@@ -441,9 +509,9 @@ def review_strategy(strategy):
                 for a in alert["actions"])
             # No-action quarterly reviews remain in history without
             # triggering rebalance alerts or cluttering the Overview.
-            actionable = alert["kind"] == "THIRTY_DOWN" or any(
+            actionable = alert["kind"] in ("THIRTY_DOWN", "SPIKE_WATCH") or any(
                 action.get("side") in ("BUY", "SELL") for action in alert["actions"])
-            if actionable and alert["kind"] == "THIRTY_DOWN":
+            if actionable and alert["kind"] in ("THIRTY_DOWN", "SPIKE_WATCH"):
                 route_notice(strategy.owner, "urgent",
                              "signal:%s:%s" % (strategy.pk, signal.signal_key),
                              "Wealtharr — " + signal.title,

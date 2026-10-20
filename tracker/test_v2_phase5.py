@@ -15,7 +15,7 @@ from tracker.models import (
     Account, LedgerEntry, LedgerRevision, MarketObservation,
     StrategyInstance, StrategyPreset, StrategySignal, YahooSync,
 )
-from tracker.strategies.nine_sig.v1 import VERSION, signal_line_value
+from tracker.strategies.nine_sig.v2 import VERSION, signal_line_value
 from tracker.instrument_mapping import MAPPING_VERSION
 from tracker.services import validate_and_record
 from tracker.v2_breakdown import _detail, _trace, _growth_drawdown

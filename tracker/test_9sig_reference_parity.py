@@ -99,18 +99,24 @@ class WorkbookAndKellyParity(SimpleTestCase):
             starting_equity_cost=D("100"), equity_price=D("114"))
         self.assertGreater(action_sum(signals, "BUY", "LQQ3.L"), D("4"))
 
-    def test_30down_exception_takes_precedence_over_large_cash_shortage(self):
+    def test_30down_shortage_now_exhausts_reserve(self):
+        # Owner decision 3 in v2 replaces the v1 HOLD-on-shortage branch.
         signals = quarterly(
             equity_price=D("10"), safe_qty=D("0.1"),
             spy_reference=[(date(2026, 3, 31), D("100")),
                            (date(2026, 6, 30), D("60"))])
         q = next(s for s in signals if s["kind"] == "QUARTERLY")
-        self.assertEqual([x["side"] for x in q["actions"]], ["HOLD"])
+        self.assertEqual([x["side"] for x in q["actions"]], ["SELL", "BUY"])
+        self.assertEqual(q["reset_reason"], "")
+        self.assertIn("Your reserve is now empty", q["message"])
 
-    def test_100_percent_bond_deficit_is_reset_outside_30down(self):
+    def test_100_percent_bond_deficit_is_all_in_without_reset(self):
+        # Owner decision 3 in v2 replaces the v1 automatic shortage reset.
         signals = quarterly(equity_price=D("10"), safe_qty=D("0.1"))
         q = next(s for s in signals if s["kind"] == "QUARTERLY")
-        self.assertIn("reset to 60%", q["message"])
+        self.assertEqual([x["side"] for x in q["actions"]], ["SELL", "BUY"])
+        self.assertEqual(q["reset_reason"], "")
+        self.assertIn("Your reserve is now empty", q["message"])
 
 
 from types import SimpleNamespace
