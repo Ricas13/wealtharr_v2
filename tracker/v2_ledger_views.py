@@ -32,6 +32,7 @@ from .v2_ledger_core import (
 )
 from .v2_views import _render
 from .v2_onboarding import _decimal, _date
+from .core.isa_allowance import estimate_allowance, tax_year_bounds
 from .cockpit_import import inspect_csv
 
 
@@ -285,6 +286,28 @@ def _validate_proposal(strategy, operation, entry_id, payload):
     }
 
 
+def _isa_advisory(strategy, payload, other_isa=""):
+    """Advisory only: never reject an actual deposit based on unseen ISA data."""
+    if not payload or payload["kind"] != "DEPOSIT" or strategy.account.kind != "ISA":
+        return ""
+    other_raw = str(other_isa or "").strip()
+    other = _decimal(other_raw, "other ISA subscriptions") if other_raw else None
+    day = date.fromisoformat(payload["occurred_on"])
+    start, end = tax_year_bounds(day)
+    recorded = tuple(strategy.ledger.filter(
+        kind=LedgerEntry.DEPOSIT, occurred_on__range=(start, end),
+    ).values_list("occurred_on", "amount"))
+    try:
+        estimate = estimate_allowance(
+            as_of=day,
+            recorded_deposits=recorded + ((day, D(payload["amount"])),),
+            other_isa_subscriptions=other,
+        )
+    except ValueError:
+        return "ISA allowance policy is not verified for this tax year; check HMRC."
+    return estimate.warning if estimate.status in ("approaching", "limit_reached") else ""
+
+
 def _preview_key(strategy):
     return f"wealtharr_v2_ledger_preview_{strategy.pk}"
 
@@ -305,7 +328,7 @@ def edit_entry(request, instance_id, operation, entry_id=None):
         "symbol": "", "quantity": "", "unit_price": "", "amount": "", "fee": "",
         "note": "",
     }
-    view = {"preview": None, "form_values": default}
+    view = {"preview": None, "form_values": default, "isa_warning": ""}
     error = ""
     if request.method == "POST":
         try:
@@ -320,6 +343,9 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                         raise ValidationError("The ledger changed since preview. Review its impact again.")
                     payload = approved["payload"]
                     report = _validate_proposal(locked, operation, entry_id, payload)
+                    advisory = _isa_advisory(
+                        locked, payload, approved.get("other_isa_subscriptions", ""),
+                    ) if operation == "new" else ""
                     if operation == "new":
                         instance = LedgerEntry(
                             kind=payload["kind"], occurred_on=date.fromisoformat(payload["occurred_on"]),
@@ -350,6 +376,8 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                         )
                     request.session.pop(key, None)
                 messages.success(request, "Ledger change saved with its full revision history.")
+                if advisory:
+                    messages.warning(request, advisory)
                 return redirect("v2_instance_page", instance_id=instance_id, section="ledger")
             payload = (
                 _input_payload(request.POST, strategy) if operation in ("new", "edit")
@@ -358,9 +386,17 @@ def edit_entry(request, instance_id, operation, entry_id=None):
             )
             view["form_values"] = payload or default
             report = _validate_proposal(strategy, operation, entry_id, payload)
+            other_isa = (
+                request.POST.get("other_isa_subscriptions", "").strip()
+                if operation == "new" else ""
+            )
+            view["isa_warning"] = _isa_advisory(
+                strategy, payload, other_isa,
+            ) if operation == "new" else ""
             request.session[_preview_key(strategy)] = {
                 "operation": operation, "entry_id": entry_id,
                 "payload": payload, "ledger_hash": state_digest(strategy),
+                "other_isa_subscriptions": other_isa,
             }
             view["preview"] = report
         except (ValidationError, ValueError, InvalidOperation, IntegrityError) as exc:
@@ -376,7 +412,7 @@ def edit_entry(request, instance_id, operation, entry_id=None):
         instance=strategy, section="ledger",
         ledger_edit=True, edit_operation=operation, edit_entry=old,
         edit_values=view["form_values"], edit_preview=view["preview"],
-        edit_error=error,
+        edit_isa_warning=view["isa_warning"], edit_error=error,
     )
 
 
