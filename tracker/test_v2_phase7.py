@@ -232,7 +232,12 @@ class Phase7Tests(TestCase):
         self.assertIn("application/zip", response["Content-Type"])
         import io, zipfile
         archive = zipfile.ZipFile(io.BytesIO(response.content))
-        self.assertIn("strategies.csv", archive.namelist())
+        for filename in ("strategies.csv", "ledger.csv", "revisions.csv",
+                         "opening_holdings.csv", "reconciliations.csv",
+                         "actual_fills.csv", "executions.csv", "broker_imports.csv",
+                         "owner_wealth_snapshots.csv", "strategy_alert_routes.csv",
+                         "alert_deliveries.csv"):
+            self.assertIn(filename, archive.namelist())
         self.assertIn("Owner ISA", archive.read("strategies.csv").decode())
         self.assertNotIn("SECRET_OTHER_ACCOUNT", archive.read("strategies.csv").decode())
         self.assertNotIn("strong-test-password", response.content.decode("latin1", "ignore"))

@@ -31,7 +31,7 @@ from .models import (
     LedgerRevision, NotificationDelivery, NotificationPreference,
     NotificationSchedulerRun, OpeningReconciliation, RebalanceExecution,
     SignalFill, StrategyBaseline, StrategyInstance, StrategySignal,
-    StrategyValueSnapshot, SystemIntegration,
+    StrategyValueSnapshot, SystemIntegration, WealthSnapshot,
 )
 from .notification_routing import CATEGORIES, CHANNELS
 from .services import dispatch
@@ -245,6 +245,46 @@ def _export_owner(owner):
               StrategyBaseline.objects.filter(strategy_id__in=ids).values_list(
                   "pk", "strategy_id", "as_of", "strategy_version",
                   "mapping_version", "equity_value", "safe_value", "cash_value"))
+        table("opening_holdings.csv",
+              ("id", "instance", "reported_on", "cash_gbp",
+               "owner_reported_positions_json"),
+              ((s.pk, s.strategy_id, s.reported_on, s.cash_gbp,
+                json.dumps(s.positions, sort_keys=True))
+               for s in InstanceOpeningSnapshot.objects.filter(strategy_id__in=ids)))
+        table("reconciliations.csv",
+              ("id", "opening_id", "file_sha256", "accepted_rows", "reconciled_at"),
+              OpeningReconciliation.objects.filter(
+                  opening__strategy_id__in=ids
+              ).values_list("pk", "opening_id", "file_sha256",
+                            "accepted_rows", "reconciled_at"))
+        table("actual_fills.csv",
+              ("id", "instance", "signal", "ledger_entry", "action_index",
+               "idempotency_token", "recorded_by"),
+              SignalFill.objects.filter(strategy_id__in=ids).values_list(
+                  "pk", "strategy_id", "signal_id", "ledger_entry_id",
+                  "action_index", "idempotency_key", "recorded_by_id"))
+        table("executions.csv",
+              ("id", "instance", "signal", "executed_on", "baseline_id"),
+              RebalanceExecution.objects.filter(strategy_id__in=ids).values_list(
+                  "pk", "strategy_id", "signal_id", "executed_on", "baseline_id"))
+        table("broker_imports.csv",
+              ("id", "instance", "fingerprint", "ledger_entry"),
+              BrokerImportRow.objects.filter(strategy_id__in=ids).values_list(
+                  "pk", "strategy_id", "fingerprint", "ledger_entry_id"))
+        table("owner_wealth_snapshots.csv",
+              ("id", "date", "GBP_value", "GBP_net_contributed"),
+              WealthSnapshot.objects.filter(owner=owner).values_list(
+                  "pk", "as_of", "total_value", "net_contributed"))
+        table("strategy_alert_routes.csv",
+              ("instance", "alert_routes"),
+              ((s.pk, json.dumps(s.alert_routes, sort_keys=True))
+               for s in instances))
+        table("alert_deliveries.csv",
+              ("id", "strategy", "channel", "category", "event_key",
+               "status", "created_at", "attempts", "subject", "message"),
+              NotificationDelivery.objects.filter(owner=owner).values_list(
+                  "pk", "strategy_id", "channel", "category", "event_key",
+                  "status", "created_at", "attempts", "subject", "message"))
         out.writestr("README.txt",
                      "Wealtharr private owner data export. Real recorded data only.\\n"
                      "Secrets, passwords and session tokens intentionally excluded.\\n"
