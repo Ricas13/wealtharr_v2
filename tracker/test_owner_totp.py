@@ -45,7 +45,7 @@ class OwnerAuthenticatorTests(TestCase):
         secret = self.enroll()
         self.client.logout()
         self.client.force_login(self.user)
-        response = self.client.post(reverse("cockpit_deposit"), {
+        response = self.client.post(reverse("v2_ledger_add", args=[0]), {
             "amount": "100.00", "occurred_on": "2026-10-19"})
         self.assertRedirects(response, reverse("totp_challenge"))
         self.assertTrue(OwnerTOTP.objects.filter(owner=self.user).exists())
@@ -57,9 +57,9 @@ class OwnerAuthenticatorTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_unenrolled_owners_remain_password_only(self):
-        self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("v2_settings")).status_code, 200)
         self.client.force_login(self.other)
-        self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("v2_settings")).status_code, 200)
 
     def test_authenticator_secret_encrypted_and_second_step_required(self):
         secret = self.enroll()
@@ -69,7 +69,7 @@ class OwnerAuthenticatorTests(TestCase):
         self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
         self.client.logout()
         self.client.force_login(self.user)
-        for url in (reverse("cockpit_today"), reverse("dashboard"),
+        for url in (reverse("v2_overview"), reverse("v2_catalogue"),
                     reverse("admin:index")):
             with self.subTest(url=url):
                 self.assertRedirects(self.client.get(url), reverse("totp_challenge"))
@@ -77,8 +77,8 @@ class OwnerAuthenticatorTests(TestCase):
         with patch("tracker.totp.time.time", return_value=TIME_A + 30):
             res = self.client.post(reverse("totp_challenge"), {
                 "code": current_code(secret)})
-        self.assertRedirects(res, reverse("cockpit_today"), fetch_redirect_response=False)
-        self.assertEqual(self.client.get(reverse("cockpit_settings")).status_code, 200)
+        self.assertRedirects(res, reverse("v2_overview"), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse("v2_settings")).status_code, 200)
         with patch("tracker.totp.time.time", return_value=TIME_A + 30):
             self.assertFalse(verify_account_code(self.user, current_code(secret)))
 
@@ -90,7 +90,7 @@ class OwnerAuthenticatorTests(TestCase):
         self.client.force_login(self.user)
         response = self.client.post(reverse("totp_challenge"), {"code": "123456"})
         self.assertEqual(response.status_code, 200)
-        self.assertRedirects(self.client.get(reverse("cockpit_settings")),
+        self.assertRedirects(self.client.get(reverse("v2_settings")),
                              reverse("totp_challenge"))
 
     def test_setup_requires_password_and_valid_code(self):
