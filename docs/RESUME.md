@@ -1,5 +1,17 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+## APPROVED v2 DESIGN — Phase 7 completion checkpoint (20 October 2026)
+
+- Phase 7 branch `feature/v2-phase7-notifications-settings` stacks on Phase 6 `feature/v2-phase6-history-overview` commit `7c6d6c31492223c55db50e501410e3d382f7e605`. Open a **draft** Phase 7 PR targeting Phase 6; keep merge order #12 → #13 → #15 → #17 → #19 → #22 → Phase 7. Methodology PR #14 was independently merged on main and must be reconciled with the stack during proper merge order; do not force-merge or deploy it blindly.
+- Implemented editable authenticated v2 Settings in `tracker/v2_settings.py` and `templates/v2/settings.html`: global email/Discord master switches/category choices, validated 1–30 day review delay, individual per-strategy routing, read-only private receipt status, staff-only transport tests and carefully bounded scheduler diagnostics. Existing Django password/TOTP setup and staff-only encrypted integration management remain authoritative.
+- Alert routing now honors the stored v2 onboarding `alert_routes` for all five categories, including urgent mid-period warnings, not just owner-wide masters. The prior `followup` category maps to the stored `unacted` route. `NotificationDelivery.strategy` migration 0019 persists source scope; retries recheck opt-outs and cancel pending receipts rather than sending after opt-out. Older unscoped legacy receipts retain historic behaviour; no new broker contact.
+- Documented explicit non-features rather than reproducing mock prototype claims: no ntfy push transport, no certified backup/restore timestamp, no global export bundle or destructive account-reset endpoint. Staff-only diagnostics do not prove owner Oracle uptime; live email/Discord still requires real test delivery.
+- New `tracker/test_v2_phase7.py` and `browser_tests/test_v2_phase7.py` exercise access control, owner isolation, retry permission, settings forms and 390px/1440px layout. **Inspect latest GitHub Actions run before calling green.** Read `docs/v2-settings-notifications.md`.
+- **End of approved seven phases.** Next requested action is sequential stacked PR CI/visual review, conflict resolution and merging with explicit owner approval, then owner-only staging/production operational acceptance using actual ISA, broker, workbook and off-host restore evidence from `docs/OWNER_TODO.md`. No eighth phase is implied.
+
+---
+
+
 ## APPROVED v2 DESIGN — Phase 6 handoff (20 October 2026)
 
 - Phase 6 branch feature/v2-phase6-history-overview is stacked on Phase 5 commit 9308b5e8b082840fbc3a41bc63de15d18c410840. Draft PR targets Phase 5; planned merge order #12 -> #13 -> #15 -> #17 -> #19 -> Phase 6, retargeting after predecessors merge. Keep separate methodology decisions independent.
