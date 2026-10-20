@@ -1,5 +1,8 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+Integration note: the independently merged owner 9Sig ruleset is nine_sig.v2.0.0 (#14). Phase 5 Breakdown now references its released v2 pure line-trace and SPY reference utilities. Pinned v1 historical reviews are not retroactively upgraded; no broker action or strategy methodology is altered.
+
+
 ## APPROVED v2 DESIGN — Phase 5 handoff (20 October 2026)
 
 - Branch `feature/v2-phase5-auditable-breakdown` begins at Phase 4 `feature/v2-phase4-today-guided-review-stacked` commit `9fc6a3fb086c14a39534f21b76eceea6521e3b45` (both CI workflows green). Draft PR for this Phase 5 branch MUST target Phase 4; planned merge order #12 -> #13 -> #15 -> #17 -> Phase 5; retarget after predecessor merges. Independently proposed owner 9Sig workbook decisions PR #14 are **NOT** silently merged or used to alter the engine.

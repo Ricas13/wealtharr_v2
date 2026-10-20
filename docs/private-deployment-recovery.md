@@ -1,12 +1,15 @@
 # Wealtharr Section I — private Oracle / Traefik deployment and recoverability
 
+**Simplified current operator commands:** see [Portable deployment](PORTABLE_DEPLOYMENT.md). The `wealtharr.sh` wrapper pins the Compose project/files and supports checked portable migrations; detailed disaster recovery contract remains below.
+
 Status: deployable configuration committed on PR #11, **not a claim that Oracle has been changed, backup restored, the owner received an email, or TOTP was enrolled**. Financial 9Sig source/ISA verification is separate. No broker API, order placement or public signup exists.
 
 ## Network architecture
 
 - **Default host/Traefik setup:** `compose.yml` publishes Gunicorn only to `127.0.0.1:8088` on the Oracle host. PostgreSQL has **no published port**. Route an existing trusted **host-mode** Traefik HTTPS server to `127.0.0.1:8088`; do not expose port 8088 to the internet or make Gunicorn the TLS endpoint.
-- **Docker-network Traefik option:** use `docker compose -f compose.yml -f compose.traefik.yml`, with Docker Compose v2.24+ (supports `ports: !reset []`), an already-created trusted external Traefik network, a configured TLS certificate resolver, and a deliberate private/VPN CIDR allowlist. Required variables: `WEALTHARR_HOST`, `TRAEFIK_DOCKER_NETWORK`, `TRAEFIK_CERT_RESOLVER`, `WEALTHARR_ALLOWLIST_CIDRS`. The override **removes** the loopback port and exposes port 8000 only on the existing Traefik Docker network. Always inspect the merged `docker compose config` before `up`. If Traefik sees a Cloudflare proxy address rather than the client IP, configure only trusted forwarded-header proxies; never blindly trust arbitrary `X-Forwarded-For` or use `0.0.0.0/0` to defeat the allowlist.
-- A private VPN/Cloudflare Access pre-authentication policy may further restrict the hostname but is external infrastructure, **not automatically installed by this PR**. Keep DNS, certificates, Traefik network/forwarded-header trust and firewall under the owner’s control.
+- **Docker-network Traefik option:** use `docker compose -f compose.yml -f compose.traefik.yml`, with Docker Compose v2.24+ (supports `ports: !reset []`), an already-created trusted external Traefik network and a configured TLS certificate resolver. Required variables: `WEALTHARR_HOST`, `TRAEFIK_DOCKER_NETWORK`, `TRAEFIK_CERT_RESOLVER`. The override **removes** the loopback port and routes traffic to port 8000 only on the shared Traefik Docker network. The HTTPS login page is **publicly reachable** through Cloudflare/Traefik, as expressly accepted by the owner. The removed `WEALTHARR_ALLOWLIST_CIDRS` setting is ignored. Password, production Turnstile verification and optional enrolled TOTP are still enforced by Django. Do not blindly trust arbitrary `X-Forwarded-For` headers.
+
+- An optional VPN/Cloudflare Access pre-authentication policy may further restrict the hostname but is external infrastructure, **not automatically installed by this PR**. Keep DNS, certificates, Traefik network/forwarded-header trust and firewall under the owner’s control.
 - The login requires password and production Cloudflare Turnstile. There is no registration. Optional time-based authenticator can be enabled from the authenticated security page. Docker health probes run locally and do not bypass owner login.
 - Django production security: `DEBUG=0`, exact `ALLOWED_HOSTS`, exact HTTPS `CSRF_TRUSTED_ORIGINS`, HSTS, secure session/CSRF cookies and trusted Traefik TLS forwarding. Disable the public Django debug page. No application or broker secrets in GitHub or image layers.
 
@@ -22,7 +25,7 @@ Only do these on the **correct** Wealtharr host/check-out; no tool in the PR dep
 6. Test `docker compose ps`; `docker compose exec -T web python manage.py check --deploy`; `docker compose exec -T web python manage.py migrate --check`; `docker compose exec -T web python manage.py test tracker`; local `/health/`; then `https://wealtharr.vpn4u.cc/health/` through your actual TLS ingress. A working `/health/` is **database reachability**, not proof that quotes, the scheduler, TOTP, notifications or restores work. Confirm the private account can log in, optional TOTP challenge cannot be bypassed, and all public registration remains disabled.
 7. Check `docker compose logs --tail=100 web reminders backups` for scheduler and backup outcomes. A second, real, owner-authorised test email/Discord delivery is needed before relying on alerts. Keep failures generic in logs; never log a token, auth code, account balance or full message body.
 
-If moving to the `compose.traefik.yml` option, set `WEALTHARR_HOST` and all proxy variables in the invoking deployment environment. Ensure `docker compose -f compose.yml -f compose.traefik.yml config` contains **no published web ports**; failing that, stop before deploying.
+If moving to the `compose.traefik.yml` option, set `WEALTHARR_HOST` and all proxy variables in the invoking deployment environment. Ensure `docker compose -f compose.yml -f compose.traefik.yml config` contains **no published web ports**; failing that, stop before deploying. The public login page must still be protected by password/Turnstile and optional TOTP.
 
 ## Backup routine and off-host retention
 
@@ -57,4 +60,4 @@ If the authenticator is lost and there is no other approved recovery path, do **
 
 ## Decision gate
 
-Source code and tests prepare the private stack, but **actual readiness requires**: proven Oracle ingress and TLS allowlist, stable secrets and PostgreSQL, the owner account and TOTP test where enabled, scheduler heartbeat, test alert delivery, successful disposable full restore using a real archive, and independently retained off-host copy. If any check is unavailable, report that step as *not verified*, not 'already deployed'. No changes here affect 9Sig arithmetic, Trading 212 products, deposits or fill confirmation.
+Source code and tests prepare the private stack, but **actual readiness requires**: proven Oracle HTTPS ingress and owner login security, stable secrets and PostgreSQL, the owner account and TOTP test where enabled, scheduler heartbeat, test alert delivery, successful disposable full restore using a real archive, and independently retained off-host copy. If any check is unavailable, report that step as *not verified*, not 'already deployed'. No changes here affect 9Sig arithmetic, Trading 212 products, deposits or fill confirmation.
