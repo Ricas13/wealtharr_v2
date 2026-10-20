@@ -42,25 +42,26 @@ docker compose -p wealtharr_v2 -f compose.yml -f compose.traefik.yml exec web py
 ```
 
 The interactive setup asks for your private hostname, proxy network, TLS
-resolver, restrictive IP/CIDR allowlist and Cloudflare Turnstile keys. It
+resolver and Cloudflare Turnstile keys. It
 generates independent PostgreSQL and stable Django keys without printing
 them. For host-mode Traefik choose `n` when prompted, and route your
 HTTPS proxy to the local 127.0.0.1:8088 backend instead. Enable optional
 TOTP inside Wealtharr and save its recovery seed separately.
 
-**Cloudflare proxy 403:** Traefik generally sees a Cloudflare edge IP rather
-than your laptop IP. Only AFTER activating a Cloudflare Zero Trust Access
-policy that authenticates your identity for this exact hostname, run:
+**Public login model (Cloudflare + Traefik):** The hostname serves the
+Wealtharr login page over HTTPS just like other owner-hosted applications.
+There is no Wealtharr-specific Traefik IP allowlist or Cloudflare Zero Trust
+Access requirement. The app still requires an owner username/password,
+production Cloudflare Turnstile verification, and optional authenticator
+TOTP. There is no public registration. **The login endpoint is publicly
+reachable**, so keep credentials and TOTP secure, maintain security updates,
+and use Cloudflare protection/firewall rules as appropriate. The PostgreSQL
+service has no published host port.
 
-```bash
-bash wealtharr.sh allow-cloudflare
-```
-
-Confirm by typing `ACCESS PROTECTED`. This safely downloads and
-validates both IPv4 and IPv6 Cloudflare ranges, adjusts the allowlist and
-recreates only the app web container. Turnstile alone is **not** Cloudflare
-Access. Without Access, use a truly private VPN route and restrictive source
-ranges instead. An unauthenticated curl may correctly receive 403.
+If upgrading a deployment whose private `.env` includes the old
+`WEALTHARR_ALLOWLIST_CIDRS` value, it can be left in place: the current
+Traefik override no longer consumes it. The next `bash wealtharr.sh update`
+recreates the changed web service labels automatically.
 
 ## Move to a different server
 
