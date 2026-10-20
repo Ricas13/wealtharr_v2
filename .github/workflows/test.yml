@@ -45,10 +45,14 @@ jobs:
           django.setup()
           from django.test import Client
           client = Client(raise_request_exception=True)
-          for path in ("/", "/login/"):
-              response = client.get(path, secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
-              print(path, response.status_code)
-              assert response.status_code == 200, (path, response.status_code)
+          # Private app: "/" sends anonymous visitors to the login page.
+          response = client.get("/", secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
+          print("/", response.status_code, response.get("Location"))
+          assert response.status_code == 302 and response["Location"] == "/login/", (
+              "/", response.status_code, response.get("Location"))
+          response = client.get("/login/", secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
+          print("/login/", response.status_code)
+          assert response.status_code == 200, ("/login/", response.status_code)
           PY
       - name: Validate private deployment and recovery configuration
         run: |
