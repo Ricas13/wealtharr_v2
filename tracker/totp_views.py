@@ -24,12 +24,12 @@ def challenge(request):
     if not OwnerTOTP.objects.filter(owner=request.user).exists():
         return redirect(preferred_url(request.user))
     if request.session.get(SESSION_FLAG) == request.user.pk:
-        return redirect("cockpit_today")
+        return redirect(preferred_url(request.user))
     if request.method == "POST":
         if verify_account_code(request.user, request.POST.get("code", "")):
             request.session[SESSION_FLAG] = request.user.pk
             request.session.cycle_key()
-            return redirect("cockpit_today")
+            return redirect(preferred_url(request.user))
         messages.error(request, "Code unavailable or invalid. Check your authenticator clock or try later.")
     return render(request, "v2/totp_challenge.html")
 
