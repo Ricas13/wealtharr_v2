@@ -265,6 +265,8 @@ class NotificationPreference(models.Model):
     email_enabled = models.BooleanField(default=False)
     discord_enabled = models.BooleanField(default=False)
     monthly_reminders = models.BooleanField(default=True)
+    unacted_reminder_days = models.PositiveSmallIntegerField(default=3)
+    isa_allowance_enabled = models.BooleanField(default=True)
     # Category-by-channel routing: master destination toggles still apply.
     quarterly_email = models.BooleanField(default=True)
     quarterly_discord = models.BooleanField(default=True)
@@ -311,6 +313,8 @@ class SystemIntegration(models.Model):
 
 class NotificationDelivery(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    strategy = models.ForeignKey("StrategyInstance", on_delete=models.PROTECT,
+                                 blank=True, null=True, related_name="alert_deliveries")
     channel = models.CharField(max_length=12)
     # Fixed-category provenance lets due retries honor changed owner preferences.
     # Empty for legacy one-off notices which must not be guessed as a category.

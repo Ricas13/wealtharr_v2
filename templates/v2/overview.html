@@ -59,10 +59,14 @@
     </section>
     <section class="w2-panel">
       <h2>UK ISA contributions</h2>
+      {% if not overview_isa_enabled %}
+        <p class="w2-muted">ISA allowance tracking is switched off in Settings.</p>
+      {% else %}
       {% if overview_has_isa %}
         <p class="w2-muted">Lifetime net funding recorded within Wealtharr ISA strategies: £{{ overview_isa_contributed|floatformat:2 }}.</p>
         <p class="w2-note">Not an ISA allowance estimate. Withdrawals and flexible ISA replacements, contributions at other providers and current UK tax-year rules are not fully established here.</p>
       {% else %}<p class="w2-muted">No recorded Wealtharr ISA strategy account.</p>{% endif %}
+      {% endif %}
     </section>
   </div>
 </div>

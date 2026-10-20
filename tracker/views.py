@@ -450,10 +450,30 @@ def test_notification(request, channel):
 
 @require_GET
 def health(request):
+    """Database liveness plus sanitized scheduler heartbeat; never secrets."""
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
-        return JsonResponse({"status": "ok"})
+        from .models import NotificationSchedulerRun
+        from datetime import timedelta
+        successful = NotificationSchedulerRun.objects.filter(
+            status="SUCCEEDED", finished_at__isnull=False
+        ).order_by("-finished_at").first()
+        last = NotificationSchedulerRun.objects.order_by("-started_at").first()
+        healthy = bool(successful and successful.finished_at >= (
+            timezone.now() - timedelta(hours=3)))
+        return JsonResponse({
+            "status": "ok",
+            "scheduler": {
+                "state": (
+                    "failed" if last and last.status == "FAILED"
+                    else "healthy" if healthy else "overdue"
+                    if successful else "never_run"
+                ),
+                "last_success": successful.finished_at.isoformat() if successful else None,
+                "last_run_status": last.status if last else None,
+            },
+        })
     except Exception:
         return JsonResponse({"status": "unavailable"}, status=503)

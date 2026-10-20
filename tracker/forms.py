@@ -172,7 +172,7 @@ class NotificationForm(forms.ModelForm):
         model = NotificationPreference
         fields = [
             "destination_email", "email_enabled", "discord_enabled",
-            "monthly_reminders", "quarterly_email", "quarterly_discord",
+            "monthly_reminders", "unacted_reminder_days", "isa_allowance_enabled", "quarterly_email", "quarterly_discord",
             "urgent_email", "urgent_discord", "data_email", "data_discord",
             "followup_email", "followup_discord", "contribution_email",
             "contribution_discord",
@@ -195,6 +195,11 @@ class NotificationForm(forms.ModelForm):
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["unacted_reminder_days"].min_value = 1
+        self.fields["unacted_reminder_days"].max_value = 30
+        # Older notification forms do not carry this newly introduced field.
+        # Keep their previous value instead of rejecting unrelated updates.
+        self.fields["unacted_reminder_days"].required = False
         style(self.fields)
 
 class IntegrationForm(forms.ModelForm):

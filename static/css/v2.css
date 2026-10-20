@@ -555,3 +555,30 @@ body.v2 {
 .w2-history-table td a{display:block}
 .w2-history-table .w2-number{font-variant-numeric:tabular-nums}
 @media(max-width:550px){.w2-history-table{min-width:640px}.w2-history-figure{gap:5px}}
+
+/* Phase 7: responsive private Settings, fixed-rule Strategy presentation */
+.w2-settings-form{display:grid;gap:13px;margin:12px 0}
+.w2-settings-form input:not([type=checkbox]),.w2-settings-form select{
+  min-height:40px;width:100%;min-width:0;border:1px solid #343b45;
+  background:#11161c;color:var(--w2-text);border-radius:7px;padding:8px 11px
+}
+.w2-settings-form input[type=checkbox]{accent-color:var(--w2-accent)}
+.w2-settings-form .w2-field{display:grid;gap:6px}
+.w2-settings-form .w2-button{justify-self:start}
+.w2-settings-form .errorlist{color:#ffb5b9;font-size:.8rem;list-style:none;margin:0;padding:0}
+.w2-settings-form .w2-table td{vertical-align:middle}
+.w2-settings-form .w2-table input[type=checkbox]{width:17px;height:17px}
+.w2-settings-details{display:grid;gap:3px;margin:14px 0}
+.w2-settings-details>div{display:grid;grid-template-columns:minmax(115px,40%) minmax(0,1fr);gap:12px;padding:10px 0;border-bottom:1px solid var(--w2-stroke-soft)}
+.w2-settings-details dt{font-size:.83rem;color:var(--w2-muted)}
+.w2-settings-details dd{margin:0;font-size:.86rem;overflow-wrap:anywhere}
+.w2-test-actions{display:flex;flex-wrap:wrap;gap:9px;margin:12px 0}
+.w2-test-actions form{display:inline-flex}
+.w2-rules-list{padding-left:25px;display:grid;gap:14px;margin:14px 0}
+.w2-rules-list li{padding-left:5px;line-height:1.55;font-size:.91rem}
+.w2-settings-form summary,.w2-panel summary{cursor:pointer;color:var(--w2-text);font-weight:600;padding:10px 0}
+.w2-panel summary:focus-visible,.w2-settings-form summary:focus-visible{outline:2px solid var(--w2-accent)}
+.w2-panel h3{font-size:1rem;margin-top:18px}
+.w2-settings-form label:has(input[type=checkbox]){display:flex;align-items:center}
+@media(max-width:600px){.w2-settings-details>div{grid-template-columns:1fr;gap:3px}
+.w2-settings-form .w2-button{justify-self:stretch}.w2-test-actions>*{flex:1}}

@@ -31,12 +31,13 @@ def trade_lines(signal):
     return lines
 
 
-def _send(owner, category, key, subject, message):
+def _send(owner, category, key, subject, message, *, strategy=None):
     return newly_delivered(route_notice(
-        owner, category, key, subject, message, sender=dispatch))
+        owner, category, key, subject, message, sender=dispatch,
+        strategy=strategy))
 
 
-def send_due_cockpit_notices(today=None, remind_after_days=3):
+def send_due_cockpit_notices(today=None, remind_after_days=None):
     """Send owner-selected, deterministic advisory notices only once per key.
 
     Previously recorded partial fills suppress stale trade quantities, but
@@ -48,6 +49,9 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
             preset__slug="nasdaq-quarterly-target").exclude(account__kind="PAPER"):
         owner = strategy.owner
         pref, _ = NotificationPreference.objects.get_or_create(owner=owner)
+        # The personal, validated unacted reminder delay is account-wide.
+        days = (pref.unacted_reminder_days if remind_after_days is None
+                else remind_after_days)
         report = ledger_summary(strategy)
         fresh, why, marks = _price_status(strategy, report)
         # A recurring source issue is never converted to a trade instruction.
@@ -62,14 +66,14 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                 "Wealtharr — review market data",
                 "%s: an accurate review is currently unavailable. %s "
                 "Open Today to see the data status. Do not trade from old "
-                "recommendations." % (strategy.name, why))
+                "recommendations." % (strategy.name, why), strategy=strategy)
 
         recent = StrategySignal.objects.filter(
             strategy=strategy, kind="QUARTERLY",
             as_of=quarter_end_before(today)).exclude(
                 review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"),
             ).order_by("-as_of", "-pk").first()
-        if (strategy.market_data_enabled and recent and
+        if (strategy.market_data_enabled and not strategy.tracking_only and recent and
                 not RebalanceExecution.objects.filter(signal=recent).exists()):
             actions = trade_lines(recent)
             existing = SignalFill.objects.filter(strategy=strategy, signal=recent)
@@ -85,9 +89,9 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                     "Recorded review %s\n\n%s\n\n"
                     "Open Wealtharr → Today. Check broker availability, actual "
                     "prices, quantities and fees. No orders have been placed." % (
-                        recent.as_of, "\n".join(actions)))
+                        recent.as_of, "\n".join(actions)), strategy=strategy)
             if (actions and recent.created_at.date() <= today - timedelta(
-                    days=remind_after_days) and (partial or reconciled)):
+                    days=days) and (partial or reconciled)):
                 week = today.isocalendar()
                 label = ("You have saved actual partial fills. Complete the "
                          "review only after all broker fills and verified "
@@ -100,13 +104,14 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                         strategy.pk, recent.signal_key, week.year, week.week),
                     "Wealtharr — outstanding quarterly review",
                     "%s: %s No automatic trades are placed." % (
-                        strategy.name, label))
+                        strategy.name, label), strategy=strategy)
 
         if (pref.monthly_reminders and strategy.contribution_alerts and
                 strategy.monthly_target > 0 and today.day >= 3):
-            contributed = sum((row.amount for row in strategy.ledger.filter(
-                kind="DEPOSIT", occurred_on__year=today.year,
-                occurred_on__month=today.month)), D("0"))
+            from .v2_ledger_core import effective_entries
+            contributed = sum((row.amount for row in effective_entries(strategy)
+                if row.kind == "DEPOSIT" and row.occurred_on.year == today.year
+                and row.occurred_on.month == today.month), D("0"))
             if contributed < strategy.monthly_target:
                 count += _send(owner, "contribution",
                     "monthly:%s:%04d-%02d" % (
@@ -118,5 +123,5 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                     "Trading 212, record it in Wealtharr. This is a "
                     "reminder, not an automatic transfer." % (
                         strategy.monthly_target, contributed,
-                        strategy.monthly_target - contributed))
+                        strategy.monthly_target - contributed), strategy=strategy)
     return count

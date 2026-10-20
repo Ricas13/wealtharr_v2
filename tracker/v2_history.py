@@ -378,12 +378,16 @@ def overview_page(request):
     isa_total = sum((row["contributed"] for row in rows
                      if row["strategy"].account.kind == "ISA" and
                      row["contributed"] is not None), ZERO)
+    from .models import NotificationPreference
+    preferences, _ = NotificationPreference.objects.get_or_create(owner=request.user)
     return _render(
         request, page_key="overview", page_title="Overview",
         overview_rows=rows, overview_total=aggregate,
         overview_contributed=contributed if complete_funding and items else None,
         overview_gain=gained, overview_same_date=complete_value,
-        overview_isa_contributed=isa_total, overview_has_isa=any(
+        overview_isa_contributed=isa_total,
+        overview_isa_enabled=preferences.isa_allowance_enabled,
+        overview_has_isa=any(
             row["strategy"].account.kind == "ISA" for row in rows
         ), overview_review_date=_next_quarter(today),
     )

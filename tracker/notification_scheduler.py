@@ -78,4 +78,38 @@ def run_notification_scheduler(*, today=None):
     run.save(update_fields=[
         "new_deliveries", "attempted_retries", "successful_retries",
         "status", "finished_at"])
+    # Optional owner-operated dead-man's switch; never include its URL or token
+    # in logs, database diagnostic fields or /health/ output.
+    _ping_dead_mans_switch()
     return run
+
+
+def _ping_dead_mans_switch():
+    """Best-effort external success ping; network failure must not lose a run."""
+    import os
+    from urllib.parse import urlsplit
+    from urllib.request import Request, urlopen
+
+    url = os.environ.get("WEALTHARR_SCHEDULER_PING_URL", "").strip()
+    if not url:
+        return False
+    parsed = urlsplit(url)
+    # Do not call arbitrary insecure URLs or loopback/private hosts by default.
+    if (parsed.scheme != "https" or not parsed.hostname or
+            parsed.username or parsed.password or parsed.fragment):
+        return False
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(parsed.hostname)
+    except ValueError:
+        addr = None
+    if (addr is not None and not addr.is_global) or parsed.hostname in (
+            "localhost", "localhost.localdomain"):
+        return False
+    try:
+        with urlopen(Request(url, method="GET",
+                             headers={"User-Agent": "Wealtharr/2.0"}),
+                     timeout=5) as response:
+            return 200 <= response.status < 300
+    except Exception:
+        return False

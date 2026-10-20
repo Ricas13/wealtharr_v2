@@ -1,0 +1,128 @@
+<div class="w2-two-columns w2-space-top">
+  <div class="w2-column">
+    <section class="w2-panel">
+      <h2>Notification destinations</h2>
+      <p class="w2-muted">These destinations apply to all strategies. Choose which alerts each strategy sends on its Strategy page.</p>
+      <form method="post" class="w2-settings-form">
+        {% csrf_token %}<input type="hidden" name="intent" value="preferences">
+        {% if settings_form.non_field_errors %}<div class="w2-form-error" role="alert">{{ settings_form.non_field_errors }}</div>{% endif %}
+        <label class="w2-field" for="{{ settings_form.destination_email.id_for_label }}">Email address
+          {{ settings_form.destination_email }}{{ settings_form.destination_email.errors }}</label>
+        <label class="w2-check">{{ settings_form.email_enabled }} <span>Enable email notifications</span></label>
+        <label class="w2-check">{{ settings_form.discord_enabled }} <span>Enable Discord notifications</span></label>
+        <p class="w2-note">Push is not currently configured; no unsupported delivery channel will be silently enabled.</p>
+        <label class="w2-field" for="{{ settings_form.unacted_reminder_days.id_for_label }}">Remind me after this many days (1–30)
+          {{ settings_form.unacted_reminder_days }}{{ settings_form.unacted_reminder_days.errors }}</label>
+        <label class="w2-check">{{ settings_form.monthly_reminders }} <span>Enable optional planned contribution reminders</span></label>
+        <label class="w2-check">{{ settings_form.isa_allowance_enabled }} <span>Show advisory ISA allowance tracking</span></label>
+        <h3>Global alert categories</h3>
+        <p class="w2-note">Both the account-wide checkbox and the strategy-specific checkbox must be enabled.</p>
+        <div class="w2-table-wrap"><table class="w2-table w2-alert-matrix">
+          <thead><tr><th>Category</th><th>Email</th><th>Discord</th></tr></thead>
+          <tbody>
+          <tr><td>Quarterly decision</td><td>{{ settings_form.quarterly_email }}</td><td>{{ settings_form.quarterly_discord }}</td></tr>
+          <tr><td>Urgent warnings</td><td>{{ settings_form.urgent_email }}</td><td>{{ settings_form.urgent_discord }}</td></tr>
+          <tr><td>Data quality</td><td>{{ settings_form.data_email }}</td><td>{{ settings_form.data_discord }}</td></tr>
+          <tr><td>Unacted reminder</td><td>{{ settings_form.followup_email }}</td><td>{{ settings_form.followup_discord }}</td></tr>
+          <tr><td>Contribution reminder</td><td>{{ settings_form.contribution_email }}</td><td>{{ settings_form.contribution_discord }}</td></tr>
+          </tbody></table></div>
+        <button class="w2-button w2-button-primary" type="submit">Save destinations</button>
+      </form>
+      {% if user.is_staff %}
+      <details class="w2-space-top"><summary>Advanced transport configuration</summary>
+        <div class="w2-settings-form">
+          <p class="w2-note">Administrator only. Passwords and webhook URLs are encrypted at rest, never returned to this page.</p>
+          <p>SMTP: {% if settings_smtp_set %}Configured{% else %}Not configured{% endif %} · Discord: {% if settings_discord_set %}Configured{% else %}Not configured{% endif %}</p>
+          <form method="post" class="w2-settings-form">
+            {% csrf_token %}<input type="hidden" name="intent" value="transport">
+            {% for field in settings_transport %}
+              <label class="w2-field" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{{ field.errors }}</label>
+            {% endfor %}
+            <button type="submit" class="w2-button">Save encrypted transport</button>
+          </form>
+          <div class="w2-test-actions">
+            <form method="post" action="{% url 'v2_test_channel' 'email' %}">{% csrf_token %}<button class="w2-button" type="submit">Send test email</button></form>
+            <form method="post" action="{% url 'v2_test_channel' 'discord' %}">{% csrf_token %}<button class="w2-button" type="submit">Send test Discord</button></form>
+          </div>
+        </div>
+      </details>{% endif %}
+    </section>
+    <section class="w2-panel">
+      <h2>Your strategies &amp; accounts</h2>
+      {% for item in shell_instances %}
+      <div class="w2-setting-row">
+        <span><a href="{% url 'v2_instance_page' instance_id=item.pk section='strategy' %}">{{ item.name }}</a>
+        <small class="w2-muted">{{ item.preset.name }}</small></span>
+        <span class="w2-muted">{{ item.account.kind }} · {{ item.account.broker }}</span>
+      </div>
+      {% empty %}<div class="w2-empty">No strategies yet.</div>{% endfor %}
+      <p class="w2-note">Platform and account type are immutable. Create another strategy instance to use another account.</p>
+    </section>
+    <section class="w2-panel">
+      <h2>Recent alert deliveries</h2>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>When</th><th>Route</th><th>Status</th><th>Attempts</th></tr></thead>
+        <tbody>{% for item in settings_deliveries %}
+          <tr><td>{{ item.created_at|date:"j M H:i" }}</td><td>{{ item.channel|title }}</td>
+              <td>{{ item.status }}</td><td>{{ item.attempts }}/3</td></tr>
+        {% empty %}<tr><td colspan="4"><div class="w2-empty">No deliveries recorded yet.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+  </div>
+  <div class="w2-column">
+    <section class="w2-panel">
+      <h2>Account security</h2>
+      <p class="w2-note">Secure password authentication and optional authenticator 2FA protect all private pages, including administrator routes.</p>
+      <div class="w2-test-actions">
+        <a class="w2-button" href="{% url 'change_password' %}">Change password</a>
+        <a class="w2-button" href="{% url 'totp_setup' %}">Manage authenticator 2FA</a>
+      </div>
+      <p class="w2-muted">{{ settings_sessions }} active browser session{{ settings_sessions|pluralize }} recorded. Session tokens are never displayed.</p>
+      <details><summary>Sign out other sessions</summary>
+        <form class="w2-settings-form" method="post" action="{% url 'v2_revoke_sessions' %}">
+          {% csrf_token %}
+          <label class="w2-field">Confirm your current password<input class="w2-input" type="password" name="password" autocomplete="current-password" required></label>
+          <button class="w2-button" type="submit">Sign out other sessions</button>
+        </form>
+      </details>
+    </section>
+    <section class="w2-panel">
+      <h2>Data &amp; health</h2>
+      <p class="w2-note">All figures and ledger histories are personal; exports require your password and contain no credentials.</p>
+      <form method="post" action="{% url 'v2_export_data' %}" class="w2-settings-form">
+        {% csrf_token %}
+        <label class="w2-field">Current password to export all your portfolio data
+          <input class="w2-input" type="password" name="password" autocomplete="current-password" required></label>
+        <button class="w2-button" type="submit">Export my data (ZIP)</button>
+      </form>
+      {% if user.is_staff %}
+      <div class="w2-settings-details">
+        <div><dt>Notification scheduler</dt><dd>{{ settings_heartbeat.status }}</dd></div>
+        <div><dt>Last successful run</dt><dd>{{ settings_heartbeat.last_finished|date:"j M Y H:i"|default:"Not recorded" }}</dd></div>
+        <div><dt>Last diagnostics</dt><dd>{{ settings_heartbeat.last_status }} · {{ settings_heartbeat.last_error|default:"No error code" }}</dd></div>
+        <div><dt>Last backup status</dt><dd>{{ settings_backup.label }}</dd></div>
+        <div><dt>Latest backup file</dt><dd>{{ settings_backup.latest|date:"j M Y H:i"|default:"Not verified" }}</dd></div>
+        <div><dt>Restore drill</dt><dd>Not verified in this session. Use the approved administrator restore drill.</dd></div>
+      </div>
+      <p class="w2-note">Scheduler heartbeat and backup checks only report evidence available to the server. No credentials, webhook URLs or backup paths are exposed.</p>
+      {% else %}
+      <p class="w2-muted">Administrator health diagnostics and backup configuration are restricted.</p>
+      {% endif %}
+    </section>
+    <section class="w2-panel">
+      <h2>Reset empty strategies</h2>
+      <p class="w2-note">Existing financial events, broker imports, audits, confirmed reviews and opening snapshots are never erased by this page. Only unused empty strategy setups can be removed.</p>
+      <details>
+        <summary>Open typed-confirmation reset</summary>
+        <form method="post" action="{% url 'v2_reset_empty' %}" class="w2-settings-form">
+          {% csrf_token %}
+          <label class="w2-field">Type <code>ERASE MY EMPTY STRATEGIES</code> to confirm
+            <input class="w2-input" name="confirmation" autocomplete="off" required></label>
+          <label class="w2-field">Current password
+            <input class="w2-input" type="password" name="password" autocomplete="current-password" required></label>
+          <button type="submit" class="w2-button">Remove unused strategies</button>
+        </form>
+      </details>
+    </section>
+  </div>
+</div>

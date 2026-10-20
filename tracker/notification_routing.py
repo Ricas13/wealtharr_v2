@@ -27,14 +27,31 @@ def selected_channels(pref, category):
                  and (category != "contribution" or pref.monthly_reminders))
 
 
-def route_notice(owner, category, event_key, subject, message, *, sender=None):
+def instance_category_enabled(strategy, category, channel):
+    """A new instance's fixed alert matrix is an extra restrictive gate.
+
+    Legacy records without a pinned v2 strategy key retain owner-wide routing.
+    "unacted" is the UI label for the existing followup event category.
+    """
+    if strategy is None or not getattr(strategy, "strategy_key", ""):
+        return True
+    keys = {"followup": "unacted"}
+    name = keys.get(category, category)
+    return bool((strategy.alert_routes or {}).get(name, {}).get(channel, False))
+
+
+def route_notice(owner, category, event_key, subject, message, *, sender=None,
+                 strategy=None):
     """Return per-channel status, distinguishing old SENT from new delivery.
 
     No false 'sent' results for muted/unconfigured owner channels. Transport
     readiness is handled by dispatch, whose retry status is persisted.
     """
+    if strategy is not None and strategy.owner_id != owner.pk:
+        return {}
     pref, _ = NotificationPreference.objects.get_or_create(owner=owner)
-    channels = selected_channels(pref, category)
+    channels = tuple(ch for ch in selected_channels(pref, category)
+                     if instance_category_enabled(strategy, category, ch))
     if not channels:
         return {}
     previous = set(NotificationDelivery.objects.filter(
@@ -45,7 +62,7 @@ def route_notice(owner, category, event_key, subject, message, *, sender=None):
     transport = sender or dispatch
     if transport is dispatch:
         outcomes = transport(owner, event_key, subject, message,
-                             channels=channels, category=category)
+                             channels=channels, category=category, strategy=strategy)
     else:
         outcomes = transport(owner, event_key, subject, message,
                              channels=channels)
