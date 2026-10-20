@@ -24,7 +24,7 @@ from .models import (
     InstanceOpeningSnapshot, MarketObservation, RebalanceExecution,
     StrategyInstance, StrategySignal, YahooSync,
 )
-from .strategies.nine_sig.v1 import (
+from .strategies.nine_sig.v2 import (
     PARAMS, VERSION, _drawdown_from_spy, _quarterly_closes,
     quarter_number, signal_line_trace, signal_line_value,
 )

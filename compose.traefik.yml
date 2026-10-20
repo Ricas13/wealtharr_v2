@@ -2,6 +2,8 @@
 # Verify docker compose -f compose.yml -f compose.traefik.yml config
 # BEFORE starting; require Docker Compose supporting !reset (v2.24+).
 # This removes the base Compose localhost port publication entirely.
+# HTTPS login is publicly reachable via Traefik/Cloudflare; Django password,
+# production Turnstile and optional owner TOTP remain enforced by the app.
 services:
   web:
     ports: !reset []
@@ -11,8 +13,6 @@ services:
       - traefik.docker.network=${TRAEFIK_DOCKER_NETWORK:?set network name}
       - traefik.http.routers.wealtharr.rule=Host(`${WEALTHARR_HOST:?set hostname}`)
       - traefik.http.routers.wealtharr.entrypoints=websecure
-      - traefik.http.routers.wealtharr.middlewares=wealtharr-vpn-only
-      - traefik.http.middlewares.wealtharr-vpn-only.ipallowlist.sourcerange=${WEALTHARR_ALLOWLIST_CIDRS:?set your VPN/ingress CIDR allowlist}
       - traefik.http.routers.wealtharr.tls=true
       - traefik.http.routers.wealtharr.tls.certresolver=${TRAEFIK_CERT_RESOLVER:?set certificate resolver}
       - traefik.http.services.wealtharr.loadbalancer.server.port=8000

@@ -1,5 +1,8 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+Release integration (20 October 2026): PRs #12, #13, #15, #17, #19 and #22 were sequentially integrated with current main (including approved nine_sig.v2.0.0 and deployment corrections). Phase 7 must preserve verified Yahoo raw GBX/GBP provenance and the StrategySignal rule-version field while binding all notifications to their original strategy. This code/CI release gate is NOT proof of live owner Trading 212 access, outbound email/Discord receipt, or off-host restored backups. Do not deploy to production without separate infrastructure acceptance.
+
+
 ## APPROVED v2 DESIGN — Phase 7 completion checkpoint (20 October 2026)
  
 - Phase 7 reconciliation: Two independent draft PRs (#23 and #24) were created concurrently. #24 is the canonical implementation because queued/retried messages keep immutable source-strategy provenance and enforce per-instance opt-out. Integrated the safe read-only Strategy rule/version/instrument profile from #23 without copying conflicting routing migrations or adding reset/session/export controls. Do not merge both Phase 7 PRs; #23 should be closed as superseded after #24 passes final CI.

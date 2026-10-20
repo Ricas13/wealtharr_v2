@@ -13,7 +13,7 @@ from tracker.models import (
     Account, LedgerEntry, StrategyInstance, StrategyPreset, StrategySignal,
 )
 from tracker.services import validate_and_record
-from tracker.strategies.nine_sig.v1 import VERSION
+from tracker.strategies.nine_sig.v2 import VERSION
 from tracker.instrument_mapping import MAPPING_VERSION
 
 

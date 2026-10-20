@@ -313,8 +313,7 @@ class SystemIntegration(models.Model):
 
 class NotificationDelivery(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    # Original strategy scope survives retries and must never be inferred from
-    # a display name or message text. Legacy receipts remain unscoped.
+    # Persist immutable original strategy provenance for opt-out-safe retries.
     strategy = models.ForeignKey(
         StrategyInstance, on_delete=models.PROTECT, null=True, blank=True,
         related_name="notification_receipts",
@@ -385,6 +384,8 @@ class StrategySignal(models.Model):
     actions = models.JSONField(default=list)
     # Explicit rule output; never detect a financial reset from free-text.
     reset_reason = models.CharField(max_length=240, blank=True, default="")
+    # Immutable ruleset provenance on every newly generated review.
+    strategy_version = models.CharField(max_length=48, blank=True, default="")
     as_of = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True)
