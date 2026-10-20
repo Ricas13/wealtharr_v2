@@ -6,7 +6,6 @@ the entire financial timeline under a row lock. Historical signal/baseline
 recalculation is never silently performed.
 """
 import csv
-import hashlib
 from datetime import date
 from decimal import Decimal as D, InvalidOperation
 
@@ -20,25 +19,25 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .models import (
-    BrokerImportRow, InstanceOpeningSnapshot, LedgerEntry,
+    InstanceOpeningSnapshot, LedgerEntry,
     LedgerRevision, OpeningReconciliation, RebalanceExecution,
     SignalFill, StrategyInstance, StrategySignal,
 )
 from .services import ledger_summary, validate_and_record
+from .v2_review_refresh import retire_stale_reviews
 from .v2_ledger_core import (
     ZERO, EffectiveEntry, effective_entries, evidence_impact, find_entry,
     latest_deleted_payload, linked_source, replay, snapshot, state_digest,
     with_proposed_change,
 )
 from .v2_views import _render
-from .v2_onboarding import _decimal, _date
+from .v2_onboarding import OPENING_NOTE, _decimal, _date
 from .core.isa_allowance import estimate_allowance, tax_year_bounds
-from .cockpit_import import inspect_csv
 
 
 KIND_GROUPS = (
     ("all", "All"), ("DEPOSIT", "Deposits"), ("WITHDRAW", "Withdrawals"),
-    ("BUY", "Buys"), ("SELL", "Sells"), ("DIVIDEND", "Dividends"), ("FEE", "Fees"),
+    ("BUY", "Buys"), ("SELL", "Sells"), ("DIVIDEND", "Dividends"), ("INTEREST", "Interest"), ("FEE", "Fees"),
 )
 TABS = {"entries", "rebalances", "history"}
 OPERATIONS = {"new", "edit", "delete", "restore"}
@@ -56,14 +55,14 @@ def _get(request, instance_id, *, locked=False):
 def _editable(strategy):
     return bool(
         strategy.strategy_key and strategy.started_on and
-        strategy.resolved_instruments and strategy.tracking_only
+        strategy.resolved_instruments
     )
 
 
 def _unreconciled(strategy):
-    opening = InstanceOpeningSnapshot.objects.filter(
-        strategy=strategy).first()
-    return bool(opening and not OpeningReconciliation.objects.filter(opening=opening).exists())
+    # Opening holdings are now entered as ledger entries, and there is no
+    # broker import to reconcile against, so nothing is ever "unreconciled".
+    return False
 
 
 def _safe(value):
@@ -296,7 +295,7 @@ def _isa_advisory(strategy, payload, other_isa=""):
     start, end = tax_year_bounds(day)
     recorded = tuple(strategy.ledger.filter(
         kind=LedgerEntry.DEPOSIT, occurred_on__range=(start, end),
-    ).values_list("occurred_on", "amount"))
+    ).exclude(note=OPENING_NOTE).values_list("occurred_on", "amount"))
     try:
         estimate = estimate_allowance(
             as_of=day,
@@ -360,6 +359,7 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                             operation="ADD", before=None, after=snapshot(instance),
                             impact=report["impact"],
                         )
+                        changed_on = instance.occurred_on
                     else:
                         prior = find_entry(locked, entry_id)
                         current_revision = LedgerRevision.objects.filter(
@@ -374,6 +374,12 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                             impact=report["impact"],
                             reason=request.POST.get("reason", "").strip()[:280],
                         )
+                        dates = [prior.occurred_on]
+                        if payload:
+                            dates.append(date.fromisoformat(payload["occurred_on"]))
+                        changed_on = min(dates)
+                    # Only reviews dated on/after the changed entry are retired.
+                    retire_stale_reviews(locked, changed_on)
                     request.session.pop(key, None)
                 messages.success(request, "Ledger change saved with its full revision history.")
                 if advisory:
@@ -413,148 +419,4 @@ def edit_entry(request, instance_id, operation, entry_id=None):
         ledger_edit=True, edit_operation=operation, edit_entry=old,
         edit_values=view["form_values"], edit_preview=view["preview"],
         edit_isa_warning=view["isa_warning"], edit_error=error,
-    )
-
-
-def _import_preview_key(strategy):
-    return f"wealtharr_v2_csv_preview_{strategy.pk}"
-
-
-def _preview_import_replay(strategy, proposed):
-    """Reconcile complete imported history to reported opening state before any write."""
-    rows = effective_entries(strategy)
-    base = 1_000_000_000
-    hypothetical = rows + [_candidate(strategy, {
-        "kind": e["kind"], "occurred_on": e["occurred_on"].isoformat(),
-        "symbol": e["symbol"], "quantity": str(e["quantity"]),
-        "unit_price": str(e["unit_price"]), "amount": str(e["amount"]),
-        "fee": str(e["fee"]), "note": e["note"],
-    }, pk=base+i) for i, e in enumerate(proposed)]
-    if proposed:
-        last = strategy.ledger.order_by("-occurred_on", "-pk").first()
-        if last and any(row["occurred_on"] < last.occurred_on for row in proposed):
-            raise ValidationError(
-                "An imported event predates existing ledger history. "
-                "Reconcile manually before changing the sequence."
-            )
-        earliest = min(row["occurred_on"] for row in proposed)
-        if evidence_impact(strategy, earliest)["blocks_change"]:
-            raise ValidationError(
-                "Import would invalidate a confirmed review, baseline or saved valuation. "
-                "Reconcile separately before applying broker history."
-            )
-    summary = replay(hypothetical, strict=True)
-    opening = InstanceOpeningSnapshot.objects.filter(strategy=strategy).first()
-    if opening and not OpeningReconciliation.objects.filter(opening=opening).exists():
-        if not proposed:
-            raise ValidationError(
-                "The CSV contains no new history with which to reconcile the opening holdings."
-            )
-        if any(e["occurred_on"] > opening.reported_on for e in proposed):
-            raise ValidationError(
-                "Import includes events after the owner-reported opening snapshot date."
-            )
-        if summary["cash"] != opening.cash_gbp:
-            raise ValidationError(
-                "Imported cash does not reconcile with the reported opening cash."
-            )
-        for role, data in opening.positions.items():
-            if summary["positions"].get(data["ticker"], ZERO) != D(data["shares"]):
-                raise ValidationError(
-                    "Imported share counts do not reconcile with the opening snapshot."
-                )
-        if set(summary["positions"]) - {
-            d["ticker"] for d in opening.positions.values()
-        }:
-            raise ValidationError("Broker file contains an unmapped opening holding.")
-    return summary
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def import_csv(request, instance_id):
-    strategy = _get(request, instance_id)
-    if not _editable(strategy):
-        raise Http404("Only pinned owner instances are supported")
-    preview = {"ran": False}
-    error = ""
-    if request.method == "POST":
-        upload = request.FILES.get("csv_file")
-        try:
-            if upload is None:
-                raise ValidationError("Choose your original Trading 212 CSV export.")
-            if upload.size > 4_000_000:
-                raise ValidationError("Maximum CSV size is 4 MB.")
-            file_sha = hashlib.sha256(upload.read()).hexdigest()
-            upload.seek(0)
-            applying = request.POST.get("apply") == "yes"
-            saved_preview = request.session.get(_import_preview_key(strategy))
-            if applying and (
-                not saved_preview or saved_preview.get("digest") != file_sha or
-                saved_preview.get("hash") != state_digest(strategy)
-            ):
-                raise ValidationError("Preview this exact file again before importing.")
-            if applying:
-                with transaction.atomic():
-                    locked = _get(request, instance_id, locked=True)
-                    if saved_preview["hash"] != state_digest(locked):
-                        raise ValidationError("Ledger changed since preview. Preview again.")
-                    proposed, errors, duplicates = inspect_csv(upload, locked)
-                    if errors:
-                        raise ValidationError("CSV contains unverified rows; no import was saved.")
-                    _preview_import_replay(locked, proposed)
-                    opening = InstanceOpeningSnapshot.objects.filter(strategy=locked).first()
-                    count = 0
-                    for line in proposed:
-                        if BrokerImportRow.objects.filter(
-                                strategy=locked, fingerprint=line["fingerprint"]).exists():
-                            continue
-                        ledger = LedgerEntry(**{key: line[key] for key in (
-                            "kind", "occurred_on", "symbol", "quantity", "unit_price",
-                            "amount", "fee", "note",
-                        )})
-                        ledger.full_clean(exclude=["strategy"])
-                        validate_and_record(locked, ledger)
-                        BrokerImportRow.objects.create(
-                            strategy=locked, fingerprint=line["fingerprint"],
-                            ledger_entry=ledger,
-                        )
-                        LedgerRevision.objects.create(
-                            entry=ledger, strategy=locked, version=1,
-                            operation="ADD", actor=request.user,
-                            before=None, after=snapshot(ledger),
-                            impact=evidence_impact(locked, ledger.occurred_on),
-                            reason="Original Trading 212 CSV evidence",
-                        )
-                        count += 1
-                    if opening and not OpeningReconciliation.objects.filter(opening=opening).exists():
-                        OpeningReconciliation.objects.create(
-                            opening=opening, file_sha256=file_sha,
-                            accepted_rows=count, reconciled_by=request.user,
-                        )
-                request.session.pop(_import_preview_key(strategy), None)
-                messages.success(request, f"Imported {count} original broker events; check cash and shares.")
-                return redirect("v2_instance_page", instance_id=instance_id, section="ledger")
-            proposed, errors, duplicates = inspect_csv(upload, strategy)
-            if not errors:
-                _preview_import_replay(strategy, proposed)
-                request.session[_import_preview_key(strategy)] = {
-                    "digest": file_sha, "hash": state_digest(strategy)
-                }
-            else:
-                request.session.pop(_import_preview_key(strategy), None)
-            preview = {
-                "ran": True, "rows": proposed[:100], "count": len(proposed),
-                "errors": errors[:100], "error_count": len(errors),
-                "duplicates": len(duplicates), "duplicate_lines": duplicates[:20],
-                "ready": not errors, "file_name": upload.name[:120],
-            }
-        except (ValidationError, ValueError, IntegrityError, ArithmeticError) as exc:
-            request.session.pop(_import_preview_key(strategy), None)
-            error = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
-    return _render(
-        request, page_key="instance", page_title="Import Trading 212 history",
-        instance=strategy, section="ledger", ledger_import=True,
-        import_error=error, import_preview=preview,
-        import_unreconciled=_unreconciled(strategy),
     )

@@ -14,7 +14,6 @@ from .models import (Account, LedgerEntry, MarketObservation, PriceMark,
 from .performance import (xirr, time_weighted_return, max_drawdown, simple_return,
                           annualized_return, cumulative_from_annualized)
 from .services import ledger_summary, validate_and_record
-from .cockpit_import import inspect_csv
 from .cockpit import _performance
 from .management.commands.sync_market_and_signals import save_verified_strategy_snapshot
 from .cockpit_notifications import send_due_cockpit_notices
@@ -174,64 +173,6 @@ class GuidedRebalanceTests(TestCase):
         self.client.force_login(stranger)
         self.assertEqual(self.client.get(reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk])).status_code, 404)
 
-class ImportSafetyTests(TestCase):
-    def setUp(self):
-        self.user = get_user_model().objects.create_user('import-owner',password='strong-password')
-        account = Account.objects.create(owner=self.user, name='ISA', kind='ISA', broker='TRADING212')
-        preset, _ = StrategyPreset.objects.get_or_create(slug='nasdaq-quarterly-target', defaults={
-            'name':'9Sig', 'summary':'', 'risk':'HIGH', 'methodology':'', 'active':True})
-        self.strategy = StrategyInstance.objects.create(owner=self.user, account=account,preset=preset,
-            name='9Sig', equity_symbol='LQQ3.L', safe_symbol='ERNS.L',
-            strategy_key='nasdaq-quarterly-target', platform_code='TRADING212',
-            account_type_code='ISA', started_on=date(2026, 1, 1),
-            owner_checked_on=date(2026, 1, 1), tracking_only=True,
-            strategy_version=released_version('nasdaq-quarterly-target'),
-            mapping_version=CATALOGUE_VERSION,
-            resolved_instruments=onboarding_manifest(
-                'nasdaq-quarterly-target', 'TRADING212', 'ISA'))
-    def file(self, text):
-        return SimpleUploadedFile('history.csv', text.encode('utf-8'), content_type='text/csv')
-    def test_preview_duplicate_in_same_file(self):
-        text = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,dep-1\nDeposit,2026-01-02 12:00:00,500,dep-1\n'
-        entries, errors, duplicate_lines = inspect_csv(self.file(text), self.strategy)
-        self.assertEqual(len(entries), 1)
-        self.assertEqual(errors, [])
-        self.assertEqual(duplicate_lines, [3])
-        self.assertEqual(self.strategy.ledger.count(), 0)
-    def test_unknown_currency_fails_closed(self):
-        text = ('Action,Time,Ticker,No. of shares,Price / share,Currency (Price / share),ID\n'
-                'Market buy,2026-01-02 12:00:00,LQQ3,1,10,USD,order-1\n')
-        entries, errors, duplicate_lines = inspect_csv(self.file(text), self.strategy)
-        self.assertFalse(entries)
-        self.assertEqual(len(errors), 1)
-    def test_import_endpoint_never_partial_on_error(self):
-        self.client.force_login(self.user)
-        csv = ('Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
-               'Currency conversion,2026-01-02 12:01:00,10,bad\n')
-        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(csv), 'apply':'yes'})
-        self.assertEqual(self.strategy.ledger.count(), 0)
-        self.assertEqual(BrokerImportRow.objects.count(), 0)
-
-class CSVImportCommitTests(ImportSafetyTests):
-    def test_commit_and_repeat_is_idempotent(self):
-        self.client.force_login(self.user)
-        csv_data = ('Action,Time,Total (GBP),Ticker,No. of shares,Price / share,'
-                    'Currency (Price / share),ISIN,ID\n'
-                    'Deposit,2026-01-02 12:00:00,1000,,,,,,d1\n'
-                    'Market buy,2026-01-03 12:00:00,500,LQQ3,5,100,GBP,IE00BLRPRL42,o1\n')
-        preview = self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]),
-            {'csv_file': self.file(csv_data)})
-        self.assertEqual(preview.status_code, 200)
-        first = self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]),
-            {'csv_file': self.file(csv_data), 'apply': 'yes'})
-        self.assertEqual(first.status_code, 302)
-        self.assertEqual(self.strategy.ledger.count(), 2)
-        self.assertEqual(BrokerImportRow.objects.count(), 2)
-        self.assertEqual(ledger_summary(self.strategy)['cash'], D('500.00'))
-        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(csv_data)})
-        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]),
-            {'csv_file': self.file(csv_data), 'apply': 'yes'})
-        self.assertEqual(self.strategy.ledger.count(), 2)
 
 class NonResetQuarterTests(GuidedRebalanceTests):
     def test_ordinary_safe_asset_fill_remains_partial_until_all_real_units(self):
@@ -269,58 +210,4 @@ class CashOnlyTodayTests(TestCase):
         self.assertEqual(response.context['today_cash'], D('1000.00'))
         self.assertEqual(strategy.ledger.filter(kind='BUY').count(), 0)
 
-class ImportPreviewGateTests(ImportSafetyTests):
-    def test_direct_apply_without_preview_does_not_write(self):
-        self.client.force_login(self.user)
-        csv_data = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
-        response = self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]),
-            {'csv_file': self.file(csv_data), 'apply': 'yes'})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.strategy.ledger.count(), 0)
 
-    def test_changed_file_after_preview_is_rejected(self):
-        self.client.force_login(self.user)
-        a = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
-        b = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,600,d1\n'
-        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(a)})
-        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(b), 'apply': 'yes'})
-        self.assertEqual(self.strategy.ledger.count(), 0)
-
-    def test_manual_overlap_after_preview_aborts_import(self):
-        self.client.force_login(self.user)
-        csv_data = 'Action,Time,Total (GBP),ID\nDeposit,2026-01-02 12:00:00,500,d1\n'
-        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(csv_data)})
-        validate_and_record(self.strategy, LedgerEntry(kind='DEPOSIT',
-            occurred_on=date(2026, 1, 2), amount=D('500')))
-        self.client.post(reverse('v2_ledger_import', args=[self.strategy.pk]), {'csv_file': self.file(csv_data), 'apply': 'yes'})
-        self.assertEqual(self.strategy.ledger.count(), 1)
-        self.assertFalse(BrokerImportRow.objects.exists())
-
-    def test_trade_missing_isin_fails_closed(self):
-        csv_data = ('Action,Time,Ticker,No. of shares,Price / share,'
-                    'Currency (Price / share),ID\n'
-                    'Market buy,2026-01-02 12:00:00,LQQ3,1,100,GBP,o1\n')
-        entries, errors, _ = inspect_csv(self.file(csv_data), self.strategy)
-        self.assertFalse(entries)
-        self.assertIn('ISIN', errors[0][1])
-
-class ImportCorrectionTests(ImportSafetyTests):
-    def test_reused_broker_id_with_changed_amount_fails_preview(self):
-        text = ('Action,Time,Total (GBP),ID\n'
-                'Deposit,2026-01-02 12:00:00,500,dep-1\n'
-                'Deposit,2026-01-02 12:00:00,600,dep-1\n')
-        rows, errors, duplicate_lines = inspect_csv(self.file(text), self.strategy)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(len(errors), 1)
-        self.assertIn('reused', errors[0][1])
-        self.assertEqual(duplicate_lines, [])
-
-class ImportTimezoneTests(ImportSafetyTests):
-    def test_mixed_timezone_formats_dont_crash_or_reorder_unpredictably(self):
-        text = ('Action,Time,Total (GBP),ID\n'
-                'Deposit,2026-01-02T12:01:00+01:00,500,one\n'
-                'Deposit,2026-01-02T11:02:00Z,700,two\n'
-                'Deposit,2026-01-02 11:00:00,200,three\n')
-        entries, errors, _ = inspect_csv(self.file(text), self.strategy)
-        self.assertEqual(errors, [])
-        self.assertEqual([e['broker_id'] for e in entries], ['three', 'one', 'two'])

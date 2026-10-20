@@ -65,7 +65,7 @@
     {% for group in strategy_routes %}
       <div id="strategy-{{ group.instance.pk }}" class="w2-settings-instance">
         <div class="w2-setting-row">
-          <div><strong>{{ group.instance.name }}</strong><p class="w2-muted">{{ group.instance.account.kind }} · {{ group.instance.account.broker }} · {{ group.instance.strategy_version|default:"Legacy version" }}</p></div>
+          <div><strong>{{ group.instance.name }}</strong><p class="w2-muted">{{ group.instance.account.kind }} · {{ group.instance.account.broker_label }} · {{ group.instance.strategy_version|default:"Legacy version" }}</p></div>
           <a href="{% url 'v2_instance_page' instance_id=group.instance.pk section='today' %}">Open Today →</a>
         </div>
         <form method="post" action="{% url 'v2_settings' %}">

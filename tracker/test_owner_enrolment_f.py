@@ -7,7 +7,6 @@ from datetime import date, timedelta
 from decimal import Decimal as D
 
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -16,6 +15,7 @@ from tracker.core.catalogue import (
     CATALOGUE_VERSION, onboarding_manifest, released_version,
 )
 from tracker.instrument_mapping import enrolment_manifest, InstrumentMappingUnavailable
+from tracker.v2_onboarding import OPENING_NOTE
 from tracker.models import (
     Account, BrokerImportRow, InstanceOpeningSnapshot, LedgerEntry,
     StrategyInstance, StrategyPreset,
@@ -78,15 +78,15 @@ class OwnerEnrollmentTests(TestCase):
         self.assertNotContains(page, 'name="equity_symbol"')
         self.assertNotContains(page, 'name="safe_symbol"')
 
-    def test_plan_is_never_recorded_as_real_funding(self):
-        # A reported opening holding is NOT a backdated deposit or invented BUY.
+    def test_opening_cash_is_recorded_as_a_labelled_opening_position(self):
+        # What the owner holds at the start becomes a clearly labelled opening position.
         s = self.finish(mode="hold", cash="250")
         self.assertEqual(s.account.kind, "ISA")
         self.assertEqual(s.account.country, "GB")
         self.assertEqual(s.account.broker, "TRADING212")
         self.assertEqual(s.account.currency, "GBP")
-        self.assertEqual(s.ledger.count(), 0)
-        self.assertEqual(InstanceOpeningSnapshot.objects.get(strategy=s).cash_gbp, D("250"))
+        opening = s.ledger.get()
+        self.assertEqual((opening.kind, opening.amount, opening.note), ("DEPOSIT", D("250.00"), OPENING_NOTE))
         self.assertEqual(s.mapping_version, CATALOGUE_VERSION)
         self.assertEqual(s.equity_symbol, "LQQ3.L")
         self.assertEqual(s.safe_symbol, "ERNS.L")
@@ -108,12 +108,12 @@ class OwnerEnrollmentTests(TestCase):
         self.client.get(reverse("v2_instance_page", args=[s.pk, "today"]))
         self.assertEqual(s.ledger.count(), 1)
 
-    def test_existing_holdings_begin_empty_and_go_to_csv_preview(self):
+    def test_existing_holdings_become_the_opening_position(self):
         s = self.finish(mode="hold", cash="50", shares_growth="2", cost_growth="100")
-        self.assertEqual(s.ledger.count(), 0)
-        self.assertEqual(InstanceOpeningSnapshot.objects.get(strategy=s).positions["growth"]["shares"], "2")
-        url = reverse("v2_ledger_import", args=[s.pk])
-        self.assertContains(self.client.get(url), "Preview CSV without saving")
+        self.assertEqual(
+            sorted(s.ledger.values_list("kind", "symbol", "quantity", "amount")),
+            [("BUY", "LQQ3.L", D("2"), D("0")), ("DEPOSIT", "", D("0"), D("250.00"))])
+        self.assertFalse(InstanceOpeningSnapshot.objects.filter(strategy=s).exists())
 
     def test_existing_holdings_reject_double_counted_opening_cash(self):
         self.to_start()
@@ -122,7 +122,7 @@ class OwnerEnrollmentTests(TestCase):
             "start": self.today.isoformat(), "cash": "500",
             "shares_growth": "0", "cost_growth": "100",
         })
-        self.assertContains(response, "average cost")
+        self.assertContains(response, "price when you hold no growth shares")
         self.assertFalse(StrategyInstance.objects.filter(owner=self.owner).exists())
         self.assertFalse(Account.objects.filter(owner=self.owner).exists())
 
@@ -198,66 +198,3 @@ class OwnerEnrollmentTests(TestCase):
         self.assertEqual(enrolment_manifest(), enrolment_manifest())
 
 
-class Trading212PreviewJourneyTests(TestCase):
-    def setUp(self):
-        self.owner = get_user_model().objects.create_user(
-            username="section_f_importer", password="strong-example-test-password")
-        account = Account.objects.create(
-            owner=self.owner, name="ISA", kind="ISA", broker="TRADING212")
-        preset, _ = StrategyPreset.objects.get_or_create(
-            slug="nasdaq-quarterly-target",
-            defaults={"name": "9Sig", "summary": "", "risk": "HIGH"})
-        self.strategy = StrategyInstance.objects.create(
-            owner=self.owner, account=account, preset=preset, name="9Sig",
-            equity_symbol="LQQ3.L", safe_symbol="ERNS.L",
-            strategy_key="nasdaq-quarterly-target", platform_code="TRADING212",
-            account_type_code="ISA", started_on=date(2026, 1, 1),
-            owner_checked_on=timezone.localdate(), tracking_only=True,
-            strategy_version=released_version("nasdaq-quarterly-target"),
-            mapping_version=CATALOGUE_VERSION,
-            resolved_instruments=onboarding_manifest(
-                "nasdaq-quarterly-target", "TRADING212", "ISA"))
-        self.url = reverse("v2_ledger_import", args=[self.strategy.pk])
-        self.client.force_login(self.owner)
-
-    def csv_file(self, text):
-        return SimpleUploadedFile(
-            "sample.csv", text.encode("utf-8"), content_type="text/csv")
-
-    def test_preview_is_read_only_and_exact_file_confirmation_is_explicit(self):
-        csv_text = (
-            "Action,Time,Total (GBP),Ticker,No. of shares,Price / share,"
-            "Currency (Price / share),ISIN,ID\n"
-            "Deposit,2026-01-02 12:00:00,1000,,,,,,dep-1\n"
-            "Market buy,2026-01-03 12:00:00,500,LQQ3,5,100,GBP,IE00BLRPRL42,buy-1\n")
-        response = self.client.post(self.url, {"csv_file": self.csv_file(csv_text)})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Preview passed")
-        self.assertContains(response, "exact same file")
-        self.assertContains(response, "sample.csv")
-        self.assertEqual(self.strategy.ledger.count(), 0)
-        self.assertEqual(BrokerImportRow.objects.count(), 0)
-        changed = csv_text.replace("1000,,,,,,dep-1", "1010,,,,,,dep-1")
-        refused = self.client.post(self.url, {
-            "csv_file": self.csv_file(changed), "apply": "yes"})
-        self.assertEqual(refused.status_code, 200)
-        self.assertEqual(self.strategy.ledger.count(), 0)
-        self.client.post(self.url, {"csv_file": self.csv_file(csv_text)})
-        confirmed = self.client.post(self.url, {
-            "csv_file": self.csv_file(csv_text), "apply": "yes"})
-        self.assertRedirects(confirmed, reverse(
-            "v2_instance_page", args=[self.strategy.pk, "ledger"]))
-        self.assertEqual(self.strategy.ledger.count(), 2)
-        self.assertEqual(BrokerImportRow.objects.count(), 2)
-
-    def test_errors_show_all_or_nothing_preview_reason(self):
-        bad = (
-            "Action,Time,Total (GBP),ID\n"
-            "Deposit,2026-01-02 12:00:00,1000,d1\n"
-            "Currency conversion,2026-01-02 12:01:00,100,fx-1\n")
-        response = self.client.post(self.url, {"csv_file": self.csv_file(bad)})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Nothing can be imported")
-        self.assertContains(response, "Line 3")
-        self.assertNotContains(response, "Confirm original CSV import")
-        self.assertFalse(self.strategy.ledger.exists())

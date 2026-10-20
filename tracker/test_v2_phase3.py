@@ -4,7 +4,6 @@ from decimal import Decimal as D
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -199,73 +198,7 @@ class LedgerVersioningTests(TestCase):
         self.assertContains(denied, "original source")
         self.assertEqual(d.revisions.count(), 0)
 
-    @staticmethod
-    def _upload(text):
-        return SimpleUploadedFile(
-            "actual-t212.csv", text.encode("utf-8"), content_type="text/csv"
-        )
 
-    def test_t212_preview_confirm_duplicate_and_exact_record(self):
-        importer = reverse("v2_ledger_import", args=[self.instance.pk])
-        csv_text = (
-            "Action,Time,Total (GBP),ID\n"
-            f"Deposit,{self.day.isoformat()} 08:00:00,300.00,bank-01\n"
-        )
-        preview = self.client.post(importer, {"csv_file": self._upload(csv_text)})
-        self.assertContains(preview, "Preview ·")
-        self.assertContains(preview, "Confirm original CSV import")
-        self.assertEqual(self.instance.ledger.count(), 0)
-        bad_confirm = self.client.post(importer, {
-            "apply": "yes", "csv_file": self._upload(csv_text.replace("300.00", "301.00"))
-        })
-        self.assertContains(bad_confirm, "Preview this exact file")
-        self.assertEqual(self.instance.ledger.count(), 0)
-        self.client.post(importer, {"csv_file": self._upload(csv_text)})
-        completed = self.client.post(importer, {
-            "apply": "yes", "csv_file": self._upload(csv_text),
-        })
-        self.assertRedirects(completed, self._ledger())
-        self.assertEqual(self.instance.ledger.count(), 1)
-        self.assertEqual(BrokerImportRow.objects.filter(strategy=self.instance).count(), 1)
-        self.assertEqual(LedgerRevision.objects.filter(strategy=self.instance).count(), 1)
-        self.assertEqual(ledger_summary(self.instance)["cash"], D("300"))
-        duplicate = self.client.post(importer, {"csv_file": self._upload(csv_text)})
-        self.assertContains(duplicate, "Duplicate events")
-
-    def test_opening_holding_requires_exact_broker_reconciliation(self):
-        hold = self._instance(self.owner, "Existing ISA")
-        opening = InstanceOpeningSnapshot.objects.create(
-            strategy=hold, reported_on=self.day,
-            cash_gbp=D("300"), positions={
-                "growth": {"ticker": "LQQ3.L", "isin": "IE00BLRPRL42",
-                           "shares": "0", "average_cost_gbp": "0"},
-                "safe": {"ticker": "ERNS.L", "isin": "IE00BCRY6441",
-                         "shares": "0", "average_cost_gbp": "0"},
-            },
-        )
-        addr = reverse("v2_ledger_add", args=[hold.pk])
-        self.assertContains(self.client.post(addr, self._payload()), "Reconcile the complete existing holdings")
-        importer = reverse("v2_ledger_import", args=[hold.pk])
-        wrong = (
-            "Action,Time,Total (GBP),ID\n"
-            f"Deposit,{self.day.isoformat()} 08:00:00,250.00,bank-01\n"
-        )
-        self.assertContains(
-            self.client.post(importer, {"csv_file": self._upload(wrong)}),
-            "does not reconcile",
-        )
-        self.assertFalse(OpeningReconciliation.objects.filter(opening=opening).exists())
-        good = wrong.replace("250.00", "300.00")
-        self.assertContains(
-            self.client.post(importer, {"csv_file": self._upload(good)}),
-            "Confirm original CSV import",
-        )
-        self.client.post(importer, {
-            "apply": "yes", "csv_file": self._upload(good),
-        })
-        self.assertTrue(OpeningReconciliation.objects.filter(opening=opening).exists())
-        self.assertEqual(hold.ledger.count(), 1)
-        self.assertContains(self.client.get(self._ledger(hold)), "Ledger cash")
 
     def test_rebalances_read_actual_signal_fills_without_fake_execution(self):
         self._entry()

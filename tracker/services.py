@@ -35,7 +35,7 @@ def ledger_summary(strategy):
         elif e.kind == LedgerEntry.WITHDRAW:
             cash -= e.amount
             net_contributed -= e.amount
-        elif e.kind == LedgerEntry.DIVIDEND:
+        elif e.kind in (LedgerEntry.DIVIDEND, LedgerEntry.INTEREST):
             cash += e.amount
         elif e.kind == LedgerEntry.FEE:
             cash -= e.amount

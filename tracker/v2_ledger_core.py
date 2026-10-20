@@ -21,7 +21,7 @@ PENNY = D("0.01")
 QTY_QUANT = D("0.00000001")
 ENTRY_FIELDS = ("occurred_on", "kind", "symbol", "quantity", "unit_price",
                 "amount", "fee", "note")
-MONEY_KINDS = {"DEPOSIT", "WITHDRAW", "DIVIDEND", "FEE"}
+MONEY_KINDS = {"DEPOSIT", "WITHDRAW", "DIVIDEND", "INTEREST", "FEE"}
 TRADE_KINDS = {"BUY", "SELL"}
 
 
@@ -141,7 +141,7 @@ def replay(entries, *, strict=True):
             elif row.kind == "WITHDRAW":
                 cash -= row.amount
                 funded -= row.amount
-            elif row.kind == "DIVIDEND":
+            elif row.kind in ("DIVIDEND", "INTEREST"):
                 cash += row.amount
             elif row.kind == "FEE":
                 cash -= row.amount

@@ -44,9 +44,7 @@ def cockpit_section(request, section="today", signal_id=None):
     if section in ("prices", "deposit"):
         section = "today" if section == "prices" else "ledger"
     if section == "import":
-        ids = list(owner_instances(request.user).values_list("pk", flat=True)[:2])
-        return _to(reverse("v2_ledger_import", args=[ids[0]]) if len(ids) == 1
-                   else reverse("v2_overview"))
+        section = "ledger"
     if section == "rebalance":
         # The historic link identifies a specific saved signal. Its owner and
         # strategy must be checked even if the user now has several accounts.

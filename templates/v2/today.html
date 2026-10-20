@@ -1,12 +1,12 @@
 <section class="w2-stats" aria-label="Recorded 9Sig strategy figures">
   <div class="w2-stat"><p class="w2-label">Value</p>
-    <p class="w2-stat-value">{% if today_value is not None %}£{{ today_value|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-stat-value">{% if today_value is not None %}£{{ today_value|floatformat:"2g" }}{% else %}—{% endif %}</p>
     <p class="w2-muted">{% if today_quote_date %}Verified close {{ today_quote_date|date:"j M" }}{% elif today_value is not None %}Recorded cash only{% else %}Not verified{% endif %}</p></div>
   <div class="w2-stat"><p class="w2-label">Net contributed</p>
-    <p class="w2-stat-value">£{{ today_contributed|floatformat:2 }}</p>
+    <p class="w2-stat-value">£{{ today_contributed|floatformat:"2g" }}</p>
     <p class="w2-muted">Actual ledger flows only</p></div>
   <div class="w2-stat"><p class="w2-label">Gain / loss</p>
-    <p class="w2-stat-value">{% if today_gain is not None %}£{{ today_gain|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-stat-value">{% if today_gain is not None %}£{{ today_gain|floatformat:"2g" }}{% else %}—{% endif %}</p>
     <p class="w2-muted">Withheld unless valuation verified</p></div>
   <div class="w2-stat"><p class="w2-label">Next calendar review</p>
     <p class="w2-stat-value">{{ today_next_review|date:"j M Y" }}</p>
@@ -18,8 +18,9 @@
       <div class="w2-today-top">
         <span class="w2-badge {% if today_status == 'blocked' or today_status == 'review' %}w2-warning{% endif %}">
           {% if selected_instance.tracking_only %}Tracking only{% elif today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Partial actual fills
-          {% elif today_status == 'trade' %}Review required{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}
+          {% elif today_status == 'trade' %}Action needed{% elif today_status == 'start' %}Action needed{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}
         </span>
+        {% if selected_instance.onboarding_mode == 'hold' %}<span class="w2-badge" title="Your starting position was entered by you, not imported from Trading 212. Correct it in the Ledger if needed.">Based on holdings you entered</span>{% endif %}
         {% if today_signal %}<span class="w2-muted">{{ today_signal.as_of|date:"j M Y" }} · {{ today_signal.kind|title }}</span>{% endif %}
       </div>
       <h2 class="w2-card-title">{{ today_headline }}</h2>
@@ -35,12 +36,19 @@
         </div>
         <a class="w2-button w2-button-primary" href="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=today_signal.pk %}">
           {% if today_status == 'record' %}Continue actual fill record{% else %}Review proposal / I did this{% endif %}</a>
+      {% elif today_status == 'start' %}
+        <div class="w2-action-lines" aria-label="Opening buys at target weights">
+          {% for line in today_opening %}
+          <div class="w2-action-line">
+            <strong>Buy £{{ line.amount|floatformat:"2g" }} of {{ line.symbol }}</strong>
+            <span>{{ line.role }} · {{ line.pct|floatformat:0 }}%{% if line.shares %} · ≈ {{ line.shares }} shares at £{{ line.price|floatformat:"2g" }}{% endif %}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <a class="w2-button w2-button-primary" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">Record what I bought</a>
       {% elif today_status == 'blocked' %}
         {% if selected_instance.tracking_only %}
           <a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Go live</a>
-        {% endif %}
-        {% if selected_instance.onboarding_mode == 'hold' %}
-          <a class="w2-button" href="{% url 'v2_ledger_import' instance_id=selected_instance.pk %}">Reconcile broker history</a>
         {% endif %}
         <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}">Check strategy setup</a>
       {% elif today_status == 'review' %}
@@ -69,7 +77,6 @@
     </section>
     <section class="w2-panel" aria-labelledby="w2-quarter-heading">
       <h2 id="w2-quarter-heading">Quarter by quarter</h2>
-      <p class="w2-note">Saved reviews</p>
       <div class="w2-table-wrap">
         <table class="w2-table">
           <thead><tr><th>Period</th><th>Review</th><th>Actual execution</th></tr></thead>
@@ -80,43 +87,39 @@
                   {% elif row.partial_count %}<span class="w2-badge w2-warning">{{ row.partial_count }} actual fill{{ row.partial_count|pluralize }} recorded</span>
                   {% elif row.has_trades %}<span class="w2-badge">Not recorded</span>
                   {% else %}<span class="w2-badge">No trade proposed</span>{% endif %}</td>
-          </tr>{% empty %}<tr><td colspan="3"><div class="w2-empty">No verified quarterly reviews saved yet.</div></td></tr>{% endfor %}</tbody>
+          </tr>{% empty %}<tr><td colspan="3"><div class="w2-empty">No quarterly reviews yet. The first comes after your first full quarter.</div></td></tr>{% endfor %}</tbody>
         </table>
       </div>
     </section>
     <section class="w2-panel">
       <h2>Actual holdings</h2>
-      <p class="w2-note">Recorded holdings and verified quotes.</p>
       <div class="w2-table-wrap"><table class="w2-table">
         <thead><tr><th>Role</th><th>Line</th><th>Units</th><th>Verified value</th></tr></thead>
         <tbody>{% for holding in today_holdings %}
           <tr><td>{{ holding.role }}</td><td>{{ holding.symbol }}</td>
-              <td>{{ holding.quantity }}</td><td>{% if holding.value_gbp is not None %}£{{ holding.value_gbp|floatformat:2 }}{% else %}—{% endif %}</td></tr>
-        {% empty %}<tr><td colspan="4"><div class="w2-empty">No bought holdings in the real ledger.</div></td></tr>{% endfor %}
+              <td>{{ holding.quantity }}</td><td>{% if holding.value_gbp is not None %}£{{ holding.value_gbp|floatformat:"2g" }}{% else %}—{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="4"><div class="w2-empty">No holdings recorded yet.</div></td></tr>{% endfor %}
         </tbody></table></div>
-      <p class="w2-note">Cash £{{ today_cash|floatformat:2 }} · 60/40 applies only to initial/confirmed resets.</p>
+      <p class="w2-note">Cash £{{ today_cash|floatformat:"2g" }}</p>
     </section>
   </div>
   <div class="w2-column">
     <section class="w2-panel">
-      <h2>Verified portfolio history</h2>
-      <p class="w2-note">{{ today_chart_caution }}</p>
+      <h2>Portfolio history</h2>
       <div class="w2-table-wrap"><table class="w2-table">
         <thead><tr><th>Quote date</th><th>GBP value</th><th>Net cash contributed</th></tr></thead>
         <tbody>{% for snapshot in today_snapshots %}
           <tr><td>{{ snapshot.as_of|date:"j M Y" }}</td>
-              <td>£{{ snapshot.total_value|floatformat:2 }}</td>
-              <td>£{{ snapshot.net_contributed|floatformat:2 }}</td></tr>
-        {% empty %}<tr><td colspan="3"><div class="w2-empty">No source-verified portfolio snapshots yet.</div></td></tr>{% endfor %}
+              <td>£{{ snapshot.total_value|floatformat:"2g" }}</td>
+              <td>£{{ snapshot.net_contributed|floatformat:"2g" }}</td></tr>
+        {% empty %}<tr><td colspan="3"><div class="w2-empty">Values appear after the first price update.</div></td></tr>{% endfor %}
         </tbody></table></div>
     </section>
     <section class="w2-panel">
-      <h2>Data and safety checks</h2>
-      <p class="w2-muted">{% if today_ready %}Verified GBP price checks passed for the recorded holdings.{% else %}{{ today_blocking_reason|default:"A current verified valuation is unavailable." }}{% endif %}</p>
+      <h2>Data</h2>
       <div class="w2-today-checks">
-        <div><span>Market price evidence</span><span class="w2-badge {% if not today_ready %}w2-warning{% endif %}">{% if today_ready %}Verified{% else %}Not ready{% endif %}</span></div>
-        <div><span>Owner controls</span><span class="w2-badge">Manual execution only</span></div>
-        <div><span>Price date</span><span>{% if today_quote_date %}{{ today_quote_date|date:"j M Y" }}{% else %}Unavailable{% endif %}</span></div>
+        <div><span>Prices</span><span class="w2-badge {% if not today_ready %}w2-warning{% endif %}">{% if today_ready %}Verified{% else %}Not ready{% endif %}</span></div>
+        <div><span>Price date</span><span>{% if today_quote_date %}{{ today_quote_date|date:"j M Y" }}{% else %}—{% endif %}</span></div>
       </div>
       <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">See calculation breakdown →</a>
     </section>

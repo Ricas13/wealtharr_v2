@@ -5,7 +5,7 @@
   <div>
     <p class="w2-overline">
       {% if selected_instance %}{{ selected_instance.name }}
-        <span class="w2-account-label">{{ selected_instance.account.kind }} · {{ selected_instance.account.broker|default:"Platform not set" }}</span>
+        <span class="w2-account-label">{{ selected_instance.account.kind }} · {{ selected_instance.account.broker_label|default:"Platform not set" }}</span>
       {% elif page_key == 'overview' %}All strategies
       {% elif page_key == 'settings' %}Applies to all strategies
       {% elif page_key == 'catalogue' %}Read-only mappings
@@ -29,7 +29,6 @@
 {% include 'v2/history.html' %}
 {% elif section == 'ledger' %}
 {% if ledger_edit %}{% include 'v2/ledger_edit.html' %}
-{% elif ledger_import %}{% include 'v2/ledger_import.html' %}
 {% else %}{% include 'v2/ledger.html' %}{% endif %}
 {% elif section == 'strategy' %}
 {% include 'v2/strategy_info.html' %}

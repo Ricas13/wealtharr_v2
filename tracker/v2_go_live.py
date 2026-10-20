@@ -66,6 +66,10 @@ def go_live(strategy, user):
             mapping_version=CATALOGUE_VERSION,
             resolved_instruments=manifest,
             owner_checked_on=strategy.owner_checked_on or timezone.localdate(),
+            # A linked legacy strategy has no pinned start; its first entry is it.
+            started_on=strategy.started_on or (
+                strategy.ledger.order_by("occurred_on").values_list("occurred_on", flat=True).first()
+                or timezone.localdate()),
             tracking_only=False,
             market_data_enabled=True,
         )

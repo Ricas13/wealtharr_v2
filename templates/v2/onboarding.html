@@ -94,7 +94,7 @@
           <label class="w2-option"><input type="radio" name="mode" value="fresh" {% if wizard.mode == 'fresh' %}checked{% endif %}>
             <span><strong>Starting fresh</strong><small>I have already deposited real cash</small></span></label>
           <label class="w2-option"><input type="radio" name="mode" value="hold" {% if wizard.mode == 'hold' %}checked{% endif %}>
-            <span><strong>I already hold these</strong><small>Record existing cash and share counts; no trades invented</small></span></label>
+            <span><strong>I already hold these</strong><small>Enter your current shares and cash</small></span></label>
         </div>
       </fieldset>
       <div id="w2-fresh-fields" {% if wizard.mode != 'fresh' %}hidden{% endif %}>
@@ -105,7 +105,7 @@
           <span>I confirm I have already deposited this amount. It is not a planned future contribution.</span></label>
       </div>
       <div id="w2-hold-fields" {% if wizard.mode != 'hold' %}hidden{% endif %}>
-        <p class="w2-field-help">Enter owner-reported holdings and *average historical cost*, not a current market price. These are recorded as an unvalued opening snapshot, never as made-up buys.</p>
+        <p class="w2-field-help">Enter what you hold on the start date and the price per share that day (from Trading 212). This becomes your opening position; you can correct it later in the Ledger.</p>
         <label class="w2-field">Existing cash in account (£)
           <input class="w2-input" name="cash" inputmode="decimal" type="number" min="0" step="0.01"
                  value="{{ wizard.cash }}" placeholder="0.00"></label>
@@ -115,7 +115,7 @@
             <label class="w2-field">Shares held
               <input class="w2-input" name="shares_{{ holding.line.role }}" type="number"
                      min="0" step="0.00000001" value="{{ holding.shares }}"></label>
-            <label class="w2-field">Average purchase cost per share (£)
+            <label class="w2-field">Price per share on the start date (£)
               <input class="w2-input" name="cost_{{ holding.line.role }}" type="number"
                      min="0" step="0.00000001" value="{{ holding.cost }}"></label>
           </div>
@@ -126,7 +126,7 @@
       <div class="w2-notice">
         <strong>ISA allowance (warning only)</strong>
         {% if wizard_tax_year_verified %}
-          Recorded deposits into Wealtharr ISA strategies this tax year: £{{ wizard_known_isa|floatformat:2 }} of £{{ wizard_isa_limit|floatformat:0 }}.
+          Recorded deposits into Wealtharr ISA strategies this tax year: £{{ wizard_known_isa|floatformat:"2g" }} of £{{ wizard_isa_limit|floatformat:0 }}.
           This does not include subscriptions to other ISAs or flexible replacements.
         {% else %}
           Current tax-year limit not confirmed by this application's policy; check HMRC directly.

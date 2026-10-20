@@ -71,7 +71,7 @@ class V2HistoryTests(TestCase):
         self.assertEqual(report["points"][0].origin, "Replayed GBP ledger cash")
         self.assertTrue(report["points"][0].certified)
         self.assertContains(self.client.get(self._url()), "Ledger-backed cash endpoint")
-        self.assertContains(self.client.get(self._url()), "£1000.00")
+        self.assertContains(self.client.get(self._url()), "£1,000.00")
 
     def test_irregular_deposits_and_withdrawals_never_become_return(self):
         self._record(amount="1000")
@@ -100,7 +100,7 @@ class V2HistoryTests(TestCase):
         self.assertFalse(report["points"][0].certified)
         self.assertIn("raw vendor quote-unit", report["reason"])
         page = self.client.get(self._url())
-        self.assertContains(page, "£1350.00")
+        self.assertContains(page, "£1,350.00")
         self.assertContains(page, "Not certified")
         self.assertContains(page, "XIRR")
         self.assertNotContains(page, "1350.00%", html=False)
@@ -256,7 +256,7 @@ class V2HistoryTests(TestCase):
         self.assertContains(page,"Combined verified value")
         self.assertEqual(page.context["overview_total"],D("1500"))
         self.assertEqual(page.context["overview_contributed"],D("1500"))
-        self.assertContains(page,"£1500.00")
+        self.assertContains(page,"£1,500.00")
         self._record(sibling,amount="0",kind="BUY",
                      day=self.start+timedelta(days=1),symbol="LQQ3.L",
                      qty="2",price="100")
@@ -264,7 +264,7 @@ class V2HistoryTests(TestCase):
         self.assertIsNone(later.context["overview_total"])
         self.assertIsNone(later.context["overview_gain"])
         self.assertContains(later,"Withheld: some accounts")
-        self.assertContains(later,"£1500.00")  # real net contributions persist
+        self.assertContains(later,"£1,500.00")  # real net contributions persist
 
     def test_range_filters_recorded_points_but_not_inception_funding(self):
         self._record()
