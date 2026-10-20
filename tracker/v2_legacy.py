@@ -68,6 +68,10 @@ def cockpit_section(request, section="today", signal_id=None):
 
 @login_required
 def app_section(request, section="", instance_id=None, signal_id=None):
+    # Even deprecated POST paths must not reveal whether another owner's
+    # strategy exists. Check ownership before returning 405 for retired writes.
+    if instance_id is not None and not owner_instances(request.user).filter(pk=instance_id).exists():
+        raise Http404
     if request.method not in ("GET", "HEAD"):
         return HttpResponseNotAllowed(["GET", "HEAD"])
     if section == "settings":
