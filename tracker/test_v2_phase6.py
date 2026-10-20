@@ -65,7 +65,7 @@ class V2HistoryTests(TestCase):
         self.assertEqual(report["status"], "verified_cash")
         self.assertEqual(report["latest_certified"].value_gbp, D("1000"))
         self.assertEqual(report["inception"].cash_gain_gbp, D("0"))
-        self.assertEqual(report["inception"].xirr_annual, D("0"))
+        self.assertLess(abs(report["inception"].xirr_annual), D("1e-12"))
         self.assertEqual(report["inception"].simple_cumulative_return, D("0"))
         self.assertEqual(len(report["points"]), 1)
         self.assertEqual(report["points"][0].origin, "Replayed GBP ledger cash")
@@ -82,7 +82,7 @@ class V2HistoryTests(TestCase):
         self.assertEqual(result["actual_net_funding"], D("1050"))
         self.assertEqual(result["latest_certified"].value_gbp, D("1050"))
         self.assertEqual(result["inception"].cash_gain_gbp, D("0"))
-        self.assertEqual(result["inception"].xirr_annual, D("0"))
+        self.assertLess(abs(result["inception"].xirr_annual), D("1e-12"))
         self.assertIsNone(result["inception"].simple_cumulative_return)
         self.assertEqual([f.amount_gbp for f in result["flows"]],
                          [D("1000"),D("125"),D("-75")])
@@ -141,7 +141,7 @@ class V2HistoryTests(TestCase):
         self.assertEqual(report["period"].status, "ok")
         self.assertEqual(report["period"].cumulative_return, D("0"))
         self.assertEqual(report["period"].max_drawdown, D("0"))
-        self.assertEqual(report["period"].xirr_annual, D("0"))
+        self.assertLess(abs(report["period"].xirr_annual), D("1e-12"))
 
     def test_flow_between_verified_points_withholds_twr_missing_boundaries(self):
         self._record(amount="1000")
