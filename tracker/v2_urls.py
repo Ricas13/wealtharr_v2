@@ -18,6 +18,8 @@ urlpatterns = [
          v2_ledger_views.import_csv, name="v2_ledger_import"),
     path("s/<int:instance_id>/review/<int:signal_id>/",
          v2_today.guided_review, name="v2_guided_review"),
+    path("s/<int:instance_id>/notice/<int:signal_id>/feedback/",
+         v2_today.notice_feedback, name="v2_notice_feedback"),
     path("catalogue/", v2_views.catalogue, name="v2_catalogue"),
     path("settings/", v2_views.settings, name="v2_settings"),
     path("settings/test/<str:channel>/",
