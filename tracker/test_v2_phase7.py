@@ -194,7 +194,7 @@ class SettingsAndRoutingTests(TestCase):
         with patch("tracker.notification_scheduler.dispatch",
                    return_value={"email": "sent"}) as send:
             self.assertEqual(retry_due_deliveries(), (1, 1))
-        self.assertIs(send.call_args.kwargs["strategy"], self.own)
+        self.assertEqual(send.call_args.kwargs["strategy"].pk, self.own.pk)
         self.assertEqual(send.call_args.kwargs["category"], "data")
 
     def test_receipts_and_global_diagnostics_do_not_cross_owner(self):
