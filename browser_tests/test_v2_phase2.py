@@ -13,7 +13,7 @@ from django.conf import settings
 from django.test import override_settings
 from django.utils import timezone
 
-from browser_tests.test_owner_journeys import BrowserHarness
+from browser_tests.harness import BrowserHarness
 
 
 @override_settings(TURNSTILE_REQUIRED=False)
