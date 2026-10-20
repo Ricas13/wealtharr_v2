@@ -11,11 +11,11 @@ from uuid import uuid4
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .cockpit import _last_action, _next_end, _price_status
 from .cockpit_execution import (
@@ -325,3 +325,40 @@ def guided_review(request, instance_id, signal_id):
         page_title="Record actual trades", instance=strategy,
         section="today", guided_review=True, **context,
     )
+
+
+@login_required
+@require_POST
+def notice_feedback(request, instance_id, signal_id):
+    """Record owner assessment of saved advice; NEVER treat it as a broker fill.
+
+    Historical alerts remain intact. A signal with actual linked fills or
+    confirmed execution cannot be reclassified by this lightweight feedback.
+    The strategy row is locked first, matching the execution service order.
+    """
+    strategy = _owned(request, instance_id)
+    outcome = request.POST.get("outcome", "")
+    note = request.POST.get("review_note", "").strip()[:2000]
+    if outcome not in ("CONFIRMED", "FALSE_POSITIVE", "NOT_APPLICABLE"):
+        messages.error(request, "Choose a valid review outcome.")
+        return redirect("v2_instance_page", instance_id=strategy.pk, section="today")
+    if outcome == "FALSE_POSITIVE" and not note:
+        messages.error(request, "Give a short reason for a false positive.")
+        return redirect("v2_instance_page", instance_id=strategy.pk, section="today")
+    with transaction.atomic():
+        locked = _owned(request, instance_id)
+        StrategyInstance.objects.select_for_update().get(pk=locked.pk)
+        signal = get_object_or_404(
+            StrategySignal.objects.select_for_update(),
+            pk=signal_id, strategy=locked,
+        )
+        if (SignalFill.objects.filter(strategy=locked, signal=signal).exists()
+                or RebalanceExecution.objects.filter(strategy=locked, signal=signal).exists()):
+            messages.error(request, "Actual fills exist. Review them through the audited trade record.")
+            return redirect("v2_instance_page", instance_id=locked.pk, section="today")
+        signal.review_outcome = outcome
+        signal.review_note = note
+        signal.acknowledged_at = timezone.now()
+        signal.save(update_fields=["review_outcome", "review_note", "acknowledged_at"])
+    messages.success(request, "Review recorded. No trades or balances changed.")
+    return redirect("v2_instance_page", instance_id=strategy.pk, section="today")
