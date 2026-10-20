@@ -45,11 +45,16 @@ jobs:
           django.setup()
           from django.test import Client
           client = Client(raise_request_exception=True)
-          # Private app: "/" sends anonymous visitors to the login page.
+          # Signed out, "/" is the public homepage (no private data) with its
+          # own hashed static files.
           response = client.get("/", secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
-          print("/", response.status_code, response.get("Location"))
-          assert response.status_code == 302 and response["Location"] == "/login/", (
-              "/", response.status_code, response.get("Location"))
+          print("/", response.status_code)
+          body = response.content.decode()
+          assert response.status_code == 200, ("/", response.status_code)
+          assert 'href="/login/"' in body and "/static/css/home." in body and "/static/js/home." in body, "homepage assets"
+          response = client.get("/compare.json", secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
+          print("/compare.json", response.status_code)
+          assert response.status_code == 200 and "ready" in response.json(), ("/compare.json", response.status_code)
           response = client.get("/login/", secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
           print("/login/", response.status_code)
           assert response.status_code == 200, ("/login/", response.status_code)
