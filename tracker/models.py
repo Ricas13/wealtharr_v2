@@ -114,6 +114,23 @@ class StrategyInstance(models.Model):
         return self.name
 
 
+class StrategyGoLive(models.Model):
+    """The owner's explicit, dated confirmation that a strategy may go live.
+
+    Until this exists a v2 strategy stays tracking-only: no Yahoo prices, no
+    trade instructions. Recording it never places a trade.
+    """
+    strategy = models.OneToOneField(StrategyInstance, on_delete=models.CASCADE, related_name="go_live")
+    confirmed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    confirmed_at = models.DateTimeField(auto_now_add=True)
+    strategy_version = models.CharField(max_length=48)
+    mapping_version = models.CharField(max_length=40)
+    attestation = models.TextField()
+
+    def __str__(self):
+        return f"{self.strategy} live since {self.confirmed_at:%Y-%m-%d}"
+
+
 class InstanceOpeningSnapshot(models.Model):
     """Owner-reported initial positions; NOT verified trades or prices.
 
