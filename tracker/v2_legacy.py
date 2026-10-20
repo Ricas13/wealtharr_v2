@@ -48,14 +48,19 @@ def cockpit_section(request, section="today", signal_id=None):
         return _to(reverse("v2_ledger_import", args=[ids[0]]) if len(ids) == 1
                    else reverse("v2_overview"))
     if section == "rebalance":
-        ids = list(owner_instances(request.user).values_list("pk", flat=True)[:2])
-        if len(ids) == 1 and signal_id is not None:
-            from .models import StrategySignal
-            if StrategySignal.objects.filter(
-                    pk=signal_id, strategy_id=ids[0],
-                    strategy__owner=request.user, kind="QUARTERLY").exists():
-                return _to(reverse("v2_guided_review", args=[ids[0], signal_id]))
-        return _to(reverse("v2_overview"))
+        # The historic link identifies a specific saved signal. Its owner and
+        # strategy must be checked even if the user now has several accounts.
+        # Never send a foreign or missing signal to a generic owner page.
+        from django.shortcuts import get_object_or_404
+        from .models import StrategySignal
+        signal = get_object_or_404(
+            StrategySignal.objects.filter(
+                strategy__owner=request.user,
+                strategy__account__owner=request.user,
+            ).exclude(strategy__account__kind="PAPER"),
+            pk=signal_id, kind="QUARTERLY",
+        )
+        return _to(reverse("v2_guided_review", args=[signal.strategy_id, signal.pk]))
     if section not in ("today", "history", "ledger", "strategy", "breakdown"):
         raise Http404
     return _to(preferred_url(request.user, section))
