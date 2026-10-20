@@ -37,7 +37,7 @@ def _send(strategy, owner, category, key, subject, message):
         sender=dispatch, strategy=strategy))
 
 
-def send_due_cockpit_notices(today=None, remind_after_days=3):
+def send_due_cockpit_notices(today=None, remind_after_days=None):
     """Send owner-selected, deterministic advisory notices only once per key.
 
     Previously recorded partial fills suppress stale trade quantities, but
@@ -49,6 +49,9 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
             preset__slug="nasdaq-quarterly-target").exclude(account__kind="PAPER"):
         owner = strategy.owner
         pref, _ = NotificationPreference.objects.get_or_create(owner=owner)
+        delay = (remind_after_days if remind_after_days is not None
+                 else pref.followup_delay_days)
+        delay = max(1, min(30, delay))
         report = ledger_summary(strategy)
         fresh, why, marks = _price_status(strategy, report)
         # A recurring source issue is never converted to a trade instruction.
@@ -88,7 +91,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                     "prices, quantities and fees. No orders have been placed." % (
                         recent.as_of, "\n".join(actions)))
             if (actions and recent.created_at.date() <= today - timedelta(
-                    days=remind_after_days) and (partial or reconciled)):
+                    days=delay) and (partial or reconciled)):
                 week = today.isocalendar()
                 label = ("You have saved actual partial fills. Complete the "
                          "review only after all broker fills and verified "
