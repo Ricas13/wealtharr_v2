@@ -55,19 +55,18 @@ case "${1:-help}" in
     if [[ -z "$DOCKER_PROXY" || "$DOCKER_PROXY" =~ ^[Yy]$ ]]; then
       read -r -p "Existing Traefik Docker network: " NET
       read -r -p "Existing TLS resolver name: " RESOLVER
-      read -r -p "Allowed source IP/CIDR (NOT 0.0.0.0/0): " CIDRS
       docker network inspect "$NET" >/dev/null ||
         die "Docker network not found: $NET"
     else
-      NET="" RESOLVER="" CIDRS=""
+      NET="" RESOLVER=""
       echo "Host-mode Traefik: web binds 127.0.0.1:8088 only."
     fi
     read -r -p "Cloudflare Turnstile site key: " TS_SITE
     read -r -s -p "Cloudflare Turnstile secret key: " TS_SECRET
     printf '\n'
-    export HOST NET RESOLVER CIDRS TS_SITE TS_SECRET
+    export HOST NET RESOLVER TS_SITE TS_SECRET
     python3 - <<'PY'
-import ipaddress, os, re
+import os, re
 from pathlib import Path
 host = os.environ["HOST"]
 if not re.fullmatch(r"(?=.{4,253}$)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", host):
@@ -75,23 +74,15 @@ if not re.fullmatch(r"(?=.{4,253}$)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", host):
 for key in ("TS_SITE", "TS_SECRET"):
     if not re.fullmatch(r"[A-Za-z0-9_.-]{10,255}", os.environ[key]):
         raise SystemExit(f"Missing/invalid {key}")
-net, resolver, cidrs = (os.environ[k] for k in ("NET", "RESOLVER", "CIDRS"))
+net, resolver = (os.environ[k] for k in ("NET", "RESOLVER"))
 if net:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", net) or not re.fullmatch(r"[A-Za-z0-9_.-]+", resolver):
         raise SystemExit("Invalid network/resolver")
-    nets = [n.strip() for n in cidrs.split(",")]
-    if not all(nets):
-        raise SystemExit("CIDR allowlist is required")
-    for n in nets:
-        network = ipaddress.ip_network(n, strict=False)
-        if network.prefixlen == 0:
-            raise SystemExit("Refusing open-to-all CIDR")
     Path(".env").write_text(
         "COMPOSE_PROJECT_NAME=wealtharr_v2\n"
         f"WEALTHARR_HOST={host}\n"
         f"TRAEFIK_DOCKER_NETWORK={net}\n"
         f"TRAEFIK_CERT_RESOLVER={resolver}\n"
-        f"WEALTHARR_ALLOWLIST_CIDRS={','.join(nets)}\n"
     )
 else:
     Path(".env").write_text("COMPOSE_PROJECT_NAME=wealtharr_v2\n")
@@ -130,50 +121,6 @@ PY
     ;;
   logs)
     compose logs --tail=70 --follow web reminders backups
-    ;;
-  allow-cloudflare)
-    docker_proxy || die "Cloudflare allowlist requires Docker-based Traefik."
-    read -r -p "Cloudflare Zero Trust Access must ALREADY protect this hostname. Type ACCESS PROTECTED: " YES
-    [[ "$YES" == "ACCESS PROTECTED" ]] || die "No changes made."
-    command -v curl >/dev/null || die "curl required"
-    CIDRS="$(
-      { curl -fsS --max-time 20 https://www.cloudflare.com/ips-v4
-        printf '\n'
-        curl -fsS --max-time 20 https://www.cloudflare.com/ips-v6
-        printf '\n'
-      } | python3 -c '
-import ipaddress, sys
-networks = [s.strip() for s in sys.stdin if s.strip()]
-if len(networks) < 10:
-    raise SystemExit("Incomplete Cloudflare address list")
-for value in networks:
-    ipaddress.ip_network(value, strict=True)
-if not any(":" in n for n in networks) or not any("." in n for n in networks):
-    raise SystemExit("Both IPv4 and IPv6 are required")
-print(",".join(dict.fromkeys(networks)))
-'
-    )"
-    export CIDRS
-    python3 - <<'PY'
-import os
-from pathlib import Path
-p = Path(".env")
-rows = p.read_text().splitlines()
-key = "WEALTHARR_ALLOWLIST_CIDRS="
-if not any(row.startswith(key) for row in rows):
-    raise SystemExit("Missing allowlist configuration")
-backup = Path(".env.before-cloudflare")
-if not backup.exists():
-    backup.write_bytes(p.read_bytes())
-    backup.chmod(0o600)
-rows = [key + os.environ["CIDRS"] if row.startswith(key) else row for row in rows]
-p.write_text("\n".join(rows) + "\n")
-p.chmod(0o600)
-PY
-    preflight
-    compose up -d --no-deps --force-recreate --wait web
-    echo "Cloudflare edge IPs allowed. Cloudflare Access MUST remain enforced."
-    echo "Verify protection from an unauthenticated PRIVATE browser window."
     ;;
   export)
     preflight
@@ -229,7 +176,6 @@ Wealtharr owner commands (run from your checked-out directory):
   bash wealtharr.sh update           Pull main, rebuild, migrate, verify
   bash wealtharr.sh status           See container health
   bash wealtharr.sh logs             Follow relevant logs
-  bash wealtharr.sh allow-cloudflare Allow Cloudflare edge IPs only AFTER Access is enforced
   bash wealtharr.sh export DIR       Private portable DB + settings + secret export
   bash wealtharr.sh restore-fresh DIR Restore on a NEW EMPTY server, never over live DB
 USAGE
