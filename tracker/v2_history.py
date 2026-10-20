@@ -94,6 +94,56 @@ def _cash_evidence(strategy, state, day, entries):
     )
 
 
+def _invested_evidence(strategy, state, day, entries, snapshot_value):
+    """Source-checked exact-date GBP quote proof, not broker eligibility proof.
+
+    The original Yahoo raw unit and price must have been captured by sync_ticker
+    on that exact trading day; legacy normalized-only rows remain unapproved.
+    """
+    if strategy.account.country != "GB":
+        return None
+    expected = {"LQQ3.L": ("GBp", "GBX", Decimal("100")),
+                "ERNS.L": ("GBP", Decimal("1"))}
+    if (strategy.equity_symbol != "LQQ3.L" or
+            strategy.safe_symbol != "ERNS.L" or not state["positions"]):
+        return None
+    value = state["cash"]
+    ids = []
+    for symbol, qty in state["positions"].items():
+        if qty <= ZERO or symbol not in expected:
+            return None
+        if YahooSync.objects.filter(
+                symbol=symbol, last_error__startswith="PRICE_HOLD:").exists():
+            return None
+        obs = MarketObservation.objects.filter(
+            symbol=symbol, as_of=day, currency="GBP",
+            source="yahoo", raw_unit_verified=True,
+        ).first()
+        if obs is None or not isinstance(obs.raw_close, Decimal) or obs.raw_close <= ZERO:
+            return None
+        allowed = expected[symbol]
+        units = allowed[:-1]
+        factor = allowed[-1]
+        if (obs.raw_quote_unit not in units or
+                not obs.price.is_finite() or obs.price <= ZERO or
+                (obs.raw_close / factor).quantize(Decimal("0.00000001")) != obs.price):
+            return None
+        value += qty * obs.price
+        ids.append("yahoo-raw:%s:%s:%s:%s" % (
+            obs.pk, symbol, obs.raw_quote_unit, obs.as_of.isoformat()
+        ))
+    if value.quantize(Decimal("0.01")) != snapshot_value:
+        return None
+    ids.extend(
+        "owner-ledger:%s:%s:%s" % (strategy.pk, entry.pk, entry.version)
+        for entry in entries if entry.occurred_on <= day
+    )
+    return VerifiedValuation(
+        as_of=day, value_gbp=snapshot_value, verified=True,
+        currency="GBP", observation_ids=tuple(ids),
+    )
+
+
 def _flow_rows(entries, until):
     result = []
     for sequence, event in enumerate(e for e in entries if
@@ -126,16 +176,23 @@ def _records(strategy, entries):
             accepted = None
         else:
             accepted = _cash_evidence(strategy, state, record.as_of, entries)
-            reason = (
-                "Reproduced from actual GBP cash ledger (no positions)."
-                if accepted and accepted.value_gbp == record.total_value else RETURN_HOLD
-            )
             if accepted and accepted.value_gbp != record.total_value:
                 accepted = None
+            if not accepted:
+                accepted = _invested_evidence(
+                    strategy, state, record.as_of, entries, record.total_value
+                )
+            reason = (
+                "Reproduced from actual GBP cash ledger (no positions)."
+                if accepted and not state["positions"] else
+                "Reproduced from dated owner holdings plus captured Yahoo raw GBX/GBP quote evidence."
+                if accepted else RETURN_HOLD
+            )
         points.append(HistoryPoint(
             record.as_of, record.total_value, record.net_contributed,
-            "Recorded portfolio snapshot", bool(accepted),
-            reason, accepted.observation_ids if accepted else ()))
+            ("Source-checked GBP portfolio close"
+             if accepted and state["positions"] else "Recorded portfolio snapshot"),
+            bool(accepted), reason, accepted.observation_ids if accepted else ()))
     # A real current cash-only balance is independently derivable even when
     # no price snapshot exists; it is explicitly labelled ledger, not a quote.
     if entries:
@@ -227,12 +284,15 @@ def build_history(strategy, *, span="all"):
             period = evaluate_period(PortfolioPeriod(opening, closing, in_period))
     status = (
         "no_history" if not points else
+        "verified_market" if certified and certified.origin == "Source-checked GBP portfolio close" else
         "verified_cash" if certified else "recorded_only"
     )
     return {
         "status": status,
         "reason": (
             "No verified valuation dates are recorded." if not points else
+            "Exact-date Yahoo raw quote units and dated GBP holdings independently reproduce the saved valuation."
+            if certified and status == "verified_market" else
             "Ledger-backed cash-only endpoint; market investment values remain separately gated."
             if certified else RETURN_HOLD
         ),

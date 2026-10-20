@@ -120,6 +120,66 @@ class V2HistoryTests(TestCase):
         self.assertFalse(report["points"][0].certified)
         self.assertIn("raw vendor quote-unit", report["reason"])
 
+    def test_exact_raw_yahoo_observation_can_certify_real_invested_xirr(self):
+        self._record(amount="1000")
+        self._record(kind="BUY", amount="0", day=self.start+timedelta(days=1),
+                     symbol="LQQ3.L", qty="2", price="100")
+        self._snapshot(self.account, self.day, "1100", "1000")
+        MarketObservation.objects.create(
+            symbol="LQQ3.L", as_of=self.day, price=D("150"),
+            currency="GBP", source="yahoo",
+            raw_quote_unit="GBp", raw_close=D("15000"),
+            raw_unit_verified=True,
+        )
+        report = build_history(self.account)
+        self.assertEqual(report["status"], "verified_market")
+        self.assertTrue(report["latest_certified"].certified)
+        self.assertEqual(report["latest_certified"].value_gbp, D("1100"))
+        self.assertEqual(report["inception"].cash_gain_gbp, D("100"))
+        self.assertGreater(report["inception"].xirr_annual, D("0"))
+        self.assertIsNone(report["period"])  # No fabricated flow boundaries.
+        self.assertContains(self.client.get(self._url()), "Source-verified GBP valuation")
+
+    def test_raw_unit_scale_mismatch_and_price_hold_both_refuse_xirr(self):
+        self._record(amount="1000")
+        self._record(kind="BUY", amount="0", day=self.start+timedelta(days=1),
+                     symbol="LQQ3.L", qty="2", price="100")
+        self._snapshot(self.account, self.day, "1100", "1000")
+        observed = MarketObservation.objects.create(
+            symbol="LQQ3.L", as_of=self.day, price=D("150"),
+            currency="GBP", source="yahoo",
+            raw_quote_unit="GBp", raw_close=D("150"),
+            raw_unit_verified=True,
+        )
+        self.assertIsNone(build_history(self.account)["inception"])
+        observed.raw_close = D("15000")
+        observed.save(update_fields=["raw_close"])
+        from tracker.models import YahooSync
+        hold, _ = YahooSync.objects.get_or_create(symbol="LQQ3.L")
+        hold.last_error = "PRICE_HOLD:REVISED_HISTORICAL_CLOSE"
+        hold.save(update_fields=["last_error"])
+        self.assertIsNone(build_history(self.account)["inception"])
+        hold.last_error = ""
+        hold.save(update_fields=["last_error"])
+        self.assertEqual(build_history(self.account)["status"], "verified_market")
+
+    def test_raw_quote_capture_from_fetcher_is_not_assumed_for_mock_legacy_rows(self):
+        from tracker.market_signals import FetchedChart, sync_ticker
+        day = self.day
+        source = FetchedChart("GBP", [(day, D("150"))], "GBp",
+                              {day: D("15000")})
+        with patch("tracker.market_signals.fetch_chart", return_value=source):
+            result = sync_ticker("LQQ3.L", force=True)
+        self.assertEqual(result.raw_close, D("15000"))
+        self.assertEqual(result.raw_quote_unit, "GBp")
+        self.assertEqual(result.source, "yahoo")
+        self.assertTrue(result.raw_unit_verified)
+        with patch("tracker.market_signals.fetch_chart",
+                   return_value=("GBP", [(day,D("104"))])):
+            result = sync_ticker("ERNS.L", force=True)
+        self.assertEqual(result.source, "")
+        self.assertFalse(result.raw_unit_verified)
+
     def test_future_and_conflicting_snapshots_cannot_become_verified(self):
         self._record()
         self._snapshot(self.account, self.day-timedelta(days=2), "900", "1000")

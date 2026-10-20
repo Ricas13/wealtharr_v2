@@ -12,7 +12,7 @@
     </form>
   </div>
   <div class="w2-notice" role="status">
-    <strong>{% if history.status == 'blocked' %}History blocked{% elif history.status == 'verified_cash' %}Ledger-backed cash endpoint{% elif history.status == 'recorded_only' %}Recorded values — uncertified investment returns{% else %}No recorded values{% endif %}.</strong>
+    <strong>{% if history.status == 'blocked' %}History blocked{% elif history.status == 'verified_market' %}Source-verified GBP valuation{% elif history.status == 'verified_cash' %}Ledger-backed cash endpoint{% elif history.status == 'recorded_only' %}Recorded values — uncertified investment returns{% else %}No recorded values{% endif %}.</strong>
     {{ history.reason }}
   </div>
   {% if history.points %}
@@ -48,7 +48,7 @@
 </div>
 <section class="w2-panel w2-space-top">
   <h2>Source-labelled observation log</h2>
-  <p class="w2-note">A database snapshot can record a GBP number without retaining its original raw GBX quote source. Only cash-only dates exactly matching the ledger are certified. Rows marked unverified cannot contribute to reported performance.</p>
+  <p class="w2-note">A database snapshot can record a GBP number without retaining its original raw GBX quote source. Cash-only dates matching the ledger, or invested dates rebuilt with contemporaneous owner holdings and captured exact raw GBX/GBP Yahoo source, can be certified. Other rows are recorded only and cannot contribute to reported performance.</p>
   <div class="w2-table-wrap">
     <table class="w2-table w2-history-table">
       <thead><tr><th>Date</th><th class="w2-number">GBP value</th><th class="w2-number">Net funded</th><th>Origin</th><th>Verification</th></tr></thead>
@@ -57,7 +57,7 @@
       <td class="w2-number">£{{ point.value_gbp|floatformat:2 }}</td>
       <td class="w2-number">£{{ point.net_contributed_gbp|floatformat:2 }}</td>
       <td>{{ point.origin }}</td><td>
-        <span class="w2-badge {% if not point.certified %}w2-warning{% endif %}">{% if point.certified %}Ledger-verified cash{% else %}Not certified{% endif %}</span>
+        <span class="w2-badge {% if not point.certified %}w2-warning{% endif %}">{% if point.certified %}{% if point.origin == 'Source-checked GBP portfolio close' %}Source-verified GBP{% else %}Ledger-verified cash{% endif %}{% else %}Not certified{% endif %}</span>
         <small class="w2-muted w2-history-reason">{{ point.reason }}</small>
       </td></tr>
       {% empty %}<tr><td colspan="5"><div class="w2-empty">No real values for this range.</div></td></tr>{% endfor %}

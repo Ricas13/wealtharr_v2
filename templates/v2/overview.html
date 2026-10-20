@@ -24,14 +24,14 @@
             <small><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='history' %}">View history</a></small></td>
             <td>{{ row.strategy.account.kind }} · {{ row.strategy.account.broker }}</td>
             <td>{% if row.value is not None %}£{{ row.value|floatformat:2 }} <small>{{ row.as_of|date:"j M Y" }}</small>{% else %}—{% endif %}</td>
-            <td><span class="w2-badge {% if row.status != 'verified_cash' %}w2-warning{% endif %}">{% if row.status == 'verified_cash' %}Cash verified{% elif row.status == 'blocked' %}Blocked{% elif row.status == 'recorded_only' %}Stored, unverified{% else %}No history{% endif %}</span></td></tr>
+            <td><span class="w2-badge {% if row.status != 'verified_cash' and row.status != 'verified_market' %}w2-warning{% endif %}">{% if row.status == 'verified_cash' %}Cash verified{% elif row.status == 'verified_market' %}Source-verified GBP{% elif row.status == 'blocked' %}Blocked{% elif row.status == 'recorded_only' %}Stored, unverified{% else %}No history{% endif %}</span></td></tr>
           {% empty %}<tr><td colspan="4"><div class="w2-empty">No strategies yet. Add a strategy to start recording real deposits or broker history.</div></td></tr>{% endfor %}
         </tbody></table></div>
     </section>
     <section class="w2-panel">
       <h2>Needs your attention</h2>
       {% for row in overview_rows %}
-        {% if row.status != 'verified_cash' %}
+        {% if row.status != 'verified_cash' and row.status != 'verified_market' %}
         <div class="w2-setting-row"><span><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='history' %}">{{ row.strategy.name }}</a>
           <small class="w2-muted w2-history-reason">{{ row.reason }}</small></span>
           <span class="w2-badge w2-warning">Review data</span></div>

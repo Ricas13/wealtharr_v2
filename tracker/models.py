@@ -334,6 +334,13 @@ class MarketObservation(models.Model):
     as_of = models.DateField()
     price = models.DecimalField(max_digits=22, decimal_places=8)
     currency = models.CharField(max_length=3)
+    # Captured only from a source response, never inferred from old GBP values.
+    source = models.CharField(max_length=16, blank=True, default="")
+    raw_quote_unit = models.CharField(max_length=8, blank=True, default="")
+    raw_close = models.DecimalField(
+        max_digits=22, decimal_places=8, blank=True, null=True
+    )
+    raw_unit_verified = models.BooleanField(default=False)
     class Meta:
         constraints = [models.UniqueConstraint(fields=["symbol", "as_of"], name="unique_market_close")]
         ordering = ["as_of"]
