@@ -207,7 +207,8 @@ def _export_owner(owner):
             writer.writerow(columns)
             for row in rows:
                 writer.writerow([
-                    ("'" + str(v) if str(v).lstrip().startswith(("=", "+", "-", "@")) else v)
+                    ("'" + v if isinstance(v, str) and
+                     v.lstrip().startswith(("=", "+", "-", "@")) else v)
                     for v in row
                 ])
             out.writestr(name, data.getvalue())

@@ -7,7 +7,40 @@
       {% if selected_instance %}{{ selected_instance.name }}
         <span class="w2-account-label">{{ selected_instance.account.kind }} · {{ selected_instance.account.broker|default:"Platform not set" }}</span>
       {% elif page_key == 'overview' %}All strategies
-      {% elif page_key == 'settings' %}
+      {% elif page_key == 'settings' %}Applies to all strategies
+      {% elif page_key == 'catalogue' %}Read-only mappings
+      {% else %}Fixed, code-defined strategies{% endif %}
+    </p>
+    <h1>{{ page_title }}</h1>
+  </div>
+  {% if page_key == 'overview' %}
+    <a class="w2-button w2-button-primary" href="{% url 'v2_add_strategy' %}">{% include 'partials/icon.html' with name='plus' %} Add strategy</a>
+  {% endif %}
+</header>
+
+{% if page_key == 'overview' %}
+{% include 'v2/overview.html' %}
+
+{% elif page_key == 'instance' %}
+{% if section == 'today' %}
+{% if guided_review %}{% include 'v2/guided_review.html' %}
+{% else %}{% include 'v2/today.html' %}{% endif %}
+{% elif section == 'history' %}
+{% include 'v2/history.html' %}
+{% elif section == 'ledger' %}
+{% if ledger_edit %}{% include 'v2/ledger_edit.html' %}
+{% elif ledger_import %}{% include 'v2/ledger_import.html' %}
+{% else %}{% include 'v2/ledger.html' %}{% endif %}
+{% elif section == 'strategy' %}
+{% include 'v2/strategy_info.html' %}
+{% elif section == 'breakdown' %}
+{% include 'v2/breakdown.html' %}
+{% endif %}
+
+{% elif page_key == 'catalogue' %}
+{% include 'v2/catalogue.html' %}
+
+{% elif page_key == 'settings' %}
 {% include 'v2/settings.html' %}
 
 {% else %}

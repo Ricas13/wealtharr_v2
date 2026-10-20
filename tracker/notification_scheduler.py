@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from .models import NotificationDelivery, NotificationSchedulerRun
 from .services import dispatch
-from .notification_routing import category_for_event_key, selected_channels
+from .notification_routing import category_for_event_key, selected_channels, instance_category_enabled
 from .models import NotificationPreference
 from .cockpit_notifications import send_due_cockpit_notices
 
@@ -35,7 +35,8 @@ def retry_due_deliveries(*, as_of=None):
         pref, _ = NotificationPreference.objects.get_or_create(owner=row.owner)
         if category:
             try:
-                permitted = row.channel in selected_channels(pref, category)
+                permitted = (row.channel in selected_channels(pref, category)
+                             and instance_category_enabled(row.strategy, category, row.channel))
             except ValueError:
                 permitted = False
         else:
@@ -50,7 +51,7 @@ def retry_due_deliveries(*, as_of=None):
             continue
         outcome = dispatch(
             row.owner, row.event_key, row.subject, row.message,
-            channels=(row.channel,), category=category or "")
+            channels=(row.channel,), category=category or "", strategy=row.strategy)
         if outcome.get(row.channel) in ("sent", "failed", "retrying"):
             attempted += 1
         if outcome.get(row.channel) == "sent":

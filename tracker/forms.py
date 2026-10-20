@@ -202,6 +202,14 @@ class NotificationForm(forms.ModelForm):
         self.fields["unacted_reminder_days"].required = False
         style(self.fields)
 
+    def clean_unacted_reminder_days(self):
+        value = self.cleaned_data.get("unacted_reminder_days")
+        if value is None:
+            return getattr(self.instance, "unacted_reminder_days", 3)
+        if not 1 <= value <= 30:
+            raise forms.ValidationError("Choose a reminder delay between 1 and 30 days.")
+        return value
+
 class IntegrationForm(forms.ModelForm):
     smtp_password = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="SMTP password (leave blank to keep existing)")
     discord_webhook = forms.URLField(required=False, widget=forms.PasswordInput(render_value=False), label="Discord webhook URL (leave blank to keep existing)")

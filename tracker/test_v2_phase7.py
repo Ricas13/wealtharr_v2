@@ -123,11 +123,12 @@ class Phase7Tests(TestCase):
             owner=self.other).count(), 0)
 
     def test_legacy_is_unmodified_by_instance_matrix(self):
-        legacy = self._make(self.owner, "Legacy")
-        legacy.strategy_key = ""
-        legacy.save(update_fields=["strategy_key"])
-        legacy.alert_routes = {}
-        legacy.save(update_fields=["alert_routes"])
+        legacy_account = Account.objects.create(
+            owner=self.owner, name="Legacy", kind="ISA",
+            country="GB", broker="TRADING212")
+        legacy = StrategyInstance.objects.create(
+            owner=self.owner, account=legacy_account, preset=self.preset,
+            name="Legacy", strategy_key="", alert_routes={})
         self.assertTrue(instance_category_enabled(legacy, "quarterly", "email"))
         self.assertTrue(instance_category_enabled(legacy, "quarterly", "discord"))
 
