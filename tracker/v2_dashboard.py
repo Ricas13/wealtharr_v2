@@ -297,7 +297,9 @@ def holdings_detail(strategy, report, roles):
             cost[entry.symbol] -= cost[entry.symbol] * entry.quantity / shares[entry.symbol]
             shares[entry.symbol] -= entry.quantity
     rows = []
-    for symbol, quantity in sorted(report["positions"].items()):
+    order = {"Growth": 0, "Safe": 1}
+    for symbol, quantity in sorted(report["positions"].items(),
+                                   key=lambda item: (order.get(roles.get(item[0]), 9), item[0])):
         if quantity <= ZERO:
             continue
         mark = report["marks"].get(symbol)
