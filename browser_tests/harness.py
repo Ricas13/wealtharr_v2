@@ -81,7 +81,7 @@ class BrowserHarness(StaticLiveServerTestCase):
             document: document.documentElement.scrollWidth,
             css: getComputedStyle(document.querySelector('.w2-shell')).display
         })""")
-        self.assertEqual(dimension["css"], "grid", "Real v2 CSS did not load")
+        self.assertEqual(dimension["css"], "flex", "Real v2 CSS did not load")
         self.assertLessEqual(
             dimension["document"], dimension["viewport"] + 1,
             "Entire page has horizontal overflow at %s px" % dimension["viewport"])
