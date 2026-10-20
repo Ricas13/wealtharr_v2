@@ -19,9 +19,6 @@ from browser_tests.harness import BrowserHarness
 @override_settings(TURNSTILE_REQUIRED=False)
 class V2OnboardingBrowserTests(BrowserHarness):
     def test_catalogue_and_all_five_onboarding_steps_at_desktop_and_mobile(self):
-        prototype = (Path(settings.BASE_DIR) / "docs/design/app_v2.html").read_text(
-            encoding="utf-8"
-        )
         output = Path(settings.BASE_DIR) / "docs/design/screenshots"
         keep = os.environ.get("WEALTHARR_CAPTURE_V2_BASELINES") == "1"
         with TemporaryDirectory() as tmp:
@@ -29,20 +26,13 @@ class V2OnboardingBrowserTests(BrowserHarness):
                 with self.subTest(width=width):
                     self.new_page(width)
                     self.sign_in()
-                    ref = self.ctx.new_page()
-                    ref.route("https://fonts.googleapis.com/**", lambda route: route.abort())
-                    ref.route("https://fonts.gstatic.com/**", lambda route: route.abort())
-                    ref.set_content(prototype, wait_until="domcontentloaded")
-                    expected_bar = ref.locator(".topbar").bounding_box()
-                    ref.close()
 
                     def screenshot(name):
                         self.assertLessEqual(
                             self.page.evaluate("document.documentElement.scrollWidth"),
                             width + 1,
                         )
-                        bar = self.page.locator(".w2-topbar").bounding_box()
-                        self.assertAlmostEqual(bar["height"], expected_bar["height"], delta=2)
+                        self.assert_compact_chrome(width)
                         target = (output if keep else Path(tmp)) / (
                             f"phase2-{name}-{width}.png"
                         )
@@ -109,7 +99,7 @@ class V2OnboardingBrowserTests(BrowserHarness):
                     self.page.get_by_text("step 5 of 5").wait_for()
                     screenshot("alerts")
                     self.page.get_by_role("button", name="Create strategy").click()
-                    self.page.get_by_role("heading", name="Today").wait_for()
-                    self.page.get_by_text("Tracking only", exact=False).first.wait_for()
+                    self.page.get_by_role("link", name="Dashboard").wait_for()
+                    self.page.get_by_text("Not live yet", exact=False).first.wait_for()
                     self.assertNotIn("OTHER_PERSON_PRIVATE_STRATEGY", self.page.content())
                     self.assertEqual(self.browser_errors, [])

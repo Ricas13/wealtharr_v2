@@ -1,65 +1,118 @@
-<section class="w2-stats" aria-label="Owner portfolio summary">
-  <div class="w2-stat"><p class="w2-label">Combined value</p>
+{% load w2_format %}<section class="w2-kpis" aria-label="Owner portfolio summary">
+  <div class="w2-kpi"><p class="w2-label">Combined value</p>
     <p class="w2-stat-value">{% if overview_total is not None %}£{{ overview_total|floatformat:"2g" }}{% else %}—{% endif %}</p>
-    <p class="w2-muted">{% if overview_excluded %}Excludes {{ overview_excluded|join:", " }} (not valued yet){% else %}All strategies · latest closes{% endif %}</p></div>
-  <div class="w2-stat"><p class="w2-label">Recorded net contributions</p>
+    <p class="w2-muted">{% if overview_excluded %}Excludes {{ overview_excluded|join:", " }} (not valued yet){% else %}Latest closes{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Recorded net contributions</p>
     <p class="w2-stat-value">{% if overview_contributed is not None %}£{{ overview_contributed|floatformat:"2g" }}{% else %}—{% endif %}</p>
     <p class="w2-muted">Deposits less withdrawals</p></div>
-  <div class="w2-stat"><p class="w2-label">Gain</p>
-    <p class="w2-stat-value">{% if overview_gain is not None %}£{{ overview_gain|floatformat:"2g" }}{% else %}—{% endif %}</p>
+  <div class="w2-kpi"><p class="w2-label">Simple gain</p>
+    <p class="w2-stat-value {{ overview_gain|tone }}">{% if overview_gain is not None %}{{ overview_gain|signed_money }}{% else %}—{% endif %}</p>
     <p class="w2-muted">{% if overview_excluded %}Valued strategies only{% else %}Value less contributions{% endif %}</p></div>
-  <div class="w2-stat"><p class="w2-label">Next calendar quarter end</p>
-    <p class="w2-stat-value">{{ overview_review_date|date:"j M Y" }}</p>
-    <p class="w2-muted">Review schedule</p></div>
+  <div class="w2-kpi"><p class="w2-label">Annualised (XIRR)</p>
+    <p class="w2-stat-value {{ ov_xirr|tone }}">{% if ov_xirr is not None %}{{ ov_xirr|signed_pct }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">{% if ov_xirr is None %}Per strategy below{% else %}Since first deposit{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Today</p>
+    <p class="w2-stat-value {{ ov_day_change|tone }}">{% if ov_day_change is not None %}{{ ov_day_change|signed_money }}{% if ov_day_pct is not None %} <small>{{ ov_day_pct|signed_pct }}</small>{% endif %}{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">ISA used {% if ov_isa %}{{ ov_isa.label }}{% endif %}</p>
+    <p class="w2-stat-value">{% if ov_isa %}£{{ ov_isa.used|floatformat:"0g" }} <small class="w2-muted">/ {{ ov_isa.limit|floatformat:"0g" }}</small>{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">To do</p>
+    <p class="w2-stat-value {% if ov_todos %}w2-warn{% endif %}">{% if ov_todos %}{{ ov_todos|length }} action{{ ov_todos|length|pluralize }}{% else %}Nothing{% endif %}</p></div>
 </section>
-<div class="w2-two-columns w2-space-top">
-  <div class="w2-column">
-    <section class="w2-panel">
-      <h2>Your strategy accounts</h2>
-      <p class="w2-note">Each account is tracked separately.</p>
+
+<div class="w2-dash">
+  <div class="w2-grid2">
+    <section class="w2-card w2-span2" aria-label="Combined value chart">
+      {% include 'v2/_chart.html' with c=ov_chart ranges=ov_ranges label="Combined value vs money in" height=160 %}
+    </section>
+
+    <section class="w2-card w2-span2">
+      <div class="w2-ch"><h2 class="w2-ct">Your strategy accounts</h2><span class="w2-muted">Each tracked separately</span></div>
       <div class="w2-table-wrap"><table class="w2-table">
-        <thead><tr><th>Strategy</th><th>Account</th><th>Last certified value</th><th>History status</th></tr></thead>
+        <thead><tr><th>Strategy</th><th>Account</th><th>Status</th><th class="w2-r">Value</th><th class="w2-r">Net deposits</th><th class="w2-r">Gain</th><th class="w2-r">Annualised</th><th>Next action</th></tr></thead>
         <tbody>{% for row in overview_rows %}
-          <tr><td><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='today' %}">{{ row.strategy.name }}</a>
-            <small><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='history' %}">View history</a></small></td>
+          <tr><td><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='today' %}">{{ row.strategy.name }}</a></td>
             <td>{{ row.strategy.account.kind }} · {{ row.strategy.account.broker_label }}</td>
-            <td>{% if row.value is not None %}£{{ row.value|floatformat:"2g" }} <small>{{ row.as_of|date:"j M Y" }}</small>{% else %}—{% endif %}</td>
-            <td><span class="w2-badge {% if row.status != 'verified_cash' and row.status != 'verified_market' %}w2-warning{% endif %}">{% if row.status == 'verified_cash' %}Cash verified{% elif row.status == 'verified_market' %}Source-verified GBP{% elif row.status == 'blocked' %}Blocked{% elif row.status == 'recorded_only' %}Stored, unverified{% else %}No history{% endif %}</span></td></tr>
-          {% empty %}<tr><td colspan="4"><div class="w2-empty">No strategies yet. Add a strategy to start tracking.</div></td></tr>{% endfor %}
+            <td>{% if row.strategy.tracking_only %}<span class="w2-chip">Not live</span>{% else %}<span class="w2-chip w2-ok">Live</span>{% endif %}</td>
+            <td class="w2-r">{% if row.value is not None %}{{ row.value|floatformat:"2g" }}{% else %}<span class="w2-muted">Not valued yet</span>{% endif %}</td>
+            <td class="w2-r">{% if row.contributed is not None %}{{ row.contributed|floatformat:"2g" }}{% else %}—{% endif %}</td>
+            <td class="w2-r {{ row.gain|tone }}">{% if row.gain is not None %}{{ row.gain|signed_num }}{% else %}—{% endif %}</td>
+            <td class="w2-r">{% if row.xirr is not None %}{{ row.xirr|signed_pct }}{% else %}—{% endif %}</td>
+            <td>{% if row.action %}<span class="w2-chip {% if row.action.kind != 'golive' %}w2-wait{% endif %}">{{ row.action.title }}</span>{% else %}<span class="w2-muted">Nothing due</span>{% endif %}</td></tr>
+          {% empty %}<tr><td colspan="8"><div class="w2-empty">No strategies yet. Add a strategy to start tracking.</div></td></tr>{% endfor %}
         </tbody></table></div>
     </section>
-    <section class="w2-panel">
-      <h2>Needs your attention</h2>
+
+    <section class="w2-card">
+      <div class="w2-ch"><h2 class="w2-ct">Split by strategy</h2></div>
+      {% if overview_total %}<div class="w2-bar">{% for row in overview_rows %}{% if row.share %}<span class="{% cycle 'w2-c1' 'w2-c2' 'w2-c3' 'w2-c4' %}" style="width:{{ row.share|floatformat:1 }}%"></span>{% endif %}{% endfor %}</div>{% endif %}
       {% for row in overview_rows %}
-        {% if row.status != 'verified_cash' and row.status != 'verified_market' %}
-        <div class="w2-setting-row"><span><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='history' %}">{{ row.strategy.name }}</a>
-          <small class="w2-muted w2-history-reason">{{ row.reason }}</small></span>
-          <span class="w2-badge w2-warning">Review data</span></div>
-        {% endif %}
-      {% empty %}<p class="w2-muted">Add your first strategy to start tracking.</p>{% endfor %}
-      <p class="w2-note">See Today for each strategy’s action.</p>
-    </section>
-  </div>
-  <div class="w2-column">
-    <section class="w2-panel">
-      <h2>Portfolio performance</h2>
-      <p class="w2-notice"><span class="w2-badge w2-warning">Data: check needed</span> Combined returns need complete verified valuations. <a href="{% url 'v2_catalogue' %}">Why?</a></p>
-      <div class="w2-chart-empty" role="status">No combined return chart is certified yet</div>
-    </section>
-    <section class="w2-panel">
-      <h2>Split by strategy</h2>
-      {% for row in overview_rows %}
-        <div class="w2-setting-row"><span>{{ row.strategy.name }}</span><strong>{% if row.value is not None and row.strategy.name not in overview_excluded %}£{{ row.value|floatformat:"2g" }}{% else %}Not valued yet{% endif %}</strong></div>
+        <div class="w2-kv w2-setting-row"><span>{{ row.strategy.name }}</span><strong>{% if row.value is not None and row.strategy.name not in overview_excluded %}£{{ row.value|floatformat:"2g" }}{% else %}Not valued yet{% endif %}</strong></div>
       {% empty %}<div class="w2-empty">No strategies yet.</div>{% endfor %}
-      <h2 class="w2-subheading">Split by asset type</h2>
-      <p class="w2-note">Allocation needs verified underlying holdings.</p>
     </section>
-    <section class="w2-panel">
-      <h2>UK ISA contributions</h2>
-      {% if overview_has_isa %}
-        <p class="w2-muted">Lifetime net funding recorded within Wealtharr ISA strategies: £{{ overview_isa_contributed|floatformat:"2g" }}.</p>
-        <p class="w2-note">Lifetime deposits only; not an ISA allowance estimate.</p>
-      {% else %}<p class="w2-muted">No recorded Wealtharr ISA strategy account.</p>{% endif %}
+
+    <section class="w2-card">
+      <div class="w2-ch"><h2 class="w2-ct">Split by asset</h2></div>
+      {% if ov_assets %}
+        <div class="w2-bar" role="img" aria-label="{% for a in ov_assets %}{{ a.label }} {{ a.pct }}%{% if not forloop.last %}, {% endif %}{% endfor %}">{% for a in ov_assets %}<span class="{{ a.css }}" style="width:{{ a.width|floatformat:1 }}%"></span>{% endfor %}</div>
+        {% for a in ov_assets %}<div class="w2-kv" style="margin-top:4px"><span><span class="w2-dotsw {{ a.css }}"></span>{{ a.label }}</span><span>{{ a.pct }}% · £{{ a.value|floatformat:"2g" }}</span></div>{% endfor %}
+      {% else %}<p class="w2-muted">Needs live prices and holdings.</p>{% endif %}
+    </section>
+
+    <section class="w2-card w2-span2">
+      <div class="w2-ch"><h2 class="w2-ct">What's coming next</h2></div>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Date</th><th>In</th><th>Strategy</th><th>Event</th><th>What you'll need to do</th></tr></thead>
+        <tbody>{% for c in ov_coming %}
+          <tr><td>{% if c.date %}{{ c.date|date:"j M Y" }}{% else %}Now{% endif %}</td><td class="w2-muted">{% if c.date %}{{ c.date|timeuntil:ov_today }}{% else %}open{% endif %}</td><td>{{ c.strategy }}</td><td>{{ c.event }}</td><td>{{ c.todo }}</td></tr>
+        {% empty %}<tr><td colspan="5"><div class="w2-empty">Nothing scheduled.</div></td></tr>{% endfor %}
+        </tbody></table></div>
     </section>
   </div>
+
+  <aside class="w2-side">
+    <section class="w2-card w2-card-action {% if not ov_todos %}w2-state-idle{% endif %}" aria-label="To do">
+      <div class="w2-ch"><h2 class="w2-ct w2-big">Needs your attention</h2><span class="w2-chip {% if ov_todos %}w2-wait{% else %}w2-ok{% endif %}">{% if ov_todos %}{{ ov_todos|length }} open{% else %}All clear{% endif %}</span></div>
+      {% for todo in ov_todos %}
+        <div class="w2-todo"><span><strong>{{ todo.strategy.name }}</strong> · {{ todo.title }}<br><span class="w2-muted">{{ todo.detail }}</span></span>
+          {% if todo.kind == 'review' %}<a class="w2-button w2-button-primary" href="{% url 'v2_guided_review' instance_id=todo.strategy.pk signal_id=todo.signal.pk %}">Open</a>
+          {% elif todo.kind == 'golive' %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=todo.strategy.pk section='strategy' %}#go-live">Go live</a>
+          {% else %}<a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=todo.strategy.pk section='today' %}">Open</a>{% endif %}</div>
+      {% empty %}<p class="w2-muted">Nothing to do right now. See each strategy's Dashboard for detail.</p>{% endfor %}
+    </section>
+    <div class="w2-mini">
+      <section class="w2-card">
+        <h2 class="w2-ct" style="margin-bottom:8px">Quick add money</h2>
+        {% if overview_rows %}
+        <form method="post" action="{% url 'v2_ledger_add' instance_id=overview_rows.0.strategy.pk %}" id="w2-quick-money">
+          {% csrf_token %}<input type="hidden" name="intent" value="preview">
+          {% if overview_rows|length > 1 %}<label class="w2-field">Strategy<select class="w2-input" data-w2-form-action>{% for row in overview_rows %}<option value="{% url 'v2_ledger_add' instance_id=row.strategy.pk %}">{{ row.strategy.name }}</option>{% endfor %}</select></label>{% endif %}
+          <label class="w2-field">Type<select class="w2-input" name="kind"><option value="DEPOSIT">Deposit</option><option value="INTEREST">Interest on cash</option><option value="DIVIDEND">Dividend</option></select></label>
+          <input type="hidden" name="occurred_on" value="{{ ov_today|date:'Y-m-d' }}">
+          <label class="w2-field">Amount £<input class="w2-input" type="number" name="amount" step="0.01" min="0.01" placeholder="0.00" required></label>
+          <button type="submit" class="w2-button w2-button-primary w2-full">Preview &amp; save</button>
+        </form>
+        {% else %}<p class="w2-muted">Add a strategy first.</p>{% endif %}
+      </section>
+      <section class="w2-card">
+        <div class="w2-ch"><h2 class="w2-ct">Prices</h2>{% if ov_prices %}<span class="w2-chip w2-ok">OK</span>{% endif %}</div>
+        {% for p in ov_prices %}<div class="w2-kv"><span>{{ p.symbol }}</span><span>£{{ p.price|floatformat:2 }} <small class="w2-muted">{{ p.as_of|date:"j M" }}</small></span></div>{% empty %}<p class="w2-muted">No prices yet.</p>{% endfor %}
+        {% if ov_last_sync %}<div class="w2-kv"><span>Last check</span><span>{{ ov_last_sync.last_attempt|date:"j M H:i" }}</span></div>{% endif %}
+      </section>
+      <section class="w2-card">
+        <div class="w2-ch"><h2 class="w2-ct">UK ISA contributions</h2></div>
+        {% if ov_isa %}
+          <p class="w2-stat-value" style="font-size:13px">£{{ ov_isa.left|floatformat:"0g" }} <span class="w2-muted" style="font-weight:400">left</span></p>
+          <div class="w2-bar" style="margin-top:6px"><span class="w2-c1" style="width:{{ ov_isa.width|floatformat:1 }}%"></span></div>
+          <p class="w2-note">Advisory · resets {{ ov_isa.resets|date:"j M" }}</p>
+        {% elif overview_has_isa %}<p class="w2-muted">Lifetime net funding recorded: £{{ overview_isa_contributed|floatformat:"2g" }}.</p>
+        {% else %}<p class="w2-muted">No recorded Wealtharr ISA strategy account.</p>{% endif %}
+      </section>
+      <section class="w2-card">
+        <div class="w2-ch"><h2 class="w2-ct">Alerts</h2><a href="{% url 'v2_settings' %}">Edit</a></div>
+        <div class="w2-kv"><span>Email</span><span class="{% if ov_alerts.email %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.email %}On{% else %}Off{% endif %}</span></div>
+        <div class="w2-kv"><span>Discord</span><span class="{% if ov_alerts.discord %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.discord %}On{% else %}Off{% endif %}</span></div>
+        <div class="w2-kv"><span>Last sent</span><span>{% if ov_alerts.last %}{{ ov_alerts.last.created_at|date:"j M" }}{% else %}—{% endif %}</span></div>
+      </section>
+    </div>
+  </aside>
 </div>

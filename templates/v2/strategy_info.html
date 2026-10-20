@@ -1,95 +1,82 @@
-<div class="w2-two-columns w2-space-top">
-  <div class="w2-column">
-    <section class="w2-panel">
-      <h2>How this strategy works</h2>
-      {% if strategy_description %}
+<div class="w2-grid2">
+  <section class="w2-card w2-span2" id="alerts" aria-labelledby="w2-alerts-title">
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-alerts-title">Alerts for this strategy</h2><span class="w2-muted">Tick where each alert goes</span></div>
+    <form method="post" action="{% url 'v2_settings' %}">
+      {% csrf_token %}
+      <input type="hidden" name="form_kind" value="strategy">
+      <input type="hidden" name="strategy_id" value="{{ selected_instance.pk }}">
+      <input type="hidden" name="return_to" value="strategy">
+      <div class="w2-table-wrap"><table class="w2-table w2-alert-matrix">
+        <thead><tr><th scope="col">Alert</th><th scope="col" style="text-align:left">When</th><th scope="col">Email</th><th scope="col">Discord</th><th scope="col" style="text-align:left">Last sent</th></tr></thead>
+        <tbody>{% for option in strategy_routes %}
+          <tr><th scope="row" style="font-weight:400;text-align:left">{{ option.title }}</th><td class="w2-muted" style="text-align:left">{{ option.when }}</td>
+            <td><label class="w2-check"><input type="checkbox" name="route_{{ option.key }}_email" {% if option.email %}checked{% endif %}><span class="w2-sr-only">Email {{ option.title }}</span></label></td>
+            <td><label class="w2-check"><input type="checkbox" name="route_{{ option.key }}_discord" {% if option.discord %}checked{% endif %}><span class="w2-sr-only">Discord {{ option.title }}</span></label></td>
+            <td style="text-align:left">{% if option.last %}{{ option.last|date:"j M" }}{% else %}<span class="w2-muted">Never</span>{% endif %}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      <div class="w2-row w2-space-top"><button type="submit" class="w2-button w2-button-primary">Save alerts</button><span class="w2-muted">Alerts always show the date their numbers come from.</span></div>
+    </form>
+  </section>
+
+  <section class="w2-card">
+    <div class="w2-ch"><h2 class="w2-ct">Where alerts go</h2><a href="{% url 'v2_settings' %}">Change</a></div>
+    <div class="w2-kv"><span>Email</span><span>{% if strategy_alerts.email %}<span class="w2-chip w2-ok">On</span> {{ strategy_preference.destination_email }}{% else %}<span class="w2-chip">Off</span>{% endif %}</span></div>
+    <div class="w2-kv"><span>Discord</span><span>{% if strategy_alerts.discord %}<span class="w2-chip w2-ok">On</span>{% else %}<span class="w2-chip">Off</span>{% endif %}</span></div>
+    <div class="w2-kv"><span>Last delivery</span><span>{% if strategy_alerts.last %}{{ strategy_alerts.last.created_at|date:"j M H:i" }} · {{ strategy_alerts.last.channel }} · {{ strategy_alerts.last.status|lower }}{% else %}None yet{% endif %}</span></div>
+    {% if not strategy_alerts.email and not strategy_alerts.discord %}<p class="w2-note">No destination is switched on, so nothing will be sent. Set one in <a href="{% url 'v2_settings' %}">Alerts &amp; settings</a>.</p>{% endif %}
+  </section>
+
+  {% if strategy_tracking_only %}
+  <section class="w2-card w2-card-action w2-go-live" id="go-live">
+    <h2 class="w2-ct w2-big" style="margin-bottom:6px">Go live</h2>
+    <p class="w2-muted">This strategy is tracking-only: no live prices and no instructions. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm.</p>
+    <form method="post" action="{% url 'v2_go_live' instance_id=selected_instance.pk %}" class="w2-space-top">
+      {% csrf_token %}
+      <label class="w2-check"><input type="checkbox" name="confirm" value="yes" required> <span>{{ strategy_attestation }}</span></label>
+      <button type="submit" class="w2-button w2-button-primary w2-space-top">Go live</button>
+    </form>
+  </section>
+  {% else %}
+  <section class="w2-card" id="go-live">
+    <div class="w2-ch"><h2 class="w2-ct">Strategy</h2>{% if strategy_go_live %}<span class="w2-chip w2-ok">Live since {{ strategy_go_live.confirmed_at|date:"j M Y" }}</span>{% endif %}</div>
+    <div class="w2-kv"><span>Name</span><span>{{ selected_instance.name }}</span></div>
+    <div class="w2-kv"><span>Rules</span><span>{{ selected_instance.strategy_version|default:"Legacy version not pinned" }} · fixed</span></div>
+    <div class="w2-kv"><span>Account</span><span>{{ selected_instance.account.kind }} · {{ selected_instance.account.broker_label }} · {{ selected_instance.account.country }}</span></div>
+    <div class="w2-kv"><span>Started</span><span>{{ selected_instance.started_on|date:"j M Y"|default:"Not pinned" }}{% if selected_instance.onboarding_mode == 'hold' %} · from holdings you entered{% elif selected_instance.onboarding_mode %} · from cash{% endif %}</span></div>
+    <div class="w2-kv"><span>Monthly plan</span><span>{% if selected_instance.monthly_target %}£{{ selected_instance.monthly_target|floatformat:"2g" }}{% else %}Not set{% endif %}</span></div>
+    {% if strategy_go_live %}<p class="w2-note">You confirmed: “{{ strategy_go_live.attestation }}”</p>{% endif %}
+  </section>
+  {% endif %}
+
+  <section class="w2-card w2-span2">
+    <div class="w2-ch"><h2 class="w2-ct">Instruments (locked to this strategy)</h2><span class="w2-muted">Mapping {{ selected_instance.mapping_version|default:"not pinned" }}</span></div>
+    <div class="w2-table-wrap"><table class="w2-table">
+      <thead><tr><th>Role</th><th>Weight at reset</th><th>Ticker</th><th>Name</th><th>ISIN</th><th>Units</th><th>Status</th></tr></thead>
+      <tbody>{% for line in strategy_catalogue_rows %}
+        <tr><td>{{ line.role_label }}</td><td>{{ line.weight_pct|floatformat:0 }}%</td><td>{{ line.ticker }}</td><td>{{ line.name }}</td><td>{{ line.isin }}</td><td>{{ line.raw_quote_unit }}</td>
+          <td>{% if line.status == 'account_check_pending' %}<span class="w2-chip w2-wait">Account check pending</span>{% elif line.status == 'draft' %}<span class="w2-chip">Draft</span>{% else %}<span class="w2-chip w2-ok">Reviewed</span>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="7"><div class="w2-empty">No released, account-specific instrument mapping. Do not infer replacements.</div></td></tr>{% endfor %}
+      </tbody></table></div>
+    <p class="w2-note">You can't change these. A new rules version would come with its own upgrade step. <a href="{% url 'v2_catalogue' %}">Evidence and sources</a></p>
+  </section>
+
+  <section class="w2-card">
+    <h2 class="w2-ct" style="margin-bottom:6px">How this strategy works</h2>
+    {% if strategy_description %}
       <p class="w2-muted">{{ strategy_description.summary }}</p>
-      <p class="w2-note"><strong>Review cadence:</strong> {{ strategy_description.cadence }}</p>
-      <ol class="w2-rules-list">
-        {% for rule in strategy_description.rules %}<li>{{ rule }}</li>{% endfor %}
-      </ol>
-      <p class="w2-note">{{ strategy_description.target_explanation }}</p>
-      <p class="w2-notice">{{ strategy_description.caution }}</p>
-      {% else %}
-      <div class="w2-notice">This legacy strategy has no released read-only description. The app will not infer any strategy rules.</div>
-      {% endif %}
-    </section>
-    <section class="w2-panel">
-      <h2>Account &amp; fixed identity</h2>
-      <dl class="w2-settings-details">
-        <div><dt>Strategy</dt><dd>{{ selected_instance.name }}</dd></div>
-        <div><dt>Account</dt><dd>{{ selected_instance.account.name }} · {{ selected_instance.account.kind }}</dd></div>
-        <div><dt>Platform</dt><dd>{{ selected_instance.account.broker_label }}</dd></div>
-        <div><dt>Jurisdiction</dt><dd>{{ selected_instance.account.country }}</dd></div>
-        <div><dt>Started</dt><dd>{{ selected_instance.started_on|date:"j M Y"|default:"Legacy start not pinned" }}</dd></div>
-        <div><dt>Strategy version</dt><dd>{{ selected_instance.strategy_version|default:"Legacy version not pinned" }}</dd></div>
-        <div><dt>Mapping version</dt><dd>{{ selected_instance.mapping_version|default:"Legacy mapping not pinned" }}</dd></div>
-        <div><dt>Execution access</dt><dd>{% if strategy_tracking_only %}Tracking only — no trade instructions{% else %}Live — instructions when prices and holdings are verified{% endif %}</dd></div>
-      </dl>
-      <p class="w2-note">Identity is fixed after enrolment.</p>
-    </section>
-    <section class="w2-panel">
-      <h2>Recorded rule and baseline history</h2>
-      <div class="w2-table-wrap"><table class="w2-table">
-        <thead><tr><th>Recorded date</th><th>Milestone</th><th>Rule version</th><th>Mapping version</th></tr></thead>
-        <tbody>{% for row in strategy_history %}
-          <tr><td>{{ row.date|date:"j M Y" }}</td><td>{{ row.title }}</td><td>{{ row.strategy }}</td><td>{{ row.mapping }}</td></tr>
-        {% empty %}<tr><td colspan="4"><div class="w2-empty">No versioned baseline evidence is recorded.</div></td></tr>{% endfor %}
-        </tbody></table></div>
-    </section>
-  </div>
-  <div class="w2-column">
-    {% if strategy_tracking_only %}
-    <section class="w2-panel w2-go-live" id="go-live">
-      <h2>Go live</h2>
-      <p class="w2-muted">This strategy is tracking-only: no live prices and no instructions. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm.</p>
-      <form method="post" action="{% url 'v2_go_live' instance_id=selected_instance.pk %}">
-        {% csrf_token %}
-        <label class="w2-check"><input type="checkbox" name="confirm" value="yes" required> <span>{{ strategy_attestation }}</span></label>
-        <button type="submit" class="w2-button w2-button-primary w2-space-top">Go live</button>
-      </form>
-      <p class="w2-note">Live means hourly Yahoo prices and advisory instructions. Stale prices or unreconciled holdings still block instructions.</p>
-    </section>
-    {% elif strategy_go_live %}
-    <section class="w2-panel" id="go-live">
-      <h2>Live</h2>
-      <p class="w2-muted"><span class="w2-badge">Live since {{ strategy_go_live.confirmed_at|date:"j M Y" }}</span> You confirmed: “{{ strategy_go_live.attestation }}”</p>
-    </section>
-    {% endif %}
-    <section class="w2-panel">
-      <h2>Mapped instruments</h2>
-      <p class="w2-muted"><span class="w2-badge w2-warning">Rules: partly verified</span> Check permissions in Trading 212. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
-      <div class="w2-table-wrap"><table class="w2-table">
-        <thead><tr><th>Role</th><th>Instrument</th><th>Trading line</th><th>Status</th></tr></thead>
-        <tbody>{% for line in strategy_catalogue_rows %}
-          <tr><td>{{ line.role_label }}</td><td class="w2-wrap">{{ line.name }}<small class="w2-muted">{{ line.isin }}</small></td>
-              <td>{{ line.ticker }} · {{ line.raw_quote_unit }}</td>
-              <td>{% if line.status == 'account_check_pending' %}<span class="w2-badge w2-warning">Account check pending</span>
-                  {% elif line.status == 'draft' %}<span class="w2-badge">Draft</span>
-                  {% else %}<span class="w2-badge">Reviewed</span>{% endif %}</td></tr>
-        {% empty %}<tr><td colspan="4"><div class="w2-empty">No released, account-specific instrument mapping. Do not infer replacements.</div></td></tr>{% endfor %}
-        </tbody></table></div>
-      <a href="{% url 'v2_catalogue' %}">View evidence and source URLs in the Catalogue →</a>
-    </section>
-    {% if selected_instance.onboarding_mode == 'hold' %}
-    <section class="w2-panel">
-      <h2>Owner-reported opening holdings</h2>
-      <p class="w2-note">Opening positions need broker-history reconciliation.</p>
-      {% if selected_instance.opening_snapshot %}
-      <p class="w2-muted">Reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }} · cash £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:"2g" }}</p>
-      <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Role</th><th>Shares</th><th>Reported GBP cost</th></tr></thead><tbody>
-      {% for role, holding in selected_instance.opening_snapshot.positions.items %}
-      <tr><td>{{ role|capfirst }}</td><td>{{ holding.shares }}</td><td>{{ holding.average_cost_gbp }}</td></tr>
-      {% endfor %}</tbody></table></div>
-      {% endif %}
-    </section>{% endif %}
-    <section class="w2-panel">
-      <h2>Alerts for this strategy</h2>
-      <p class="w2-muted">Manage strategy alerts centrally.</p>
-      <p><a class="w2-button" href="{% url 'v2_settings' %}#strategy-{{ selected_instance.pk }}">Edit strategy alert preferences</a></p>
-      {% if not selected_instance.strategy_key %}
-      <p class="w2-note">Legacy alert routing needs review.</p>
-      {% endif %}
-    </section>
-  </div>
+      <ol class="w2-rules-list" style="margin:8px 0;line-height:1.5">{% for rule in strategy_description.rules %}<li>{{ rule }}</li>{% endfor %}</ol>
+      <p class="w2-note">{{ strategy_description.caution }}</p>
+    {% else %}<p class="w2-muted">This legacy strategy has no released description. The app won't infer any rules.</p>{% endif %}
+  </section>
+
+  <section class="w2-card">
+    <h2 class="w2-ct" style="margin-bottom:6px">Rule and baseline history</h2>
+    <div class="w2-table-wrap"><table class="w2-table">
+      <thead><tr><th>Date</th><th>Milestone</th><th>Rules</th><th>Mapping</th></tr></thead>
+      <tbody>{% for row in strategy_history %}
+        <tr><td>{{ row.date|date:"j M Y" }}</td><td>{{ row.title }}</td><td>{{ row.strategy }}</td><td>{{ row.mapping }}</td></tr>
+      {% empty %}<tr><td colspan="4"><div class="w2-empty">Nothing recorded yet.</div></td></tr>{% endfor %}
+      </tbody></table></div>
+  </section>
 </div>

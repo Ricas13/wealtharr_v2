@@ -106,10 +106,10 @@ class Phase7SettingsBrowserTests(BrowserHarness):
                     "heading", name="How this strategy works"
                 ).wait_for()
                 self.page.get_by_role(
-                    "heading", name="Mapped instruments"
+                    "heading", name="Instruments (locked to this strategy)"
                 ).wait_for()
                 self.page.get_by_role(
-                    "heading", name="Recorded rule and baseline history"
+                    "heading", name="Rule and baseline history"
                 ).wait_for()
                 self.assertNotIn("CROSS_OWNER_PRIVATE_SECRET", self.page.content())
                 self.assertLessEqual(
@@ -117,7 +117,7 @@ class Phase7SettingsBrowserTests(BrowserHarness):
                     width + 1,
                 )
                 self.page.get_by_role(
-                    "link", name="Edit strategy alert preferences"
+                    "link", name="Change", exact=True
                 ).click()
                 self.page.get_by_role(
                     "heading", name="Notification destinations"

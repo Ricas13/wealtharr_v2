@@ -63,16 +63,17 @@ class NewShellTests(TestCase):
     def test_instance_pages_have_expected_urls_active_navigation_and_no_fake_values(self):
         self.client.force_login(self.owner)
         for part, title in (
-            ("today", "Today"), ("history", "History"),
-            ("ledger", "Ledger"), ("strategy", "Strategy"),
-            ("breakdown", "Breakdown"),
+            ("today", "Dashboard"), ("history", "Performance"),
+            ("ledger", "Ledger"), ("strategy", "Strategy &amp; alerts"),
+            ("breakdown", "Quarterly review"),
         ):
             with self.subTest(part=part):
                 url = reverse("v2_instance_page", args=[self.mine.pk, part])
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
-                self.assertContains(response, f"<h1>{title}</h1>", html=True)
-                self.assertContains(response, 'aria-current="page"')
+                # The strategy name is the heading; the active tab names the page.
+                self.assertContains(response, "<h1>Owner-only strategy</h1>", html=True)
+                self.assertContains(response, f'class="w2-on" aria-current="page">{title}</a>', html=False)
                 self.assertContains(response, "Owner-only strategy")
                 self.assertNotContains(response, "£14,820")
                 self.assertNotContains(response, "£12,400")

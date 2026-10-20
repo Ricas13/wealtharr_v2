@@ -12,12 +12,13 @@ from .models import StrategyInstance
 from .core.catalogue import CATALOGUE, OFFERS, ACCOUNT_TYPES, CATALOGUE_VERSION
 
 
-SECTIONS = ("today", "history", "ledger", "strategy", "breakdown")
+SECTIONS = ("today", "review", "history", "ledger", "strategy", "breakdown")
 LABELS = {
-    "today": "Today",
-    "history": "History",
+    "today": "Dashboard",
+    "review": "Quarterly review",
+    "history": "Performance",
     "ledger": "Ledger",
-    "strategy": "Strategy",
+    "strategy": "Strategy & alerts",
     "breakdown": "Breakdown",
 }
 
@@ -32,8 +33,26 @@ def _instances(request):
     )
 
 
+def _price_freshness(instance):
+    """Latest stored close for the strategy's instruments, for the header chip."""
+    from datetime import timedelta
+    from django.utils import timezone
+    from .models import MarketObservation, YahooSync
+    symbols = [x for x in (instance.equity_symbol, instance.safe_symbol) if x]
+    latest = MarketObservation.objects.filter(
+        symbol__in=symbols, currency="GBP").order_by("-as_of").first()
+    sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()
+    return {
+        "date": latest.as_of if latest else None,
+        "fresh": bool(latest and latest.as_of >= timezone.localdate() - timedelta(days=4)),
+        "checked": sync.last_attempt if sync else None,
+    }
+
+
 def _render(request, *, page_key, page_title, instance=None, section=None, **extra):
     items = _instances(request)
+    if instance is not None and "head_prices" not in extra:
+        extra["head_prices"] = _price_freshness(instance)
     return render(
         request, "v2/page.html",
         {
@@ -64,6 +83,9 @@ def instance_page(request, instance_id, section):
     if section == "today":
         from .v2_today import today_page
         return today_page(request, instance_id)
+    if section == "review":
+        from .v2_today import review_page
+        return review_page(request, instance_id)
     if section == "breakdown":
         from .v2_breakdown import breakdown_page
         return breakdown_page(request, instance_id)

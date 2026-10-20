@@ -87,4 +87,12 @@ class BrowserHarness(StaticLiveServerTestCase):
             "Entire page has horizontal overflow at %s px" % dimension["viewport"])
         self.assertEqual(self.browser_errors, [], "Browser JavaScript errors")
 
-
+    def assert_compact_chrome(self, width):
+        """196px rail on desktop; a 44px top bar with the menu only on phones."""
+        if width > 900:
+            self.assertFalse(self.page.locator(".w2-topbar").is_visible())
+            rail = self.page.locator(".w2-sidebar").bounding_box()
+            self.assertAlmostEqual(rail["width"], 196, delta=2)
+        else:
+            bar = self.page.locator(".w2-topbar").bounding_box()
+            self.assertAlmostEqual(bar["height"], 44, delta=2)

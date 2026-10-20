@@ -222,7 +222,7 @@ def _trace(strategy, as_of):
         "positions": position["positions"],
         "flows": tuple({"date": d, "amount": a} for d, a in flows),
         "quarters": tuple({
-            "quarter": "%s-Q%s" % (q//4, q%4+1),
+            "quarter": "%s-Q%s" % (q//4, q%4+1), "end": _quarter_end(q),
             "opening": opening, "net_flows": contributed,
             "growth": opening * PARAMS.quarterly_growth,
             "closing": closing,

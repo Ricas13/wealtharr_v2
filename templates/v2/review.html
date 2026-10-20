@@ -1,0 +1,148 @@
+{% if review_signal %}
+<div class="w2-steps" aria-label="Review progress">
+  <div class="w2-step w2-done"><span class="w2-num">✓</span>Review calculated <span class="w2-muted">· {{ review_signal.created_at|date:"j M" }}</span></div>
+  <div class="w2-step {% if not review_completed %}w2-on{% else %}w2-done{% endif %}"><span class="w2-num">{% if review_completed %}✓{% else %}2{% endif %}</span>Trade in {{ selected_instance.account.broker_label }}, record fills <span class="w2-muted">· {{ review_actual_fills|length }} recorded</span></div>
+  <div class="w2-step {% if review_completed %}w2-done{% endif %}"><span class="w2-num">{% if review_completed %}✓{% else %}3{% endif %}</span>Next close confirms</div>
+  <div class="w2-step {% if review_completed %}w2-done{% endif %}"><span class="w2-num">{% if review_completed %}✓{% else %}4{% endif %}</span>Done</div>
+</div>
+{% endif %}
+
+<div class="w2-dash w2-dash-narrow">
+  <div class="w2-side">
+    {% if review_signal %}
+    <section class="w2-card w2-card-action" aria-labelledby="w2-review-title">
+      <div class="w2-ch"><h2 class="w2-ct w2-big" id="w2-review-title">{{ review_signal.title }}</h2>
+        <span class="w2-chip {% if review_completed %}w2-ok{% else %}w2-wait{% endif %}">{% if review_completed %}Completed{% else %}{{ review_actual_fills|length }} fill{{ review_actual_fills|length|pluralize }} recorded{% endif %}</span></div>
+      <p class="w2-muted">Confirm only what you actually traded. Review dated {{ review_signal.as_of|date:"j M Y" }}.</p>
+      {% if review_error %}<div class="w2-form-error w2-space-top" role="alert">{{ review_error }}</div>{% endif %}
+      {% if review_completed %}
+        <div class="w2-notice w2-space-top">Completed and immutable. A confirmed quarterly execution can't be reopened as a new trade.</div>
+      {% elif not review_is_current %}
+        <div class="w2-notice w2-space-top">Historical review: read-only. Old advice can't be used to record a new trade.</div>
+      {% elif review_blocked %}
+        <div class="w2-notice w2-space-top">Recording against this review is unavailable right now. Check the strategy is live and its setup on Strategy &amp; alerts.</div>
+      {% endif %}
+      <div class="w2-table-wrap w2-space-top"><table class="w2-table">
+        <thead><tr><th>#</th><th>Side</th><th>Ticker</th><th class="w2-r">Suggested</th><th class="w2-r">Recorded</th><th class="w2-r">Left</th>{% if review_can_submit %}<th>Date done</th><th>Shares got</th><th>Price £</th><th>Fee £</th><th></th>{% endif %}</tr></thead>
+        <tbody>
+        {% for action in review_rows %}
+          <tr>
+            <td class="w2-muted">{{ action.index|add:1 }}</td>
+            <td class="{% if action.side == 'SELL' %}w2-neg{% else %}w2-pos{% endif %}">{{ action.side|title }}</td>
+            <td>{{ action.symbol }}</td>
+            <td class="w2-r">{{ action.suggested|floatformat:-4 }}</td>
+            <td class="w2-r">{{ action.recorded|floatformat:-4 }}</td>
+            <td class="w2-r">{% if action.complete %}<span class="w2-chip w2-ok">Done</span>{% else %}{{ action.remaining|floatformat:-4 }}{% endif %}</td>
+            {% if review_can_submit %}
+              {% if not action.complete %}
+              <td colspan="5">
+                <form method="post" class="w2-row" style="flex-wrap:nowrap">
+                  {% csrf_token %}
+                  <input type="hidden" name="intent" value="record_one">
+                  <input type="hidden" name="action_index" value="{{ action.index }}">
+                  <input type="hidden" name="idempotency_key" value="{{ review_nonce }}">
+                  <input class="w2-input w2-fill-input" style="width:120px" type="date" name="executed_on" max="{% now 'Y-m-d' %}" required aria-label="Date done">
+                  <input class="w2-input w2-fill-input" type="number" name="quantity" step="0.00000001" min="0.00000001" max="{{ action.remaining }}" value="{{ action.remaining }}" required aria-label="Shares got">
+                  <input class="w2-input w2-fill-input" type="number" name="unit_price" step="0.00000001" min="0.00000001" required aria-label="Price per share in pounds">
+                  <input class="w2-input w2-fill-input" style="width:64px" type="number" name="fee" step="0.01" min="0" value="0" required aria-label="Fee in pounds">
+                  <label class="w2-check" style="white-space:nowrap;font-size:11px"><input type="checkbox" name="actual_confirmation" value="yes" required> Done in {{ selected_instance.account.broker_label }}</label>
+                  <button type="submit" class="w2-button w2-button-primary">I did this</button>
+                </form>
+              </td>
+              {% else %}<td colspan="5"></td>{% endif %}
+            {% endif %}
+          </tr>
+          {% for fill in action.fills %}
+          <tr><td></td><td colspan="2" class="w2-muted">↳ fill {{ fill.ledger_entry.occurred_on|date:"j M Y" }}</td><td></td><td class="w2-r">{{ fill.ledger_entry.quantity|floatformat:-4 }}</td><td class="w2-r w2-muted">£{{ fill.ledger_entry.unit_price|floatformat:-4 }}</td>{% if review_can_submit %}<td colspan="5" class="w2-muted">fee £{{ fill.ledger_entry.fee|floatformat:2 }}</td>{% endif %}</tr>
+          {% endfor %}
+        {% empty %}<tr><td colspan="11"><div class="w2-empty">This review has no trades to record.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+      <p class="w2-note">Wealtharr never trades. Do it yourself in {{ selected_instance.account.broker_label }}, then enter what you actually got. Tick "Done" to confirm the trade already happened. Part fills are fine.</p>
+    </section>
+
+    <section class="w2-card">
+      <details {% if not review_completed %}open{% endif %}>
+        <summary>How this was calculated</summary>
+        {% with t=review_detail.trace %}
+        {% if t %}
+        <div class="w2-table-wrap w2-space-top"><table class="w2-table">
+          <thead><tr><th>Quarter</th><th class="w2-r">Line start</th><th class="w2-r">× 1.09</th><th class="w2-r">New money (half added)</th><th class="w2-r">Target</th></tr></thead>
+          <tbody>{% for q in t.quarters %}<tr><td>{{ q.quarter }}</td><td class="w2-r">{{ q.opening|floatformat:"2g" }}</td><td class="w2-r">{{ q.growth|floatformat:"2g" }}</td><td class="w2-r">{{ q.net_flows|floatformat:"2g" }}</td><td class="w2-r"><strong>{{ q.closing|floatformat:"2g" }}</strong></td></tr>{% endfor %}</tbody>
+        </table></div>
+        <div class="w2-kv w2-space-top"><span>Starting point</span><span>{{ t.anchor_label }} · {{ t.anchor_date|date:"j M Y" }} · £{{ t.starting|floatformat:"2g" }}</span></div>
+        <div class="w2-kv"><span>Target at {{ review_detail.as_of|date:"j M Y" }}</span><strong>£{{ t.line|floatformat:"2g" }}</strong></div>
+        {% else %}<p class="w2-muted w2-space-top">{{ review_detail.trace_error|default:"The calculation can't be reproduced for this review." }}</p>{% endif %}
+        {% endwith %}
+        {% if review_detail.spy_result %}<div class="w2-kv"><span>30 Down rule</span><span>{% if review_detail.spy_result.triggered %}Triggered{% else %}Not active{% endif %} · S&amp;P {{ review_detail.spy_result.decline_pct }}% vs 8-quarter peak</span></div>{% endif %}
+        <div class="w2-kv"><span>Saved message</span><span style="white-space:normal;text-align:right">{{ review_signal.message }}</span></div>
+        <div class="w2-row w2-space-top">
+          <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}?quarter={{ review_signal.as_of|date:'Y-m-d' }}&amp;export=csv">Download CSV</a>
+          <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}?quarter={{ review_signal.as_of|date:'Y-m-d' }}">Full detail and data checks</a>
+        </div>
+      </details>
+    </section>
+    {% else %}
+    <section class="w2-card"><h2 class="w2-ct">No quarterly review yet</h2>
+      <p class="w2-muted">Reviews arrive after each quarter-end close, once the strategy is live with holdings. You'll get an alert.</p></section>
+    {% endif %}
+
+    <section class="w2-card">
+      <div class="w2-ch"><h2 class="w2-ct">Past reviews</h2></div>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Quarter end</th><th>Review</th><th class="w2-r">Suggested £</th><th class="w2-r">Recorded £</th><th>Filled</th><th>Status</th><th></th></tr></thead>
+        <tbody>{% for row in review_past %}
+          <tr><td>{{ row.signal.as_of|date:"j M Y" }}</td><td>{{ row.signal.title|truncatechars:48 }}</td>
+            <td class="w2-r">{% if row.trades %}{{ row.suggested|floatformat:"2g" }}{% else %}—{% endif %}</td>
+            <td class="w2-r">{% if row.recorded %}{{ row.recorded|floatformat:"2g" }}{% else %}—{% endif %}</td>
+            <td>{{ row.filled_on|date:"j M"|default:"—" }}</td>
+            <td>{% if row.execution %}<span class="w2-chip w2-ok">Done {{ row.execution.executed_on|date:"j M" }}</span>{% elif row.signal.review_outcome == 'NOT_APPLICABLE' %}<span class="w2-chip">Skipped / replaced</span>{% elif row.signal.review_outcome == 'FALSE_POSITIVE' %}<span class="w2-chip">False positive</span>{% elif row.trades %}<span class="w2-chip w2-wait">Not recorded</span>{% else %}<span class="w2-chip">No trade</span>{% endif %}</td>
+            <td class="w2-r"><a href="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=row.signal.pk %}">View</a></td></tr>
+        {% empty %}<tr><td colspan="7"><div class="w2-empty">No earlier reviews.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+  </div>
+
+  <aside class="w2-side">
+    {% if review_signal %}
+    <section class="w2-card">
+      <h2 class="w2-ct" style="margin-bottom:8px">This review</h2>
+      <div class="w2-kv"><span>Quarter end</span><span>{{ review_signal.as_of|date:"j M Y" }}</span></div>
+      <div class="w2-kv"><span>Calculated</span><span>{{ review_signal.created_at|date:"j M H:i" }}</span></div>
+      <div class="w2-kv"><span>Rules</span><span>{{ review_signal.strategy_version|default:"—" }}</span></div>
+      <div class="w2-kv"><span>Type</span><span>{% if review_signal.reset_reason %}60/40 reset{% else %}Quarterly rebalance{% endif %}</span></div>
+      {% for a in review_trades %}<div class="w2-kv"><span>{{ a.side|title }} {{ a.symbol }}</span><span>≈ {{ a.quantity }} sh{% if a.estimated_gbp %} · £{{ a.estimated_gbp }}{% endif %}</span></div>{% endfor %}
+    </section>
+    {% if review_can_manual_reset %}
+    <section class="w2-card">
+      <h2 class="w2-ct" style="margin-bottom:6px">Reserve empty</h2>
+      <form method="post">{% csrf_token %}<input type="hidden" name="intent" value="request_manual_reset">
+        <p class="w2-note" style="margin-top:0">You can instead ask for a separate 60/40 reset review using verified closes. The saved review stays as it is.</p>
+        <button type="submit" class="w2-button w2-full">Choose manual 60/40 reset review</button></form>
+    </section>
+    {% endif %}
+    <section class="w2-card">
+      <h2 class="w2-ct" style="margin-bottom:8px">Finish</h2>
+      {% if review_can_finalize %}
+      <form method="post">{% csrf_token %}<input type="hidden" name="intent" value="finalize">
+        <button class="w2-button w2-button-primary w2-full" type="submit">Verify and complete review</button></form>
+      <p class="w2-note">Needs a closing price after your last fill (usually the next weekday).</p>
+      {% elif review_completed %}<p class="w2-muted">Done.</p>
+      {% else %}
+      <button class="w2-button w2-full" type="button" disabled>Verify and complete review</button>
+      <p class="w2-note">Unlocks when every line is recorded. Part fills are saved and you can come back.</p>
+      {% endif %}
+    </section>
+    {% if review_is_current and not review_completed and not review_actual_fills %}
+    <section class="w2-card">
+      <h2 class="w2-ct" style="margin-bottom:6px">Not doing it?</h2>
+      <p class="w2-note" style="margin-top:0">Skip this quarter with a reason. It stays in history and stops reminders.</p>
+      <form method="post" action="{% url 'v2_notice_feedback' instance_id=selected_instance.pk signal_id=review_signal.pk %}" class="w2-row w2-space-top" style="flex-wrap:nowrap">
+        {% csrf_token %}<input type="hidden" name="outcome" value="NOT_APPLICABLE">
+        <input class="w2-input" name="review_note" maxlength="2000" placeholder="Reason" aria-label="Reason for skipping">
+        <button type="submit" class="w2-button">Skip</button>
+      </form>
+    </section>
+    {% endif %}
+    {% endif %}
+  </aside>
+</div>

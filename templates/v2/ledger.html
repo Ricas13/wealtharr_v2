@@ -1,79 +1,104 @@
-<section class="w2-ledger-toolbar" aria-label="Ledger navigation">
-  <nav class="w2-tab-labels" aria-label="Ledger tabs">
-    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=entries"
-       class="{% if ledger_tab == 'entries' %}w2-tab-active{% endif %}" {% if ledger_tab == 'entries' %}aria-current="page"{% endif %}>Entries</a>
-    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=rebalances"
-       class="{% if ledger_tab == 'rebalances' %}w2-tab-active{% endif %}" {% if ledger_tab == 'rebalances' %}aria-current="page"{% endif %}>Rebalances</a>
-    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=history"
-       class="{% if ledger_tab == 'history' %}w2-tab-active{% endif %}" {% if ledger_tab == 'history' %}aria-current="page"{% endif %}>Change history</a>
+<div class="w2-ch">
+  <nav class="w2-seg" aria-label="Ledger tabs">
+    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=entries" class="{% if ledger_tab == 'entries' %}w2-on{% endif %}" {% if ledger_tab == 'entries' %}aria-current="page"{% endif %}>Entries</a>
+    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=rebalances" class="{% if ledger_tab == 'rebalances' %}w2-on{% endif %}" {% if ledger_tab == 'rebalances' %}aria-current="page"{% endif %}>Rebalances</a>
+    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=history" class="{% if ledger_tab == 'history' %}w2-on{% endif %}" {% if ledger_tab == 'history' %}aria-current="page"{% endif %}>Change history</a>
   </nav>
-  <div class="w2-ledger-buttons">
-    {% if ledger_can_edit %}
-      <a class="w2-button w2-button-primary" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">+ Add entry</a>
-    {% endif %}
+  <div class="w2-row">
+    {% if ledger_can_edit %}<a class="w2-button w2-button-primary" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">+ Add entry</a>{% endif %}
     <a class="w2-button" href="?tab=entries&amp;export=csv">Export CSV</a>
   </div>
-</section>
+</div>
 {% if not ledger_can_edit %}
-<div class="w2-notice w2-space-top">This legacy strategy's transaction history is read-only here; existing owner cockpit operations remain available. No implicit migration of past data is attempted.</div>
+<div class="w2-notice">This legacy strategy's transaction history is read-only here.</div>
 {% endif %}
 {% if ledger_tab == 'entries' %}
-{% if ledger_summary %}
-<section class="w2-ledger-stats w2-space-top" aria-label="Recorded ledger totals">
-  <div class="w2-panel"><p class="w2-label">Ledger cash</p><p class="w2-stat-value">£{{ ledger_summary.cash|floatformat:"2g" }}</p></div>
-  <div class="w2-panel"><p class="w2-label">Net contributions</p><p class="w2-stat-value">£{{ ledger_summary.net_contributed|floatformat:"2g" }}</p></div>
-  <div class="w2-panel"><p class="w2-label">Current value</p><p class="w2-stat-value">Not verified</p><p class="w2-muted">No invented prices</p></div>
-</section>
-{% endif %}
-<section class="w2-panel w2-space-top">
-  <form class="w2-ledger-filter" method="get">
+<div class="w2-dash w2-dash-narrow">
+<section class="w2-card">
+  <form class="w2-ch" method="get" aria-label="Filter entries">
     <input type="hidden" name="tab" value="entries">
-    <label class="w2-field">Search entries<input class="w2-input" name="q" value="{{ ledger_search }}" maxlength="100" placeholder="Search description, symbol or value"></label>
-    <label class="w2-field">Event type
-      <select name="kind" class="w2-input">
-        {% for key, label in ledger_kinds %}
-        <option value="{{ key }}" {% if ledger_kind == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="w2-field">Sort
-      <select name="sort" class="w2-input">
+    <div class="w2-row">
+      <label class="w2-sr-only" for="w2-ledger-kind">Event type</label>
+      <select id="w2-ledger-kind" name="kind" class="w2-input" style="width:auto">{% for key, label in ledger_kinds %}<option value="{{ key }}" {% if ledger_kind == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <label class="w2-sr-only" for="w2-ledger-sort">Sort</label>
+      <select id="w2-ledger-sort" name="sort" class="w2-input" style="width:auto">
         <option value="newest" {% if ledger_sort == 'newest' %}selected{% endif %}>Newest first</option>
         <option value="oldest" {% if ledger_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
         <option value="amount" {% if ledger_sort == 'amount' %}selected{% endif %}>Largest value</option>
         <option value="kind" {% if ledger_sort == 'kind' %}selected{% endif %}>Event type</option>
       </select>
-    </label>
-    <label class="w2-check w2-filter-check"><input type="checkbox" name="deleted" value="1" {% if ledger_deleted %}checked{% endif %}><span>Show deleted</span></label>
-    <button type="submit" class="w2-button">Apply</button>
-    <button type="submit" name="export" value="csv" class="w2-button">Export filtered CSV</button>
+      <label class="w2-check w2-filter-check" style="padding:0"><input type="checkbox" name="deleted" value="1" {% if ledger_deleted %}checked{% endif %}><span>Show deleted</span></label>
+    </div>
+    <div class="w2-row">
+      <label class="w2-sr-only" for="w2-ledger-q">Search entries</label>
+      <input id="w2-ledger-q" class="w2-input" name="q" value="{{ ledger_search }}" maxlength="100" placeholder="Search notes, ticker or value" style="width:200px">
+      <button type="submit" class="w2-button">Apply</button>
+      <button type="submit" name="export" value="csv" class="w2-button">Export filtered CSV</button>
+    </div>
   </form>
   <div class="w2-table-wrap"><table class="w2-table w2-entry-table">
-    <thead><tr><th>Date</th><th>Type</th><th>Instrument</th><th class="w2-number">Shares</th><th class="w2-number">Price (£)</th><th class="w2-number">Amount (£)</th><th class="w2-number">Fee (£)</th><th>Note</th><th>Source</th><th>Actions</th></tr></thead>
-    <tbody>{% for entry in ledger_entries %}
+    <thead><tr><th>Date</th><th>Type</th><th>Ticker</th><th class="w2-r">Shares</th><th class="w2-r">Price</th><th class="w2-r">Fee</th><th class="w2-r">Cash in/out</th><th class="w2-r">Cash after</th><th>Note</th><th class="w2-r">Edit</th></tr></thead>
+    <tbody>{% for row in ledger_rows %}{% with entry=row.entry %}
     <tr {% if entry.deleted %}class="w2-deleted-row"{% endif %}>
-      <td>{{ entry.occurred_on|date:"d M Y" }}</td>
-      <td>{{ entry.kind|title }}{% if entry.deleted %} <span class="w2-badge">Deleted</span>{% endif %}</td>
+      <td>{{ entry.occurred_on|date:"j M Y" }}</td>
+      <td>{% if entry.kind == 'INTEREST' %}Interest{% elif entry.kind == 'WITHDRAW' %}Withdrawal{% else %}{{ entry.kind|title }}{% endif %}{% if entry.deleted %} <span class="w2-chip">Deleted</span>{% endif %}</td>
       <td>{{ entry.symbol|default:"—" }}</td>
-      <td class="w2-number">{{ entry.quantity }}</td><td class="w2-number">{{ entry.unit_price }}</td>
-      <td class="w2-number">{{ entry.amount }}</td><td class="w2-number">{{ entry.fee }}</td>
-      <td class="w2-wrap">{{ entry.note|default:"—" }}</td>
-      <td>{% if entry.linked_fill %}<span class="w2-badge">Rebalance</span>{% else %}<span class="w2-badge">Manual</span>{% endif %}{% if entry.version > 0 %}<small class="w2-muted">v{{ entry.version }}</small>{% endif %}</td>
-      <td>{% if ledger_can_edit and not ledger_unreconciled and not entry.imported and not entry.linked_fill %}
-        {% if entry.deleted %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='restore' %}">Restore</a>
-        {% else %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='edit' %}">Edit</a>
-        <a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='delete' %}">Delete</a>{% endif %}
-        {% else %}—{% endif %}
-      </td>
+      <td class="w2-r">{% if entry.quantity %}{{ entry.quantity|floatformat:-8 }}{% else %}<span class="w2-muted">—</span>{% endif %}</td>
+      <td class="w2-r">{% if entry.unit_price %}{{ entry.unit_price|floatformat:-4 }}{% else %}<span class="w2-muted">—</span>{% endif %}</td>
+      <td class="w2-r">{% if entry.kind == 'BUY' or entry.kind == 'SELL' %}{{ entry.fee|floatformat:2 }}{% else %}<span class="w2-muted">—</span>{% endif %}</td>
+      <td class="w2-r {% if row.move > 0 %}w2-pos{% elif row.move < 0 %}w2-neg{% endif %}">{% if entry.deleted %}<span class="w2-muted">—</span>{% else %}{% if row.move > 0 %}+{% endif %}{{ row.move|floatformat:"2g" }}{% endif %}</td>
+      <td class="w2-r">{% if entry.deleted %}<span class="w2-muted">—</span>{% else %}{{ row.after|floatformat:"2g" }}{% endif %}</td>
+      <td class="w2-muted">{{ entry.note|default:"—"|truncatechars:40 }}{% if entry.version > 0 %} · edited{% endif %}</td>
+      <td class="w2-r">{% if entry.linked_fill %}<span class="w2-chip w2-info">Review</span>
+        {% elif ledger_can_edit and not ledger_unreconciled and not entry.imported %}
+          {% if entry.deleted %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='restore' %}">Restore</a>
+          {% else %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='edit' %}">Edit</a> <a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='delete' %}">Delete</a>{% endif %}
+        {% else %}—{% endif %}</td>
     </tr>
-    {% empty %}<tr><td colspan="10"><div class="w2-empty">No ledger entries match these filters.</div></td></tr>{% endfor %}</tbody>
+    {% endwith %}{% empty %}<tr><td colspan="10"><div class="w2-empty">No ledger entries match these filters.</div></td></tr>{% endfor %}</tbody>
   </table></div>
-  {% if ledger_count > 200 %}<p class="w2-note">Showing the first 200 filtered entries. Export CSV includes the entire filtered set.</p>{% endif %}
+  <p class="w2-note">Edits keep the original in Change history. Entries linked to a quarterly review are edited from that review.{% if ledger_count > 200 %} Showing the first 200; CSV has them all.{% endif %}</p>
 </section>
+<aside class="w2-side">
+  {% if ledger_can_edit %}
+  <section class="w2-card">
+    <h2 class="w2-ct" style="margin-bottom:8px">Add money</h2>
+    <form method="post" action="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">
+      {% csrf_token %}<input type="hidden" name="intent" value="preview">
+      <div class="w2-pair">
+        <label class="w2-field">Type<select class="w2-input" name="kind"><option value="DEPOSIT">Deposit</option><option value="WITHDRAW">Withdrawal</option><option value="INTEREST">Interest on cash</option><option value="DIVIDEND">Dividend</option><option value="FEE">Fee</option></select></label>
+        <label class="w2-field">Date<input class="w2-input" type="date" name="occurred_on" value="{{ ledger_today|date:'Y-m-d' }}" max="{{ ledger_today|date:'Y-m-d' }}" required></label>
+        <label class="w2-field">Amount £<input class="w2-input" type="number" name="amount" step="0.01" min="0.01" required></label>
+        <label class="w2-field">Note<input class="w2-input" name="note" maxlength="200" placeholder="Optional"></label>
+      </div>
+      <button type="submit" class="w2-button w2-button-primary w2-full">Preview &amp; save</button>
+    </form>
+    <p class="w2-note">Back-dated entries are fine if cash never goes negative. Record trades with the + Add entry button or from the Dashboard.</p>
+  </section>
+  {% endif %}
+  {% if ledger_totals %}
+  <section class="w2-card">
+    <h2 class="w2-ct" style="margin-bottom:6px">Totals</h2>
+    <div class="w2-kv"><span>Deposits</span><span>£{{ ledger_totals.deposits|floatformat:"2g" }}</span></div>
+    <div class="w2-kv"><span>Withdrawals</span><span>£{{ ledger_totals.withdrawals|floatformat:"2g" }}</span></div>
+    <div class="w2-kv"><span>Interest &amp; dividends</span><span>£{{ ledger_totals.income|floatformat:"2g" }}</span></div>
+    <div class="w2-kv"><span>Fees</span><span>£{{ ledger_totals.fees|floatformat:"2g" }}</span></div>
+    <div class="w2-kv"><span>Bought / sold</span><span>£{{ ledger_totals.bought|floatformat:"2g" }} / £{{ ledger_totals.sold|floatformat:"2g" }}</span></div>
+    {% if ledger_summary %}<div class="w2-kv"><span>Ledger cash</span><strong>£{{ ledger_summary.cash|floatformat:"2g" }}</strong></div>
+    <div class="w2-kv"><span>Net contributions</span><span>£{{ ledger_summary.net_contributed|floatformat:"2g" }}</span></div>{% endif %}
+  </section>
+  {% endif %}
+  <section class="w2-card">
+    <div class="w2-ch"><h2 class="w2-ct">Recent changes</h2><a href="?tab=history">All</a></div>
+    {% for item in ledger_recent_changes %}<div class="w2-kv"><span>{{ item.created_at|date:"j M" }} · {{ item.get_operation_display }} #{{ item.entry_id }}</span><span>v{{ item.version }}</span></div>
+    {% empty %}<p class="w2-muted">No edits yet.</p>{% endfor %}
+  </section>
+</aside>
+</div>
 
 {% elif ledger_tab == 'rebalances' %}
-<section class="w2-panel w2-space-top">
-  <h2>Recorded quarterly rebalances</h2>
+<section class="w2-card">
+  <h2 class="w2-ct">Recorded quarterly rebalances</h2>
   <p class="w2-note">Historical advice; only actual fills are recorded.</p>
   {% for item in ledger_rebalances %}
     <article class="w2-rebalance">
@@ -97,8 +122,8 @@
 </section>
 
 {% elif ledger_tab == 'history' %}
-<section class="w2-panel w2-space-top">
-  <h2>Immutable change history</h2>
+<section class="w2-card">
+  <h2 class="w2-ct">Immutable change history</h2>
   <p class="w2-note">Original entries and revision history are retained.</p>
   <div class="w2-table-wrap"><table class="w2-table w2-history-table">
     <thead><tr><th>Recorded at</th><th>Entry</th><th>Action</th><th>Version</th><th>Before</th><th>After</th><th>Review impact</th></tr></thead>

@@ -53,8 +53,19 @@ def strategy_page(request, instance_id):
             "strategy": row.strategy_version or "Not recorded",
             "mapping": row.mapping_version or "Not recorded",
         })
+    from .v2_dashboard import alerts_summary
+    from .v2_settings import strategy_route_rows
+    from .models import NotificationPreference
+    last_by_category = {}
+    for receipt in instance.notification_receipts.order_by("-created_at", "-pk")[:50]:
+        last_by_category.setdefault(receipt.category, receipt.created_at)
+    routes = strategy_route_rows(instance)
+    for row in routes:
+        row["last"] = last_by_category.get(row["key"])
     return _render(
-        request, page_key="instance", page_title="Strategy",
+        request, page_key="instance", page_title="Strategy & alerts",
+        strategy_routes=routes, strategy_alerts=alerts_summary(request.user, instance),
+        strategy_preference=NotificationPreference.objects.filter(owner=request.user).first(),
         instance=instance, section="strategy",
         strategy_description=description, strategy_catalogue_rows=lines,
         strategy_history=tuple(events),

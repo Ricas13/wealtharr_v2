@@ -321,10 +321,40 @@ def history_page(request, instance_id):
     span = _selected_window(request)
     report = build_history(strategy, span=span)
     return _render(
-        request, page_key="instance", page_title="History", section="history",
+        request, page_key="instance", page_title="Performance", section="history",
         instance=strategy, history=report, history_chart=_chart(report["points"]),
-        history_ranges=WINDOWS,
+        history_ranges=WINDOWS, **_performance(request, strategy),
     )
+
+
+def _performance(request, strategy):
+    from . import v2_dashboard as dash
+    points = dash.recorded_points(strategy)
+    monthly = dash.monthly_rows(points)
+    best, worst = dash.best_worst(monthly)
+    returns = dash.period_returns(points)
+    since = next((r for r in returns if r["label"] == "Since start"), None)
+    vs_nasdaq = (since["you"] - since["indexes"][0]
+                 if since and since["you"] is not None and since["indexes"][0] is not None
+                 else None)
+    last = points[-1] if points else None
+    return {
+        "perf_points": bool(points),
+        "perf_chart": dash.chart(points, span=dash.pick_range(request),
+                                 mode=dash.pick_mode(request, "pct")),
+        "perf_ranges": dash.RANGES, "perf_indexes": dash.INDEXES,
+        "perf_monthly": monthly, "perf_best": best, "perf_worst": worst,
+        "perf_drawdown": dash.drawdown(points),
+        "perf_money_in": dash.money_in_by_month([strategy]),
+        "perf_returns": returns,
+        "perf_index_rows": tuple({"name": name, "values": [r["indexes"][i] for r in returns]}
+                                 for i, (_, name) in enumerate(dash.INDEXES)),
+        "perf_gain_pct": ((last[1] - last[2]) / last[2] * 100).quantize(Decimal("0.1"))
+        if last and last[2] > ZERO else None,
+        "perf_xirr": dash.xirr_pct(strategy, points),
+        "perf_vs_nasdaq": vs_nasdaq,
+        "perf_days": (timezone.localdate() - points[0][0]).days if points else None,
+    }
 
 
 def _next_quarter(today):
@@ -380,6 +410,7 @@ def overview_page(request):
                      row["contributed"] is not None), ZERO)
     return _render(
         request, page_key="overview", page_title="Overview",
+        **_overview_extras(request, items, rows, today),
         overview_rows=rows, overview_total=aggregate,
         overview_contributed=contributed if complete_funding and items else None,
         overview_gain=gained, overview_same_date=bool(items) and not excluded,
@@ -388,3 +419,104 @@ def overview_page(request):
             row["strategy"].account.kind == "ISA" for row in rows
         ), overview_review_date=_next_quarter(today),
     )
+
+
+def _open_action(strategy, summary, today):
+    """One short to-do for a strategy, from saved reviews and the ledger."""
+    from .cockpit_execution import proposed_actions
+    from .models import RebalanceExecution
+    if strategy.tracking_only:
+        return {"kind": "golive", "title": "Not live yet", "detail": "Check the ledger, then go live"}
+    if not summary["positions"] and summary["cash"] > ZERO:
+        return {"kind": "start", "title": "Buy your opening position",
+                "detail": "Split your cash at the target weights"}
+    signal = strategy.signals.filter(
+        kind="QUARTERLY", as_of=quarter_end_before(today),
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-pk").first()
+    if signal and proposed_actions(signal) and not RebalanceExecution.objects.filter(
+            signal=signal).exists():
+        trades = " · ".join("%s ≈ £%s %s" % (
+            a["side"].title(), "{:,.0f}".format(Decimal(str(a.get("estimated_gbp") or 0))), a["symbol"])
+            for a in proposed_actions(signal))
+        quarter = (signal.as_of.month - 1) // 3 + 1
+        return {"kind": "review", "title": "Q%s rebalance" % quarter, "detail": trades,
+                "signal": signal}
+    return None
+
+
+def _overview_extras(request, items, rows, today):
+    from . import v2_dashboard as dash
+    from .models import NotificationPreference
+    from .services import ledger_summary
+    span = dash.pick_range(request)
+    mode = dash.pick_mode(request)
+    live = [s for s in items if not s.tracking_only]
+    points = dash.combine_points(live)
+    todos = []
+    assets = {}
+    for row in rows:
+        strategy = row["strategy"]
+        try:
+            summary = ledger_summary(strategy)
+        except (ValidationError, ArithmeticError):
+            summary = None
+        own = dash.recorded_points(strategy)
+        row["gain"] = (row["value"] - row["contributed"]
+                       if row["value"] is not None and row["contributed"] is not None else None)
+        row["xirr"] = dash.xirr_pct(strategy, own) if not strategy.tracking_only else None
+        row["action"] = _open_action(strategy, summary, today) if summary else None
+        if row["action"]:
+            todos.append({"strategy": strategy, **row["action"]})
+        if summary and summary["value"] is not None and not strategy.tracking_only:
+            for symbol, qty in summary["positions"].items():
+                mark = summary["marks"].get(symbol)
+                if mark and qty > ZERO:
+                    label = ("Growth" if symbol == strategy.equity_symbol else
+                             "Safe" if symbol == strategy.safe_symbol else symbol)
+                    assets[label] = assets.get(label, ZERO) + qty * mark.price
+            assets["Cash"] = assets.get("Cash", ZERO) + summary["cash"]
+    asset_total = sum(assets.values(), ZERO)
+    asset_rows = tuple({
+        "label": label, "value": value,
+        "pct": (value / asset_total * 100).quantize(Decimal("0.1")) if asset_total > ZERO else None,
+        "css": {"Growth": "w2-c1", "Safe": "w2-c2", "Cash": "w2-c4"}.get(label, "w2-c3"),
+        "width": float(value / asset_total * 100) if asset_total > ZERO else 0,
+    } for label, value in assets.items()) if asset_total > ZERO else ()
+    valued = [r for r in rows if r["value"] is not None]
+    total = sum((r["value"] for r in valued), ZERO)
+    for r in rows:
+        r["share"] = float(r["value"] / total * 100) if r["value"] is not None and total > ZERO else 0
+    next_end = _next_quarter(today)
+    coming = []
+    for todo in todos:
+        if todo["kind"] == "review":
+            coming.append({"date": None, "strategy": todo["strategy"].name,
+                           "event": todo["title"], "todo": todo["detail"]})
+    pref = NotificationPreference.objects.filter(owner=request.user).first()
+    if items and (pref is None or pref.monthly_reminders):
+        first = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        coming.append({"date": first, "strategy": "All", "event": "Monthly deposit reminder",
+                       "todo": "Record your top-up if you made one"})
+    if live:
+        coming.append({"date": next_end, "strategy": ", ".join(s.name for s in live),
+                       "event": "Quarter end", "todo": "Review arrives after the close"})
+    isa = dash.isa_allowance(items)
+    if isa:
+        coming.append({"date": isa["resets"], "strategy": "All ISAs", "event": "New ISA tax year",
+                       "todo": "Allowance resets"})
+    coming.sort(key=lambda c: (c["date"] is not None, c["date"] or today))
+    symbols = sorted({x for s in live for x in (s.equity_symbol, s.safe_symbol) if x})
+    prices = [MarketObservation.objects.filter(symbol=x, currency="GBP").order_by("-as_of").first()
+              for x in symbols]
+    last_sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()
+    change, change_pct = dash.day_change(points)
+    return {
+        "ov_chart": dash.chart(points, span=span, mode=mode, indexes=False),
+        "ov_ranges": dash.RANGES, "ov_todos": tuple(todos), "ov_assets": asset_rows,
+        "ov_coming": tuple(coming), "ov_isa": isa,
+        "ov_prices": tuple(p for p in prices if p), "ov_last_sync": last_sync,
+        "ov_alerts": dash.alerts_summary(request.user),
+        "ov_day_change": change, "ov_day_pct": change_pct,
+        "ov_xirr": dash.xirr_pct(live[0], points) if len(live) == 1 else None,
+        "ov_today": today,
+    }

@@ -107,7 +107,7 @@ class TodayPhase4Tests(TestCase):
         page = self.client.get(self._url())
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, "Review the verified quarterly proposal")
-        self.assertContains(page, "Proposed 1")
+        self.assertContains(page, "I did this")
         self.assertContains(page, "LQQ3.L")
         self.assertContains(page, "£1,003.00")  # £750 cash + £202 equity + £51 safe
         self.assertNotContains(page, "SECRET_OTHER_OWNER")
@@ -123,7 +123,7 @@ class TodayPhase4Tests(TestCase):
         self.assertContains(p, "Not live yet")
         self.assertContains(p, "#go-live")
         self.assertNotContains(p, "Review proposal / I did this")
-        self.assertNotContains(p, "Proposed 1")
+        self.assertNotContains(p, "I did this")
         self.assertIsNone(save_verified_strategy_snapshot(self.strategy))
 
     def test_saved_signal_without_evidenced_prices_never_shows_advice(self):
@@ -217,7 +217,7 @@ class TodayPhase4Tests(TestCase):
             strategy=self.strategy, as_of=self.quarter,
             total_value=D("1150"), net_contributed=D("1000"),
         )
-        p = self.client.get(self._url())
+        p = self.client.get(reverse("v2_instance_page", args=[self.strategy.pk, "history"]))
         self.assertContains(p, "£1,150.00")
         self.assertContains(p, "30 Sep") if self.quarter.month == 9 else None
         self.assertContains(p, "No source-verified portfolio snapshots") if False else None

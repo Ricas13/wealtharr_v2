@@ -81,7 +81,7 @@ def fetch_chart(symbol, since):
     # must not create a fictitious 100x portfolio valuation.
     expected_units = {"LQQ3.L": ("GBp", "GBX"),
                       "ERNS.L": ("GBP",),
-                      "TQQQ": ("USD",), "SPY": ("USD",)}
+                      "TQQQ": ("USD",), "SPY": ("USD",), "QQQ": ("USD",)}
     if symbol in expected_units and raw_currency not in expected_units[symbol]:
         raise ValueError("PRICE_HOLD:RAW_UNIT_MISMATCH")
     currency = "GBP" if raw_currency in ("GBp", "GBX", "GBP") else raw_currency
@@ -153,7 +153,7 @@ def sync_ticker(symbol, *, force=False):
         raw_unit = getattr(fetched, "raw_unit", "")
         raw_series = getattr(fetched, "raw_closes", {})
         pinned = {"LQQ3.L": ("GBp", "GBX"), "ERNS.L": ("GBP",),
-                  "SPY": ("USD",), "TQQQ": ("USD",)}
+                  "SPY": ("USD",), "TQQQ": ("USD",), "QQQ": ("USD",)}
         accepted_raw = bool(raw_unit and raw_unit in pinned.get(symbol, ()))
         observations = []
         for day, price in series:
