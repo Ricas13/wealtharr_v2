@@ -458,3 +458,37 @@ body.v2 {
 .w2-filterbar{display:grid;grid-template-columns:1fr 1fr}
 .w2-filterbar button{grid-column:1/-1}
 }
+
+/* Phase 3: real ledger/rebalance/history data with scoped mobile scrolling. */
+.w2-ledger-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:14px}
+.w2-tab-labels a{padding:6px 12px;border-radius:5px;color:var(--w2-muted)}
+.w2-tab-labels a.w2-tab-active{background:#262b33;color:var(--w2-text)}
+.w2-ledger-buttons{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.w2-ledger-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.w2-ledger-filter{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin-bottom:18px}
+.w2-ledger-filter .w2-field{min-width:132px;flex:1 1 150px}
+.w2-ledger-filter .w2-field:first-child{flex:2 1 220px}
+.w2-filter-check{padding-bottom:9px;white-space:nowrap}
+.w2-entry-table .w2-number{font-variant-numeric:tabular-nums}
+.w2-entry-table td .w2-badge{font-size:.7rem}
+.w2-entry-table td a{margin-right:9px}
+.w2-deleted-row{opacity:.65}
+.w2-history-table code{font-size:.72rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.w2-history-table .w2-wrap{max-width:300px}
+.w2-rebalance{margin-top:18px;border-top:1px solid var(--w2-stroke);padding-top:18px}
+.w2-rebalance h3,.w2-preview h3{font-size:1rem;font-weight:600;margin:2px 0 6px}
+.w2-preview{border-top:1px solid var(--w2-stroke);margin-top:18px;padding-top:18px;display:grid;gap:12px}
+.w2-preview .w2-panel{padding:12px}
+.w2-review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:12px 0}
+.w2-review-grid dt{color:var(--w2-muted);font-size:.8rem}
+.w2-review-grid dd{margin:0;font-weight:600}
+.w2-ledger-toolbar a:focus-visible{outline:2px solid var(--w2-accent);outline-offset:3px}
+@media(max-width:800px){.w2-ledger-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){
+.w2-ledger-stats{grid-template-columns:1fr}
+.w2-ledger-buttons{width:100%}
+.w2-ledger-buttons .w2-button{flex:1}
+.w2-ledger-filter .w2-field{flex:1 1 100%}
+.w2-review-grid{grid-template-columns:1fr}
+.w2-table-wrap{max-width:100%;overscroll-behavior-x:contain}
+}

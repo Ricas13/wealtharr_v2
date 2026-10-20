@@ -95,10 +95,9 @@
 </div>
 <section class="w2-panel w2-space-top"><h2>Periodic results</h2><div class="w2-empty">Only real completed periods will be listed.</div></section>
 {% elif section == 'ledger' %}
-<section class="w2-panel w2-space-top">
-  <div class="w2-tab-labels"><span class="w2-tab-active">Entries</span><span>Rebalances</span><span>Change history</span></div>
-  <div class="w2-empty">Ledger listing, editing, import and CSV export are implemented in Phase 3.</div>
-</section>
+{% if ledger_edit %}{% include 'v2/ledger_edit.html' %}
+{% elif ledger_import %}{% include 'v2/ledger_import.html' %}
+{% else %}{% include 'v2/ledger.html' %}{% endif %}
 {% elif section == 'strategy' %}
 <section class="w2-panel w2-space-top"><h2>How it works</h2>
   <p class="w2-muted">Fixed strategy rules and version information will be displayed here, read-only.</p>

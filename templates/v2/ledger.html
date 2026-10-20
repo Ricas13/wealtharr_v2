@@ -1,0 +1,126 @@
+<section class="w2-ledger-toolbar" aria-label="Ledger navigation">
+  <nav class="w2-tab-labels" aria-label="Ledger tabs">
+    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=entries"
+       class="{% if ledger_tab == 'entries' %}w2-tab-active{% endif %}" {% if ledger_tab == 'entries' %}aria-current="page"{% endif %}>Entries</a>
+    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=rebalances"
+       class="{% if ledger_tab == 'rebalances' %}w2-tab-active{% endif %}" {% if ledger_tab == 'rebalances' %}aria-current="page"{% endif %}>Rebalances</a>
+    <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?tab=history"
+       class="{% if ledger_tab == 'history' %}w2-tab-active{% endif %}" {% if ledger_tab == 'history' %}aria-current="page"{% endif %}>Change history</a>
+  </nav>
+  <div class="w2-ledger-buttons">
+    {% if ledger_can_edit %}
+      <a class="w2-button w2-button-primary" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">+ Add entry</a>
+      <a class="w2-button" href="{% url 'v2_ledger_import' instance_id=selected_instance.pk %}">Import CSV</a>
+    {% endif %}
+    <a class="w2-button" href="?tab=entries&amp;export=csv">Export CSV</a>
+  </div>
+</section>
+{% if ledger_unreconciled %}
+<div class="w2-notice w2-space-top" role="status"><strong>Opening holdings are not reconciled.</strong>
+  An owner-reported snapshot is not an opening trade. Import complete Trading 212 history and match all actual cash and share counts before making manual ledger changes.</div>
+{% endif %}
+{% if not ledger_can_edit %}
+<div class="w2-notice w2-space-top">This legacy strategy's transaction history is read-only here; existing owner cockpit operations remain available. No implicit migration of past data is attempted.</div>
+{% endif %}
+{% if ledger_tab == 'entries' %}
+{% if ledger_summary %}
+<section class="w2-ledger-stats w2-space-top" aria-label="Recorded ledger totals">
+  <div class="w2-panel"><p class="w2-label">Ledger cash</p><p class="w2-stat-value">£{{ ledger_summary.cash|floatformat:2 }}</p></div>
+  <div class="w2-panel"><p class="w2-label">Net contributions</p><p class="w2-stat-value">£{{ ledger_summary.net_contributed|floatformat:2 }}</p></div>
+  <div class="w2-panel"><p class="w2-label">Current value</p><p class="w2-stat-value">Not verified</p><p class="w2-muted">No invented prices</p></div>
+</section>
+{% endif %}
+<section class="w2-panel w2-space-top">
+  <form class="w2-ledger-filter" method="get">
+    <input type="hidden" name="tab" value="entries">
+    <label class="w2-field">Search entries<input class="w2-input" name="q" value="{{ ledger_search }}" maxlength="100" placeholder="Search description, symbol or value"></label>
+    <label class="w2-field">Event type
+      <select name="kind" class="w2-input">
+        {% for key, label in ledger_kinds %}
+        <option value="{{ key }}" {% if ledger_kind == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="w2-field">Sort
+      <select name="sort" class="w2-input">
+        <option value="newest" {% if ledger_sort == 'newest' %}selected{% endif %}>Newest first</option>
+        <option value="oldest" {% if ledger_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
+        <option value="amount" {% if ledger_sort == 'amount' %}selected{% endif %}>Largest value</option>
+        <option value="kind" {% if ledger_sort == 'kind' %}selected{% endif %}>Event type</option>
+      </select>
+    </label>
+    <label class="w2-check w2-filter-check"><input type="checkbox" name="deleted" value="1" {% if ledger_deleted %}checked{% endif %}><span>Show deleted</span></label>
+    <button type="submit" class="w2-button">Apply</button>
+    <button type="submit" name="export" value="csv" class="w2-button">Export filtered CSV</button>
+  </form>
+  <div class="w2-table-wrap"><table class="w2-table w2-entry-table">
+    <thead><tr><th>Date</th><th>Type</th><th>Instrument</th><th class="w2-number">Shares</th><th class="w2-number">Price (£)</th><th class="w2-number">Amount (£)</th><th class="w2-number">Fee (£)</th><th>Note</th><th>Source</th><th>Actions</th></tr></thead>
+    <tbody>{% for entry in ledger_entries %}
+    <tr {% if entry.deleted %}class="w2-deleted-row"{% endif %}>
+      <td>{{ entry.occurred_on|date:"d M Y" }}</td>
+      <td>{{ entry.kind|title }}{% if entry.deleted %} <span class="w2-badge">Deleted</span>{% endif %}</td>
+      <td>{{ entry.symbol|default:"—" }}</td>
+      <td class="w2-number">{{ entry.quantity }}</td><td class="w2-number">{{ entry.unit_price }}</td>
+      <td class="w2-number">{{ entry.amount }}</td><td class="w2-number">{{ entry.fee }}</td>
+      <td class="w2-wrap">{{ entry.note|default:"—" }}</td>
+      <td>{% if entry.imported %}<span class="w2-badge">T212 CSV</span>{% elif entry.linked_fill %}<span class="w2-badge">Rebalance</span>{% else %}<span class="w2-badge">Manual</span>{% endif %}{% if entry.version > 0 %}<small class="w2-muted">v{{ entry.version }}</small>{% endif %}</td>
+      <td>{% if ledger_can_edit and not ledger_unreconciled and not entry.imported and not entry.linked_fill %}
+        {% if entry.deleted %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='restore' %}">Restore</a>
+        {% else %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='edit' %}">Edit</a>
+        <a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='delete' %}">Delete</a>{% endif %}
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% empty %}<tr><td colspan="10"><div class="w2-empty">No ledger entries match these filters.</div></td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if ledger_count > 200 %}<p class="w2-note">Showing the first 200 filtered entries. Export CSV includes the entire filtered set.</p>{% endif %}
+</section>
+
+{% elif ledger_tab == 'rebalances' %}
+<section class="w2-panel w2-space-top">
+  <h2>Recorded quarterly rebalances</h2>
+  <p class="w2-note">Historical recommendations are dated guidance, not executable broker orders. Recorded fills always use the owner's real executions. Any completed reset retains its verified post-fill baseline.</p>
+  {% for item in ledger_rebalances %}
+    <article class="w2-rebalance">
+      <div class="w2-section-heading">
+        <div><h3>{{ item.signal.as_of|date:"j M Y" }} · {{ item.signal.title }}</h3>
+          <p class="w2-muted">{% if item.execution %}Confirmed on {{ item.execution.executed_on|date:"j M Y" }}{% elif item.recorded_fills %}Partial actual fills · not completed{% else %}No recorded fill{% endif %}</p></div>
+        <span class="w2-badge {% if not item.execution %}w2-warning{% endif %}">{% if item.execution %}Closed period{% else %}Pending review{% endif %}</span>
+      </div>
+      {% if item.warning %}<p role="alert" class="w2-form-error">{{ item.warning }}</p>{% endif %}
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Trade</th><th>Line</th><th class="w2-number">Suggested shares</th><th class="w2-number">Recorded shares</th><th class="w2-number">Difference</th><th>Actual fill date</th></tr></thead>
+        <tbody>{% for line in item.rows %}
+          <tr><td>{{ line.side }}</td><td>{{ line.symbol }}</td><td class="w2-number">{{ line.suggested }}</td>
+              <td class="w2-number">{{ line.recorded }}</td><td class="w2-number">{{ line.remaining }}</td>
+              <td>{% for fill in line.fills %}{{ fill.ledger_entry.occurred_on|date:"j M Y" }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td></tr>
+        {% empty %}<tr><td colspan="6" class="w2-muted">No recorded execution quantities for this review.</td></tr>{% endfor %}</tbody>
+      </table></div>
+      <p class="w2-note">A source-linked fill cannot be overwritten here. Corrections to an executed past review need source evidence and an audited reconciliation; a confirmed baseline is never recalculated silently. Latest-period reopening and the guided fill workflow are completed in Phase 4.</p>
+    </article>
+  {% empty %}<div class="w2-empty">No genuine recorded rebalance reviews for this strategy.</div>{% endfor %}
+</section>
+
+{% elif ledger_tab == 'history' %}
+<section class="w2-panel w2-space-top">
+  <h2>Immutable change history</h2>
+  <p class="w2-note">Original entries are kept. Each revision captures the before/after values, owner and reviews potentially affected. Import provenance is also stored against the original broker ID.</p>
+  <div class="w2-table-wrap"><table class="w2-table w2-history-table">
+    <thead><tr><th>Recorded at</th><th>Entry</th><th>Action</th><th>Version</th><th>Before</th><th>After</th><th>Review impact</th></tr></thead>
+    <tbody>
+    {% for item in ledger_revisions %}
+      <tr>
+        <td>{{ item.created_at|date:"d M Y H:i" }}</td>
+        <td>#{{ item.entry_id }}</td><td>{{ item.get_operation_display }}</td>
+        <td>v{{ item.version }}</td>
+        <td class="w2-wrap"><code>{{ item.before|default:"—" }}</code></td>
+        <td class="w2-wrap"><code>{{ item.after|default:"Soft deleted" }}</code></td>
+        <td>{% if item.impact.requires_recheck %}<span class="w2-badge w2-warning">Re-check affected periods</span>
+          {% else %}<span class="w2-badge">No stored reviews affected</span>{% endif %}
+        </td>
+      </tr>
+    {% empty %}<tr><td colspan="7"><div class="w2-empty">No v2 ledger revisions yet.</div></td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}

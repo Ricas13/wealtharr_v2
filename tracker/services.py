@@ -25,7 +25,10 @@ def ledger_summary(strategy):
     cash = ZERO
     net_contributed = ZERO
     positions = defaultdict(lambda: ZERO)
-    for e in strategy.ledger.all().order_by("occurred_on", "pk"):
+    # Phase 3 append-only corrections are projected here, never by mutating
+    # the original source entry or double-counting an obsolete version.
+    from .v2_ledger_core import effective_entries
+    for e in effective_entries(strategy):
         if e.kind == LedgerEntry.DEPOSIT:
             cash += e.amount
             net_contributed += e.amount

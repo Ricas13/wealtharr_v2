@@ -163,6 +163,81 @@ class LedgerEntry(models.Model):
         ordering = ["occurred_on", "pk"]
         indexes = [models.Index(fields=["strategy", "occurred_on"], name="tracker_led_strategy_2026_idx")]
 
+
+
+class OpeningReconciliation(models.Model):
+    """Append-only evidence that imported events reproduce owner-reported holdings."""
+    opening = models.OneToOneField(
+        InstanceOpeningSnapshot, on_delete=models.PROTECT,
+        related_name="reconciliation",
+    )
+    file_sha256 = models.CharField(max_length=64)
+    accepted_rows = models.PositiveIntegerField()
+    reconciled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+    )
+    reconciled_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Reconciliation evidence is immutable.")
+        if self.opening_id and self.reconciled_by_id and (
+                self.opening.strategy.owner_id != self.reconciled_by_id):
+            raise ValidationError("Another owner's opening snapshot cannot be reconciled.")
+        return super().save(*args, **kwargs)
+
+
+
+class LedgerRevision(models.Model):
+    """Append-only audited overlay; original LedgerEntry rows never change.
+
+    The most recent revision provides an effective entry or soft deletion.
+    Changes to source-linked broker fills and confirmed reviews are forbidden.
+    """
+    entry = models.ForeignKey(
+        LedgerEntry, on_delete=models.PROTECT, related_name="revisions"
+    )
+    strategy = models.ForeignKey(
+        StrategyInstance, on_delete=models.PROTECT, related_name="ledger_revisions"
+    )
+    version = models.PositiveIntegerField()
+    operation = models.CharField(
+        max_length=10,
+        choices=[
+            ("ADD", "Added"), ("EDIT", "Edited"),
+            ("DELETE", "Soft deleted"), ("RESTORE", "Restored"),
+        ],
+    )
+    before = models.JSONField(blank=True, null=True)
+    after = models.JSONField(blank=True, null=True)
+    impact = models.JSONField(default=dict)
+    reason = models.CharField(max_length=280, blank=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["entry_id", "version"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["entry", "version"], name="unique_ledger_revision"
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Ledger revisions are immutable.")
+        if (self.entry_id and self.strategy_id and
+                self.entry.strategy_id != self.strategy_id):
+            raise ValidationError("Ledger revision strategy mismatch.")
+        if self.actor_id and self.strategy_id and (
+                self.strategy.owner_id != self.actor_id):
+            raise ValidationError("Ledger revision owner mismatch.")
+        return super().save(*args, **kwargs)
+
+
+
 class PriceMark(models.Model):
     strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE, related_name="prices")
     symbol = models.CharField(max_length=24)

@@ -1,0 +1,86 @@
+<section class="w2-panel w2-space-top w2-wizard">
+  <div class="w2-section-heading">
+    <div><h2>{% if edit_operation == 'new' %}Record a real transaction{% elif edit_operation == 'edit' %}Propose a correction{% elif edit_operation == 'delete' %}Preview soft deletion{% else %}Restore a deleted transaction{% endif %}</h2>
+      <p class="w2-muted">Changes preserve the original source entry and are audited. Nothing is sent to Trading 212.</p></div>
+    <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Back to ledger</a>
+  </div>
+  {% if edit_error %}<p class="w2-form-error" role="alert">{{ edit_error }}</p>{% endif %}
+  {% if edit_entry and edit_entry.imported or edit_entry.linked_fill %}
+    <p class="w2-notice">This broker-imported or review-linked transaction cannot be overwritten. Reconcile against source evidence.</p>
+  {% elif not edit_preview %}
+    <form method="post" class="w2-wizard-form" id="w2-transaction-form">
+      {% csrf_token %}
+      <input type="hidden" name="intent" value="preview">
+      {% if edit_operation == 'new' or edit_operation == 'edit' %}
+        <div class="w2-form-grid">
+          <label class="w2-field">Actual transaction date
+            <input type="date" name="occurred_on" class="w2-input" value="{{ edit_values.occurred_on }}" max="{% now 'Y-m-d' %}" required></label>
+          <label class="w2-field">Transaction type
+            <select class="w2-input" name="kind" id="w2-entry-kind">
+              <option value="DEPOSIT" {% if edit_values.kind == 'DEPOSIT' %}selected{% endif %}>Deposit</option>
+              <option value="WITHDRAW" {% if edit_values.kind == 'WITHDRAW' %}selected{% endif %}>Withdrawal</option>
+              <option value="BUY" {% if edit_values.kind == 'BUY' %}selected{% endif %}>Buy</option>
+              <option value="SELL" {% if edit_values.kind == 'SELL' %}selected{% endif %}>Sell</option>
+              <option value="DIVIDEND" {% if edit_values.kind == 'DIVIDEND' %}selected{% endif %}>Dividend</option>
+              <option value="FEE" {% if edit_values.kind == 'FEE' %}selected{% endif %}>Fee</option>
+            </select>
+          </label>
+        </div>
+        <div class="w2-form-grid">
+          <label class="w2-field" data-v2-trade-field>Instrument / exact trading line
+            <select name="symbol" class="w2-input">
+              <option value="">Choose instrument</option>
+              <option value="{{ selected_instance.equity_symbol }}" {% if edit_values.symbol == selected_instance.equity_symbol %}selected{% endif %}>{{ selected_instance.equity_symbol }} · Growth</option>
+              <option value="{{ selected_instance.safe_symbol }}" {% if edit_values.symbol == selected_instance.safe_symbol %}selected{% endif %}>{{ selected_instance.safe_symbol }} · Safe</option>
+            </select>
+          </label>
+          <label class="w2-field" data-v2-cash-field>Actual GBP amount
+            <input class="w2-input" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="{{ edit_values.amount }}" placeholder="500.00"></label>
+          <label class="w2-field" data-v2-trade-field>Actual shares
+            <input class="w2-input" name="quantity" type="number" min="0.00000001" step="0.00000001" value="{{ edit_values.quantity }}"></label>
+          <label class="w2-field" data-v2-trade-field>Execution price in GBP per share
+            <input class="w2-input" name="unit_price" type="number" min="0.00000001" step="0.00000001" value="{{ edit_values.unit_price }}"></label>
+          <label class="w2-field" data-v2-trade-field>Actual fee in GBP
+            <input class="w2-input" name="fee" type="number" min="0" step="0.01" value="{{ edit_values.fee }}"></label>
+        </div>
+        <label class="w2-field">Private reference / note
+          <input class="w2-input" name="note" maxlength="280" value="{{ edit_values.note }}" placeholder="Actual transaction reference"></label>
+      {% else %}
+        <p class="w2-notice">{% if edit_operation == 'delete' %}This entry will be hidden from current balances, but the old values and audit remain in Change history.{% else %}The last recorded financial values will be restored without inventing a new broker transaction.{% endif %}</p>
+        <dl class="w2-review-grid">
+          <div><dt>Original date</dt><dd>{{ edit_entry.occurred_on|date:"j M Y" }}</dd></div>
+          <div><dt>Event</dt><dd>{{ edit_entry.kind }} {{ edit_entry.symbol }}</dd></div>
+          <div><dt>Cash movement</dt><dd>£{{ edit_entry.amount }}</dd></div>
+          <div><dt>Shares</dt><dd>{{ edit_entry.quantity }}</dd></div>
+        </dl>
+      {% endif %}
+      <button class="w2-button w2-button-primary" type="submit">Preview impact</button>
+    </form>
+  {% endif %}
+
+  {% if edit_preview %}
+    <div class="w2-preview" role="status">
+      <h3>Impact preview · no changes saved yet</h3>
+      <p class="w2-muted">Every historical balance has been checked for negative cash and overselling. No market prices or investment returns are inferred.</p>
+      <div class="w2-form-grid">
+        <div class="w2-panel"><p class="w2-label">Cash before</p><p class="w2-stat-value">£{{ edit_preview.before.cash }}</p><p class="w2-muted">Net funded: £{{ edit_preview.before.net_contributed }}</p></div>
+        <div class="w2-panel"><p class="w2-label">Cash after</p><p class="w2-stat-value">£{{ edit_preview.after.cash }}</p><p class="w2-muted">Net funded: £{{ edit_preview.after.net_contributed }}</p></div>
+      </div>
+      <p class="w2-note">Holdings before: {{ edit_preview.before.positions }}. Holdings after: {{ edit_preview.after.positions }}.</p>
+      {% if edit_preview.impact.periods %}
+      <h3>Reviews requiring recalculation</h3>
+      <ul>{% for period in edit_preview.impact.periods %}<li>{{ period.as_of }} · {{ period.title }}{% if period.confirmed %} — already confirmed, cannot change until reconciled{% endif %}</li>{% endfor %}</ul>
+      {% else %}<p class="w2-notice">No stored periodic reviews depend on this date.</p>{% endif %}
+      <p class="w2-note">A saved change appends an audited version; no confirmed baseline is recalculated automatically.</p>
+      <form method="post" class="w2-wizard-form">
+        {% csrf_token %}<input type="hidden" name="intent" value="confirm">
+        <label class="w2-field">Why are you changing this entry? (optional)
+          <input type="text" class="w2-input" name="reason" maxlength="280" placeholder="Correction based on actual broker statement"></label>
+        <div class="w2-wizard-actions">
+          <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Cancel</a>
+          <button type="submit" class="w2-button w2-button-primary">Confirm audited change</button>
+        </div>
+      </form>
+    </div>
+  {% endif %}
+</section>

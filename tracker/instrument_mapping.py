@@ -197,6 +197,34 @@ def resolve_instruments(strategy_slug, country, account_type, broker):
         ) from exc
 
 
+def for_historical_import(strategy):
+    """A pinned, exact ISIN map for evidence from REAL past broker fills.
+
+    This does not approve new trades. A v2 tracking-only instance keeps
+    for_strategy() returning None for review execution and notifications.
+    """
+    if not getattr(strategy, "strategy_key", ""):
+        return for_strategy(strategy)
+    if (not strategy.tracking_only or not strategy.owner_checked_on or
+            strategy.strategy_key != strategy.preset.slug or
+            strategy.strategy_key != STRATEGY_9SIG or
+            strategy.account.owner_id != strategy.owner_id or
+            strategy.platform_code != strategy.account.broker or
+            strategy.account_type_code != strategy.account.kind or
+            strategy.mapping_version != MAPPING_VERSION):
+        return None
+    from .core.catalogue import onboarding_manifest, selection_available
+    if not selection_available(
+            strategy.strategy_key, strategy.platform_code, strategy.account_type_code):
+        return None
+    if strategy.resolved_instruments != onboarding_manifest(
+            strategy.strategy_key, strategy.platform_code, strategy.account_type_code):
+        return None
+    return resolve_instruments(
+        strategy.strategy_key, strategy.account.country,
+        strategy.account.kind, strategy.account.broker)
+
+
 def for_strategy(strategy):
     """No guesswork for older accounts without recorded broker metadata."""
     # New v2 enrolments explicitly remain tracking-only while instrument,
