@@ -105,7 +105,8 @@ def catalogue(request):
 
 @login_required
 def settings(request):
-    return _render(request, page_key="settings", page_title="Settings")
+    from .v2_settings import settings_page
+    return settings_page(request)
 
 
 @login_required
