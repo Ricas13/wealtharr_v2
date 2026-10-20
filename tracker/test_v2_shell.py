@@ -35,7 +35,7 @@ class NewShellTests(TestCase):
             reverse("v2_add_strategy"),
         ] + [
             reverse("v2_instance_page", args=[self.mine.pk, part])
-            for part in ("today", "review", "history", "ledger", "strategy")
+            for part in ("today", "review", "history", "study", "ledger", "strategy")
         ]
         for url in routes:
             with self.subTest(url=url):

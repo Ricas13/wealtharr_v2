@@ -719,3 +719,10 @@ body.v2 {
 .w2-card .w2-table :is(th,td):last-child{padding-right:0}
 .w2-card input.field{background:#0d1014;border:1px solid #2a313b;border-radius:5px;color:var(--w2-text);font:inherit;min-height:28px;padding:3px 8px;width:100%}
 .w2-card input.check{accent-color:var(--w2-primary);width:14px;height:14px;margin:0}
+.w2-chart polyline.w2-c4{stroke:#6b7480;stroke-dasharray:2 3}
+.w2-chart polyline.w2-c5{stroke:#b58cf0}
+.w2-c5{background:#b58cf0}
+.w2-sw.w2-c4,.w2-sw.w2-c5{height:2px}
+.w2-best{font-weight:600}
+.w2-seg button{background:none;border:0;color:#9aa3ad;font:inherit;font-size:11px;padding:3px 8px;cursor:pointer}
+.w2-seg button.w2-on{background:#1f2631;color:#fff}

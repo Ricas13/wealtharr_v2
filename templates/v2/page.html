@@ -20,11 +20,13 @@
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}" {% if section == 'review' %}class="w2-on" aria-current="page"{% endif %}>Quarterly review</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}" {% if section == 'ledger' %}class="w2-on" aria-current="page"{% endif %}>Ledger</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='history' %}" {% if section == 'history' %}class="w2-on" aria-current="page"{% endif %}>Performance</a>
+  <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='study' %}" {% if section == 'study' %}class="w2-on" aria-current="page"{% endif %}>Study</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}" {% if section == 'strategy' %}class="w2-on" aria-current="page"{% endif %}>Strategy &amp; alerts</a>
 </nav>
 {% if section == 'today' %}{% include 'v2/today.html' %}
 {% elif section == 'review' %}{% include 'v2/review.html' %}
 {% elif section == 'history' %}{% include 'v2/history.html' %}
+{% elif section == 'study' %}{% include 'v2/study.html' %}
 {% elif section == 'ledger' %}{% if ledger_edit %}{% include 'v2/ledger_edit.html' %}{% else %}{% include 'v2/ledger.html' %}{% endif %}
 {% elif section == 'strategy' %}{% include 'v2/strategy_info.html' %}
 {% endif %}

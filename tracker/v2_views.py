@@ -11,11 +11,12 @@ from django.shortcuts import get_object_or_404, render
 from .models import StrategyInstance
 
 
-SECTIONS = ("today", "review", "history", "ledger", "strategy")
+SECTIONS = ("today", "review", "history", "study", "ledger", "strategy")
 LABELS = {
     "today": "Dashboard",
     "review": "Quarterly review",
     "history": "Performance",
+    "study": "Study",
     "ledger": "Ledger",
     "strategy": "Strategy & alerts",
 }
@@ -84,6 +85,9 @@ def instance_page(request, instance_id, section):
     if section == "review":
         from .v2_today import review_page
         return review_page(request, instance_id)
+    if section == "study":
+        from .v2_study import study_page
+        return study_page(request, instance_id)
     if section == "history":
         from .v2_history import history_page
         return history_page(request, instance_id)

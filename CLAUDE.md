@@ -4,7 +4,7 @@ Read `docs/architecture.md`, `docs/instrument-research.md`, `docs/RESUME.md`, `d
 
 ## Mission
 
-Wealtharr is a private **tracking and notification** application. No broker connection, broker API, order placement, paper trading, fake transactions, invented prices or backtests. Owner enters real deposits and confirms actual trades. One-screen setup and **Today → what to do next → I did this** must require less time than a configured spreadsheet. Start with UK / Trading 212 / Stocks & Shares ISA and fixed 9Sig; keep the core strategy-agnostic.
+Wealtharr is a private **tracking and notification** application. No broker connection, broker API, order placement, paper trading, fake transactions or invented prices. The only backtest is the per-strategy **Study** tab: clearly labelled hypothetical, reading its own `StudyPrice` history, replaying the same pure strategy rules, and never valuing real holdings or feeding instructions, alerts or real performance figures. Any simulated pre-launch history in it must be flagged on the page. Owner enters real deposits and confirms actual trades. One-screen setup and **Today → what to do next → I did this** must require less time than a configured spreadsheet. Start with UK / Trading 212 / Stocks & Shares ISA and fixed 9Sig; keep the core strategy-agnostic.
 
 ## Hard boundaries
 

@@ -1,0 +1,109 @@
+{% load w2_format %}
+<p class="w2-notice" role="note"><strong>Hypothetical study, not your results.</strong> Past prices replayed through the same 9Sig rules your live reviews use. Nothing here is used for instructions, alerts or your real figures.</p>
+
+{% if not study_supported %}
+  <section class="w2-card w2-space-top"><p class="w2-muted">A study isn't available for this strategy yet.</p></section>
+{% elif not study_ready %}
+  <section class="w2-card w2-space-top"><h2 class="w2-ct">Study data not downloaded yet</h2>
+    <p class="w2-muted">Long price histories for QQQ, SPY, VTI, GBP/USD, LQQ3 and ERNS download once a day with the hourly price check. Check back after the next run.</p></section>
+{% else %}
+<form method="get" class="w2-card w2-space-top" aria-label="Study inputs">
+  <div class="w2-row" style="justify-content:space-between;align-items:flex-end;gap:12px">
+    <div class="w2-row" style="align-items:flex-end;gap:10px">
+      <label class="w2-field">Start with £<input class="w2-input" style="width:120px" name="amount" inputmode="decimal" value="{{ study_amount|floatformat:'0' }}"></label>
+      <label class="w2-field">Add each month £<input class="w2-input" style="width:120px" name="monthly" inputmode="decimal" value="{{ study_monthly|floatformat:'0' }}"></label>
+      <input type="hidden" name="scale" value="{{ study_scale }}">
+      <button type="submit" name="range" value="{{ study_range }}" class="w2-button w2-button-primary">Update</button>
+    </div>
+    <div class="w2-seg" role="group" aria-label="Timeframe">
+      {% for key, label, days in study_timeframes %}<button type="submit" name="range" value="{{ key }}" {% if key == study_range %}class="w2-on" aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>{{ label }}</button>{% endfor %}
+    </div>
+  </div>
+  {% if study_input_error %}<p class="w2-note w2-warn">One amount wasn't valid, so the default was used.</p>{% endif %}
+</form>
+
+{% if not study_selected %}
+  <section class="w2-card w2-space-top"><p class="w2-muted">Price history doesn't reach back this far yet (data starts {{ study_first_day|date:"j M Y" }}).</p></section>
+{% else %}
+{% with s=study_selected.series.nine_sig %}
+<section class="w2-kpis w2-space-top" aria-label="9Sig result">
+  <div class="w2-kpi"><p class="w2-label">9Sig value now</p><p class="w2-stat-value">£{{ s.final|floatformat:"0g" }}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Money put in</p><p class="w2-stat-value">£{{ s.put_in|floatformat:"0g" }}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Gain</p><p class="w2-stat-value {{ s.gain|tone }}">{{ s.gain|signed_money:0 }} <small>{{ s.gain_pct|signed_pct }}</small></p></div>
+  <div class="w2-kpi"><p class="w2-label">Annualised</p><p class="w2-stat-value {{ s.annual|tone }}">{% if s.annual is not None %}{{ s.annual|signed_pct }}{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Worst fall</p><p class="w2-stat-value w2-neg">{{ s.drawdown|signed_pct }}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Trades</p><p class="w2-stat-value">{{ s.trades }}</p></div>
+  <div class="w2-kpi"><p class="w2-label">From</p><p class="w2-stat-value">{{ study_selected.start|date:"j M Y" }}</p></div>
+</section>
+{% endwith %}
+
+<div class="w2-grid2">
+  <section class="w2-card w2-span2" aria-label="Study chart">
+    <div class="w2-ch"><h2 class="w2-ct">£{{ study_amount|floatformat:"0g" }}{% if study_monthly %} + £{{ study_monthly|floatformat:"0g" }} a month{% endif %} from {{ study_selected.start|date:"j M Y" }}</h2>
+      <div class="w2-seg" role="group" aria-label="Scale">
+        <a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ study_range }}&amp;scale=linear" {% if study_scale == 'linear' %}class="w2-on" aria-current="true"{% endif %}>Linear</a>
+        <a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ study_range }}&amp;scale=log" {% if study_scale == 'log' %}class="w2-on" aria-current="true"{% endif %}>Log</a>
+      </div></div>
+    {% if study_chart %}
+    <div class="w2-legend">{% for line in study_chart.lines %}<span><span class="w2-sw {{ line.css }}"></span>{{ line.label }}</span>{% endfor %}</div>
+    <div class="w2-chart">
+      <svg viewBox="0 0 800 200" preserveAspectRatio="none" style="height:240px" role="img" aria-label="Hypothetical value of each approach from {{ study_selected.start|date:'j M Y' }} to {{ study_selected.end|date:'j M Y' }}">
+        <line class="w2-grid-line" x1="0" y1="100" x2="800" y2="100"></line>
+        {% for line in study_chart.lines %}<polyline class="{{ line.css }}" points="{{ line.points }}"></polyline>{% endfor %}
+      </svg>
+      <div class="w2-ylabels" aria-hidden="true">{% for y in study_chart.y_labels %}<span>{{ y }}</span>{% endfor %}</div>
+    </div>
+    <div class="w2-axis" aria-hidden="true">{% for t in study_chart.ticks %}<span>{{ t|date:"M Y" }}</span>{% endfor %}</div>
+    {% endif %}
+    {% if study_selected.simulated_growth or study_selected.simulated_safe %}
+      <p class="w2-note"><span class="w2-chip w2-wait">Includes simulated history</span>
+        {% if study_selected.simulated_growth %}Before {{ study_growth_real_from|date:"j M Y"|default:"LQQ3 data" }}, the growth fund is rebuilt from 3× QQQ's daily return less {{ study_charge|floatformat:2 }}% a year.{% endif %}
+        {% if study_selected.simulated_safe %}Before {{ study_safe_real_from|date:"j M Y"|default:"ERNS data" }}, the safe sleeve is cash at 0%.{% endif %}</p>
+    {% endif %}
+  </section>
+
+  <section class="w2-card w2-span2">
+    <div class="w2-ch"><h2 class="w2-ct">Compared over {{ study_selected.start|date:"j M Y" }} – {{ study_selected.end|date:"j M Y" }}</h2></div>
+    <div class="w2-table-wrap"><table class="w2-table">
+      <thead><tr><th>Approach</th><th class="w2-r">Value now</th><th class="w2-r">Put in</th><th class="w2-r">Gain</th><th class="w2-r">Gain %</th><th class="w2-r">Annualised</th><th class="w2-r">Worst fall</th><th class="w2-r">Trades</th></tr></thead>
+      <tbody>{% for name, label, css, row in study_selected_rows %}
+        <tr><td><span class="w2-dotsw {{ css }}"></span>{{ label }}{% if name == study_best %} <span class="w2-chip w2-ok">Best</span>{% endif %}</td>
+          {% if row %}<td class="w2-r">£{{ row.final|floatformat:"2g" }}</td><td class="w2-r">£{{ row.put_in|floatformat:"0g" }}</td>
+          <td class="w2-r {{ row.gain|tone }}">{{ row.gain|signed_money }}</td><td class="w2-r {{ row.gain_pct|tone }}">{{ row.gain_pct|signed_pct }}</td>
+          <td class="w2-r">{% if row.annual is not None %}{{ row.annual|signed_pct }}{% else %}—{% endif %}</td>
+          <td class="w2-r w2-neg">{{ row.drawdown|signed_pct }}</td><td class="w2-r">{% if row.trades is not None %}{{ row.trades }}{% else %}—{% endif %}</td>
+          {% else %}<td colspan="7" class="w2-muted">No data this far back</td>{% endif %}</tr>
+      {% endfor %}</tbody>
+    </table></div>
+    <p class="w2-note">Annualised is money-weighted and shown for a year or more. Worst fall ignores the effect of top-ups. Buy &amp; hold puts everything, and every top-up, into the growth fund.</p>
+  </section>
+
+  <section class="w2-card w2-span2">
+    <div class="w2-ch"><h2 class="w2-ct">Every timeframe · value now</h2><span class="w2-muted">£{{ study_amount|floatformat:"0g" }}{% if study_monthly %} + £{{ study_monthly|floatformat:"0g" }}/month{% endif %}</span></div>
+    <div class="w2-table-wrap"><table class="w2-table">
+      <thead><tr><th>Started</th><th>On</th>{% for name, label in study_series %}<th class="w2-r">{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in study_rows %}
+        <tr><td><a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ row.key }}&amp;scale={{ study_scale }}">{% if row.key == 'ytd' %}Since 1 Jan{% else %}{{ row.label }} ago{% endif %}</a></td>
+          {% if row.result %}<td class="w2-muted">{{ row.result.start|date:"j M Y" }}{% if row.result.simulated_growth %}*{% endif %}</td>
+            {% for name, cell in row.cells %}<td class="w2-r {% if name == row.best %}w2-best{% endif %}">{% if cell %}£{{ cell.final|floatformat:"0g" }} <small class="{{ cell.gain_pct|tone }}">{{ cell.gain_pct|signed_pct:0 }}</small>{% else %}<span class="w2-muted">—</span>{% endif %}</td>{% endfor %}
+          {% else %}<td colspan="5" class="w2-muted">Not enough history</td>{% endif %}</tr>
+      {% endfor %}</tbody>
+    </table></div>
+    <p class="w2-note">* includes simulated history. Bold is the best result for that start.</p>
+  </section>
+
+  <section class="w2-card w2-span2">
+    <details>
+      <summary>How the study works</summary>
+      <ul class="w2-note" style="line-height:1.6;margin:8px 0 0;padding-left:18px">
+        <li>9Sig starts 60% growth (LQQ3) / 40% safe (ERNS) and runs the live quarterly rule at each quarter end: the 9% signal line, half of new money, the large-buy throttle, 30 Down (from SPY), the 100%-up reset and 60/40 resets.</li>
+        <li>Monthly top-ups arrive on the first trading day of each month. In 9Sig they wait as cash for the next quarterly review; in the others they're invested that day.</li>
+        <li>All values are in pounds. SPY, VTI and QQQ are converted with daily GBP/USD rates and include reinvested dividends. Trades fill at that day's close with no dealing costs or tax.</li>
+        <li>Rebuilt history is an estimate: real leveraged funds also pay borrowing and swap costs, so early periods may look better than reality.</li>
+        <li>Data {{ study_first_day|date:"j M Y" }} – {{ study_last_day|date:"j M Y" }}, from Yahoo, downloaded daily.</li>
+      </ul>
+    </details>
+  </section>
+</div>
+{% endif %}
+{% endif %}

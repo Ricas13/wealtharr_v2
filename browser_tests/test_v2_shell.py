@@ -48,6 +48,7 @@ class V2ShellBrowserTests(BrowserHarness):
             ("ledger", "v2_instance_page", [self.instance.pk, "ledger"]),
             ("strategy", "v2_instance_page", [self.instance.pk, "strategy"]),
             ("review", "v2_instance_page", [self.instance.pk, "review"]),
+            ("study", "v2_instance_page", [self.instance.pk, "study"]),
             ("settings", "v2_settings", None),
             ("add-strategy", "v2_add_strategy", None),
         ]

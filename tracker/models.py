@@ -363,6 +363,24 @@ class NotificationDelivery(models.Model):
         constraints = [models.UniqueConstraint(fields=["owner", "channel", "event_key"], name="unique_notification_event")]
 
 
+class StudyPrice(models.Model):
+    """Long daily history for the hypothetical Study tab only.
+
+    Kept apart from MarketObservation: these closes never value real holdings,
+    never feed instructions or alerts, and include dividend-adjusted closes.
+    """
+    symbol = models.CharField(max_length=24)
+    as_of = models.DateField()
+    close = models.DecimalField(max_digits=22, decimal_places=8)
+    adj_close = models.DecimalField(max_digits=22, decimal_places=8)
+    currency = models.CharField(max_length=3)
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["symbol", "as_of"], name="unique_study_close")]
+        ordering = ["symbol", "as_of"]
+
+
 class MarketObservation(models.Model):
     symbol = models.CharField(max_length=24)
     as_of = models.DateField()
