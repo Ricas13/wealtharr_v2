@@ -10,6 +10,8 @@ urlpatterns = [
     path("security/authenticator/", totp_views.configure, name="totp_setup"),
     path("security/verify/", totp_views.challenge, name="totp_challenge"),
     path("cockpit/", include("tracker.cockpit_urls")),
+    # Phased Django/template redesign: isolated from the existing financial cockpit.
+    path("", include("tracker.v2_urls")),
     path("app/", views.dashboard, name="dashboard"),
     path("app/accounts/", views.accounts, name="accounts"),
     path("app/strategies/new/", views.new_strategy, name="new_strategy"),

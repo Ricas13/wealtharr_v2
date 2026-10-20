@@ -1,0 +1,151 @@
+{% extends 'v2/base.html' %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block content %}
+<header class="w2-page-heading">
+  <div>
+    <p class="w2-overline">
+      {% if selected_instance %}{{ selected_instance.name }}
+        <span class="w2-account-label">{{ selected_instance.account.kind }} · {{ selected_instance.account.broker|default:"Platform not set" }}</span>
+      {% elif page_key == 'overview' %}All strategies
+      {% elif page_key == 'settings' %}Applies to all strategies
+      {% elif page_key == 'catalogue' %}Read-only mappings
+      {% else %}Fixed, code-defined strategies{% endif %}
+    </p>
+    <h1>{{ page_title }}</h1>
+  </div>
+  {% if page_key == 'overview' %}
+    <a class="w2-button w2-button-primary" href="{% url 'v2_add_strategy' %}">{% include 'partials/icon.html' with name='plus' %} Add strategy</a>
+  {% endif %}
+</header>
+
+{% if page_key == 'overview' %}
+<section class="w2-stats" aria-label="All strategy metrics">
+  <div class="w2-stat"><p class="w2-label">Total value</p><p class="w2-stat-value">—</p><p class="w2-muted">Not calculated in this phase</p></div>
+  <div class="w2-stat"><p class="w2-label">Contributed</p><p class="w2-stat-value">—</p><p class="w2-muted">Verified ledger only</p></div>
+  <div class="w2-stat"><p class="w2-label">Gain</p><p class="w2-stat-value">—</p><p class="w2-muted">No estimated returns</p></div>
+  <div class="w2-stat"><p class="w2-label">Actions needed</p><p class="w2-stat-value">—</p><p class="w2-muted">Not assessed</p></div>
+</section>
+<div class="w2-two-columns">
+  <div class="w2-column">
+    <section class="w2-panel">
+      <h2>Needs your attention</h2>
+      <div class="w2-empty">Action checks will appear here when the verified strategy-result integration is complete.</div>
+    </section>
+    <section class="w2-panel">
+      <h2>Your strategies</h2>
+      {% if shell_instances %}
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Strategy</th><th>Account</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for item in shell_instances %}
+          <tr><td><a href="{% url 'v2_instance_page' instance_id=item.pk section='today' %}">{{ item.name }}</a></td>
+              <td>{{ item.account.kind }}</td><td><span class="w2-badge">Not assessed</span></td></tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}<div class="w2-empty"><strong>No strategies yet</strong>
+        <p>Add a strategy when the catalogue-backed onboarding is available.</p>
+      </div>{% endif %}
+    </section>
+    <section class="w2-panel"><h2>Coming up</h2><div class="w2-empty">Review dates will come from each strategy's verified schedule.</div></section>
+  </div>
+  <div class="w2-column">
+    <section class="w2-panel"><h2>All strategies · performance</h2>
+      <div class="w2-chart-empty" role="status">No consolidated valuation data displayed yet</div>
+      <p class="w2-note">Only actual, verified price and ledger snapshots will be charted.</p>
+    </section>
+    <section class="w2-panel"><h2>Split by strategy</h2><div class="w2-empty">Awaiting source-backed valuations.</div>
+      <h2 class="w2-subheading">Split by asset type</h2><div class="w2-empty">Awaiting mapped holdings.</div>
+    </section>
+    <section class="w2-panel"><h2>ISA allowance</h2>
+      <div class="w2-empty">Allowance tracking is introduced in the Overview phase; no estimate is shown.</div>
+    </section>
+  </div>
+</div>
+
+{% elif page_key == 'instance' %}
+{% if section == 'today' %}
+<section class="w2-stats" aria-label="Strategy metrics">
+  <div class="w2-stat"><p class="w2-label">Value</p><p class="w2-stat-value">—</p><p class="w2-muted">Awaiting valuation</p></div>
+  <div class="w2-stat"><p class="w2-label">Contributed</p><p class="w2-stat-value">—</p><p class="w2-muted">Ledger integration pending</p></div>
+  <div class="w2-stat"><p class="w2-label">Gain</p><p class="w2-stat-value">—</p><p class="w2-muted">Unverified</p></div>
+  <div class="w2-stat"><p class="w2-label">Next review</p><p class="w2-stat-value">—</p><p class="w2-muted">Not assessed</p></div>
+</section>
+<div class="w2-two-columns"><div class="w2-column">
+  <section class="w2-panel w2-action">
+    <span class="w2-badge w2-warning">Cannot compute yet</span>
+    <h2 class="w2-card-title">No trade instruction available in this shell</h2>
+    <p class="w2-muted">Strategy evaluation and verified data will be connected in Phase 4. This screen does not infer prices or recommend trades.</p>
+  </section>
+  <section class="w2-panel"><h2>Quarter by quarter</h2>
+    <div class="w2-empty">Reviews will appear from recorded evaluations only.</div></section>
+</div><div class="w2-column">
+  <section class="w2-panel"><h2>Performance</h2>
+    <div class="w2-chart-empty">No source-backed valuation series available here</div></section>
+  <section class="w2-panel"><h2>Allocation vs target</h2>
+    <div class="w2-empty">Waiting for verified holdings and mapped instruments.</div></section>
+  <section class="w2-panel"><h2>Metrics</h2><div class="w2-empty">Calculated from real contributions and valuations only.</div></section>
+</div></div>
+{% elif section == 'history' %}
+<section class="w2-panel w2-space-top"><h2>Performance</h2><div class="w2-chart-empty">No verified historical values available in this shell</div></section>
+<div class="w2-metric-grid">
+  {% for label in '123456'|make_list %}<div class="w2-panel"><p class="w2-label">
+    {% if forloop.counter == 1 %}XIRR{% elif forloop.counter == 2 %}Time-weighted{% elif forloop.counter == 3 %}Annualised{% elif forloop.counter == 4 %}Max drawdown{% elif forloop.counter == 5 %}Best period{% else %}Worst period{% endif %}
+    </p><p class="w2-stat-value">—</p></div>{% endfor %}
+</div>
+<section class="w2-panel w2-space-top"><h2>Periodic results</h2><div class="w2-empty">Only real completed periods will be listed.</div></section>
+{% elif section == 'ledger' %}
+<section class="w2-panel w2-space-top">
+  <div class="w2-tab-labels"><span class="w2-tab-active">Entries</span><span>Rebalances</span><span>Change history</span></div>
+  <div class="w2-empty">Ledger listing, editing, import and CSV export are implemented in Phase 3.</div>
+</section>
+{% elif section == 'strategy' %}
+<section class="w2-panel w2-space-top"><h2>How it works</h2>
+  <p class="w2-muted">Fixed strategy rules and version information will be displayed here, read-only.</p>
+  {% if selected_instance.strategy_version %}<p class="w2-note">Recorded strategy version: {{ selected_instance.strategy_version }}</p>{% endif %}
+</section>
+<section class="w2-panel w2-space-top"><h2>Instruments</h2>
+  <div class="w2-empty">A versioned, evidence-aware instrument catalogue will be connected in Phase 2.</div>
+</section>
+<section class="w2-panel w2-space-top"><h2>Alerts for this strategy</h2>
+  <div class="w2-empty">Routing is configured in Phase 7.</div></section>
+{% elif section == 'breakdown' %}
+<div class="w2-two-columns w2-space-top">
+  <section class="w2-panel"><h2>Calculation</h2><div class="w2-empty">Period-by-period auditable calculations will be shown in Phase 5.</div></section>
+  <div class="w2-column">
+    <section class="w2-panel"><h2>Recommended vs recorded</h2><div class="w2-empty">No recommendation inferred.</div></section>
+    <section class="w2-panel"><h2>Data used</h2><div class="w2-empty">Source dates and quote units will be shown here.</div></section>
+    <section class="w2-panel"><h2>Safety checks</h2><div class="w2-empty">No successful price or workbook check is asserted.</div></section>
+  </div>
+</div>
+{% endif %}
+
+{% elif page_key == 'catalogue' %}
+<section class="w2-panel w2-space-top"><h2>Instrument catalogue</h2>
+  <p class="w2-muted">Mappings are maintained in code, not edited by users. Unverified lines never produce trade instructions.</p>
+  <div class="w2-empty">Versioned catalogue and account-type filters arrive in Phase 2.</div>
+</section>
+
+{% elif page_key == 'settings' %}
+<div class="w2-two-columns w2-space-top">
+  <div class="w2-column">
+    <section class="w2-panel"><h2>Notification destinations</h2><div class="w2-empty">Email, Discord and optional push configuration arrive in Phase 7.</div></section>
+    <section class="w2-panel"><h2>Your strategies &amp; accounts</h2>
+      {% for item in shell_instances %}<div class="w2-setting-row"><span>{{ item.name }}</span>
+        <span class="w2-muted">{{ item.account.kind }} · {{ item.account.broker }}</span></div>
+      {% empty %}<div class="w2-empty">No strategies yet.</div>{% endfor %}
+    </section>
+  </div>
+  <div class="w2-column">
+    <section class="w2-panel"><h2>Security</h2><div class="w2-empty">Private authentication is handled by the existing application. New settings arrive in Phase 7.</div></section>
+    <section class="w2-panel"><h2>Data &amp; health</h2><div class="w2-empty">Backup, restore and scheduler health details arrive in Phase 7.</div></section>
+  </div>
+</div>
+
+{% else %}
+<section class="w2-panel w2-space-top"><h2>Add strategy</h2>
+  <div class="w2-empty">The five-step, catalogue-backed onboarding wizard will be introduced in Phase 2.
+    No account or holdings have been created.</div>
+</section>
+{% endif %}
+{% endblock %}
