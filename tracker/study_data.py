@@ -79,7 +79,7 @@ def sync_study_prices(*, fetch=fetch_study_chart, force=False):
     today = timezone.localdate()
     for symbol, (_, currency, _) in STUDY_SYMBOLS.items():
         latest = StudyPrice.objects.filter(symbol=symbol).order_by("-as_of").first()
-        if latest and not force and latest.fetched_at.date() >= today:
+        if latest and not force and timezone.localtime(latest.fetched_at).date() >= today:
             results[symbol] = "fresh"
             continue
         # Always a full download: adjusted closes change after every dividend.
