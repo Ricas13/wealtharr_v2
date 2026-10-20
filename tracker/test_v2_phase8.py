@@ -82,6 +82,25 @@ class V2OnlyRoutingTests(TestCase):
         self.assertEqual(self.client.get("/app/strategies/%s/" % private.pk).status_code,404)
         self.assertContains(self.client.get("/overview/"),"Existing 9Sig")
         self.assertEqual(self.client.get("/s/%s/today/" % private.pk).status_code,404)
+        # The legacy review ID must resolve to its *own* strategy, not the
+        # first account or a generic redirect that hides a foreign ID.
+        own_signal = StrategySignal.objects.create(
+            strategy=b, signal_key="quarter:owned", kind="QUARTERLY",
+            as_of=date(2026, 6, 30), title="Owned", message="Saved",
+        )
+        foreign_signal = StrategySignal.objects.create(
+            strategy=private, signal_key="quarter:private", kind="QUARTERLY",
+            as_of=date(2026, 6, 30), title="Private", message="Saved",
+        )
+        self.assertRedirects(
+            self.client.get("/cockpit/rebalance/%s/" % own_signal.pk),
+            reverse("v2_guided_review", args=[b.pk, own_signal.pk]),
+            status_code=301, fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            self.client.get("/cockpit/rebalance/%s/" % foreign_signal.pk).status_code,
+            404,
+        )
 
     def test_login_restyled_and_authentication_security_retained(self):
         res = self.client.get("/login/")
@@ -108,6 +127,11 @@ class V2OnlyRoutingTests(TestCase):
             strategy=good, as_of=date(2026,3,31),
             total_value=Decimal("1010"), net_contributed=Decimal("1000"),
         )
+        baseline = StrategyBaseline.objects.create(
+            strategy=good, reset_signal=signal, as_of=date(2026, 3, 31),
+            equity_value=Decimal("600"), equity_quantity=Decimal("6"),
+            safe_value=Decimal("400"), cash_value=Decimal("10"),
+        )
         migration = import_module("tracker.migrations.0021_link_legacy_v2")
         class Apps:
             @staticmethod
@@ -119,6 +143,7 @@ class V2OnlyRoutingTests(TestCase):
         self.assertEqual(good.pk,actual.strategy_id)
         self.assertEqual(good.pk,signal.strategy_id)
         self.assertEqual(good.pk,snap.strategy_id)
+        self.assertEqual(good.pk,baseline.strategy_id)
         self.assertEqual(good.strategy_key,"nasdaq-quarterly-target")
         self.assertEqual(good.platform_code,"TRADING212")
         self.assertTrue(good.tracking_only)
@@ -133,3 +158,4 @@ class V2OnlyRoutingTests(TestCase):
         good.refresh_from_db()
         self.assertEqual(good.strategy_key,"")
         self.assertTrue(LedgerEntry.objects.filter(pk=actual.pk, strategy_id=good.pk).exists())
+        self.assertTrue(StrategyBaseline.objects.filter(pk=baseline.pk, strategy_id=good.pk).exists())
