@@ -39,6 +39,12 @@ KIND_GROUPS = (
     ("BUY", "Buys"), ("SELL", "Sells"), ("DIVIDEND", "Dividends"), ("INTEREST", "Interest"), ("FEE", "Fees"),
 )
 TABS = {"entries", "rebalances", "history"}
+# The All / Money / Trades tabs above the entries table.
+FILTER_GROUPS = {
+    "all": ("All", {"DEPOSIT", "WITHDRAW", "DIVIDEND", "INTEREST", "FEE", "BUY", "SELL"}),
+    "money": ("Money", {"DEPOSIT", "WITHDRAW", "DIVIDEND", "INTEREST", "FEE"}),
+    "trades": ("Trades", {"BUY", "SELL"}),
+}
 OPERATIONS = {"new", "edit", "delete", "restore"}
 
 
@@ -126,7 +132,7 @@ def ledger_page(request, instance_id):
     if tab not in TABS:
         tab = "entries"
     kind = request.GET.get("kind", "all")
-    if kind not in dict(KIND_GROUPS):
+    if kind not in dict(KIND_GROUPS) and kind not in FILTER_GROUPS:
         kind = "all"
     search = request.GET.get("q", "").strip()[:100]
     order = request.GET.get("sort", "newest")
@@ -134,7 +140,10 @@ def ledger_page(request, instance_id):
         order = "newest"
     show_deleted = request.GET.get("deleted") == "1"
     entries = effective_entries(strategy, show_deleted=show_deleted)
-    if kind != "all":
+    counts = {key: sum(1 for e in entries if e.kind in kinds) for key, (_, kinds) in FILTER_GROUPS.items()}
+    if kind in FILTER_GROUPS:
+        entries = [e for e in entries if e.kind in FILTER_GROUPS[kind][1]]
+    elif kind != "all":
         entries = [e for e in entries if e.kind == kind]
     if search:
         entries = [
@@ -175,6 +184,7 @@ def ledger_page(request, instance_id):
         ledger_sort=order, ledger_deleted=show_deleted,
         ledger_entries=entries[:200], ledger_count=len(entries),
         ledger_kinds=KIND_GROUPS, ledger_revisions=revisions,
+        ledger_filters=tuple((key, label, counts[key]) for key, (label, _) in FILTER_GROUPS.items()),
         ledger_rebalances=_rebalance_rows(strategy) if tab == "rebalances" else (),
         ledger_summary=summary, ledger_can_edit=_editable(strategy),
     )
