@@ -265,6 +265,8 @@ class NotificationPreference(models.Model):
     email_enabled = models.BooleanField(default=False)
     discord_enabled = models.BooleanField(default=False)
     monthly_reminders = models.BooleanField(default=True)
+    # Owner-selected delay before a weekly outstanding-review reminder.
+    followup_delay_days = models.PositiveSmallIntegerField(default=7)
     # Category-by-channel routing: master destination toggles still apply.
     quarterly_email = models.BooleanField(default=True)
     quarterly_discord = models.BooleanField(default=True)
