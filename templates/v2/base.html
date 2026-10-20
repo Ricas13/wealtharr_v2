@@ -28,37 +28,19 @@
 <div class="w2-shell">
   <aside class="w2-sidebar" id="v2-sidebar" aria-label="Sidebar">
     <nav aria-label="Primary navigation">
+      <a class="w2-nav-brand" href="{% url 'v2_overview' %}"><span class="w2-brand-mark" aria-hidden="true">W</span><span class="w2-nav-label">Wealtharr</span></a>
       <a class="w2-nav-link {% if page_key == 'overview' %}w2-active{% endif %}"
          href="{% url 'v2_overview' %}" {% if page_key == 'overview' %}aria-current="page"{% endif %} title="Overview">
         {% include 'partials/icon.html' with name='home' %}<span class="w2-nav-label">Overview</span>
       </a>
       <p class="w2-nav-caption">Strategies</p>
       {% for item in shell_instances %}
-      <details class="w2-strategy-group" {% if selected_instance.pk == item.pk %}open{% endif %}>
-        <summary class="w2-group-heading" title="{{ item.name }}">
-          <span class="w2-avatar" aria-hidden="true">{{ item.name|slice:":2"|upper }}</span>
-          <span class="w2-nav-label w2-instance-name">{{ item.name }}</span>
-          <span class="w2-account-label">{{ item.account.kind }}</span>
-          {% include 'partials/icon.html' with name='chevron-right' %}
-        </summary>
-        <div class="w2-subnav">
-          <a href="{% url 'v2_instance_page' instance_id=item.pk section='today' %}"
-             {% if selected_instance.pk == item.pk and section == 'today' %}class="w2-active" aria-current="page"{% endif %}>
-             {% include 'partials/icon.html' with name='activity' %}<span>Today</span></a>
-          <a href="{% url 'v2_instance_page' instance_id=item.pk section='history' %}"
-             {% if selected_instance.pk == item.pk and section == 'history' %}class="w2-active" aria-current="page"{% endif %}>
-             {% include 'partials/icon.html' with name='chart' %}<span>History</span></a>
-          <a href="{% url 'v2_instance_page' instance_id=item.pk section='ledger' %}"
-             {% if selected_instance.pk == item.pk and section == 'ledger' %}class="w2-active" aria-current="page"{% endif %}>
-             {% include 'partials/icon.html' with name='wallet' %}<span>Ledger</span></a>
-          <a href="{% url 'v2_instance_page' instance_id=item.pk section='strategy' %}"
-             {% if selected_instance.pk == item.pk and section == 'strategy' %}class="w2-active" aria-current="page"{% endif %}>
-             {% include 'partials/icon.html' with name='shield' %}<span>Strategy</span></a>
-          <a href="{% url 'v2_instance_page' instance_id=item.pk section='breakdown' %}"
-             {% if selected_instance.pk == item.pk and section == 'breakdown' %}class="w2-active" aria-current="page"{% endif %}>
-             {% include 'partials/icon.html' with name='flask' %}<span>Breakdown</span></a>
-        </div>
-      </details>
+      <a class="w2-nav-link {% if selected_instance.pk == item.pk %}w2-active{% endif %}" title="{{ item.name }}"
+         href="{% url 'v2_instance_page' instance_id=item.pk section='today' %}" {% if selected_instance.pk == item.pk %}aria-current="page"{% endif %}>
+        <span class="w2-dot {% if item.tracking_only %}w2-off{% endif %}" aria-hidden="true"></span>
+        <span class="w2-nav-label w2-instance-name">{{ item.name }}</span>
+        <span class="w2-nav-sub w2-nav-label">{% if item.tracking_only %}not live{% else %}{{ item.account.kind }}{% endif %}</span>
+      </a>
       {% empty %}
       <p class="w2-nav-empty w2-nav-label">No strategies yet</p>
       {% endfor %}
@@ -66,14 +48,14 @@
          href="{% url 'v2_add_strategy' %}" {% if page_key == 'add' %}aria-current="page"{% endif %} title="Add strategy">
         {% include 'partials/icon.html' with name='plus' %}<span class="w2-nav-label">Add strategy</span>
       </a>
-      <p class="w2-nav-caption">System</p>
+      <p class="w2-nav-caption">Account</p>
+      <a class="w2-nav-link {% if page_key == 'settings' %}w2-active{% endif %}"
+         href="{% url 'v2_settings' %}" {% if page_key == 'settings' %}aria-current="page"{% endif %} title="Alerts &amp; settings">
+        {% include 'partials/icon.html' with name='settings' %}<span class="w2-nav-label">Alerts &amp; settings</span>
+      </a>
       <a class="w2-nav-link {% if page_key == 'catalogue' %}w2-active{% endif %}"
          href="{% url 'v2_catalogue' %}" {% if page_key == 'catalogue' %}aria-current="page"{% endif %} title="Instrument catalogue">
         {% include 'partials/icon.html' with name='wallet' %}<span class="w2-nav-label">Instrument catalogue</span>
-      </a>
-      <a class="w2-nav-link {% if page_key == 'settings' %}w2-active{% endif %}"
-         href="{% url 'v2_settings' %}" {% if page_key == 'settings' %}aria-current="page"{% endif %} title="Settings">
-        {% include 'partials/icon.html' with name='settings' %}<span class="w2-nav-label">Settings</span>
       </a>
     </nav>
     <div class="w2-sidebar-footer">

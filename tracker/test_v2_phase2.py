@@ -157,7 +157,7 @@ class Phase2WizardTests(TestCase):
         self.assertEqual(entry.quantity, D("0"))
         self.assertFalse(InstanceOpeningSnapshot.objects.exists())
         response = self.client.get(reverse("v2_instance_page", args=[instance.pk, "today"]))
-        self.assertContains(response, "Tracking only")
+        self.assertContains(response, "Not live yet")
         self.assertNotContains(response, "SELL LQQ3")
         self.assertNotContains(response, "£14,820")
 

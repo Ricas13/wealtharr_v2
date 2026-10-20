@@ -84,7 +84,7 @@ class Phase6HistoryBrowserTests(BrowserHarness):
                         "heading",name="Your strategy accounts"
                     ).wait_for()
                     self.assertNotIn("SECRET_UNRELATED_PORTFOLIO",self.page.content())
-                    self.page.get_by_text("Combined value").wait_for()
+                    self.page.get_by_text("Combined value", exact=True).wait_for()
                     self.assertLessEqual(
                         self.page.evaluate("document.documentElement.scrollWidth"),width+1,
                     )
@@ -99,7 +99,7 @@ class Phase6HistoryBrowserTests(BrowserHarness):
                     self.page.get_by_text(
                         "Recorded values — uncertified investment returns"
                     ).wait_for()
-                    self.page.locator('svg[data-w2-history-chart]').wait_for()
+                    self.page.locator('section[aria-label="Return chart"]').wait_for()
                     self.assertNotIn("SECRET_UNRELATED_PORTFOLIO",self.page.content())
                     target=(output if keep else Path(temp))/f"phase6-history-invested-{width}.png"
                     self.page.screenshot(path=str(target),full_page=True)
@@ -119,7 +119,7 @@ class Phase6HistoryBrowserTests(BrowserHarness):
         self.new_page(390)
         self.sign_in()
         self.visit("v2_instance_page",self.invested.pk,"history")
-        self.page.locator('select[name="range"]').select_option("1y")
+        self.page.get_by_role("group", name="Period").get_by_role("link", name="1Y").click()
         self.page.get_by_role("heading",name="Recorded investment history").wait_for()
         self.assertIn("range=1y",self.page.url)
         self.assertIn("Not certified",self.page.content())

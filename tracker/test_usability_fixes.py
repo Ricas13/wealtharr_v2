@@ -142,6 +142,6 @@ class UsabilityFixesTests(TestCase):
         s = self.strategy("9Sig")
         validate_and_record(s, LedgerEntry(kind="DEPOSIT", amount=D("12345.6"), occurred_on=date(2026, 3, 2)))
         page = self.client.get(reverse("v2_instance_page", args=[s.pk, "today"]))
-        self.assertContains(page, '<span class="w2-avatar" aria-hidden="true">9S</span>', html=False)
+        self.assertContains(page, '<span class="w2-nav-label w2-instance-name">9Sig</span>', html=False)
         self.assertContains(page, "ISA · Trading 212")
         self.assertContains(page, "£12,345.60")

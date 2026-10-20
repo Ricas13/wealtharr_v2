@@ -120,53 +120,10 @@
   switchKind();
 }());
 
-/* Phase 6: plot ONLY server-provided, dated recorded GBP amounts.
-   Never imply a rate-of-return or interpolate missing market observations. */
+/* A strategy picker that points its form at that strategy's ledger. */
 (function () {
   "use strict";
-  var svg = document.querySelector("[data-w2-history-chart]");
-  var payload = document.getElementById("v2-history-samples");
-  if (!svg || !payload) return;
-  var points;
-  try { points = JSON.parse(payload.textContent); }
-  catch (_) { return; }
-  if (!Array.isArray(points) || !points.length) return;
-  var data = points.map(function (p) {
-    return { date: p.date, value: Number(p.value), certified: p.certified === true };
-  }).filter(function (p) {
-    return /^\d{4}-\d{2}-\d{2}$/.test(p.date) && Number.isFinite(p.value) &&
-      p.value >= 0 && typeof p.certified === "boolean";
+  document.querySelectorAll("select[data-w2-form-action]").forEach(function (select) {
+    select.addEventListener("change", function () { select.form.action = select.value; });
   });
-  if (!data.length) return;
-  var namespace = "http://www.w3.org/2000/svg";
-  var create = function (tag, attrs, txt) {
-    var node = document.createElementNS(namespace, tag);
-    Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, String(attrs[key])); });
-    if (txt !== undefined) node.textContent = txt;
-    svg.appendChild(node);
-    return node;
-  };
-  var max = Math.max.apply(null, data.map(function (p) { return p.value; }));
-  var min = Math.min.apply(null, data.map(function (p) { return p.value; }));
-  var scale = Math.max(max-min, 1);
-  var X = function (i) { return 52 + i * 620 / Math.max(data.length-1, 1); };
-  var Y = function (v) { return 183-(v-min)/scale*140; };
-  create("path", {d:"M52 25 V183 H677", "class":"w2-chart-axis"});
-  create("text",{x:52,y:18}, "£" + max.toFixed(2));
-  create("text",{x:52,y:207},data[0].date);
-  create("text",{x:575,y:207},data[data.length-1].date);
-  if (data.length > 1) {
-    create("path",{d:data.map(function(p,i){
-      return (i===0?"M":"L")+X(i).toFixed(2)+" "+Y(p.value).toFixed(2);
-    }).join(" "),"class":"w2-chart-line"});
-  }
-  data.forEach(function (p, i) {
-    var circle = create("circle",{
-      cx:X(i).toFixed(2),cy:Y(p.value).toFixed(2),r:4.5,
-      "class":"w2-chart-point"+(p.certified?" w2-chart-certified":"")
-    });
-    var title = document.createElementNS(namespace,"title");
-    title.textContent = p.date+": £"+p.value.toFixed(2)+(p.certified?" (ledger-verified cash)":" (recorded, not certified)");
-    circle.appendChild(title);
-  });
-}());
+})();

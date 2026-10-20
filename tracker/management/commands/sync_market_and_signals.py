@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from tracker.models import MarketObservation, StrategyInstance, StrategyValueSnapshot, WealthSnapshot
-from tracker.market_signals import review_strategy
+from tracker.market_signals import review_strategy, sync_ticker
 from tracker.services import consolidated, ledger_summary
 from tracker.instrument_mapping import for_strategy
 from tracker.models import OpeningReconciliation, InstanceOpeningSnapshot
@@ -71,6 +71,13 @@ class Command(BaseCommand):
                     fail += 1
             except Exception:
                 fail += 1
+        # Index comparison lines only (USD price change); never an input to advice.
+        if owners:
+            for symbol in ("QQQ", "SPY"):
+                try:
+                    sync_ticker(symbol)
+                except Exception:
+                    pass
         for owner in owners:
             # One unverified/changed component blocks an aggregated GBP NAV.
             # Omit neither a real owner strategy nor its cash silently.

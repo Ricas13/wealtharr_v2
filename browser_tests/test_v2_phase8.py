@@ -39,9 +39,6 @@ class Phase8OnlyV2BrowserTests(BrowserHarness):
         )
 
     def test_login_and_ten_owner_views_against_approved_chrome(self):
-        prototype = (Path(settings.BASE_DIR) / "docs/design/app_v2.html").read_text(
-            encoding="utf-8"
-        )
         pages = [
             ("overview","v2_overview",()),
             ("today","v2_instance_page",(self.instance.pk,"today")),
@@ -71,30 +68,18 @@ class Phase8OnlyV2BrowserTests(BrowserHarness):
                     self.assertIn(
                         "/s/%s/today/" % self.instance.pk, self.page.url
                     )
-                    ref = self.ctx.new_page()
-                    ref.route("https://fonts.googleapis.com/**",lambda route:route.abort())
-                    ref.route("https://fonts.gstatic.com/**",lambda route:route.abort())
-                    ref.set_content(prototype,wait_until="domcontentloaded")
-                    ref_bar = ref.locator(".topbar").bounding_box()
-                    ref_rail = ref.locator(".rail").bounding_box()
-                    self.assertIsNotNone(ref_bar)
-                    self.assertIsNotNone(ref_rail)
                     for label,name,args in pages:
                         self.visit(name,*args)
-                        self.page.locator(".w2-page-heading h1").wait_for()
+                        self.page.locator("#v2-main h1").first.wait_for()
                         self.assertNotIn("SECRET_OTHER_OWNER",self.page.content())
                         self.assertLessEqual(
                             self.page.evaluate("document.documentElement.scrollWidth"),
                             width+1,
                         )
-                        top=self.page.locator(".w2-topbar").bounding_box()
-                        rail=self.page.locator(".w2-sidebar").bounding_box()
-                        self.assertAlmostEqual(top["height"],ref_bar["height"],delta=2)
-                        self.assertAlmostEqual(rail["width"],ref_rail["width"],delta=8)
+                        self.assert_compact_chrome(width)
                         screenshot=folder/("phase8-%s-%s.png"%(label,width))
                         self.page.screenshot(path=str(screenshot),full_page=True)
                         self.assertTrue(screenshot.exists())
-                    ref.close()
                     self.assertEqual(self.browser_errors, [])
 
     def test_legacy_bookmark_transparently_opens_v2(self):

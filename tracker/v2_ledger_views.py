@@ -169,9 +169,16 @@ def ledger_page(request, instance_id):
         summary = ledger_summary(strategy)
     except (ValidationError, ArithmeticError):
         summary = None
+    running = _running_cash(strategy)
     return _render(
         request, page_key="instance", page_title="Ledger",
         section="ledger", instance=strategy,
+        ledger_rows=tuple({"entry": e, **running.get(e.pk, {})} for e in entries[:200]),
+        ledger_totals=_totals(strategy),
+        ledger_recent_changes=LedgerRevision.objects.filter(strategy=strategy).exclude(
+            operation="ADD").select_related("entry").order_by("-created_at", "-pk")[:3],
+        ledger_today=timezone.localdate(),
+        ledger_symbols=tuple(x for x in (strategy.equity_symbol, strategy.safe_symbol) if x),
         ledger_tab=tab, ledger_kind=kind, ledger_search=search,
         ledger_sort=order, ledger_deleted=show_deleted,
         ledger_entries=entries[:200], ledger_count=len(entries),
@@ -180,6 +187,48 @@ def ledger_page(request, instance_id):
         ledger_summary=summary, ledger_can_edit=_editable(strategy),
         ledger_unreconciled=_unreconciled(strategy),
     )
+
+
+def _cash_move(entry):
+    if entry.kind in ("DEPOSIT", "DIVIDEND", "INTEREST"):
+        return entry.amount
+    if entry.kind in ("WITHDRAW", "FEE"):
+        return -entry.amount
+    gross = (entry.quantity * entry.unit_price).quantize(D("0.01"))
+    return -(gross + entry.fee) if entry.kind == "BUY" else gross - entry.fee
+
+
+def _running_cash(strategy):
+    """Cash movement and cash balance after each effective entry."""
+    cash = D("0")
+    result = {}
+    for entry in sorted(effective_entries(strategy), key=lambda e: (e.occurred_on, e.pk)):
+        move = _cash_move(entry)
+        cash += move
+        result[entry.pk] = {"move": move, "after": cash}
+    return result
+
+
+def _totals(strategy):
+    totals = {"deposits": D("0"), "withdrawals": D("0"), "income": D("0"),
+              "fees": D("0"), "bought": D("0"), "sold": D("0")}
+    for entry in effective_entries(strategy):
+        gross = (entry.quantity * entry.unit_price).quantize(D("0.01"))
+        if entry.kind == "DEPOSIT":
+            totals["deposits"] += entry.amount
+        elif entry.kind == "WITHDRAW":
+            totals["withdrawals"] += entry.amount
+        elif entry.kind in ("DIVIDEND", "INTEREST"):
+            totals["income"] += entry.amount
+        elif entry.kind == "FEE":
+            totals["fees"] += entry.amount
+        elif entry.kind == "BUY":
+            totals["bought"] += gross
+            totals["fees"] += entry.fee
+        elif entry.kind == "SELL":
+            totals["sold"] += gross
+            totals["fees"] += entry.fee
+    return totals
 
 
 def _input_payload(post, strategy):

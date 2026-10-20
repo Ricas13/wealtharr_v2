@@ -1,68 +1,76 @@
-<section class="w2-panel w2-space-top" aria-labelledby="w2-history-heading">
-  <div class="w2-section-heading">
-    <div><h2 id="w2-history-heading">Recorded investment history</h2>
-    <p class="w2-muted">Recorded GBP values</p></div>
-    <form method="get" aria-label="History date range" class="w2-filterbar">
-      <label>Range<select class="w2-input" name="range" onchange="this.form.submit()">
-        {% for key, name in history_ranges %}
-        <option value="{{ key }}" {% if history.range == key %}selected{% endif %}>{{ name }}</option>
-        {% endfor %}
-      </select></label>
-      <button type="submit" class="w2-button">Apply</button>
-    </form>
-  </div>
-  <div class="w2-notice" role="status">
-    <strong>{% if history.status == 'blocked' %}History blocked{% elif history.status == 'verified_market' %}Source-verified GBP valuation{% elif history.status == 'verified_cash' %}Ledger-backed cash endpoint{% elif history.status == 'recorded_only' %}Recorded values — uncertified investment returns{% else %}No recorded values{% endif %}.</strong>
-    {{ history.reason }}
-  </div>
-  {% if history.points %}
-    <div class="w2-history-figure">
-      <svg class="w2-history-svg" role="img" aria-label="Dated recorded GBP account values, not a return chart"
-           viewBox="0 0 720 230" preserveAspectRatio="xMidYMid meet" data-w2-history-chart></svg>
-      <p class="w2-note">Value chart, not a return series. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
-    </div>
-    {{ history_chart|json_script:"v2-history-samples" }}
-  {% else %}
-    <div class="w2-chart-empty">No dated, reconciled history in the selected range.</div>
-  {% endif %}
+{% load w2_format %}<section class="w2-kpis" aria-label="Performance summary">
+  <div class="w2-kpi"><p class="w2-label">Simple gain</p>
+    <p class="w2-stat-value {{ perf_gain_pct|tone }}">{% if perf_gain_pct is not None %}{{ perf_gain_pct|signed_pct }}{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Annualised (XIRR)</p>
+    <p class="w2-stat-value {{ perf_xirr|tone }}">{% if perf_xirr is not None %}{{ perf_xirr|signed_pct }}{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">vs Nasdaq-100</p>
+    <p class="w2-stat-value {{ perf_vs_nasdaq|tone }}">{% if perf_vs_nasdaq is not None %}{{ perf_vs_nasdaq|signed_num:1 }} pts{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Max drawdown</p>
+    <p class="w2-stat-value {% if not perf_drawdown.empty %}w2-neg{% endif %}">{% if not perf_drawdown.empty %}{{ perf_drawdown.max|signed_pct }}{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Best month</p>
+    <p class="w2-stat-value w2-pos">{% if perf_best %}{{ perf_best.pct|signed_pct }} <small class="w2-muted">{{ perf_best.month|date:"M" }}</small>{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Worst month</p>
+    <p class="w2-stat-value {% if perf_worst.pct < 0 %}w2-neg{% endif %}">{% if perf_worst %}{{ perf_worst.pct|signed_pct }} <small class="w2-muted">{{ perf_worst.month|date:"M" }}</small>{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Recorded for</p>
+    <p class="w2-stat-value">{% if perf_days is not None %}{{ perf_days }} day{{ perf_days|pluralize }}{% else %}—{% endif %}</p></div>
 </section>
-<div class="w2-metric-grid w2-space-top">
-  <div class="w2-panel"><p class="w2-label">Latest recorded value</p>
-    <p class="w2-stat-value">{% if history.last_point %}£{{ history.last_point.value_gbp|floatformat:"2g" }}{% else %}—{% endif %}</p>
-    <p class="w2-muted">{% if history.last_point %}{{ history.last_point.as_of|date:"j M Y" }} · {{ history.last_point.origin }}{% else %}No valuation{% endif %}</p></div>
-  <div class="w2-panel"><p class="w2-label">Net contributed · ledger</p>
-    <p class="w2-stat-value">{% if history.actual_net_funding is not None %}£{{ history.actual_net_funding|floatformat:"2g" }}{% else %}—{% endif %}</p>
-    <p class="w2-muted">Lifetime dated deposits minus withdrawals, not investment return</p></div>
-  <div class="w2-panel"><p class="w2-label">Verified cash gain</p>
-    <p class="w2-stat-value">{% if history.inception and history.inception.cash_gain_gbp is not None %}£{{ history.inception.cash_gain_gbp|floatformat:"2g" }}{% else %}—{% endif %}</p>
-    <p class="w2-muted">Unavailable for unverified invested values</p></div>
-  <div class="w2-panel"><p class="w2-label">Money-weighted return · XIRR</p>
-    <p class="w2-stat-value">{% if history.xirr_pct is not None %}{{ history.xirr_pct|floatformat:2 }}%{% else %}—{% endif %}</p>
-    <p class="w2-muted">Annualised since-inception percentage, based on actual dates.</p></div>
-  <div class="w2-panel"><p class="w2-label">Period time-weighted return</p>
-    <p class="w2-stat-value">{% if history.twr_pct is not None %}{{ history.twr_pct|floatformat:2 }}%{% else %}—{% endif %}</p>
-    <p class="w2-muted">Only with exact flow boundaries; never inferred from the chart</p></div>
-  <div class="w2-panel"><p class="w2-label">Maximum observed drawdown</p>
-    <p class="w2-stat-value">{% if history.drawdown_pct is not None %}{{ history.drawdown_pct|floatformat:2 }}%{% else %}—{% endif %}</p>
-    <p class="w2-muted">Unitised NAV only, when cash-flow-adjusted evidence exists</p></div>
+
+<div class="w2-grid2">
+  <section class="w2-card w2-span2" aria-label="Return chart">
+    {% include 'v2/_chart.html' with c=perf_chart ranges=perf_ranges label="Return since start, deposits removed" height=210 %}
+    <p class="w2-note">Index lines show the index's own price change over the same dates; they're not a simulated portfolio.</p>
+  </section>
+
+  <section class="w2-card">
+    <div class="w2-ch"><h2 class="w2-ct">Monthly</h2><span class="w2-muted">Deposits shown separately</span></div>
+    <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Month</th><th class="w2-r">Start</th><th class="w2-r">Deposits</th><th class="w2-r">End</th><th class="w2-r">Gain £</th><th class="w2-r">Return</th></tr></thead><tbody>
+      {% for m in perf_monthly %}<tr><td>{{ m.month|date:"M Y" }}{% if m.partial %}*{% endif %}</td><td class="w2-r">{{ m.start|floatformat:"2g" }}</td><td class="w2-r">{{ m.deposits|floatformat:"2g" }}</td><td class="w2-r">{{ m.end|floatformat:"2g" }}</td>
+        <td class="w2-r {{ m.gain|tone }}">{{ m.gain|signed_num }}</td>
+        <td class="w2-r {{ m.pct|tone }}">{% if m.pct is not None %}{{ m.pct|signed_pct }}{% else %}—{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="6"><div class="w2-empty">Months appear after the first recorded daily value.</div></td></tr>{% endfor %}
+    </tbody></table></div>
+    {% if perf_monthly %}<p class="w2-note">* Month to date. Return = gain ÷ (start + half the month's deposits).</p>{% endif %}
+  </section>
+
+  <section class="w2-card">
+    <div class="w2-ch"><h2 class="w2-ct">Drawdown from peak</h2>{% if not perf_drawdown.empty %}<span class="w2-muted">Now {{ perf_drawdown.current|signed_pct }}</span>{% endif %}</div>
+    {% if perf_drawdown.empty %}<div class="w2-empty">Needs a few recorded daily values.</div>
+    {% else %}
+    <div class="w2-chart"><svg viewBox="0 0 800 120" preserveAspectRatio="none" style="height:120px" role="img" aria-label="Drawdown from peak, worst {{ perf_drawdown.max }}%">
+      <line class="w2-zero-line" x1="0" y1="0" x2="800" y2="0"></line>
+      <polygon points="{{ perf_drawdown.area }}" style="fill:rgba(242,119,122,.18)"></polygon>
+      <polyline points="{{ perf_drawdown.points }}" style="stroke:#f2777a"></polyline>
+    </svg></div>
+    <div class="w2-axis" aria-hidden="true"><span>{{ perf_drawdown.first|date:"j M y" }}</span><span>{{ perf_drawdown.last|date:"j M y" }}</span></div>
+    {% endif %}
+    <h2 class="w2-ct" style="margin:14px 0 8px">Money in by month</h2>
+    {% if perf_money_in %}
+    <div class="w2-bars" role="img" aria-label="Net deposits by month">{% for m in perf_money_in %}<span style="height:{{ m.height }}%" title="{{ m.month|date:'M Y' }}: £{{ m.amount|floatformat:'2g' }}"></span>{% endfor %}</div>
+    <div class="w2-axis" aria-hidden="true">{% for m in perf_money_in %}<span>{{ m.month|date:"M" }}</span>{% endfor %}</div>
+    {% endif %}
+  </section>
+
+  <section class="w2-card w2-span2">
+    <div class="w2-ch"><h2 class="w2-ct">Period returns</h2><span class="w2-muted">"—" means not enough history</span></div>
+    <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Measure</th>{% for row in perf_returns %}<th class="w2-r">{{ row.label }}</th>{% endfor %}</tr></thead><tbody>
+      <tr><td>You · time-weighted, from recorded daily values</td>{% for row in perf_returns %}<td class="w2-r {{ row.you|tone }}">{% if row.you is not None %}{{ row.you|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>
+      {% for index in perf_index_rows %}<tr><td>{{ index.name }} · USD price</td>{% for value in index.values %}<td class="w2-r">{% if value is not None %}{{ value|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>{% endfor %}
+    </tbody></table></div>
+    <p class="w2-note">Money-weighted (XIRR, annualised since your first deposit): {% if perf_xirr is not None %}{{ perf_xirr }}%{% else %}needs 30+ days{% endif %}.</p>
+  </section>
+
+  <section class="w2-card w2-span2" aria-labelledby="w2-history-heading">
+    <details {% if history.points|length <= 20 %}open{% endif %}>
+      <summary><h2 class="w2-ct" id="w2-history-heading" style="display:inline">Recorded investment history</h2> <span class="w2-muted">· {{ history.points|length }} daily value{{ history.points|length|pluralize }}</span></summary>
+      <p class="w2-note"><strong>{% if history.status == 'blocked' %}History blocked{% elif history.status == 'verified_market' %}Source-verified GBP valuation{% elif history.status == 'verified_cash' %}Ledger-backed cash endpoint{% elif history.status == 'recorded_only' %}Recorded values — uncertified investment returns{% else %}No recorded values{% endif %}.</strong> {{ history.reason }}</p>
+      <h3 class="w2-ct w2-space-top">Source-labelled observation log</h3>
+      <div class="w2-table-wrap w2-space-top"><table class="w2-table w2-history-table">
+        <thead><tr><th>Date</th><th class="w2-r">GBP value</th><th class="w2-r">Net funded</th><th>Origin</th><th>Check</th></tr></thead>
+        <tbody>{% for point in history.points reversed %}
+        <tr><td>{{ point.as_of|date:"j M Y" }}</td><td class="w2-r">£{{ point.value_gbp|floatformat:"2g" }}</td><td class="w2-r">£{{ point.net_contributed_gbp|floatformat:"2g" }}</td><td>{{ point.origin }}</td>
+          <td><span class="w2-chip {% if point.certified %}w2-ok{% endif %}">{% if point.certified %}{% if point.origin == 'Source-checked GBP portfolio close' %}Source-verified GBP{% else %}Ledger-verified cash{% endif %}{% else %}Not certified{% endif %}</span></td></tr>
+        {% empty %}<tr><td colspan="5"><div class="w2-empty">No recorded values yet.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </details>
+  </section>
 </div>
-<section class="w2-panel w2-space-top">
-  <h2>Source-labelled observation log</h2>
-  <p class="w2-note"><span class="w2-badge w2-warning">Data: check needed</span> Only source-matched values count towards returns. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
-  <div class="w2-table-wrap">
-    <table class="w2-table w2-history-table">
-      <thead><tr><th>Date</th><th class="w2-number">GBP value</th><th class="w2-number">Net funded</th><th>Origin</th><th>Verification</th></tr></thead>
-      <tbody>{% for point in history.points %}
-      <tr><td>{{ point.as_of|date:"j M Y" }}</td>
-      <td class="w2-number">£{{ point.value_gbp|floatformat:"2g" }}</td>
-      <td class="w2-number">£{{ point.net_contributed_gbp|floatformat:"2g" }}</td>
-      <td>{{ point.origin }}</td><td>
-        <span class="w2-badge {% if not point.certified %}w2-warning{% endif %}">{% if point.certified %}{% if point.origin == 'Source-checked GBP portfolio close' %}Source-verified GBP{% else %}Ledger-verified cash{% endif %}{% else %}Not certified{% endif %}</span>
-        <small class="w2-muted w2-history-reason">{{ point.reason }}</small>
-      </td></tr>
-      {% empty %}<tr><td colspan="5"><div class="w2-empty">No real values for this range.</div></td></tr>{% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <p class="w2-note">XIRR: money-weighted. TWR: funding-adjusted. <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}">Why?</a></p>
-</section>

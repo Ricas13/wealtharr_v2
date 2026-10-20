@@ -63,7 +63,7 @@ class PersonalPortalRedesignTests(TestCase):
         # A cash-only strategy needs no market quote: GBP cash is its verified value.
         self.assertEqual(response.context["overview_total"], D("1000.00"))
         self.assertContains(response, "Recorded net contributions")
-        self.assertContains(response, "No combined return chart is certified")
+        self.assertContains(response, "Combined value vs money in")
         self.assertContains(response, 'href="#v2-main"')
         self.assertNotContains(response, "Paper portfolio")
 
@@ -82,7 +82,7 @@ class PersonalPortalRedesignTests(TestCase):
         # (including the 1200 value) never inflate the total or the gain.
         self.assertEqual(after.context["overview_total"], D("1000.00"))
         self.assertEqual(after.context["overview_gain"], D("0.00"))
-        self.assertContains(after, "No combined return chart is certified")
+        self.assertNotContains(after, "£1,200")
 
     def test_strategy_tabs_preserve_manual_forms_and_instruments(self):
         for section in ("today", "history", "ledger", "strategy", "breakdown"):

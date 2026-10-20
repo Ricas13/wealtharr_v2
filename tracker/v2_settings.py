@@ -42,6 +42,40 @@ def _delay(raw):
     return value if 1 <= value <= 30 and str(value) == str(raw).strip() else None
 
 
+def strategy_route_rows(strategy):
+    routes = strategy.alert_routes if isinstance(strategy.alert_routes, dict) else {}
+    category_rows = []
+    for category, title in CATEGORIES:
+        key = _INSTANCE_CATEGORY[category]
+        explicit = routes.get(key)
+        # Existing legacy portfolios without per-strategy preferences
+        # inherit global choices until the owner edits this table.
+        inherited = not routes and not strategy.strategy_key
+        category_rows.append({
+            "key": key,
+            "title": title,
+            "when": CATEGORY_WHEN.get(key, ""),
+            "email": (
+                explicit.get("email") is True if isinstance(explicit, dict)
+                else inherited
+            ),
+            "discord": (
+                explicit.get("discord") is True if isinstance(explicit, dict)
+                else inherited
+            ),
+        })
+    return category_rows
+
+
+CATEGORY_WHEN = {
+    "quarterly": "After a quarter end, when trades are needed",
+    "urgent": "Big market drop or a reset to review",
+    "data": "Yahoo prices stale or missing",
+    "unacted": "A review is still not done",
+    "contribution": "Monthly deposit reminder",
+}
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def settings_page(request):
@@ -92,34 +126,15 @@ def settings_page(request):
             }
             strategy.save(update_fields=["alert_routes"])
             messages.success(request, "Alert routing updated for " + strategy.name + ".")
+            if request.POST.get("return_to") == "strategy":
+                return redirect("v2_instance_page", instance_id=strategy.pk, section="strategy")
             return redirect("v2_settings")
         else:
             error = "Unsupported settings action. No preferences were changed."
 
     settings_instances = _instances(request)
-    route_rows = []
-    for strategy in settings_instances:
-        routes = strategy.alert_routes if isinstance(strategy.alert_routes, dict) else {}
-        category_rows = []
-        for category, title in CATEGORIES:
-            key = _INSTANCE_CATEGORY[category]
-            explicit = routes.get(key)
-            # Existing legacy portfolios without per-strategy preferences
-            # inherit global choices until the owner edits this table.
-            inherited = not routes and not strategy.strategy_key
-            category_rows.append({
-                "key": key,
-                "title": title,
-                "email": (
-                    explicit.get("email") is True if isinstance(explicit, dict)
-                    else inherited
-                ),
-                "discord": (
-                    explicit.get("discord") is True if isinstance(explicit, dict)
-                    else inherited
-                ),
-            })
-        route_rows.append({"instance": strategy, "rows": category_rows})
+    route_rows = [{"instance": strategy, "rows": strategy_route_rows(strategy)}
+                  for strategy in settings_instances]
     config = SystemIntegration.objects.filter(pk=1).first()
     last_receipts = list(
         NotificationDelivery.objects.filter(owner=request.user)

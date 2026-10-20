@@ -139,6 +139,9 @@ def today_page(request, instance_id):
                 strategy=strategy, signal=notice
             ).select_related("ledger_entry").order_by("pk"))
             progress = completion_rows(notice, fills)
+            actions = proposed_actions(notice)
+            progress = tuple(dict(row, gbp=actions[row["index"]].get("estimated_gbp"))
+                             for row in progress)
             partial = bool(fills)
         except ValidationError:
             reason = "Recorded fills need audited reconciliation."
@@ -209,11 +212,12 @@ def today_page(request, instance_id):
     )
     symbol_roles = {
         strategy.equity_symbol: "Growth",
-        strategy.safe_symbol: "Defensive",
+        strategy.safe_symbol: "Safe",
     }
     return _render(
-        request, page_key="instance", page_title="Today",
+        request, page_key="instance", page_title="Dashboard",
         instance=strategy, section="today",
+        **_dashboard(request, strategy, report, ready, symbol_roles, next_end),
         today_status=status, today_headline=headline,
         today_explanation=explanation, today_blocking_reason=reason,
         today_ready=ready, today_signal=notice, today_partial=partial, today_executed=executed,
@@ -231,6 +235,44 @@ def today_page(request, instance_id):
             "A return rate is withheld until audited money-flow metrics are available."
         ),
     )
+
+
+def _dashboard(request, strategy, report, ready, roles, next_end):
+    """Cards for the compact dashboard; all read-only and owner-scoped."""
+    from . import v2_dashboard as dash
+    from .core.catalogue import MappingNotAvailable, rows_for
+    try:
+        lines = rows_for(strategy.strategy_key or strategy.preset.slug,
+                         strategy.account.broker, strategy.account.kind)
+    except MappingNotAvailable:
+        lines = ()
+    points = dash.recorded_points(strategy)
+    span = dash.pick_range(request)
+    mode = dash.pick_mode(request)
+    change, change_pct = dash.day_change(points) if ready else (None, None)
+    returns = dash.period_returns(points)
+    return {
+        "dash_points": bool(points),
+        "dash_chart": dash.chart(points, span=span, mode=mode),
+        "dash_ranges": dash.RANGES, "dash_indexes": dash.INDEXES,
+        "dash_day_change": change, "dash_day_pct": change_pct,
+        "dash_gain_pct": (
+            (report["profit"] / report["net_contributed"] * 100).quantize(Decimal("0.1"))
+            if ready and report["value"] is not None and report["net_contributed"] > ZERO
+            else None),
+        "dash_xirr": dash.xirr_pct(strategy, points) if ready else None,
+        "dash_target": dash.growth_target(strategy, report, next_end) if ready else None,
+        "dash_allocation": dash.allocation(report, lines, roles) if ready else None,
+        "dash_quarters": dash.quarter_rows(strategy, next_end, report) if ready else (),
+        "dash_holdings": dash.holdings_detail(strategy, report, roles) if ready else (),
+        "dash_returns": tuple(r for r in returns if r["label"] in (
+            "1 week", "1 month", "3 months", "Since start")),
+        "dash_recent": dash.recent_entries(strategy),
+        "dash_isa": dash.isa_allowance([strategy]),
+        "dash_alerts": dash.alerts_summary(request.user, strategy),
+        "dash_symbols": tuple(x for x in (strategy.equity_symbol, strategy.safe_symbol) if x),
+        "dash_today": timezone.localdate(),
+    }
 
 
 def _review_context(strategy, notice, *, form=None, error=""):
@@ -358,8 +400,50 @@ def guided_review(request, instance_id, signal_id):
             context = _review_context(strategy, notice, error=err)
     return _render(
         request, page_key="instance",
-        page_title="Record actual trades", instance=strategy,
-        section="today", guided_review=True, **context,
+        page_title="Quarterly review", instance=strategy,
+        section="review", guided_review=True,
+        **_review_extras(strategy, notice), **context,
+    )
+
+
+def _review_extras(strategy, notice):
+    """Calculation steps and past reviews shown beside the fills form."""
+    from .v2_breakdown import _detail
+    past = []
+    for signal in strategy.signals.filter(kind="QUARTERLY").order_by("-as_of", "-pk")[:12]:
+        if notice and signal.pk == notice.pk:
+            continue
+        trades = proposed_actions(signal)
+        execution = RebalanceExecution.objects.filter(signal=signal).first()
+        fills = list(SignalFill.objects.filter(signal=signal).select_related("ledger_entry"))
+        past.append({
+            "signal": signal, "trades": trades,
+            "suggested": sum((Decimal(str(a.get("estimated_gbp") or 0)) for a in trades), ZERO),
+            "recorded": sum((f.ledger_entry.quantity * f.ledger_entry.unit_price for f in fills), ZERO),
+            "filled_on": max((f.ledger_entry.occurred_on for f in fills), default=None),
+            "execution": execution,
+        })
+    detail = _detail(strategy, notice) if notice else None
+    return {
+        "review_detail": detail,
+        "review_past": tuple(past),
+        "review_trades": proposed_actions(notice) if notice else (),
+    }
+
+
+@login_required
+@require_GET
+def review_page(request, instance_id):
+    """The current quarter's review, or the latest one, with its calculation."""
+    strategy = _owned(request, instance_id)
+    signals = list(strategy.signals.filter(kind="QUARTERLY").exclude(
+        review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of", "-pk"))
+    notice = signals[0] if signals else None
+    context = _review_context(strategy, notice) if notice else {"review_signal": None}
+    return _render(
+        request, page_key="instance", page_title="Quarterly review",
+        instance=strategy, section="review", guided_review=bool(notice),
+        **_review_extras(strategy, notice), **context,
     )
 
 

@@ -92,10 +92,10 @@ class Phase4TodayBrowserTests(BrowserHarness):
                     for label in ("today", "guided-review"):
                         if label == "guided-review":
                             self.page.get_by_role(
-                                "link", name="Review proposal / I did this"
+                                "link", name="I did this", exact=True
                             ).click()
-                            self.page.get_by_role(
-                                "heading", name="Confirm only what you actually traded"
+                            self.page.get_by_text(
+                                "Confirm only what you actually traded"
                             ).wait_for()
                         output = (captures if keep else Path(temp)) / f"phase4-{label}-{width}.png"
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -111,22 +111,16 @@ class Phase4TodayBrowserTests(BrowserHarness):
         self.page.locator('input[name="quantity"]').fill("1")
         self.page.locator('input[name="unit_price"]').fill("100")
         self.page.locator('input[name="fee"]').fill("0.50")
-        self.assertFalse(
-            self.page.get_by_role(
-                "button", name="I did this · record actual fill"
-            ).is_disabled()
-        )
+        # Without the "done at my broker" tick the browser refuses to submit.
+        self.page.get_by_role("button", name="I did this").click()
+        self.assertEqual(SignalFill.objects.filter(strategy=self.strategy).count(), 0)
         self.page.locator('input[name="actual_confirmation"]').check()
-        self.page.get_by_role(
-            "button", name="I did this · record actual fill"
-        ).click()
-        self.page.get_by_text("All proposed units recorded").wait_for()
+        self.page.get_by_role("button", name="I did this").click()
+        self.page.get_by_text("1 fill recorded").wait_for()
         self.assertEqual(SignalFill.objects.filter(strategy=self.strategy).count(), 1)
         self.page.get_by_role(
             "button", name="Verify and complete review"
         ).click()
-        self.page.get_by_role(
-            "heading", name="Today", level=1
-        ).wait_for()
-        self.assertNotIn("I did this · record actual fill", self.page.content())
+        self.page.locator('a.w2-on[aria-current="page"]', has_text="Dashboard").wait_for()
+        self.assertNotIn('name="actual_confirmation"', self.page.content())
         self.assertEqual(self.browser_errors, [])
