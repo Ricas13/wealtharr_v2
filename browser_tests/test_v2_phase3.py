@@ -47,7 +47,7 @@ class Phase3LedgerBrowserTests(BrowserHarness):
             name="SECRET_OTHER_OWNER_BALANCES",
         )
 
-    def test_ledger_add_preview_edit_delete_history_and_import_390_1440(self):
+    def test_ledger_add_preview_edit_delete_and_history_390_1440(self):
         output = Path(settings.BASE_DIR) / "docs/design/screenshots"
         save = os.getenv("WEALTHARR_CAPTURE_V2_BASELINES") == "1"
         with TemporaryDirectory() as tmp:
@@ -96,9 +96,4 @@ class Phase3LedgerBrowserTests(BrowserHarness):
                     self.page.get_by_role("link", name="Rebalances").click()
                     self.page.get_by_role("heading", name="Recorded quarterly rebalances").wait_for()
                     snap("ledger-rebalances")
-                    self.visit("v2_ledger_import", self.instance.pk)
-                    self.page.get_by_role(
-                        "heading", name="Import original Trading 212 history"
-                    ).wait_for()
-                    snap("ledger-import")
                     self.assertEqual(self.browser_errors, [])

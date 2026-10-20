@@ -10,23 +10,18 @@
   <div class="w2-ledger-buttons">
     {% if ledger_can_edit %}
       <a class="w2-button w2-button-primary" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">+ Add entry</a>
-      <a class="w2-button" href="{% url 'v2_ledger_import' instance_id=selected_instance.pk %}">Import CSV</a>
     {% endif %}
     <a class="w2-button" href="?tab=entries&amp;export=csv">Export CSV</a>
   </div>
 </section>
-{% if ledger_unreconciled %}
-<div class="w2-notice w2-space-top" role="status"><strong>Opening holdings are not reconciled.</strong>
-  An owner-reported snapshot is not an opening trade. Import complete Trading 212 history and match all actual cash and share counts before making manual ledger changes.</div>
-{% endif %}
 {% if not ledger_can_edit %}
 <div class="w2-notice w2-space-top">This legacy strategy's transaction history is read-only here; existing owner cockpit operations remain available. No implicit migration of past data is attempted.</div>
 {% endif %}
 {% if ledger_tab == 'entries' %}
 {% if ledger_summary %}
 <section class="w2-ledger-stats w2-space-top" aria-label="Recorded ledger totals">
-  <div class="w2-panel"><p class="w2-label">Ledger cash</p><p class="w2-stat-value">£{{ ledger_summary.cash|floatformat:2 }}</p></div>
-  <div class="w2-panel"><p class="w2-label">Net contributions</p><p class="w2-stat-value">£{{ ledger_summary.net_contributed|floatformat:2 }}</p></div>
+  <div class="w2-panel"><p class="w2-label">Ledger cash</p><p class="w2-stat-value">£{{ ledger_summary.cash|floatformat:"2g" }}</p></div>
+  <div class="w2-panel"><p class="w2-label">Net contributions</p><p class="w2-stat-value">£{{ ledger_summary.net_contributed|floatformat:"2g" }}</p></div>
   <div class="w2-panel"><p class="w2-label">Current value</p><p class="w2-stat-value">Not verified</p><p class="w2-muted">No invented prices</p></div>
 </section>
 {% endif %}
@@ -63,7 +58,7 @@
       <td class="w2-number">{{ entry.quantity }}</td><td class="w2-number">{{ entry.unit_price }}</td>
       <td class="w2-number">{{ entry.amount }}</td><td class="w2-number">{{ entry.fee }}</td>
       <td class="w2-wrap">{{ entry.note|default:"—" }}</td>
-      <td>{% if entry.imported %}<span class="w2-badge">T212 CSV</span>{% elif entry.linked_fill %}<span class="w2-badge">Rebalance</span>{% else %}<span class="w2-badge">Manual</span>{% endif %}{% if entry.version > 0 %}<small class="w2-muted">v{{ entry.version }}</small>{% endif %}</td>
+      <td>{% if entry.linked_fill %}<span class="w2-badge">Rebalance</span>{% else %}<span class="w2-badge">Manual</span>{% endif %}{% if entry.version > 0 %}<small class="w2-muted">v{{ entry.version }}</small>{% endif %}</td>
       <td>{% if ledger_can_edit and not ledger_unreconciled and not entry.imported and not entry.linked_fill %}
         {% if entry.deleted %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='restore' %}">Restore</a>
         {% else %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='edit' %}">Edit</a>

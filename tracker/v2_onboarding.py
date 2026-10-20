@@ -22,7 +22,7 @@ from .core.catalogue import (
 )
 from .core.isa_allowance import OVERALL_LIMIT_2026_GBP, tax_year_bounds
 from .models import (
-    Account, InstanceOpeningSnapshot, LedgerEntry, StrategyInstance,
+    Account, LedgerEntry, StrategyInstance,
     StrategyPreset,
 )
 from .services import validate_and_record
@@ -76,13 +76,32 @@ def _date(value):
     return parsed
 
 
+OPENING_NOTE = "Opening position you entered (not a broker trade)."
+
+
 def _isa_recorded(owner, as_of):
     start, end = tax_year_bounds(as_of)
     amount = (LedgerEntry.objects.filter(
         strategy__owner=owner, strategy__account__kind="ISA",
         kind=LedgerEntry.DEPOSIT, occurred_on__range=(start, end),
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0"))
+    ).exclude(note=OPENING_NOTE).aggregate(total=Sum("amount"))["total"] or Decimal("0"))
     return amount, start.year == 2026
+
+
+def _draft_start(post, state):
+    """What the owner typed on step 4, kept so a validation error doesn't wipe it."""
+    return {
+        "name": post.get("name", "").strip()[:100],
+        "start": post.get("start", "").strip()[:10],
+        "mode": post.get("mode", "") if post.get("mode") in ("fresh", "hold") else state.get("mode", "fresh"),
+        "amount": post.get("amount", "").strip()[:20],
+        "cash": post.get("cash", "").strip()[:20],
+        "holdings": {
+            line.role: {"shares": post.get("shares_" + line.role, "").strip()[:30],
+                        "average_cost_gbp": post.get("cost_" + line.role, "").strip()[:30]}
+            for line in rows_for(state["strategy"], state["platform"], state["type"])
+        },
+    }
 
 
 def _validated_start(post, state):
@@ -106,11 +125,11 @@ def _validated_start(post, state):
         any_holding = False
         for line in rows_for(state["strategy"], state["platform"], state["type"]):
             shares = _decimal(post.get("shares_" + line.role, ""), line.role + " shares", precision=8)
-            cost = _decimal(post.get("cost_" + line.role, ""), line.role + " average price", precision=8)
+            cost = _decimal(post.get("cost_" + line.role, ""), line.role + " price per share", precision=8)
             if shares > 0 and cost <= 0:
-                raise ValidationError(f"Enter the actual average cost for {line.role} shares.")
+                raise ValidationError(f"Enter the {line.role} price per share on your start date.")
             if shares == 0 and cost != 0:
-                raise ValidationError(f"Remove the average cost when {line.role} shares are zero.")
+                raise ValidationError(f"Remove the {line.role} price when you hold no {line.role} shares.")
             if shares > 0:
                 any_holding = True
             result["holdings"][line.role] = {
@@ -190,11 +209,26 @@ def _enroll(owner, state):
                 note="Actual deposit entered during v2 onboarding.",
             ))
         else:
-            InstanceOpeningSnapshot.objects.create(
-                strategy=instance, reported_on=start,
-                cash_gbp=_decimal(state["cash"], "opening cash"),
-                positions=state["holdings"],
-            )
+            # The holdings the owner entered become the opening position: one
+            # funding entry for their value plus cash, and one buy per holding
+            # at the start-date price. Labelled as owner-entered, not broker trades.
+            cash = _decimal(state["cash"], "opening cash")
+            buys = []
+            for role, holding in state["holdings"].items():
+                shares = Decimal(holding["shares"])
+                price = Decimal(holding["average_cost_gbp"])
+                if shares > 0:
+                    buys.append(LedgerEntry(
+                        kind=LedgerEntry.BUY, symbol=instruments[role].ticker,
+                        quantity=shares, unit_price=price, occurred_on=start, note=OPENING_NOTE,
+                    ))
+            funding = cash + sum(((b.quantity * b.unit_price).quantize(Decimal("0.01")) for b in buys), Decimal("0"))
+            if funding > 0:
+                validate_and_record(instance, LedgerEntry(
+                    kind=LedgerEntry.DEPOSIT, amount=funding, occurred_on=start, note=OPENING_NOTE,
+                ))
+            for buy in buys:
+                validate_and_record(instance, buy)
     return instance
 
 
@@ -232,6 +266,8 @@ def wizard(request):
                     raise ValidationError("Confirm you checked these instruments in your actual account.")
                 state.update(ack=True, step=4)
             elif state["step"] == 4:
+                state.update(_draft_start(request.POST, state))
+                request.session[SESSION_KEY] = state
                 info = _validated_start(request.POST, state)
                 state.update(info)
                 state["step"] = 5

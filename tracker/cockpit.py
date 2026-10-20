@@ -74,7 +74,7 @@ def _price_status(strategy, report):
     if report['missing']:
         return False, 'A held instrument has no price. Fetch verified GBP closes.', []
     if not held:
-        return False, 'Add your actual purchases or import your Trading 212 history.', []
+        return False, 'Record your purchases in the Ledger.', []
     # 9Sig also needs a verified safe-asset quote when that sleeve holds zero
     # shares, because a BUY/SELL instruction may require its price.
     required = list(dict.fromkeys([strategy.equity_symbol, strategy.safe_symbol]))

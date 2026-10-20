@@ -10,7 +10,7 @@ GETs do not sync prices, recalculate trades, or write database records.
 """
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
@@ -25,7 +25,7 @@ from .core.metrics import (
     evaluate_inception, evaluate_period,
 )
 from .models import (
-    InstanceOpeningSnapshot, MarketObservation, StrategyInstance,
+    MarketObservation, StrategyInstance,
     StrategyValueSnapshot, YahooSync,
 )
 from .v2_ledger_core import effective_entries, replay
@@ -62,14 +62,6 @@ def _blocked(strategy):
         return "The account owner and strategy owner differ."
     if strategy.account.currency != "GBP":
         return "GBP history requires an actual GBP account and exact currency data."
-    if InstanceOpeningSnapshot.objects.filter(
-        strategy=strategy, reconciliation__isnull=True
-    ).exists():
-        return "Existing opening holdings require original broker-history reconciliation."
-    if strategy.ledger_revisions.filter(
-        operation__in=("EDIT", "DELETE", "RESTORE")
-    ).exists():
-        return "Historical ledger corrections require separately approved valuation replay."
     return ""
 
 
@@ -351,8 +343,13 @@ def overview_page(request):
     contributed = ZERO
     complete_funding = True
     total = ZERO
-    complete_value = bool(items)
+    included_funding = ZERO
+    included_funding_known = True
+    excluded = []
     today = timezone.localdate()
+    # A strategy counts when it has a certified value from the last 8 days
+    # (latest closes, so weekends and holidays don't blank the total).
+    fresh_after = today - timedelta(days=8)
     for instance in items:
         report = build_history(instance)
         if report["actual_net_funding"] is None:
@@ -360,11 +357,14 @@ def overview_page(request):
         else:
             contributed += report["actual_net_funding"]
         latest = report["latest_certified"]
-        # Consolidation requires ALL components on the exact same valuation day.
-        if not latest or latest.as_of != today:
-            complete_value = False
-        else:
+        if latest and latest.as_of >= fresh_after:
             total += latest.value_gbp
+            if report["actual_net_funding"] is None:
+                included_funding_known = False
+            else:
+                included_funding += report["actual_net_funding"]
+        else:
+            excluded.append(instance.name)
         rows.append({
             "strategy": instance, "status": report["status"],
             "reason": report["reason"], "value": latest.value_gbp if latest else None,
@@ -372,9 +372,9 @@ def overview_page(request):
             "contributed": report["actual_net_funding"],
             "last_recorded": report["last_point"],
         })
-    # No all-strategy value if any component is unvalued or asynchronously dated.
-    aggregate = total if complete_value else None
-    gained = total-contributed if complete_value and complete_funding else None
+    valued = len(items) - len(excluded)
+    aggregate = total if valued else None
+    gained = total - included_funding if valued and included_funding_known else None
     isa_total = sum((row["contributed"] for row in rows
                      if row["strategy"].account.kind == "ISA" and
                      row["contributed"] is not None), ZERO)
@@ -382,7 +382,8 @@ def overview_page(request):
         request, page_key="overview", page_title="Overview",
         overview_rows=rows, overview_total=aggregate,
         overview_contributed=contributed if complete_funding and items else None,
-        overview_gain=gained, overview_same_date=complete_value,
+        overview_gain=gained, overview_same_date=bool(items) and not excluded,
+        overview_excluded=excluded,
         overview_isa_contributed=isa_total, overview_has_isa=any(
             row["strategy"].account.kind == "ISA" for row in rows
         ), overview_review_date=_next_quarter(today),

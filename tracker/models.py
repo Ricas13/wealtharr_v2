@@ -22,6 +22,12 @@ class Account(models.Model):
         ordering = ["name"]
         constraints = [models.UniqueConstraint(fields=["owner", "name"], name="account_unique_owner_name")]
 
+    @property
+    def broker_label(self):
+        """Human platform name, e.g. "Trading 212" for TRADING212."""
+        from .core.catalogue import PLATFORMS
+        return next((label for code, label, _ in PLATFORMS if code == self.broker), self.broker)
+
     def save(self, *args, **kwargs):
         if self.pk:
             original = type(self).objects.filter(pk=self.pk).values(
@@ -160,10 +166,11 @@ class LedgerEntry(models.Model):
     SELL = "SELL"
     DIVIDEND = "DIVIDEND"
     FEE = "FEE"
+    INTEREST = "INTEREST"
     TYPES = [
         (DEPOSIT, "Add money"), (WITHDRAW, "Withdraw money"),
         (BUY, "Buy"), (SELL, "Sell"),
-        (DIVIDEND, "Dividend"), (FEE, "Other fee"),
+        (DIVIDEND, "Dividend"), (INTEREST, "Interest on cash"), (FEE, "Other fee"),
     ]
     strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE, related_name="ledger")
     kind = models.CharField(max_length=12, choices=TYPES)

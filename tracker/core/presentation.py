@@ -107,7 +107,7 @@ def ledger_cash_movement(entry) -> Decimal:
         return entry.amount
     if entry.kind == "WITHDRAW":
         return -entry.amount
-    if entry.kind == "DIVIDEND":
+    if entry.kind in ("DIVIDEND", "INTEREST"):
         return entry.amount
     if entry.kind == "FEE":
         return -entry.amount

@@ -16,8 +16,6 @@ urlpatterns = [
          v2_ledger_views.edit_entry, {"operation": "new"}, name="v2_ledger_add"),
     path("s/<int:instance_id>/ledger/<int:entry_id>/<str:operation>/",
          v2_ledger_views.edit_entry, name="v2_ledger_modify"),
-    path("s/<int:instance_id>/ledger/import/",
-         v2_ledger_views.import_csv, name="v2_ledger_import"),
     path("s/<int:instance_id>/review/<int:signal_id>/",
          v2_today.guided_review, name="v2_guided_review"),
     path("s/<int:instance_id>/notice/<int:signal_id>/feedback/",

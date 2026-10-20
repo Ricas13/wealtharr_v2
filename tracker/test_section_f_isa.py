@@ -4,7 +4,6 @@ from decimal import Decimal as D
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -12,7 +11,6 @@ from django.utils import timezone
 from tracker.core.isa_allowance import estimate_allowance, tax_year_bounds
 from tracker.core.catalogue import CATALOGUE_VERSION, onboarding_manifest, released_version
 from tracker.cockpit_forms import OneScreenSetupForm
-from tracker.cockpit_import import inspect_csv
 from tracker.instrument_mapping import enrolment_manifest, for_strategy
 from tracker.models import Account, LedgerEntry, StrategyInstance, StrategyPreset
 from tracker.services import ledger_summary, validate_and_record
@@ -98,9 +96,6 @@ class OwnerContributionAndImportTests(TestCase):
             resolved_instruments=enrolment_manifest())
         self.client.force_login(self.owner)
 
-    def csv_file(self, csv_text):
-        return SimpleUploadedFile("trades.csv", csv_text.encode("utf-8"),
-                                  content_type="text/csv")
     def v2_deposit_url(self):
         # Only an explicitly pinned tracking instance can use the audited v2
         # deposit flow. Existing legacy data is never silently re-versioned.
@@ -151,24 +146,6 @@ class OwnerContributionAndImportTests(TestCase):
         self.strategy.resolved_instruments["roles"]["growth"]["isin"] = "OTHER"
         self.strategy.save(update_fields=["resolved_instruments"])
         self.assertIsNone(for_strategy(self.strategy))
-
-    def test_duplicate_headers_or_extra_csv_values_refuse_without_writes(self):
-        bad_files = (
-            "Action,Time,Time,Total (GBP),ID\nDeposit,2026-05-01 10:00,2026-05-01 10:00,100,d1\n",
-            "Action,Time,Total (GBP),ID\nDeposit,2026-05-01 10:00,100,d1,unexpected\n",
-        )
-        for text in bad_files:
-            with self.subTest(text=text):
-                try:
-                    entries, errors, duplicates = inspect_csv(
-                        self.csv_file(text), self.strategy)
-                except ValueError as exc:
-                    self.assertIn("headers", str(exc))
-                else:
-                    self.assertFalse(entries)
-                    self.assertTrue(errors)
-                self.assertEqual(self.strategy.ledger.count(), 0)
-
 
 
 class OneScreenOwnerEnrolmentTests(TestCase):
@@ -228,16 +205,10 @@ class OneScreenOwnerEnrolmentTests(TestCase):
         self.assertEqual(strategy.monthly_target, D("0"))
         self.assertEqual(Account.objects.get(pk=previous.pk).broker, "TRADING212")
 
-    def test_existing_history_creates_no_opening_holdings_and_goes_to_preview(self):
+    def test_existing_cash_becomes_the_opening_position(self):
         strategy = self.enroll(mode="hold", cash="175")
-        self.assertEqual(strategy.ledger.count(), 0)
+        self.assertEqual(strategy.ledger.get().amount, D("175.00"))
         self.assertFalse(strategy.prices.exists())
-        from tracker.models import InstanceOpeningSnapshot
-        self.assertEqual(
-            InstanceOpeningSnapshot.objects.get(strategy=strategy).cash_gbp,
-            D("175"))
-        self.assertEqual(self.client.get(reverse(
-            "v2_ledger_import", args=[strategy.pk])).status_code, 200)
 
     def test_mismatched_existing_account_blocks_without_partial_changes(self):
         prior = Account.objects.create(
@@ -250,4 +221,4 @@ class OneScreenOwnerEnrolmentTests(TestCase):
         self.assertNotEqual(strategy.account_id, prior.pk)
         self.assertEqual(strategy.account.kind, "ISA")
         self.assertEqual(strategy.account.broker, "TRADING212")
-        self.assertEqual(strategy.ledger.count(), 0)
+        self.assertEqual(strategy.ledger.get().amount, D("100.00"))

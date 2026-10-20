@@ -90,7 +90,9 @@ class TodayPhase4Tests(TestCase):
         self._add("DEPOSIT", amount="500")
         html = self.client.get(self._url())
         self.assertContains(html, "£500.00")
-        self.assertContains(html, "Cannot compute a reliable instruction")
+        # Cash only, nothing bought yet: the next step is the opening position.
+        self.assertContains(html, "Buy your opening position")
+        self.assertContains(html, "Buy £300.00 of LQQ3.L")
         self.assertContains(html, "Recorded cash only")
         self.assertNotContains(html, "£14,820")
         self.assertNotContains(html, "SECRET_OTHER_OWNER")
@@ -107,7 +109,7 @@ class TodayPhase4Tests(TestCase):
         self.assertContains(page, "Review the verified quarterly proposal")
         self.assertContains(page, "Proposed 1")
         self.assertContains(page, "LQQ3.L")
-        self.assertContains(page, "£1003.00")  # £750 cash + £202 equity + £51 safe
+        self.assertContains(page, "£1,003.00")  # £750 cash + £202 equity + £51 safe
         self.assertNotContains(page, "SECRET_OTHER_OWNER")
         self.assertContains(page, reverse("v2_guided_review", args=[self.strategy.pk, notice.pk]))
         self.assertEqual(SignalFill.objects.count(), 0)
@@ -179,12 +181,18 @@ class TodayPhase4Tests(TestCase):
     def test_signal_changed_by_new_transactions_does_not_show_fresh_order(self):
         self._holdings()
         self._proposal()
+        # New money after quarter-end doesn't change that quarter's trades.
         self._add("DEPOSIT", amount="30", when=self.quarter+timedelta(days=1))
+        p = self.client.get(self._url())
+        self.assertNotContains(p, "ledger changed after this review")
+        # A trade made since the review does change them.
+        self._add("BUY", symbol=self.strategy.safe_symbol, shares="1",
+                  price="10", when=self.quarter+timedelta(days=2))
         p = self.client.get(self._url())
         self.assertContains(p, "ledger changed after this review")
         self.assertNotContains(p, "Review proposal / I did this")
 
-    def test_ledger_revisions_block_further_guidance_and_hourly_snapshots(self):
+    def test_ledger_revision_after_review_makes_it_stale(self):
         self._holdings()
         self._proposal()
         initial = self.strategy.ledger.first()
@@ -199,9 +207,10 @@ class TodayPhase4Tests(TestCase):
             version=1, operation="EDIT", before=original, after=original,
         )
         page = self.client.get(self._url())
+        # A correction made after the review makes that review stale...
         self.assertContains(page, "ledger changed after this review")
         self.assertNotContains(page, "Review proposal / I did this")
-        self.assertIsNone(save_verified_strategy_snapshot(self.strategy))
+        # ...but it no longer blocks valuations forever: they use the corrected ledger.
 
     def test_history_shows_only_saved_snapshots(self):
         StrategyValueSnapshot.objects.create(
@@ -209,6 +218,6 @@ class TodayPhase4Tests(TestCase):
             total_value=D("1150"), net_contributed=D("1000"),
         )
         p = self.client.get(self._url())
-        self.assertContains(p, "£1150.00")
+        self.assertContains(p, "£1,150.00")
         self.assertContains(p, "30 Sep") if self.quarter.month == 9 else None
         self.assertContains(p, "No source-verified portfolio snapshots") if False else None

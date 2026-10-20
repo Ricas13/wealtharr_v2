@@ -331,9 +331,12 @@ def review_strategy(strategy):
                 PriceMark.objects.update_or_create(
                     strategy=strategy, symbol=symbol,
                     defaults={"price": close.price, "as_of": close.as_of, "source": "yahoo"})
-    first_buy = strategy.ledger.filter(
-        kind=LedgerEntry.BUY, symbol=strategy.equity_symbol,
-    ).order_by("occurred_on", "pk").first()
+    # Replay the corrected (effective) ledger so owner edits and deletions
+    # are reflected instead of permanently blocking reviews.
+    from .v2_ledger_core import effective_entries
+    entries = list(effective_entries(strategy))
+    first_buy = next((e for e in entries if e.kind == LedgerEntry.BUY
+                      and e.symbol == strategy.equity_symbol), None)
     if not first_buy:
         return {"status": "waiting for equity purchase"}
     quarter_end = quarter_end_before(now)
@@ -362,7 +365,7 @@ def review_strategy(strategy):
     cash = ZERO
     positions = {}
     injected = []
-    for entry in strategy.ledger.filter(occurred_on__lte=quarter_end).order_by("occurred_on", "pk"):
+    for entry in (e for e in entries if e.occurred_on <= quarter_end):
         qty = positions.get(entry.symbol, ZERO)
         if entry.kind == LedgerEntry.DEPOSIT:
             cash += entry.amount
@@ -372,7 +375,7 @@ def review_strategy(strategy):
             cash -= entry.amount
             if entry.occurred_on > start_date:
                 injected.append((entry.occurred_on, -entry.amount))
-        elif entry.kind == LedgerEntry.DIVIDEND:
+        elif entry.kind in (LedgerEntry.DIVIDEND, LedgerEntry.INTEREST):
             cash += entry.amount
         elif entry.kind == LedgerEntry.FEE:
             cash -= entry.amount
@@ -439,9 +442,9 @@ def review_strategy(strategy):
     # Subsequent buys in the first calendar quarter must not silently
     # inflate the baseline and double-count their funding contributions.
     initial_equity_cost = baseline.equity_value if baseline else sum(
-        (t.quantity * t.unit_price for t in strategy.ledger.filter(
-            symbol=strategy.equity_symbol, kind=LedgerEntry.BUY,
-            occurred_on=first_buy.occurred_on)),
+        (t.quantity * t.unit_price for t in entries
+         if t.symbol == strategy.equity_symbol and t.kind == LedgerEntry.BUY
+         and t.occurred_on == first_buy.occurred_on),
         ZERO)
     if initial_equity_cost <= ZERO:
         return {"status": "missing initial equity investment"}

@@ -13,6 +13,7 @@ from tracker.models import (
     Account, InstanceOpeningSnapshot, LedgerEntry, LedgerRevision,
     MarketObservation, StrategyInstance, StrategyPreset, StrategyValueSnapshot,
 )
+from tracker.v2_ledger_core import snapshot
 from tracker.services import validate_and_record
 from tracker.v2_history import build_history
 
@@ -71,7 +72,7 @@ class V2HistoryTests(TestCase):
         self.assertEqual(report["points"][0].origin, "Replayed GBP ledger cash")
         self.assertTrue(report["points"][0].certified)
         self.assertContains(self.client.get(self._url()), "Ledger-backed cash endpoint")
-        self.assertContains(self.client.get(self._url()), "£1000.00")
+        self.assertContains(self.client.get(self._url()), "£1,000.00")
 
     def test_irregular_deposits_and_withdrawals_never_become_return(self):
         self._record(amount="1000")
@@ -100,7 +101,7 @@ class V2HistoryTests(TestCase):
         self.assertFalse(report["points"][0].certified)
         self.assertIn("raw vendor quote-unit", report["reason"])
         page = self.client.get(self._url())
-        self.assertContains(page, "£1350.00")
+        self.assertContains(page, "£1,350.00")
         self.assertContains(page, "Not certified")
         self.assertContains(page, "XIRR")
         self.assertNotContains(page, "1350.00%", html=False)
@@ -215,24 +216,22 @@ class V2HistoryTests(TestCase):
         self.assertIsNone(report["period"].max_drawdown)
         self.assertEqual(report["period"].reason_code, "MISSING_FLOW_BOUNDARIES")
 
-    def test_unreconciled_opening_and_ledger_revisions_block_all_metrics(self):
+    def test_opening_snapshot_and_corrections_do_not_block_history(self):
+        # History replays the corrected ledger rather than freezing after an edit.
         self._record()
-        opening=InstanceOpeningSnapshot.objects.create(
+        InstanceOpeningSnapshot.objects.create(
             strategy=self.account,reported_on=self.start,
             cash_gbp=D("1000"),positions={},
         )
-        report=build_history(self.account)
-        self.assertEqual(report["status"],"blocked")
-        self.assertIn("reconciliation",report["reason"])
-        opening.delete()
         entry=self.account.ledger.first()
+        corrected=snapshot(entry)
+        corrected["amount"]=str(entry.amount+D("1"))
         LedgerRevision.objects.create(
             strategy=self.account,entry=entry,actor=self.owner,
-            version=1,operation="EDIT",before={},after={},
+            version=1,operation="EDIT",before=snapshot(entry),after=corrected,
         )
         report=build_history(self.account)
-        self.assertEqual(report["status"],"blocked")
-        self.assertIsNone(report["inception"])
+        self.assertNotEqual(report["status"],"blocked")
 
     def test_cross_owner_history_and_overview_never_expose_private_rows(self):
         self._record(self.private, amount="987654")
@@ -248,23 +247,25 @@ class V2HistoryTests(TestCase):
         self.assertEqual(self.client.get(reverse("v2_overview")).status_code,302)
         self.assertEqual(self.client.get(self._url()).status_code,302)
 
-    def test_overview_all_or_nothing_even_with_one_verified_cash_account(self):
+    def test_overview_totals_valued_strategies_and_names_the_rest(self):
         self._record(amount="1000")
         sibling=self._instance(self.owner,"Second ISA")
         self._record(sibling,amount="500")
         page=self.client.get(reverse("v2_overview"))
-        self.assertContains(page,"Combined verified value")
+        self.assertContains(page,"Combined value")
         self.assertEqual(page.context["overview_total"],D("1500"))
         self.assertEqual(page.context["overview_contributed"],D("1500"))
-        self.assertContains(page,"£1500.00")
+        self.assertContains(page,"£1,500.00")
         self._record(sibling,amount="0",kind="BUY",
                      day=self.start+timedelta(days=1),symbol="LQQ3.L",
                      qty="2",price="100")
         later=self.client.get(reverse("v2_overview"))
-        self.assertIsNone(later.context["overview_total"])
-        self.assertIsNone(later.context["overview_gain"])
-        self.assertContains(later,"Withheld: some accounts")
-        self.assertContains(later,"£1500.00")  # real net contributions persist
+        # The sibling now holds shares with no price yet: it's left out and named.
+        self.assertEqual(later.context["overview_total"],D("1000"))
+        self.assertEqual(later.context["overview_gain"],D("0"))
+        self.assertEqual(later.context["overview_excluded"],["Second ISA"])
+        self.assertContains(later,"Excludes Second ISA (not valued yet)")
+        self.assertContains(later,"£1,500.00")  # real net contributions persist
 
     def test_range_filters_recorded_points_but_not_inception_funding(self):
         self._record()

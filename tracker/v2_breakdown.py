@@ -149,10 +149,6 @@ def _trace(strategy, as_of):
     if (strategy.account.currency != "GBP" or
             strategy.equity_symbol != "LQQ3.L" or strategy.safe_symbol != "ERNS.L"):
         return None, "Unmapped or non-GBP strategy holdings."
-    if strategy.ledger_revisions.filter(
-        operation__in=("EDIT", "DELETE", "RESTORE")
-    ).exists():
-        return None, "Audited ledger corrections require a separately approved historical re-evaluation."
     opening = InstanceOpeningSnapshot.objects.filter(strategy=strategy).first()
     if opening and not hasattr(opening, "reconciliation"):
         return None, "The reported opening positions are not reconciled against original broker history."
@@ -294,9 +290,9 @@ def _detail(strategy, signal):
         spy_result = None
     warn = ("Stored signals predate an edited ledger. No saved order may be "
             "certified as matching that revised history."
-            if strategy.ledger_revisions.filter(
-                operation__in=("EDIT", "DELETE", "RESTORE")
-            ).exists() else "")
+            if strategy.ledger_revisions.filter(created_at__gt=signal.created_at)
+                    .exclude(operation="ADD").exists()
+            else "")
     return {
         "signal": signal, "as_of": as_of, "quality": quality,
         "trace": trace, "trace_error": trace_error,

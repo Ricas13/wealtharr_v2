@@ -106,8 +106,14 @@ def _check_current(locked, signal):
 
 
 def _external_after_signal(locked, signal, fills):
+    """Trades or withdrawals since the review, other than its own fills.
+
+    New money, dividends or interest after quarter-end don't change the
+    quarter's trades, so they don't block recording them.
+    """
     linked = {fill.ledger_entry_id for fill in fills}
-    actual = set(locked.ledger.filter(occurred_on__gt=signal.as_of)
+    actual = set(locked.ledger.filter(occurred_on__gt=signal.as_of,
+                                      kind__in=("BUY", "SELL", "WITHDRAW"))
                  .values_list("pk", flat=True))
     return actual != linked
 

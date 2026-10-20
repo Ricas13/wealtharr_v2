@@ -36,7 +36,7 @@
       {% for item in shell_instances %}
       <details class="w2-strategy-group" {% if selected_instance.pk == item.pk %}open{% endif %}>
         <summary class="w2-group-heading" title="{{ item.name }}">
-          <span class="w2-avatar" aria-hidden="true">{{ item.preset.name|slice:":2"|upper }}</span>
+          <span class="w2-avatar" aria-hidden="true">{{ item.name|slice:":2"|upper }}</span>
           <span class="w2-nav-label w2-instance-name">{{ item.name }}</span>
           <span class="w2-account-label">{{ item.account.kind }}</span>
           {% include 'partials/icon.html' with name='chevron-right' %}

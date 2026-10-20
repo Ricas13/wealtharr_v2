@@ -6,7 +6,7 @@ from tracker.models import MarketObservation, StrategyInstance, StrategyValueSna
 from tracker.market_signals import review_strategy
 from tracker.services import consolidated, ledger_summary
 from tracker.instrument_mapping import for_strategy
-from tracker.models import LedgerRevision, OpeningReconciliation, InstanceOpeningSnapshot
+from tracker.models import OpeningReconciliation, InstanceOpeningSnapshot
 
 
 def save_verified_strategy_snapshot(strategy):
@@ -14,8 +14,6 @@ def save_verified_strategy_snapshot(strategy):
     # Never write a verified snapshot for an owner-reported or revised ledger
     # before the exact account and historical cashflows are reconciled.
     if (strategy.tracking_only or for_strategy(strategy) is None or
-            LedgerRevision.objects.filter(strategy=strategy,
-                operation__in=("EDIT", "DELETE", "RESTORE")).exists() or
             InstanceOpeningSnapshot.objects.filter(strategy=strategy,
                 reconciliation__isnull=True).exists()):
         return None
@@ -61,8 +59,6 @@ class Command(BaseCommand):
             owners.add(strategy.owner)
             try:
                 if (for_strategy(strategy) is None or
-                        LedgerRevision.objects.filter(strategy=strategy,
-                            operation__in=("EDIT", "DELETE", "RESTORE")).exists() or
                         InstanceOpeningSnapshot.objects.filter(strategy=strategy,
                             reconciliation__isnull=True).exists()):
                     fail += 1
@@ -80,8 +76,6 @@ class Command(BaseCommand):
             # Omit neither a real owner strategy nor its cash silently.
             if (StrategyInstance.objects.filter(owner=owner,
                     tracking_only=True).exclude(account__kind="PAPER").exists() or
-                    LedgerRevision.objects.filter(strategy__owner=owner,
-                        operation__in=("EDIT", "DELETE", "RESTORE")).exists() or
                     InstanceOpeningSnapshot.objects.filter(strategy__owner=owner,
                         reconciliation__isnull=True).exists()):
                 continue

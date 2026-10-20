@@ -19,7 +19,7 @@
       <dl class="w2-settings-details">
         <div><dt>Strategy</dt><dd>{{ selected_instance.name }}</dd></div>
         <div><dt>Account</dt><dd>{{ selected_instance.account.name }} · {{ selected_instance.account.kind }}</dd></div>
-        <div><dt>Platform</dt><dd>{{ selected_instance.account.broker }}</dd></div>
+        <div><dt>Platform</dt><dd>{{ selected_instance.account.broker_label }}</dd></div>
         <div><dt>Jurisdiction</dt><dd>{{ selected_instance.account.country }}</dd></div>
         <div><dt>Started</dt><dd>{{ selected_instance.started_on|date:"j M Y"|default:"Legacy start not pinned" }}</dd></div>
         <div><dt>Strategy version</dt><dd>{{ selected_instance.strategy_version|default:"Legacy version not pinned" }}</dd></div>
@@ -42,7 +42,7 @@
     {% if strategy_tracking_only %}
     <section class="w2-panel w2-go-live" id="go-live">
       <h2>Go live</h2>
-      <p class="w2-muted">This strategy is tracking-only: no live prices and no instructions. Check the two instruments below in your {{ selected_instance.account.broker }} {{ selected_instance.account.kind }}, then confirm.</p>
+      <p class="w2-muted">This strategy is tracking-only: no live prices and no instructions. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm.</p>
       <form method="post" action="{% url 'v2_go_live' instance_id=selected_instance.pk %}">
         {% csrf_token %}
         <label class="w2-check"><input type="checkbox" name="confirm" value="yes" required> <span>{{ strategy_attestation }}</span></label>
@@ -76,7 +76,7 @@
       <h2>Owner-reported opening holdings</h2>
       <p class="w2-note">Opening positions need broker-history reconciliation.</p>
       {% if selected_instance.opening_snapshot %}
-      <p class="w2-muted">Reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }} · cash £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:2 }}</p>
+      <p class="w2-muted">Reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }} · cash £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:"2g" }}</p>
       <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Role</th><th>Shares</th><th>Reported GBP cost</th></tr></thead><tbody>
       {% for role, holding in selected_instance.opening_snapshot.positions.items %}
       <tr><td>{{ role|capfirst }}</td><td>{{ holding.shares }}</td><td>{{ holding.average_cost_gbp }}</td></tr>

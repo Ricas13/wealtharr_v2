@@ -38,10 +38,10 @@
       <p class="w2-note">Engine formula: opening growth line × 1.09, plus 50% of actual net deposits/withdrawals dated inside the quarter. This is not a 60/40 quarterly rebalance target.</p>
       {% if breakdown_detail.trace %}
         <div class="w2-review-metadata">
-          <div><span>Starting growth basis</span><strong>£{{ breakdown_detail.trace.starting|floatformat:2 }}</strong></div>
+          <div><span>Starting growth basis</span><strong>£{{ breakdown_detail.trace.starting|floatformat:"2g" }}</strong></div>
           <div><span>Recorded basis date</span><strong>{{ breakdown_detail.trace.anchor_date|date:"j M Y" }}</strong></div>
-          <div><span>Reconstructed target</span><strong>£{{ breakdown_detail.trace.line|floatformat:2 }}</strong></div>
-          <div><span>Recorded historical cash</span><strong>£{{ breakdown_detail.trace.cash|floatformat:2 }}</strong></div>
+          <div><span>Reconstructed target</span><strong>£{{ breakdown_detail.trace.line|floatformat:"2g" }}</strong></div>
+          <div><span>Recorded historical cash</span><strong>£{{ breakdown_detail.trace.cash|floatformat:"2g" }}</strong></div>
         </div>
         <p class="w2-note">{{ breakdown_detail.trace.anchor_label }}. This trace alone cannot certify the original review's quantities.</p>
         <div class="w2-table-wrap"><table class="w2-table">

@@ -26,7 +26,7 @@ from .core.presentation import account_value, holding_rows
 from .instrument_mapping import for_strategy
 from .market_signals import NINE_SIG_RULE_VERSION, quarter_end_before
 from .models import (
-    LedgerRevision, RebalanceExecution, SignalFill, StrategyInstance,
+    RebalanceExecution, SignalFill, StrategyInstance,
     StrategySignal, StrategyValueSnapshot,
 )
 from .services import ledger_summary
@@ -45,14 +45,6 @@ def _owned(request, instance_id):
     )
 
 
-def _ledger_corrections(strategy):
-    # Phase 5 must explicitly replay and re-approve any historic signal after
-    # an overlay revision. Suppress new trade guidance meanwhile.
-    return LedgerRevision.objects.filter(
-        strategy=strategy, operation__in=("EDIT", "DELETE", "RESTORE")
-    ).exists()
-
-
 def _readiness(strategy, report):
     if strategy.tracking_only:
         return False, (
@@ -63,11 +55,6 @@ def _readiness(strategy, report):
         return False, (
             "Your owner-reported opening holdings are not reconciled against "
             "actual broker history. Import and verify the original transactions."
-        ), ()
-    if _ledger_corrections(strategy):
-        return False, (
-            "Your ledger has audited corrections. Historical quarterly reviews "
-            "must be recalculated and approved separately before trade advice."
         ), ()
     fresh, why, marks = _price_status(strategy, report)
     if not fresh:
@@ -82,6 +69,27 @@ def _readiness(strategy, report):
                 or strategy.mapping_version != MAPPING_VERSION):
             return False, "The pinned strategy or mapping version has changed.", marks
     return True, "", marks
+
+
+def _opening_buys(strategy, cash):
+    """Target-weight split of uninvested cash for a strategy that holds nothing yet."""
+    from .core.catalogue import rows_for
+    from .models import MarketObservation
+    lines = rows_for(strategy.strategy_key or strategy.preset.slug,
+                     strategy.account.broker, strategy.account.kind)
+    fresh_after = timezone.localdate() - timedelta(days=8)
+    rows = []
+    for line in lines:
+        amount = (cash * line.weight).quantize(Decimal("0.01"))
+        quote = MarketObservation.objects.filter(
+            symbol=line.ticker, currency="GBP", as_of__gte=fresh_after,
+        ).order_by("-as_of").first()
+        rows.append({
+            "symbol": line.ticker, "role": line.role_label, "pct": line.weight_pct,
+            "amount": amount, "price": quote.price if quote else None,
+            "shares": (amount / quote.price).quantize(Decimal("0.01")) if quote else None,
+        })
+    return tuple(rows)
 
 
 def _signal_rows(strategy):
@@ -137,19 +145,20 @@ def today_page(request, instance_id):
             ready = False
     elif notice and notice.kind not in ("THIRTY_DOWN", "SPIKE_WATCH"):
         notice = None
+    # New money after quarter-end doesn't change the quarter's trades; trades,
+    # withdrawals or corrections made since the review do.
     if notice and notice.kind == "QUARTERLY" and not partial and (
-            strategy.ledger.filter(occurred_on__gt=notice.as_of).exists()
-            or strategy.ledger_revisions.filter(
-                operation__in=("EDIT", "DELETE", "RESTORE")
-            ).exists()):
+            strategy.ledger.filter(occurred_on__gt=notice.as_of,
+                                   kind__in=("BUY", "SELL", "WITHDRAW")).exists()
+            or strategy.ledger_revisions.filter(created_at__gt=notice.created_at)
+                .exclude(operation="ADD").exists()):
         ready = False
         reason = (
             "The ledger changed after this review. An updated, verified "
             "evaluation is needed before relying on its quantities."
         )
     if (notice and notice.kind == "QUARTERLY" and partial and
-            not strategy.tracking_only and not _unreconciled(strategy)
-            and not _ledger_corrections(strategy)):
+            not strategy.tracking_only and not _unreconciled(strategy)):
         status = "record"
         headline = "Finish recording actual fills"
         explanation = (
@@ -162,6 +171,14 @@ def today_page(request, instance_id):
         status = "review"
         headline = notice.title
         explanation = notice.message
+    elif (not strategy.tracking_only and not report["positions"]
+          and report["cash"] > ZERO and not _unreconciled(strategy)):
+        status = "start"
+        headline = "Buy your opening position"
+        explanation = (
+            "Split your cash at the target weights, place the buys in "
+            f"{strategy.account.broker_label}, "
+            "then record what you actually bought.")
     elif not ready:
         status = "blocked"
         headline = ("Not live yet" if strategy.tracking_only
@@ -201,12 +218,13 @@ def today_page(request, instance_id):
         today_explanation=explanation, today_blocking_reason=reason,
         today_ready=ready, today_signal=notice, today_partial=partial, today_executed=executed,
         today_progress=progress if (status in ("trade", "record")) else (),
+        today_opening=_opening_buys(strategy, report["cash"]) if status == "start" else (),
         today_value=display_value, today_gain=gain,
         today_cash=report["cash"], today_contributed=report["net_contributed"],
         today_quote_date=price_date, today_next_review=next_end,
         today_days_to_review=(next_end-timezone.localdate()).days,
         today_holdings=holding_rows(report, roles=symbol_roles, show_quotes=ready),
-        today_snapshots=() if _ledger_corrections(strategy) else _snapshot_rows(strategy),
+        today_snapshots=_snapshot_rows(strategy),
         today_quarters=_signal_rows(strategy),
         today_chart_caution=(
             "Only persisted GBP-evidenced valuation dates are listed. "
@@ -230,8 +248,7 @@ def _review_context(strategy, notice, *, form=None, error=""):
     ).exists()
     current = notice.as_of == quarter_end_before(timezone.localdate())
     blocked = (
-        strategy.tracking_only or _unreconciled(strategy)
-        or _ledger_corrections(strategy) or
+        strategy.tracking_only or _unreconciled(strategy) or
         not current or completed or
         notice.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")
     )

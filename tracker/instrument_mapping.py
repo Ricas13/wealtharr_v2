@@ -205,7 +205,7 @@ def for_historical_import(strategy):
     """
     if not getattr(strategy, "strategy_key", ""):
         return for_strategy(strategy)
-    if (not strategy.tracking_only or not strategy.owner_checked_on or
+    if (not strategy.owner_checked_on or
             strategy.strategy_key != strategy.preset.slug or
             strategy.strategy_key != STRATEGY_9SIG or
             strategy.account.owner_id != strategy.owner_id or
