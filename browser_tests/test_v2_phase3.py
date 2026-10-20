@@ -8,7 +8,7 @@ from django.test import override_settings
 from django.utils import timezone
 from datetime import timedelta
 
-from browser_tests.test_owner_journeys import BrowserHarness
+from browser_tests.harness import BrowserHarness
 from tracker.models import Account, StrategyInstance, StrategyPreset
 from tracker.core.catalogue import onboarding_manifest, released_version, CATALOGUE_VERSION
 
