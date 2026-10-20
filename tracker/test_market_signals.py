@@ -160,23 +160,33 @@ class MarketWorkflowTests(TestCase):
         )
 
     def test_only_owner_can_update_monitoring_settings_or_acknowledge(self):
-        url = reverse("save_automation", args=[self.strategy.pk])
+        # Monitoring/instrument selections cannot be changed by POSTing old
+        # parameters through the retired mutation endpoint or v2 Settings.
+        retired = reverse("save_automation", args=[self.strategy.pk])
         self.client.force_login(self.other)
-        response = self.client.post(url, {
-            "equity_symbol": "CHANGED.L", "safe_symbol": "ERNS.L", "market_data_enabled": "on",
-        })
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.client.post(retired, {
+            "equity_symbol": "CHANGED.L", "market_data_enabled": "on",
+        }).status_code, 404)
+        self.assertEqual(self.client.post(reverse("v2_settings"), {
+            "form_kind": "strategy", "strategy_id": str(self.strategy.pk),
+            "route_urgent_email": "on",
+        }).status_code, 404)
         self.strategy.refresh_from_db()
         self.assertEqual(self.strategy.equity_symbol, "LQQ3.L")
         self.client.force_login(self.owner)
-        response = self.client.post(url, {
-            "equity_symbol": " LQQ3.L ", "safe_symbol": " ERNS.L ",
-            "market_data_enabled": "on",
+        self.assertEqual(self.client.post(retired, {
+            "equity_symbol": "CHANGED.L", "market_data_enabled": "on",
+        }).status_code, 405)
+        response = self.client.post(reverse("v2_settings"), {
+            "form_kind": "strategy", "strategy_id": str(self.strategy.pk),
+            "equity_symbol": "CHANGED.L", "safe_symbol": "ERNS.L",
+            "route_urgent_email": "on",
         })
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("v2_settings"))
         self.strategy.refresh_from_db()
         self.assertTrue(self.strategy.market_data_enabled)
         self.assertEqual(self.strategy.equity_symbol, "LQQ3.L")
+        self.assertTrue(self.strategy.alert_routes["urgent"]["email"])
 
     def test_review_creates_and_deduplicates_persistent_notifications(self):
         start = timezone.localdate() - __import__("datetime").timedelta(days=95)
@@ -250,12 +260,12 @@ class MarketWorkflowTests(TestCase):
         self.assertEqual(PriceMark.objects.get(strategy=self.strategy, symbol="LQQ3.L").source, "yahoo")
 
         signal = StrategySignal.objects.get(strategy=self.strategy, kind="THIRTY_DOWN")
-        url = reverse("acknowledge_signal", args=[self.strategy.pk, signal.pk])
+        url = reverse("v2_notice_feedback", args=[self.strategy.pk, signal.pk])
         self.client.force_login(self.other)
-        self.assertEqual(self.client.post(url).status_code, 404)
+        self.assertEqual(self.client.post(url, {"outcome": "CONFIRMED"}).status_code, 404)
         signal.refresh_from_db()
         self.assertIsNone(signal.acknowledged_at)
         self.client.force_login(self.owner)
-        self.assertEqual(self.client.post(url).status_code, 302)
+        self.assertEqual(self.client.post(url, {"outcome": "CONFIRMED"}).status_code, 302)
         signal.refresh_from_db()
         self.assertIsNotNone(signal.acknowledged_at)
