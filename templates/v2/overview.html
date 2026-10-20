@@ -1,0 +1,68 @@
+<section class="w2-stats" aria-label="Owner portfolio summary">
+  <div class="w2-stat"><p class="w2-label">Combined verified value</p>
+    <p class="w2-stat-value">{% if overview_total is not None %}£{{ overview_total|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">{% if overview_same_date %}All selected accounts · same date{% else %}Withheld: some accounts lack a same-date verified valuation{% endif %}</p></div>
+  <div class="w2-stat"><p class="w2-label">Recorded net contributions</p>
+    <p class="w2-stat-value">{% if overview_contributed is not None %}£{{ overview_contributed|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">All listed accounts · actual lifetime deposits less withdrawals</p></div>
+  <div class="w2-stat"><p class="w2-label">Verified gain</p>
+    <p class="w2-stat-value">{% if overview_gain is not None %}£{{ overview_gain|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">Unavailable unless every included account is verified</p></div>
+  <div class="w2-stat"><p class="w2-label">Next calendar quarter end</p>
+    <p class="w2-stat-value">{{ overview_review_date|date:"j M Y" }}</p>
+    <p class="w2-muted">A review date is not an instruction to trade</p></div>
+</section>
+<div class="w2-two-columns w2-space-top">
+  <div class="w2-column">
+    <section class="w2-panel">
+      <h2>Your strategy accounts</h2>
+      <p class="w2-note">No silent consolidation. Two ISA strategy instances remain two separate ledgers and histories.</p>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Strategy</th><th>Account</th><th>Last certified value</th><th>History status</th></tr></thead>
+        <tbody>{% for row in overview_rows %}
+          <tr><td><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='today' %}">{{ row.strategy.name }}</a>
+            <small><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='history' %}">View history</a></small></td>
+            <td>{{ row.strategy.account.kind }} · {{ row.strategy.account.broker }}</td>
+            <td>{% if row.value is not None %}£{{ row.value|floatformat:2 }} <small>{{ row.as_of|date:"j M Y" }}</small>{% else %}—{% endif %}</td>
+            <td><span class="w2-badge {% if row.status != 'verified_cash' and row.status != 'verified_market' %}w2-warning{% endif %}">{% if row.status == 'verified_cash' %}Cash verified{% elif row.status == 'verified_market' %}Source-verified GBP{% elif row.status == 'blocked' %}Blocked{% elif row.status == 'recorded_only' %}Stored, unverified{% else %}No history{% endif %}</span></td></tr>
+          {% empty %}<tr><td colspan="4"><div class="w2-empty">No strategies yet. Add a strategy to start recording real deposits or broker history.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+    <section class="w2-panel">
+      <h2>Needs your attention</h2>
+      {% for row in overview_rows %}
+        {% if row.status != 'verified_cash' and row.status != 'verified_market' %}
+        <div class="w2-setting-row"><span><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='history' %}">{{ row.strategy.name }}</a>
+          <small class="w2-muted w2-history-reason">{{ row.reason }}</small></span>
+          <span class="w2-badge w2-warning">Review data</span></div>
+        {% endif %}
+      {% empty %}<p class="w2-muted">Add your first strategy to start tracking.</p>{% endfor %}
+      <p class="w2-note">For actual quarter-end actions, open each strategy’s Today page. An unverified portfolio does not imply that no action is due.</p>
+    </section>
+  </div>
+  <div class="w2-column">
+    <section class="w2-panel">
+      <h2>Portfolio performance</h2>
+      <p class="w2-notice">Combined XIRR and TWR are unavailable until independently verified contemporaneous valuations and all external cashflow boundaries cover every strategy. Adding individual return percentages would be mathematically invalid.</p>
+      <div class="w2-chart-empty" role="status">No combined return chart is certified yet</div>
+    </section>
+    <section class="w2-panel">
+      <h2>Split by strategy</h2>
+      <p class="w2-note">Verified same-day GBP values only; unknown amounts are not treated as zero.</p>
+      {% if overview_same_date %}
+        {% for row in overview_rows %}
+        <div class="w2-setting-row"><span>{{ row.strategy.name }}</span><strong>£{{ row.value|floatformat:2 }}</strong></div>
+        {% endfor %}
+      {% else %}<div class="w2-empty">Allocation withheld until every account has a comparable verified date.</div>{% endif %}
+      <h2 class="w2-subheading">Split by asset type</h2>
+      <p class="w2-note">No synthetic look-through or unsupported ETP exposure equivalents. A cash-only portfolio has no estimated security allocation.</p>
+    </section>
+    <section class="w2-panel">
+      <h2>UK ISA contributions</h2>
+      {% if overview_has_isa %}
+        <p class="w2-muted">Lifetime net funding recorded within Wealtharr ISA strategies: £{{ overview_isa_contributed|floatformat:2 }}.</p>
+        <p class="w2-note">Not an ISA allowance estimate. Withdrawals and flexible ISA replacements, contributions at other providers and current UK tax-year rules are not fully established here.</p>
+      {% else %}<p class="w2-muted">No recorded Wealtharr ISA strategy account.</p>{% endif %}
+    </section>
+  </div>
+</div>

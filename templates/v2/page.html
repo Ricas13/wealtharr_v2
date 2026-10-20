@@ -19,62 +19,14 @@
 </header>
 
 {% if page_key == 'overview' %}
-<section class="w2-stats" aria-label="All strategy metrics">
-  <div class="w2-stat"><p class="w2-label">Total value</p><p class="w2-stat-value">—</p><p class="w2-muted">Not calculated in this phase</p></div>
-  <div class="w2-stat"><p class="w2-label">Contributed</p><p class="w2-stat-value">—</p><p class="w2-muted">Verified ledger only</p></div>
-  <div class="w2-stat"><p class="w2-label">Gain</p><p class="w2-stat-value">—</p><p class="w2-muted">No estimated returns</p></div>
-  <div class="w2-stat"><p class="w2-label">Actions needed</p><p class="w2-stat-value">—</p><p class="w2-muted">Not assessed</p></div>
-</section>
-<div class="w2-two-columns">
-  <div class="w2-column">
-    <section class="w2-panel">
-      <h2>Needs your attention</h2>
-      <div class="w2-empty">Action checks will appear here when the verified strategy-result integration is complete.</div>
-    </section>
-    <section class="w2-panel">
-      <h2>Your strategies</h2>
-      {% if shell_instances %}
-      <div class="w2-table-wrap"><table class="w2-table">
-        <thead><tr><th>Strategy</th><th>Account</th><th>Status</th></tr></thead>
-        <tbody>
-          {% for item in shell_instances %}
-          <tr><td><a href="{% url 'v2_instance_page' instance_id=item.pk section='today' %}">{{ item.name }}</a></td>
-              <td>{{ item.account.kind }}</td><td><span class="w2-badge">Not assessed</span></td></tr>
-          {% endfor %}
-        </tbody>
-      </table></div>
-      {% else %}<div class="w2-empty"><strong>No strategies yet</strong>
-        <p>Add a strategy when the catalogue-backed onboarding is available.</p>
-      </div>{% endif %}
-    </section>
-    <section class="w2-panel"><h2>Coming up</h2><div class="w2-empty">Review dates will come from each strategy's verified schedule.</div></section>
-  </div>
-  <div class="w2-column">
-    <section class="w2-panel"><h2>All strategies · performance</h2>
-      <div class="w2-chart-empty" role="status">No consolidated valuation data displayed yet</div>
-      <p class="w2-note">Only actual, verified price and ledger snapshots will be charted.</p>
-    </section>
-    <section class="w2-panel"><h2>Split by strategy</h2><div class="w2-empty">Awaiting source-backed valuations.</div>
-      <h2 class="w2-subheading">Split by asset type</h2><div class="w2-empty">Awaiting mapped holdings.</div>
-    </section>
-    <section class="w2-panel"><h2>ISA allowance</h2>
-      <div class="w2-empty">Allowance tracking is introduced in the Overview phase; no estimate is shown.</div>
-    </section>
-  </div>
-</div>
+{% include 'v2/overview.html' %}
 
 {% elif page_key == 'instance' %}
 {% if section == 'today' %}
 {% if guided_review %}{% include 'v2/guided_review.html' %}
 {% else %}{% include 'v2/today.html' %}{% endif %}
 {% elif section == 'history' %}
-<section class="w2-panel w2-space-top"><h2>Performance</h2><div class="w2-chart-empty">No verified historical values available in this shell</div></section>
-<div class="w2-metric-grid">
-  {% for label in '123456'|make_list %}<div class="w2-panel"><p class="w2-label">
-    {% if forloop.counter == 1 %}XIRR{% elif forloop.counter == 2 %}Time-weighted{% elif forloop.counter == 3 %}Annualised{% elif forloop.counter == 4 %}Max drawdown{% elif forloop.counter == 5 %}Best period{% else %}Worst period{% endif %}
-    </p><p class="w2-stat-value">—</p></div>{% endfor %}
-</div>
-<section class="w2-panel w2-space-top"><h2>Periodic results</h2><div class="w2-empty">Only real completed periods will be listed.</div></section>
+{% include 'v2/history.html' %}
 {% elif section == 'ledger' %}
 {% if ledger_edit %}{% include 'v2/ledger_edit.html' %}
 {% elif ledger_import %}{% include 'v2/ledger_import.html' %}

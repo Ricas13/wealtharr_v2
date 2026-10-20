@@ -9,6 +9,7 @@ import re
 from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone as utc_timezone
 from decimal import Decimal, ROUND_DOWN
+from dataclasses import dataclass
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -27,6 +28,19 @@ ZERO = Decimal("0")
 CENTS = Decimal("0.01")
 PRECISION = Decimal("0.0001")
 TICKER = re.compile(r"^[A-Z0-9][A-Z0-9.^=_-]{0,23}$")
+
+
+@dataclass(frozen=True)
+class FetchedChart:
+    """Two-value unpacking retained; raw vendor metadata stays attached."""
+    currency: str
+    series: list
+    raw_unit: str
+    raw_closes: dict
+
+    def __iter__(self):
+        yield self.currency
+        yield self.series
 
 
 def fetch_chart(symbol, since):
@@ -76,20 +90,23 @@ def fetch_chart(symbol, since):
     divisor = Decimal(100) if raw_currency in ("GBp", "GBX") else Decimal(1)
     closes = ((chart.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
     series = []
+    raw_closes = {}
     for epoch, raw in zip(chart.get("timestamp") or [], closes):
         if raw is None:
             continue
         try:
-            amount = (Decimal(str(raw)) / divisor).quantize(Decimal("0.00000001"))
+            raw_amount = Decimal(str(raw)).quantize(Decimal("0.00000001"))
+            amount = (raw_amount / divisor).quantize(Decimal("0.00000001"))
             day = datetime.fromtimestamp(epoch, tz=utc_timezone.utc).date()
             if amount > ZERO and day <= timezone.localdate():
                 series.append((day, amount))
+                raw_closes[day] = raw_amount
         except (ValueError, ArithmeticError, OverflowError):
             continue
     series = sorted(dict(series).items())
     if not series:
         raise ValueError("No usable Yahoo daily closes")
-    return currency, series
+    return FetchedChart(currency, series, raw_currency, raw_closes)
 
 
 def sync_ticker(symbol, *, force=False):
@@ -106,7 +123,8 @@ def sync_ticker(symbol, *, force=False):
     state.last_attempt = now
     state.save(update_fields=["last_attempt"])
     try:
-        currency, series = fetch_chart(symbol, since)
+        fetched = fetch_chart(symbol, since)
+        currency, series = fetched
         # Screen the new batch before *any* upsert. A suspicious daily jump
         # (including an unhandled split/restrike or 100x pence error) stays
         # on hold; no later signal may use the older mark as though fresh.
@@ -130,10 +148,29 @@ def sync_ticker(symbol, *, force=False):
             state.save(update_fields=["last_error"])
             LOG.warning("Market price revision on hold for %s", symbol)
             return None
-        observations = [
-            MarketObservation(symbol=symbol, as_of=day, price=price, currency=currency)
-            for day, price in series
-        ]
+        # Capture original quote units only from this vendor response.
+        # A patched/legacy two-tuple cannot assert original unit provenance.
+        raw_unit = getattr(fetched, "raw_unit", "")
+        raw_series = getattr(fetched, "raw_closes", {})
+        pinned = {"LQQ3.L": ("GBp", "GBX"), "ERNS.L": ("GBP",),
+                  "SPY": ("USD",), "TQQQ": ("USD",)}
+        accepted_raw = bool(raw_unit and raw_unit in pinned.get(symbol, ()))
+        observations = []
+        for day, price in series:
+            raw = raw_series.get(day) if accepted_raw else None
+            factor = Decimal("100") if raw_unit in ("GBp", "GBX") else Decimal("1")
+            justified = bool(
+                accepted_raw and isinstance(raw, Decimal) and raw.is_finite()
+                and raw > ZERO and
+                (raw / factor).quantize(Decimal("0.00000001")) == price
+            )
+            observations.append(MarketObservation(
+                symbol=symbol, as_of=day, price=price, currency=currency,
+                source="yahoo" if justified else "",
+                raw_quote_unit=raw_unit if justified else "",
+                raw_close=raw if justified else None,
+                raw_unit_verified=justified,
+            ))
         MarketObservation.objects.bulk_create(
             observations, batch_size=250, ignore_conflicts=True,
         )

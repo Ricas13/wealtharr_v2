@@ -50,7 +50,8 @@ def _render(request, *, page_key, page_title, instance=None, section=None, **ext
 
 @login_required
 def overview(request):
-    return _render(request, page_key="overview", page_title="Overview")
+    from .v2_history import overview_page
+    return overview_page(request)
 
 
 @login_required
@@ -66,6 +67,9 @@ def instance_page(request, instance_id, section):
     if section == "breakdown":
         from .v2_breakdown import breakdown_page
         return breakdown_page(request, instance_id)
+    if section == "history":
+        from .v2_history import history_page
+        return history_page(request, instance_id)
     instance = get_object_or_404(
         StrategyInstance.objects.select_related("account", "preset"),
         pk=instance_id,

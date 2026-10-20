@@ -1,0 +1,68 @@
+<section class="w2-panel w2-space-top" aria-labelledby="w2-history-heading">
+  <div class="w2-section-heading">
+    <div><h2 id="w2-history-heading">Recorded investment history</h2>
+    <p class="w2-muted">Only real stored GBP snapshots and replayed actual ledger cash · no modelled backtests</p></div>
+    <form method="get" aria-label="History date range" class="w2-filterbar">
+      <label>Range<select class="w2-input" name="range" onchange="this.form.submit()">
+        {% for key, name in history_ranges %}
+        <option value="{{ key }}" {% if history.range == key %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select></label>
+      <button type="submit" class="w2-button">Apply</button>
+    </form>
+  </div>
+  <div class="w2-notice" role="status">
+    <strong>{% if history.status == 'blocked' %}History blocked{% elif history.status == 'verified_market' %}Source-verified GBP valuation{% elif history.status == 'verified_cash' %}Ledger-backed cash endpoint{% elif history.status == 'recorded_only' %}Recorded values — uncertified investment returns{% else %}No recorded values{% endif %}.</strong>
+    {{ history.reason }}
+  </div>
+  {% if history.points %}
+    <div class="w2-history-figure">
+      <svg class="w2-history-svg" role="img" aria-label="Dated recorded GBP account values, not a return chart"
+           viewBox="0 0 720 230" preserveAspectRatio="xMidYMid meet" data-w2-history-chart></svg>
+      <p class="w2-note">This line connects saved observations; it does not represent returns. Deposits and withdrawals change raw GBP value. No interpolation is used to calculate XIRR, TWR or drawdown.</p>
+    </div>
+    {{ history_chart|json_script:"v2-history-samples" }}
+  {% else %}
+    <div class="w2-chart-empty">No dated, reconciled history in the selected range.</div>
+  {% endif %}
+</section>
+<div class="w2-metric-grid w2-space-top">
+  <div class="w2-panel"><p class="w2-label">Latest recorded value</p>
+    <p class="w2-stat-value">{% if history.last_point %}£{{ history.last_point.value_gbp|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">{% if history.last_point %}{{ history.last_point.as_of|date:"j M Y" }} · {{ history.last_point.origin }}{% else %}No valuation{% endif %}</p></div>
+  <div class="w2-panel"><p class="w2-label">Net contributed · ledger</p>
+    <p class="w2-stat-value">{% if history.actual_net_funding is not None %}£{{ history.actual_net_funding|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">Lifetime dated deposits minus withdrawals, not investment return</p></div>
+  <div class="w2-panel"><p class="w2-label">Verified cash gain</p>
+    <p class="w2-stat-value">{% if history.inception and history.inception.cash_gain_gbp is not None %}£{{ history.inception.cash_gain_gbp|floatformat:2 }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">Unavailable for unverified invested values</p></div>
+  <div class="w2-panel"><p class="w2-label">Money-weighted return · XIRR</p>
+    <p class="w2-stat-value">{% if history.xirr_pct is not None %}{{ history.xirr_pct|floatformat:2 }}%{% else %}—{% endif %}</p>
+    <p class="w2-muted">Annualised since-inception percentage, based on actual dates.</p></div>
+  <div class="w2-panel"><p class="w2-label">Period time-weighted return</p>
+    <p class="w2-stat-value">{% if history.twr_pct is not None %}{{ history.twr_pct|floatformat:2 }}%{% else %}—{% endif %}</p>
+    <p class="w2-muted">Only with exact flow boundaries; never inferred from the chart</p></div>
+  <div class="w2-panel"><p class="w2-label">Maximum observed drawdown</p>
+    <p class="w2-stat-value">{% if history.drawdown_pct is not None %}{{ history.drawdown_pct|floatformat:2 }}%{% else %}—{% endif %}</p>
+    <p class="w2-muted">Unitised NAV only, when cash-flow-adjusted evidence exists</p></div>
+</div>
+<section class="w2-panel w2-space-top">
+  <h2>Source-labelled observation log</h2>
+  <p class="w2-note">A database snapshot can record a GBP number without retaining its original raw GBX quote source. Cash-only dates matching the ledger, or invested dates rebuilt with contemporaneous owner holdings and captured exact raw GBX/GBP Yahoo source, can be certified. Other rows are recorded only and cannot contribute to reported performance.</p>
+  <div class="w2-table-wrap">
+    <table class="w2-table w2-history-table">
+      <thead><tr><th>Date</th><th class="w2-number">GBP value</th><th class="w2-number">Net funded</th><th>Origin</th><th>Verification</th></tr></thead>
+      <tbody>{% for point in history.points %}
+      <tr><td>{{ point.as_of|date:"j M Y" }}</td>
+      <td class="w2-number">£{{ point.value_gbp|floatformat:2 }}</td>
+      <td class="w2-number">£{{ point.net_contributed_gbp|floatformat:2 }}</td>
+      <td>{{ point.origin }}</td><td>
+        <span class="w2-badge {% if not point.certified %}w2-warning{% endif %}">{% if point.certified %}{% if point.origin == 'Source-checked GBP portfolio close' %}Source-verified GBP{% else %}Ledger-verified cash{% endif %}{% else %}Not certified{% endif %}</span>
+        <small class="w2-muted w2-history-reason">{{ point.reason }}</small>
+      </td></tr>
+      {% empty %}<tr><td colspan="5"><div class="w2-empty">No real values for this range.</div></td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="w2-note">XIRR is annualised and money-weighted. TWR excludes external funding movements and needs source-matched before/after funding valuations. These are different measures and are never substituted for one another.</p>
+</section>
