@@ -64,6 +64,21 @@ jobs:
           printf 'ci-test-db-only-not-real-secret' > secrets/postgres_password
           printf 'ci-test-django-key-only-not-real-secret' > secrets/django_secret_key
           docker compose config --quiet
+          # Catch unescaped shell $ variables that Compose interpolates
+          # before the long-running PostgreSQL backup shell receives them.
+          # No Docker service is started and no environment value is printed.
+          docker compose config --format json | python3 -c '
+import json, sys
+rendered = json.load(sys.stdin)["services"]["backups"]["command"]
+shell = "\\n".join(rendered) if isinstance(rendered, list) else rendered
+required = (
+    "stamp=$(date -u +%Y%m%dT%H%M%SZ)",
+    "sha256sum \\"wealtharr-$stamp.dump\\" > \\"wealtharr-$stamp.dump.sha256\\"",
+)
+for item in required:
+    assert item in shell, "Backup Compose variable escaped incorrectly"
+print("Backup checksum stamp preserved at shell runtime")
+'
           WEALTHARR_HOST=wealtharr.vpn4u.cc \
           TRAEFIK_DOCKER_NETWORK=ci_private_proxy \
           TRAEFIK_CERT_RESOLVER=ci_resolver \
