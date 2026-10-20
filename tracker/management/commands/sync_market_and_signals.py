@@ -5,10 +5,20 @@ from django.utils import timezone
 from tracker.models import MarketObservation, StrategyInstance, StrategyValueSnapshot, WealthSnapshot
 from tracker.market_signals import review_strategy
 from tracker.services import consolidated, ledger_summary
+from tracker.instrument_mapping import for_strategy
+from tracker.models import LedgerRevision, OpeningReconciliation, InstanceOpeningSnapshot
 
 
 def save_verified_strategy_snapshot(strategy):
     """Capture source-verified quote-day growth without inventing a historical fill."""
+    # Never write a verified snapshot for an owner-reported or revised ledger
+    # before the exact account and historical cashflows are reconciled.
+    if (strategy.tracking_only or for_strategy(strategy) is None or
+            LedgerRevision.objects.filter(strategy=strategy,
+                operation__in=("EDIT", "DELETE", "RESTORE")).exists() or
+            InstanceOpeningSnapshot.objects.filter(strategy=strategy,
+                reconciliation__isnull=True).exists()):
+        return None
     summary = ledger_summary(strategy)
     if summary["value"] is None or not summary["positions"]:
         return None
@@ -46,9 +56,17 @@ class Command(BaseCommand):
         fail = 0
         owners = set()
         for strategy in StrategyInstance.objects.select_related("account", "preset", "owner").filter(
-                market_data_enabled=True, preset__slug="nasdaq-quarterly-target", preset__active=True):
+                market_data_enabled=True, tracking_only=False,
+                preset__slug="nasdaq-quarterly-target", preset__active=True):
             owners.add(strategy.owner)
             try:
+                if (for_strategy(strategy) is None or
+                        LedgerRevision.objects.filter(strategy=strategy,
+                            operation__in=("EDIT", "DELETE", "RESTORE")).exists() or
+                        InstanceOpeningSnapshot.objects.filter(strategy=strategy,
+                            reconciliation__isnull=True).exists()):
+                    fail += 1
+                    continue
                 result = review_strategy(strategy)
                 save_verified_strategy_snapshot(strategy)
                 if result["status"] == "ok":
@@ -58,6 +76,15 @@ class Command(BaseCommand):
             except Exception:
                 fail += 1
         for owner in owners:
+            # One unverified/changed component blocks an aggregated GBP NAV.
+            # Omit neither a real owner strategy nor its cash silently.
+            if (StrategyInstance.objects.filter(owner=owner,
+                    tracking_only=True).exclude(account__kind="PAPER").exists() or
+                    LedgerRevision.objects.filter(strategy__owner=owner,
+                        operation__in=("EDIT", "DELETE", "RESTORE")).exists() or
+                    InstanceOpeningSnapshot.objects.filter(strategy__owner=owner,
+                        reconciliation__isnull=True).exists()):
+                continue
             report = consolidated(owner)
             if report["total"] is None or not report["items"]:
                 continue

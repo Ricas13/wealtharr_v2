@@ -1,5 +1,16 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
+## APPROVED v2 DESIGN — Phase 4 handoff (19 October 2026)
+
+- Phase 4 stacked branch: `feature/v2-phase4-today-guided-review-stacked`, created directly from Phase 3 `feature/v2-phase3-versioned-ledger`. PR #12 (Phase 1), #13 (Phase 2) and #15 (Phase 3) are separate draft PRs with passing CI on their earlier verified heads. Phase 4 must target Phase 3; merge in sequence, retargeting each after predecessors merge. There is an unrelated owner-approved 9Sig methodology PR #14; **do not silently merge/cherry-pick or change its quantitative decisions**.
+- `tracker/v2_today.py` is a read-only per-owner Today adapter: one status card (action, urgent manual review, actual partial fills, idle or blocked), real net contribution/cash totals and only source-verified price-date value and gains, recorded completed quarter results and versioned valuation snapshots. No arbitrary live price fetches, silent review generation or fictitious 60/40 quarterly target.
+- Guided `I did this` page submits exact owner-confirmed dated quantity/GBP fill price/fee through the **existing** `record_single_fill` and `finalize_manual_review` functions. One actual fill at a time with idempotency UUID. Latest uncompleted quarterly period may be resumed; completed/historical/reset baselines stay immutable. A data hold never becomes advice. Explicitly checked broker execution required; Wealtharr never places an order.
+- The existing `sync_market_and_signals` hourly command is tightened: exclude v2 tracking-only instances and any unreconciled snapshots or audited ledger corrections; do not produce consolidated NAV when any non-paper component is blocked. Existing verified quote-day evidence rules stay intact; no extra scheduler and no math changes.
+- New code/data: `tracker/v2_today.py`, `templates/v2/today.html`, `templates/v2/guided_review.html`, new stable per-instance guided route, updated v2 URL/page/CSS, added `tracker/test_v2_phase4.py` and Chromium `browser_tests/test_v2_phase4.py` (390px/1440px screenshots). **Inspect live GitHub CI and fix until green**; do not claim completed testing based on queued runs.
+- Boundary: New instances from the Phase 2 wizard intentionally remain tracking_only=True while exact personal Trading 212 permissions and quote units are unverified. Historical imported trades do not unlock advice. The next phase must address audited strategy evaluation and data readout, but MUST preserve the fact that a confirmation checkmark is NOT proof of broker permissions. Real owner-only evidence is already listed in `docs/OWNER_TODO.md`.
+- Next requested phase: Phase 5 Breakdown: deterministic and auditable per-quarter calculations, reference history, explicit version/pinning, data quality and refusal reasons, documented 9Sig decision/DEMO replay compatibility. Never change engine maths outside a separately approved quantitative PR.
+
+---
 ## APPROVED v2 DESIGN — Phase 3 handoff (19 October 2026)
 
 - Current work: Phase 3 branch `feature/v2-phase3-versioned-ledger`, stacked on Phase 2 (`feature/v2-phase2-instances-catalogue`). Phase 1 PR #12 and Phase 2 PR #13 were confirmed green at their current heads when this phase started. Phase 3 targets Phase 2 so that its diff contains only Phase 3; merge sequentially #12 -> #13 -> Phase 3, retarget after earlier merges.

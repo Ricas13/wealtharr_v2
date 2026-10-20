@@ -65,27 +65,8 @@
 
 {% elif page_key == 'instance' %}
 {% if section == 'today' %}
-<section class="w2-stats" aria-label="Strategy metrics">
-  <div class="w2-stat"><p class="w2-label">Value</p><p class="w2-stat-value">—</p><p class="w2-muted">Awaiting valuation</p></div>
-  <div class="w2-stat"><p class="w2-label">Contributed</p><p class="w2-stat-value">—</p><p class="w2-muted">Ledger integration pending</p></div>
-  <div class="w2-stat"><p class="w2-label">Gain</p><p class="w2-stat-value">—</p><p class="w2-muted">Unverified</p></div>
-  <div class="w2-stat"><p class="w2-label">Next review</p><p class="w2-stat-value">—</p><p class="w2-muted">Not assessed</p></div>
-</section>
-<div class="w2-two-columns"><div class="w2-column">
-  <section class="w2-panel w2-action">
-    <span class="w2-badge w2-warning">Cannot compute yet</span>
-    <h2 class="w2-card-title">{% if selected_instance.tracking_only %}Tracking only · verification pending{% else %}No trade instruction available in this shell{% endif %}</h2>
-    <p class="w2-muted">{% if selected_instance.tracking_only %}The fixed instrument mapping still needs evidence of account-level dealing permission and verified quotes. No trade recommendation is available. {% endif %}Strategy evaluation and verified data will be connected in Phase 4. This screen never guesses prices or recommends trades.</p>
-  </section>
-  <section class="w2-panel"><h2>Quarter by quarter</h2>
-    <div class="w2-empty">Reviews will appear from recorded evaluations only.</div></section>
-</div><div class="w2-column">
-  <section class="w2-panel"><h2>Performance</h2>
-    <div class="w2-chart-empty">No source-backed valuation series available here</div></section>
-  <section class="w2-panel"><h2>Allocation vs target</h2>
-    <div class="w2-empty">Waiting for verified holdings and mapped instruments.</div></section>
-  <section class="w2-panel"><h2>Metrics</h2><div class="w2-empty">Calculated from real contributions and valuations only.</div></section>
-</div></div>
+{% if guided_review %}{% include 'v2/guided_review.html' %}
+{% else %}{% include 'v2/today.html' %}{% endif %}
 {% elif section == 'history' %}
 <section class="w2-panel w2-space-top"><h2>Performance</h2><div class="w2-chart-empty">No verified historical values available in this shell</div></section>
 <div class="w2-metric-grid">
