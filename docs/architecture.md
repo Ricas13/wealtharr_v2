@@ -193,7 +193,7 @@ When a price is on hold, show its raw source date/currency under the expandable 
 | `tracker/market_signals.py` | **Extract** quarterly maths, 30 Down and spike into pure `strategies/nine_sig/v1.py`; move Yahoo ingestion/quality to core prices; move ORM, scheduler and dispatch to core evaluation. Retain reference/parity tests |
 | `tracker/instrument_mapping.py` | **Replace** with immutable versioned role + country/platform/account-type manifest (Section B evidence gate); keep stable historical mappings |
 | `StrategyPreset`, preset admin/forms, end-user ticker/weight controls | **Delete** after code-defined strategy registry and onboarding are in use |
-| `PAPER` account mode, `tracker/paper.py`, paper-only views/templates/tests, paper migrations | **Delete** when new disposable DB schema is applied; preserve no paper state |
+| Paper-trial module, route, UI, test and account-type choice | **Removed from layout** in follow-up cleanup; historical migration `0005` retained for migration dependency compatibility, new `0020` removes the choice, and any legacy rows are preserved but hidden (never converted to real holdings). |
 | `PriceMark` + `MarketObservation` + `YahooSync` | **Consolidate** only after accepted/history quote quality and scheduler tests pass; preserve reference-history 30 Down/spike behaviour |
 | `WealthSnapshot` + `StrategyValueSnapshot` | **Consolidate** into flow-safe per-instance valuations after independent return-metric tests |
 | `StrategySignal`, `StrategyBaseline`, `RebalanceExecution`, `BrokerImportRow` | **Keep semantics**, refactor to immutable signal/outcome/baseline, execution and deduplication model rather than deleting safety controls |

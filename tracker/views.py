@@ -19,7 +19,6 @@ from .forms import AccountForm, AutomationForm, IntegrationForm, LedgerForm, Not
 from .models import Account, LedgerEntry, NotificationPreference, PriceMark, StrategyInstance, StrategyPreset, StrategySignal, SystemIntegration, WealthSnapshot, StrategyValueSnapshot
 from .services import consolidated, dispatch, ledger_summary, validate_and_record
 from .market_signals import review_strategy
-from .paper import create_paper_trial, PaperSetupUnavailable, PAPER_NAME
 
 @require_GET
 def home(request):
@@ -73,27 +72,6 @@ def start_real_9sig(request):
 
 
 @login_required
-@require_POST
-def start_paper_trial(request):
-    if request.POST.get("confirm_paper") != "PAPER_ONLY":
-        messages.error(request, "Please confirm virtual paper tracking.")
-        return redirect("dashboard")
-    try:
-        strategy, created = create_paper_trial(request.user)
-    except PaperSetupUnavailable as exc:
-        messages.error(request, str(exc))
-        return redirect("dashboard")
-    except StrategyPreset.DoesNotExist:
-        messages.error(request, "The 9Sig strategy is disabled by administration.")
-        return redirect("dashboard")
-    if created:
-        messages.success(request, "£1,000 virtual 9Sig tracker started from real Yahoo closing prices. No money was invested, and no broker was connected.")
-    else:
-        messages.info(request, "Your existing paper tracker is ready.")
-    return redirect("strategy_detail", pk=strategy.pk)
-
-
-@login_required
 def dashboard(request):
     data = consolidated(request.user)
     snapshots = WealthSnapshot.objects.filter(owner=request.user).order_by("as_of")
@@ -121,12 +99,17 @@ def dashboard(request):
     for item in data["items"]:
         item["sparkline_path"] = sparkline_path(
             snapshots_by_strategy.get(item["strategy"].pk, []))
-    data.update(chart=chart, paper_trial=StrategyInstance.objects.filter(owner=request.user,
-                account__kind="PAPER", account__name=PAPER_NAME).first(),
-                accounts=Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies")),
-                open_signals=StrategySignal.objects.filter(strategy__owner=request.user, acknowledged_at__isnull=True).select_related("strategy").order_by("-created_at")[:8])
-    if data["paper_trial"]:
-        data["paper_summary"] = ledger_summary(data["paper_trial"])
+    data.update(
+        chart=chart,
+        accounts=Account.objects.filter(owner=request.user).exclude(
+            kind="PAPER"
+        ).annotate(strategy_count=Count("strategies")),
+        open_signals=StrategySignal.objects.filter(
+            strategy__owner=request.user, acknowledged_at__isnull=True
+        ).exclude(strategy__account__kind="PAPER").select_related(
+            "strategy"
+        ).order_by("-created_at")[:8],
+    )
     return render(request, "dashboard.html", data)
 
 @login_required
@@ -142,7 +125,7 @@ def accounts(request):
             return redirect("new_strategy")
         except ValidationError as exc:
             form.add_error(None, exc)
-    return render(request, "accounts.html", {"form": form, "accounts": Account.objects.filter(owner=request.user).annotate(strategy_count=Count("strategies"))})
+    return render(request, "accounts.html", {"form": form, "accounts": Account.objects.filter(owner=request.user).exclude(kind="PAPER").annotate(strategy_count=Count("strategies"))})
 
 @login_required
 def new_strategy(request):
@@ -255,13 +238,13 @@ def _return_to_strategy_tab(request, pk, tab):
 
 @login_required
 def strategy_detail(request, pk):
-    strategy = get_object_or_404(StrategyInstance.objects.select_related("account", "preset"), pk=pk, owner=request.user)
+    strategy = get_object_or_404(StrategyInstance.objects.select_related("account", "preset").exclude(account__kind="PAPER"), pk=pk, owner=request.user)
     return render_strategy(request, strategy)
 
 @login_required
 @require_POST
 def record_entry(request, pk):
-    strategy = get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
+    strategy = get_object_or_404(StrategyInstance.objects.exclude(account__kind="PAPER"), pk=pk, owner=request.user)
     form = LedgerForm(request.POST, strategy=strategy)
     if form.is_valid():
         entry = form.save(commit=False)
@@ -277,7 +260,7 @@ def record_entry(request, pk):
 @login_required
 @require_POST
 def save_automation(request, pk):
-    strategy = get_object_or_404(StrategyInstance.objects.select_related("preset"), pk=pk, owner=request.user)
+    strategy = get_object_or_404(StrategyInstance.objects.select_related("preset").exclude(account__kind="PAPER"), pk=pk, owner=request.user)
     form = AutomationForm(request.POST, instance=strategy)
     if form.is_valid():
         form.save()
@@ -290,7 +273,7 @@ def save_automation(request, pk):
 @login_required
 @require_POST
 def refresh_market(request, pk):
-    strategy = get_object_or_404(StrategyInstance.objects.select_related("preset", "account"), pk=pk, owner=request.user)
+    strategy = get_object_or_404(StrategyInstance.objects.select_related("preset", "account").exclude(account__kind="PAPER"), pk=pk, owner=request.user)
     if not strategy.market_data_enabled:
         messages.warning(request, "Enable Yahoo monitoring and add exact tickers to the strategy first.")
     else:
@@ -316,7 +299,7 @@ def confirm_strategy_reset(request, pk):
     Provisional SPIKE_WATCH notices remain warnings requiring independent
     reference and execution confirmation, never a synthetic 60/40 baseline.
     """
-    get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
+    get_object_or_404(StrategyInstance.objects.exclude(account__kind="PAPER"), pk=pk, owner=request.user)
     messages.error(request,
         "This old reset shortcut cannot anchor a strategy. Review the active "
         "quarterly instruction and record actual fills separately. A verified "
@@ -328,7 +311,7 @@ def confirm_strategy_reset(request, pk):
 @require_POST
 def review_signal(request, pk, signal_pk):
     """Review advisory guidance without modifying broker holdings or signal math."""
-    strategy = get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
+    strategy = get_object_or_404(StrategyInstance.objects.exclude(account__kind="PAPER"), pk=pk, owner=request.user)
     signal = get_object_or_404(StrategySignal, pk=signal_pk, strategy=strategy)
     outcome = request.POST.get("outcome", "")
     note = request.POST.get("review_note", "").strip()[:2000]
@@ -351,7 +334,7 @@ def review_signal(request, pk, signal_pk):
 @login_required
 @require_POST
 def acknowledge_signal(request, pk, signal_pk):
-    strategy = get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
+    strategy = get_object_or_404(StrategyInstance.objects.exclude(account__kind="PAPER"), pk=pk, owner=request.user)
     signal = get_object_or_404(StrategySignal, pk=signal_pk, strategy=strategy)
     if signal.acknowledged_at is None:
         signal.acknowledged_at = timezone.now()
@@ -362,7 +345,7 @@ def acknowledge_signal(request, pk, signal_pk):
 @login_required
 @require_POST
 def record_price(request, pk):
-    strategy = get_object_or_404(StrategyInstance, pk=pk, owner=request.user)
+    strategy = get_object_or_404(StrategyInstance.objects.exclude(account__kind="PAPER"), pk=pk, owner=request.user)
     form = PriceForm(request.POST)
     if form.is_valid():
         summary = ledger_summary(strategy)

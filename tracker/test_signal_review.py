@@ -12,7 +12,10 @@ class AdvisoryFeedbackTests(TestCase):
         User = get_user_model()
         self.owner = User.objects.create_user("signal-owner", password="strong-test-password-123")
         self.other = User.objects.create_user("signal-other", password="strong-test-password-123")
-        self.account = Account.objects.create(owner=self.owner, name="Paper signal", kind="PAPER")
+        self.account = Account.objects.create(
+            owner=self.owner, name="Owner ISA signal", kind="ISA",
+            country="GB", broker="TRADING212",
+        )
         self.strategy = StrategyInstance.objects.create(
             owner=self.owner, account=self.account,
             preset=StrategyPreset.objects.get(slug="nasdaq-quarterly-target"),

@@ -8,7 +8,7 @@
 <section class="ws-stat-grid" aria-label="Real portfolio summary">
   <article class="panel ws-stat"><p class="ws-stat-title">Real portfolio value</p>
     <p class="ws-stat-number">{% if total is not None %}£{{ total|floatformat:'2g' }}{% else %}<span class="value-warning">Prices needed</span>{% endif %}</p>
-    <p class="ws-stat-detail">GBP · excludes paper accounts</p>
+    <p class="ws-stat-detail">GBP · real investment accounts</p>
   </article>
   <article class="panel ws-stat"><p class="ws-stat-title">Net money added</p>
     <p class="ws-stat-number">£{{ net_contributed|floatformat:'2g' }}</p><p class="ws-stat-detail">Deposits minus withdrawals</p>
@@ -48,7 +48,7 @@
     <div class="ws-section-heading"><div><h2 id="ws-actions-title">Needs your review</h2><p class="muted">Advisory signals only · no trades placed</p></div><span class="ws-pill ws-pill-info">{{ open_signals|length }} recent</span></div>
     {% for signal in open_signals %}
       <a class="ws-action-item" href="{% url 'strategy_detail' signal.strategy_id %}?tab=signals">
-        <span class="ws-action-title">{{ signal.title }} {% if signal.strategy.account.kind == 'PAPER' %}<span class="ws-pill ws-pill-paper">Paper</span>{% endif %}</span>
+        <span class="ws-action-title">{{ signal.title }}</span>
         <span class="ws-action-desc">{{ signal.strategy.name }} · {{ signal.message|truncatechars:125 }}</span>
       </a>
     {% empty %}
@@ -75,15 +75,4 @@
     <section class="panel ws-empty" aria-label="Getting started"><h3>Start with your real account</h3><p>Choose 9Sig, confirm the UK Trading 212 instruments and record your actual starting deposit. No broker connection is required.</p><a class="btn btn-primary" href="{% url 'start_real_9sig' %}">Track my real 9Sig</a></section>
   {% endfor %}
 </div>
-<section class="panel ws-paper-panel" aria-label="Optional virtual investments">
-  <div class="ws-section-heading"><div><span class="ws-pill ws-pill-paper">{% include 'partials/icon.html' with name='flask' %} Simulation only</span><h2>Paper portfolio</h2><p class="muted">Virtual positions never appear in your real portfolio totals.</p></div>
-  {% if paper_trial %}<a class="btn btn-subtle" href="{% url 'strategy_detail' paper_trial.pk %}">Open paper tracker</a>{% endif %}</div>
-  {% if paper_trial %}
-    <p>Virtual value: <strong>{% if paper_summary.value is not None %}£{{ paper_summary.value|floatformat:'2g' }}{% else %}Awaiting verified prices{% endif %}</strong>. All quantities and signals here are simulated.</p>
-  {% else %}
-    <details><summary>Try a separate 9Sig paper simulation</summary><p>Optional £1,000 simulated starting balance; no real cash or trades.</p>
-      <form method="post" action="{% url 'start_paper_trial' %}">{% csrf_token %}<input type="hidden" name="confirm_paper" value="PAPER_ONLY"><button type="submit" class="btn btn-subtle">Start virtual paper trial</button></form>
-    </details>
-  {% endif %}
-</section>
 {% endblock %}

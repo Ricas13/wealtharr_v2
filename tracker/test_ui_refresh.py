@@ -54,11 +54,12 @@ class PersonalPortalRedesignTests(TestCase):
         base = reverse("strategy_detail", args=[self.strategy.pk])
         return base + ("?tab=" + tab if tab else "")
 
-    def test_overview_is_real_first_and_paper_separate(self):
+    def test_overview_shows_real_value_and_accessible_chart(self):
         result = self.client.get(reverse("dashboard"))
         self.assertEqual(result.status_code, 200)
         html = result.content.decode()
-        self.assertLess(html.index("Real portfolio value"), html.index("Paper portfolio"))
+        self.assertIn("Real portfolio value", html)
+        self.assertNotIn("Paper portfolio", html)
         self.assertContains(result, "£1,000.00")
         self.assertContains(result, 'id="wealth-chart"')
         self.assertContains(result, 'id="wealth-chart-points"')
@@ -139,7 +140,7 @@ class PersonalPortalRedesignTests(TestCase):
         self.assertNotContains(
             page, "Confirm executed reset and start next 9Sig cycle")
 
-    def test_real_and_paper_money_never_mixed(self):
+    def test_historical_virtual_records_remain_excluded_from_real_totals(self):
         paper = Account.objects.create(
             owner=self.owner, name="virtual", kind="PAPER")
         demo = StrategyInstance.objects.create(
