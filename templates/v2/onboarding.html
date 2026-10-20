@@ -138,7 +138,7 @@
 
     {% elif wizard.step == 5 %}
       <h3>Where should alerts go?</h3>
-      <p class="w2-field-help">These preferences are stored for this strategy. Actual delivery and per-instance routing are activated in Phase 7, after destinations are configured.</p>
+      <p class="w2-field-help">Alerts go to the destinations switched on in Alerts &amp; settings. You can change these later on the strategy's Strategy &amp; alerts tab.</p>
       <div class="w2-table-wrap"><table class="w2-table w2-alert-matrix">
         <thead><tr><th>Alert</th><th>Email</th><th>Discord</th></tr></thead>
         <tbody>{% for row in wizard_route_rows %}
@@ -149,8 +149,10 @@
       </table></div>
       <div class="w2-notice"><strong>Review:</strong> {{ wizard.name }} · {{ wizard.type }} at Trading 212 ·
         since {{ wizard.start }} · {% if wizard.mode == 'fresh' %}actual £{{ wizard.amount }} deposit{% else %}owner-reported existing holdings{% endif %}.
-        Trading only when independent data and eligibility checks permit; manual confirmation always required. A separate owner-owned strategy, account and ledger are created.
+        Wealtharr never trades for you.
       </div>
+      <label class="w2-check w2-space-top"><input type="checkbox" name="go_live" value="yes" checked>
+        <span><strong>Go live now</strong> · fetch Yahoo prices hourly and show instructions. Untick to set it up first and go live later from Strategy &amp; alerts.</span></label>
     {% endif %}
     <div class="w2-wizard-actions">
       {% if wizard.step > 1 %}<button type="submit" name="direction" value="back" class="w2-button" formnovalidate>Back</button>{% endif %}

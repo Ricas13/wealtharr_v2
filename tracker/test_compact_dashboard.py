@@ -96,21 +96,42 @@ class CompactPagesTests(TestCase):
         self.assertContains(page, "Net deposits")
         self.assertContains(page, "Annualised (XIRR)")
         add = reverse("v2_ledger_add", args=[self.s.pk])
-        # Quick forms post to the audited ledger preview, never straight to the database.
+        # Quick forms save through the audited ledger path (with its revision row).
         self.assertContains(page, f'action="{add}"', count=2)
-        self.assertContains(page, 'name="intent" value="preview"', count=2)
+        self.assertContains(page, 'name="intent" value="save"', count=2)
         for tab in ("Dashboard", "Quarterly review", "Ledger", "Performance", "Strategy &amp; alerts"):
             self.assertContains(page, f">{tab}</a>", html=False)
 
-    def test_quick_add_money_previews_then_records_one_entry(self):
+    def test_quick_add_money_saves_in_one_step_with_revision(self):
+        from tracker.models import LedgerRevision
         add = reverse("v2_ledger_add", args=[self.s.pk])
         day = timezone.localdate().isoformat()
-        preview = self.client.post(add, {"intent": "preview", "kind": "INTEREST",
-                                         "occurred_on": day, "amount": "2.50"})
-        self.assertContains(preview, "Impact preview")
-        self.assertEqual(self.s.ledger.count(), 1)
-        self.client.post(add, {"intent": "confirm"})
-        self.assertTrue(self.s.ledger.filter(kind="INTEREST", amount=D("2.50")).exists())
+        response = self.client.post(add, {"intent": "save", "kind": "INTEREST", "return_to": "today",
+                                          "occurred_on": day, "amount": "2.50"})
+        self.assertRedirects(response, self.url("today"))
+        entry = self.s.ledger.get(kind="INTEREST", amount=D("2.50"))
+        self.assertTrue(LedgerRevision.objects.filter(entry=entry, operation="ADD").exists())
+
+    def test_one_step_save_still_refuses_negative_cash(self):
+        add = reverse("v2_ledger_add", args=[self.s.pk])
+        response = self.client.post(add, {"intent": "save", "kind": "WITHDRAW",
+                                          "occurred_on": timezone.localdate().isoformat(),
+                                          "amount": "5000"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(self.s.ledger.filter(kind="WITHDRAW").exists())
+
+    def test_wizard_can_go_live_at_creation(self):
+        url = reverse("v2_add_strategy")
+        self.client.get(url + "?restart=1")
+        self.client.post(url, {"step": "1", "strategy": KEY})
+        self.client.post(url, {"step": "2", "platform": "TRADING212", "account_type": "ISA"})
+        self.client.post(url, {"step": "3", "ack": "yes"})
+        self.client.post(url, {"step": "4", "mode": "fresh", "name": "Live at once",
+                               "start": timezone.localdate().isoformat(), "amount": "500",
+                               "deposited": "yes"})
+        self.client.post(url, {"step": "5", "go_live": "yes"})
+        created = StrategyInstance.objects.get(owner=self.owner, name="Live at once")
+        self.assertFalse(created.tracking_only)
 
     def test_isa_allowance_uses_statutory_limit(self):
         result = dash.isa_allowance([self.s])

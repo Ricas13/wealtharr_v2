@@ -14,7 +14,7 @@ from .models import (
 )
 from .services import dispatch, ledger_summary
 from .notification_routing import route_notice, newly_delivered
-from .cockpit import _price_status
+from .signal_status import _price_status
 from .market_signals import quarter_end_before
 
 D = Decimal

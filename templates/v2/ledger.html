@@ -50,7 +50,7 @@
       <td class="w2-r">{% if entry.deleted %}<span class="w2-muted">—</span>{% else %}{{ row.after|floatformat:"2g" }}{% endif %}</td>
       <td class="w2-muted">{{ entry.note|default:"—"|truncatechars:40 }}{% if entry.version > 0 %} · edited{% endif %}</td>
       <td class="w2-r">{% if entry.linked_fill %}<span class="w2-chip w2-info">Review</span>
-        {% elif ledger_can_edit and not ledger_unreconciled and not entry.imported %}
+        {% elif ledger_can_edit %}
           {% if entry.deleted %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='restore' %}">Restore</a>
           {% else %}<a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='edit' %}">Edit</a> <a href="{% url 'v2_ledger_modify' instance_id=selected_instance.pk entry_id=entry.pk operation='delete' %}">Delete</a>{% endif %}
         {% else %}—{% endif %}</td>
@@ -64,14 +64,14 @@
   <section class="w2-card">
     <h2 class="w2-ct" style="margin-bottom:8px">Add money</h2>
     <form method="post" action="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">
-      {% csrf_token %}<input type="hidden" name="intent" value="preview">
+      {% csrf_token %}<input type="hidden" name="intent" value="save">
       <div class="w2-pair">
         <label class="w2-field">Type<select class="w2-input" name="kind"><option value="DEPOSIT">Deposit</option><option value="WITHDRAW">Withdrawal</option><option value="INTEREST">Interest on cash</option><option value="DIVIDEND">Dividend</option><option value="FEE">Fee</option></select></label>
         <label class="w2-field">Date<input class="w2-input" type="date" name="occurred_on" value="{{ ledger_today|date:'Y-m-d' }}" max="{{ ledger_today|date:'Y-m-d' }}" required></label>
         <label class="w2-field">Amount £<input class="w2-input" type="number" name="amount" step="0.01" min="0.01" required></label>
         <label class="w2-field">Note<input class="w2-input" name="note" maxlength="200" placeholder="Optional"></label>
       </div>
-      <button type="submit" class="w2-button w2-button-primary w2-full">Preview &amp; save</button>
+      <button type="submit" class="w2-button w2-button-primary w2-full">Save</button>
     </form>
     <p class="w2-note">Back-dated entries are fine if cash never goes negative. Record trades with the + Add entry button or from the Dashboard.</p>
   </section>

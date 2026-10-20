@@ -91,7 +91,7 @@ class Phase2WizardTests(TestCase):
 
     def test_anonymous_cannot_see_or_write_wizard_or_catalogue(self):
         self.client.logout()
-        for url in (self.url, reverse("v2_catalogue")):
+        for url in (self.url,):
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 302)
@@ -100,16 +100,14 @@ class Phase2WizardTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(StrategyInstance.objects.count(), 0)
 
-    def test_catalogue_html_has_review_status_filters_and_safe_identifiers(self):
-        response = self.client.get(reverse("v2_catalogue"), {"strategy": STRATEGY_9SIG, "account_type": "ISA"})
-        self.assertEqual(response.status_code, 200)
+    def test_wizard_shows_exact_mapped_identifiers(self):
+        # The catalogue page is gone; setup shows the exact lines it will pin.
+        self.client.get(self.url + "?restart=1")
+        self.submit(1, strategy=STRATEGY_9SIG)
+        response = self.submit(2, platform="TRADING212", account_type="ISA")
         self.assertContains(response, "IE00BLRPRL42")
         self.assertContains(response, "IE00BCRY6441")
-        self.assertContains(response, "Account check pending")
         self.assertNotContains(response, "Global equity role")
-        draft = self.client.get(reverse("v2_catalogue"), {"strategy": ALL_WEATHER})
-        self.assertContains(draft, "Draft · no tradable line")
-        self.assertNotContains(draft, "IE00BLRPRL42")
 
     def test_unsupported_strategy_account_and_skipped_steps_refuse(self):
         self.client.get(self.url + "?restart=1")

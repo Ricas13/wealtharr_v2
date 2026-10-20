@@ -162,7 +162,7 @@ class MarketWorkflowTests(TestCase):
     def test_only_owner_can_update_monitoring_settings_or_acknowledge(self):
         # Monitoring/instrument selections cannot be changed by POSTing old
         # parameters through the retired mutation endpoint or v2 Settings.
-        retired = reverse("save_automation", args=[self.strategy.pk])
+        retired = "/app/strategies/%s/monitor/" % self.strategy.pk
         self.client.force_login(self.other)
         self.assertEqual(self.client.post(retired, {
             "equity_symbol": "CHANGED.L", "market_data_enabled": "on",
@@ -176,7 +176,7 @@ class MarketWorkflowTests(TestCase):
         self.client.force_login(self.owner)
         self.assertEqual(self.client.post(retired, {
             "equity_symbol": "CHANGED.L", "market_data_enabled": "on",
-        }).status_code, 405)
+        }).status_code, 404)
         response = self.client.post(reverse("v2_settings"), {
             "form_kind": "strategy", "strategy_id": str(self.strategy.pk),
             "equity_symbol": "CHANGED.L", "safe_symbol": "ERNS.L",

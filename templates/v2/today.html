@@ -123,19 +123,13 @@
       {% if today_signal and not today_partial and not today_executed %}
       <details class="w2-space-top">
         <summary class="w2-muted">Not doing this one?</summary>
-        <form class="w2-space-top" method="post" action="{% url 'v2_notice_feedback' instance_id=selected_instance.pk signal_id=today_signal.pk %}">
-          {% csrf_token %}
-          <label class="w2-field" for="w2-notice-outcome">Outcome
-          <select id="w2-notice-outcome" class="w2-input" name="outcome" required>
-            <option value="">Choose</option>
-            <option value="CONFIRMED">Reviewed, nothing else to record</option>
-            <option value="FALSE_POSITIVE">False positive</option>
-            <option value="NOT_APPLICABLE">Skip this quarter</option>
-          </select></label>
-          <label class="w2-field" for="w2-notice-note">Reason (needed for a false positive)
-          <input id="w2-notice-note" class="w2-input" name="review_note" maxlength="2000"></label>
-          <button type="submit" class="w2-button w2-space-top">Save</button>
+        <form class="w2-row w2-space-top" style="flex-wrap:nowrap" method="post" action="{% url 'v2_notice_feedback' instance_id=selected_instance.pk signal_id=today_signal.pk %}">
+          {% csrf_token %}<input type="hidden" name="outcome" value="NOT_APPLICABLE">
+          <label class="w2-sr-only" for="w2-notice-note">Reason for skipping</label>
+          <input id="w2-notice-note" class="w2-input" name="review_note" maxlength="2000" placeholder="Reason (optional)">
+          <button type="submit" class="w2-button">Skip</button>
         </form>
+        <p class="w2-note">Skipping keeps it in history and stops reminders.</p>
       </details>
       {% endif %}
     </section>
@@ -144,17 +138,17 @@
       <section class="w2-card" aria-labelledby="w2-add-money">
         <h2 class="w2-ct" id="w2-add-money" style="margin-bottom:8px">Add money</h2>
         <form method="post" action="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">
-          {% csrf_token %}<input type="hidden" name="intent" value="preview">
+          {% csrf_token %}<input type="hidden" name="intent" value="save"><input type="hidden" name="return_to" value="today">
           <label class="w2-field">Type<select class="w2-input" name="kind"><option value="DEPOSIT">Deposit</option><option value="INTEREST">Interest on cash</option><option value="DIVIDEND">Dividend</option><option value="WITHDRAW">Withdrawal</option><option value="FEE">Fee</option></select></label>
           <label class="w2-field">Date<input class="w2-input" type="date" name="occurred_on" value="{{ dash_today|date:'Y-m-d' }}" max="{{ dash_today|date:'Y-m-d' }}" required></label>
           <label class="w2-field">Amount £<input class="w2-input" type="number" name="amount" step="0.01" min="0.01" placeholder="0.00" required></label>
-          <button type="submit" class="w2-button w2-button-primary w2-full">Preview &amp; save</button>
+          <button type="submit" class="w2-button w2-button-primary w2-full">Save</button>
         </form>
       </section>
       <section class="w2-card" aria-labelledby="w2-add-trade">
         <h2 class="w2-ct" id="w2-add-trade" style="margin-bottom:8px">Record trade</h2>
         <form method="post" action="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">
-          {% csrf_token %}<input type="hidden" name="intent" value="preview">
+          {% csrf_token %}<input type="hidden" name="intent" value="save"><input type="hidden" name="return_to" value="today">
           <div class="w2-pair">
             <label class="w2-field">Side<select class="w2-input" name="kind"><option value="BUY">Buy</option><option value="SELL">Sell</option></select></label>
             <label class="w2-field">Ticker<select class="w2-input" name="symbol">{% for symbol in dash_symbols %}<option>{{ symbol }}</option>{% endfor %}</select></label>
@@ -165,7 +159,7 @@
           </div>
           <input type="hidden" name="fee" value="0">
           <label class="w2-field">Date<input class="w2-input" type="date" name="occurred_on" value="{{ dash_today|date:'Y-m-d' }}" max="{{ dash_today|date:'Y-m-d' }}" required></label>
-          <button type="submit" class="w2-button w2-button-primary w2-full">Preview &amp; save</button>
+          <button type="submit" class="w2-button w2-button-primary w2-full">Save</button>
         </form>
       </section>
       <section class="w2-card">

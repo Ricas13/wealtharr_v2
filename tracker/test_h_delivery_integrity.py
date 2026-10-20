@@ -80,15 +80,15 @@ class AdvisoryDeliveryIntegrityTests(TestCase):
             subject="Urgent historical check", message="Review only",
             status="FAILED", attempts=1,
             next_retry_at=timezone.now() - timedelta(minutes=30))
-        self.pref.urgent_email = False
-        self.pref.save(update_fields=["urgent_email"])
+        self.pref.email_enabled = False
+        self.pref.save(update_fields=["email_enabled"])
         with patch("tracker.notification_scheduler.dispatch") as sender:
             self.assertEqual(retry_due_deliveries(), (0, 0))
         sender.assert_not_called()
         row.refresh_from_db()
         self.assertEqual(row.status, "CANCELLED")
-        self.pref.urgent_email = True
-        self.pref.save(update_fields=["urgent_email"])
+        self.pref.email_enabled = True
+        self.pref.save(update_fields=["email_enabled"])
         with patch("tracker.notification_scheduler.dispatch") as sender:
             self.assertEqual(retry_due_deliveries(), (0, 0))
         sender.assert_not_called()

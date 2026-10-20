@@ -1,4 +1,4 @@
-"""Phase 5: read-only, evidence-labelled quarterly 9Sig Breakdown.
+"""Read-only 9Sig calculation trace and CSV export for the Review tab.
 
 Show saved historical advice, separately reproducible line arithmetic and
 missing provenance without inventing a live evaluation. MarketObservation
@@ -11,25 +11,16 @@ from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import Http404, HttpResponse
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.http import HttpResponse
 
 from .instrument_mapping import MAPPING_VERSION
-from .market_signals import quarter_end_before
-from .models import (
-    InstanceOpeningSnapshot, MarketObservation, RebalanceExecution,
-    StrategyInstance, StrategySignal, YahooSync,
-)
+from .models import MarketObservation, RebalanceExecution, YahooSync
 from .strategies.nine_sig.v2 import (
     PARAMS, VERSION, _drawdown_from_spy, _quarterly_closes,
     quarter_number, signal_line_trace, signal_line_value,
 )
 from .v2_ledger_core import effective_entries, replay
-from .v2_views import _render
 
 
 ZERO = Decimal("0")
@@ -46,37 +37,6 @@ def _quarter_end(q):
     year, index = divmod(q, 4)
     month = (index + 1) * 3
     return date(year, month, monthrange(year, month)[1])
-
-
-def _owner_strategy(request, instance_id):
-    return get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset").filter(
-            owner=request.user, account__owner=request.user
-        ).exclude(account__kind="PAPER"), pk=instance_id,
-    )
-
-
-def _reviews(strategy):
-    limit = quarter_end_before(timezone.localdate())
-    return list(strategy.signals.filter(
-        kind="QUARTERLY", as_of__lte=limit
-    ).order_by("-as_of", "-pk"))
-
-
-def _as_of(request, signals):
-    raw = request.GET.get("quarter")
-    if not raw:
-        return signals[0] if signals else None
-    if len(raw) != 10:
-        raise Http404("Unknown review date")
-    try:
-        date.fromisoformat(raw)
-    except ValueError:
-        raise Http404("Invalid review date")
-    chosen = next((x for x in signals if x.as_of.isoformat() == raw), None)
-    if chosen is None:
-        raise Http404("Review belongs to another account or is unavailable")
-    return chosen
 
 
 def _quality_rows(strategy, as_of):
@@ -149,9 +109,6 @@ def _trace(strategy, as_of):
     if (strategy.account.currency != "GBP" or
             strategy.equity_symbol != "LQQ3.L" or strategy.safe_symbol != "ERNS.L"):
         return None, "Unmapped or non-GBP strategy holdings."
-    opening = InstanceOpeningSnapshot.objects.filter(strategy=strategy).first()
-    if opening and not hasattr(opening, "reconciliation"):
-        return None, "The reported opening positions are not reconciled against original broker history."
     prior_resets = strategy.signals.filter(
         as_of__lt=as_of, reset_reason__gt=""
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"))
@@ -356,21 +313,3 @@ def _export(strategy, detail):
     for record in rows:
         writer.writerow([_csv_safe(v) for v in record])
     return response
-
-
-@login_required
-@require_GET
-def breakdown_page(request, instance_id):
-    strategy = _owner_strategy(request, instance_id)
-    reviews = _reviews(strategy)
-    selected = _as_of(request, reviews)
-    detail = _detail(strategy, selected)
-    if request.GET.get("export") == "csv" and selected is not None:
-        return _export(strategy, detail)
-    return _render(
-        request, page_key="instance", page_title="Breakdown",
-        instance=strategy, section="breakdown",
-        breakdown_reviews=reviews, breakdown_detail=detail,
-        breakdown_current=selected, breakdown_version=VERSION,
-        breakdown_mapping=MAPPING_VERSION, breakdown_params=PARAMS,
-    )

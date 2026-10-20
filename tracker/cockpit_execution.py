@@ -206,7 +206,7 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
         before = ledger_summary(locked)
         # Full completion needs a verified post-fill close rather than an
         # arbitrary legacy current mark. Later settlement cannot be invented.
-        from .cockpit import _price_status
+        from .signal_status import _price_status
         fresh, why, marks = _price_status(locked, before)
         if not fresh:
             raise ValidationError(why)

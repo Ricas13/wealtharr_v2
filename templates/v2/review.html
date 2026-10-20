@@ -73,11 +73,11 @@
         <div class="w2-kv"><span>Target at {{ review_detail.as_of|date:"j M Y" }}</span><strong>£{{ t.line|floatformat:"2g" }}</strong></div>
         {% else %}<p class="w2-muted w2-space-top">{{ review_detail.trace_error|default:"The calculation can't be reproduced for this review." }}</p>{% endif %}
         {% endwith %}
-        {% if review_detail.spy_result %}<div class="w2-kv"><span>30 Down rule</span><span>{% if review_detail.spy_result.triggered %}Triggered{% else %}Not active{% endif %} · S&amp;P {{ review_detail.spy_result.decline_pct }}% vs 8-quarter peak</span></div>{% endif %}
+        {% if review_detail.spy_result %}<div class="w2-kv"><span>30 Down rule</span><span>{% if review_detail.spy_result.triggered %}Triggered{% else %}Not active{% endif %} · S&amp;P (SPY) {{ review_detail.spy_result.current }} vs 8-quarter peak {{ review_detail.spy_result.peak }} ({{ review_detail.spy_result.decline_pct }}%; triggers at {{ review_detail.spy_result.threshold }})</span></div>
+        {% else %}<div class="w2-kv"><span>30 Down rule</span><span class="w2-muted">Needs 9 quarters of SPY closes</span></div>{% endif %}
         <div class="w2-kv"><span>Saved message</span><span style="white-space:normal;text-align:right">{{ review_signal.message }}</span></div>
         <div class="w2-row w2-space-top">
-          <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}?quarter={{ review_signal.as_of|date:'Y-m-d' }}&amp;export=csv">Download CSV</a>
-          <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='breakdown' %}?quarter={{ review_signal.as_of|date:'Y-m-d' }}">Full detail and data checks</a>
+          <a class="w2-button" href="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=review_signal.pk %}?export=csv">Download CSV</a>
         </div>
       </details>
     </section>

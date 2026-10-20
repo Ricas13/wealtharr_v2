@@ -48,7 +48,7 @@ class V2OwnerSecurityBrowserTests(BrowserHarness):
             self.assertNotIn("PRIVATE_FOREIGN_ACCOUNT", self.page.content())
             self.assertNotIn("98765.43", self.page.content())
         self.sign_in()
-        for section in ("today", "history", "ledger", "strategy", "breakdown"):
+        for section in ("today", "review", "history", "ledger", "strategy"):
             response = self.visit("v2_instance_page", self.strategy.pk, section)
             self.assertEqual(response.status, 200)
             self.assertNotIn("PRIVATE_FOREIGN_STRATEGY", self.page.content())

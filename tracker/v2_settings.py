@@ -34,14 +34,6 @@ _INSTANCE_CATEGORY = {
 }
 
 
-def _delay(raw):
-    try:
-        value = int(raw)
-    except (ValueError, TypeError):
-        return None
-    return value if 1 <= value <= 30 and str(value) == str(raw).strip() else None
-
-
 def strategy_route_rows(strategy):
     routes = strategy.alert_routes if isinstance(strategy.alert_routes, dict) else {}
     category_rows = []
@@ -89,18 +81,13 @@ def settings_page(request):
     )
     if request.method == "POST":
         if kind == "owner":
-            days = _delay(request.POST.get("followup_delay_days"))
-            if days is None:
-                error = "Choose a review reminder delay of 1 to 30 whole days."
             if form.is_valid():
                 if (form.cleaned_data["email_enabled"] and
                         not form.cleaned_data["destination_email"]):
                     form.add_error("destination_email", "An email address is required when email is enabled.")
-                elif days is not None:
-                    updated = form.save(commit=False)
-                    updated.followup_delay_days = days
-                    updated.save()
-                    messages.success(request, "Notification destinations and categories saved.")
+                else:
+                    form.save()
+                    messages.success(request, "Alert destinations saved.")
                     return redirect("v2_settings")
         elif kind == "strategy":
             try:
@@ -153,7 +140,6 @@ def settings_page(request):
     return _render(
         request, page_key="settings", page_title="Settings",
         notification_form=form, settings_error=error,
-        followup_delay=pref.followup_delay_days,
         category_rows=CATEGORIES, strategy_routes=route_rows,
         preference=pref, last_receipts=last_receipts,
         smtp_configured=bool(

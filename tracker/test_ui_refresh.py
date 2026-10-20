@@ -85,7 +85,7 @@ class PersonalPortalRedesignTests(TestCase):
         self.assertNotContains(after, "£1,200")
 
     def test_strategy_tabs_preserve_manual_forms_and_instruments(self):
-        for section in ("today", "history", "ledger", "strategy", "breakdown"):
+        for section in ("today", "review", "history", "ledger", "strategy"):
             with self.subTest(section=section):
                 result = self.client.get(self.url(section))
                 self.assertEqual(result.status_code, 200)

@@ -64,7 +64,6 @@ class RemovedPaperExperienceTests(TestCase):
         self.assertNotContains(dashboard, "999999")
         self.assertIsNone(dashboard.context["overview_contributed"])
         self.assertEqual(dashboard.context["overview_rows"], [])
-        accounts = self.client.get(reverse("accounts"), follow=True)
-        self.assertNotContains(accounts, "Historical disabled account")
+        self.assertEqual(self.client.get("/app/accounts/").status_code, 404)
         self.assertTrue(Account.objects.filter(pk=legacy.pk).exists())
         self.assertTrue(LedgerEntry.objects.filter(strategy=instance).exists())

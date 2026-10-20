@@ -71,41 +71,33 @@ class SettingsAndRoutingTests(TestCase):
         cfg.save()
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Notification destinations")
+        self.assertContains(resp, "Where alerts go")
         self.assertContains(resp, "Private first portfolio")
-        self.assertContains(resp, "Unverified")
-        self.assertContains(resp, "Enable 2FA")
+        self.assertContains(resp, "Turn on")
         self.assertNotContains(resp, "PRIVATE_OTHER_PERSON_SECRET")
         self.assertNotContains(resp, "SECRET_SMTP_CIPHERTEXT")
         self.assertNotContains(resp, "SECRET_DISCORD_CIPHERTEXT")
         self.assertNotContains(resp, "smtp.private.test")
         self.assertNotContains(resp, "Scheduler diagnostics" if False else "Never tested — OK")
 
-    def test_global_preferences_and_delay_are_saved_and_validated(self):
+    def test_destinations_are_saved_and_validated(self):
         resp = self.client.post(self.url, {
             "form_kind": "owner",
             "destination_email": "newowner@example.test",
             "email_enabled": "on",
-            "followup_delay_days": "11",
-            "urgent_email": "on",
-            "quarterly_email": "on",
         })
         self.assertEqual(resp.status_code, 302)
         self.pref.refresh_from_db()
         self.assertTrue(self.pref.email_enabled)
         self.assertFalse(self.pref.discord_enabled)
-        self.assertEqual(self.pref.followup_delay_days, 11)
         self.assertEqual(self.pref.destination_email, "newowner@example.test")
-        self.assertFalse(self.pref.data_email)
         invalid = self.client.post(self.url, {
-            "form_kind": "owner", "email_enabled": "on",
-            "destination_email": "newowner@example.test",
-            "followup_delay_days": "0",
+            "form_kind": "owner", "email_enabled": "on", "destination_email": "",
         })
         self.assertEqual(invalid.status_code, 200)
-        self.assertContains(invalid, "1 to 30 whole days")
+        self.assertContains(invalid, "An email address is required")
         self.pref.refresh_from_db()
-        self.assertEqual(self.pref.followup_delay_days, 11)
+        self.assertEqual(self.pref.destination_email, "newowner@example.test")
 
     def test_per_strategy_routes_and_followup_alias(self):
         post = {
@@ -216,12 +208,12 @@ class SettingsAndRoutingTests(TestCase):
         self.assertNotContains(resp, "OTHER_SUBJECT_SECRET")
         self.assertNotContains(resp, "OTHER_MESSAGE_SECRET")
         self.assertNotContains(resp, "DIAGNOSTIC_STAFF_ONLY")
-        self.assertNotContains(resp, "Recent success")
+        self.assertNotContains(resp, "Alert sender")
         self.owner.is_staff = True
         self.owner.save(update_fields=["is_staff"])
         resp = self.client.get(self.url)
         self.assertContains(resp, "DIAGNOSTIC_STAFF_ONLY")
-        self.assertContains(resp, "Not verified healthy")
+        self.assertContains(resp, "· failed")
 
     def test_send_test_staff_only_post_and_respects_master_switch(self):
         test_url = reverse("v2_notification_test", args=["email"])

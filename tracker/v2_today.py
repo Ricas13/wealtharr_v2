@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from .cockpit import _last_action, _next_end, _price_status
+from .signal_status import _last_action, _next_end, _price_status
 from .cockpit_execution import (
     completion_rows, finalize_manual_review, proposed_actions, record_single_fill,
 )
@@ -30,7 +30,6 @@ from .models import (
     StrategySignal, StrategyValueSnapshot,
 )
 from .services import ledger_summary
-from .v2_ledger_views import _unreconciled
 from .v2_views import _render
 
 
@@ -50,11 +49,6 @@ def _readiness(strategy, report):
         return False, (
             "This strategy isn't live yet. Confirm the instruments in your "
             "account to switch on live prices and instructions."
-        ), ()
-    if _unreconciled(strategy):
-        return False, (
-            "Your owner-reported opening holdings are not reconciled against "
-            "actual broker history. Import and verify the original transactions."
         ), ()
     fresh, why, marks = _price_status(strategy, report)
     if not fresh:
@@ -161,7 +155,7 @@ def today_page(request, instance_id):
             "evaluation is needed before relying on its quantities."
         )
     if (notice and notice.kind == "QUARTERLY" and partial and
-            not strategy.tracking_only and not _unreconciled(strategy)):
+            not strategy.tracking_only):
         status = "record"
         headline = "Finish recording actual fills"
         explanation = (
@@ -175,7 +169,7 @@ def today_page(request, instance_id):
         headline = notice.title
         explanation = notice.message
     elif (not strategy.tracking_only and not report["positions"]
-          and report["cash"] > ZERO and not _unreconciled(strategy)):
+          and report["cash"] > ZERO):
         status = "start"
         headline = "Buy your opening position"
         explanation = (
@@ -204,8 +198,6 @@ def today_page(request, instance_id):
         net_cash=report["cash"], portfolio_value=report["value"],
         prices_verified=ready, has_holdings=bool(report["positions"]),
     )
-    if _unreconciled(strategy):
-        display_value = None
     gain = (
         report["profit"] if ready and report["value"] is not None
         else None
@@ -290,7 +282,7 @@ def _review_context(strategy, notice, *, form=None, error=""):
     ).exists()
     current = notice.as_of == quarter_end_before(timezone.localdate())
     blocked = (
-        strategy.tracking_only or _unreconciled(strategy) or
+        strategy.tracking_only or
         not current or completed or
         notice.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")
     )
@@ -320,6 +312,9 @@ def guided_review(request, instance_id, signal_id):
     notice = get_object_or_404(
         StrategySignal, pk=signal_id, strategy=strategy, kind="QUARTERLY",
     )
+    if request.method == "GET" and request.GET.get("export") == "csv":
+        from .v2_breakdown import _detail, _export
+        return _export(strategy, _detail(strategy, notice))
     context = _review_context(strategy, notice)
     if request.method == "POST":
         if context["review_blocked"]:

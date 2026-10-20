@@ -17,7 +17,7 @@
 </header>
 <nav class="w2-tabs" aria-label="{{ selected_instance.name }} pages">
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='today' %}" {% if section == 'today' %}class="w2-on" aria-current="page"{% endif %}>Dashboard</a>
-  <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}" {% if section == 'review' or section == 'breakdown' %}class="w2-on" aria-current="page"{% endif %}>Quarterly review</a>
+  <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}" {% if section == 'review' %}class="w2-on" aria-current="page"{% endif %}>Quarterly review</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}" {% if section == 'ledger' %}class="w2-on" aria-current="page"{% endif %}>Ledger</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='history' %}" {% if section == 'history' %}class="w2-on" aria-current="page"{% endif %}>Performance</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}" {% if section == 'strategy' %}class="w2-on" aria-current="page"{% endif %}>Strategy &amp; alerts</a>
@@ -27,7 +27,6 @@
 {% elif section == 'history' %}{% include 'v2/history.html' %}
 {% elif section == 'ledger' %}{% if ledger_edit %}{% include 'v2/ledger_edit.html' %}{% else %}{% include 'v2/ledger.html' %}{% endif %}
 {% elif section == 'strategy' %}{% include 'v2/strategy_info.html' %}
-{% elif section == 'breakdown' %}{% include 'v2/breakdown.html' %}
 {% endif %}
 {% else %}
 <header class="w2-page-heading">
@@ -36,7 +35,6 @@
     <p class="w2-overline">
       {% if page_key == 'overview' %}All strategies · GBP
       {% elif page_key == 'settings' %}Applies to all strategies
-      {% elif page_key == 'catalogue' %}Read-only mappings
       {% else %}Fixed, code-defined strategies{% endif %}
     </p>
   </div>
@@ -48,7 +46,6 @@
   {% endif %}
 </header>
 {% if page_key == 'overview' %}{% include 'v2/overview.html' %}
-{% elif page_key == 'catalogue' %}{% include 'v2/catalogue.html' %}
 {% elif page_key == 'settings' %}{% include 'v2/settings.html' %}
 {% else %}{% include 'v2/onboarding.html' %}{% endif %}
 {% endif %}

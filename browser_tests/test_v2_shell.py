@@ -47,8 +47,7 @@ class V2ShellBrowserTests(BrowserHarness):
             ("history", "v2_instance_page", [self.instance.pk, "history"]),
             ("ledger", "v2_instance_page", [self.instance.pk, "ledger"]),
             ("strategy", "v2_instance_page", [self.instance.pk, "strategy"]),
-            ("breakdown", "v2_instance_page", [self.instance.pk, "breakdown"]),
-            ("catalogue", "v2_catalogue", None),
+            ("review", "v2_instance_page", [self.instance.pk, "review"]),
             ("settings", "v2_settings", None),
             ("add-strategy", "v2_add_strategy", None),
         ]
@@ -93,10 +92,10 @@ class V2ShellBrowserTests(BrowserHarness):
                     menu.click()
                     self.assertEqual(menu.get_attribute("aria-expanded"), "true")
                     self.page.get_by_role("navigation", name="Primary navigation").get_by_role(
-                        "link", name="Instrument catalogue"
+                        "link", name="Alerts & settings"
                     ).click()
                     self.page.get_by_role(
-                        "heading", name="Instrument catalogue", level=1
+                        "heading", name="Settings", level=1
                     ).wait_for()
                     self.assertEqual(menu.get_attribute("aria-expanded"), "false")
                     menu.click()

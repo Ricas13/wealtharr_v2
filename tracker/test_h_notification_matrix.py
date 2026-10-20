@@ -30,23 +30,23 @@ class OwnerAlertMatrixTests(TestCase):
             email_enabled=True, discord_enabled=True)
         self.client.force_login(self.owner)
 
-    def test_category_channel_matrix_selects_only_enabled_destinations(self):
+    def test_only_switched_on_destinations_are_selected(self):
+        # Which alert goes where is chosen per strategy; Settings only switches
+        # destinations on or off, and old global category flags are ignored.
         self.pref.urgent_discord = False
-        self.pref.quarterly_email = False
-        self.pref.save(update_fields=["urgent_discord", "quarterly_email"])
+        self.pref.save(update_fields=["urgent_discord"])
+        self.assertEqual(selected_channels(self.pref, "urgent"), ("email", "discord"))
+        self.pref.discord_enabled = False
+        self.pref.save(update_fields=["discord_enabled"])
         self.assertEqual(selected_channels(self.pref, "urgent"), ("email",))
-        self.assertEqual(selected_channels(self.pref, "quarterly"), ("discord",))
-        self.assertEqual(selected_channels(self.pref, "data"), ("email", "discord"))
-        self.pref.monthly_reminders = False
-        self.pref.save(update_fields=["monthly_reminders"])
-        self.assertEqual(selected_channels(self.pref, "contribution"), ())
+        self.assertEqual(selected_channels(self.pref, "data"), ("email",))
         with self.assertRaises(ValueError):
             selected_channels(self.pref, "unknown")
 
-    def test_muted_category_never_creates_delivery(self):
-        self.pref.urgent_discord = False
-        self.pref.urgent_email = False
-        self.pref.save(update_fields=["urgent_email", "urgent_discord"])
+    def test_switched_off_destinations_never_create_delivery(self):
+        self.pref.email_enabled = False
+        self.pref.discord_enabled = False
+        self.pref.save(update_fields=["email_enabled", "discord_enabled"])
         with patch("tracker.notification_routing.dispatch") as transport:
             response = route_notice(self.owner, "urgent", "spike:once",
                                     "Important source warning", "Review manually")
@@ -68,25 +68,19 @@ class OwnerAlertMatrixTests(TestCase):
         self.assertEqual(newly_delivered(outcomes), 1)
         transport.assert_called_once()
 
-    def test_owner_preference_post_updates_selected_categories_only(self):
-        self.pref.quarterly_email = True
-        self.pref.urgent_discord = True
-        self.pref.save()
+    def test_owner_preference_post_saves_destinations_only(self):
         params = {
-            "form_kind": "owner", "followup_delay_days": "7",
-            "destination_email": "owner@example.test", "email_enabled": "on",
-            "quarterly_discord": "on", "urgent_email": "on",
-            "data_discord": "on", "monthly_reminders": "on",
-            "followup_email": "on",
+            "form_kind": "owner", "destination_email": "new@example.test",
+            "email_enabled": "on", "quarterly_email": "",
         }
         response = self.client.post(reverse("v2_settings"), params)
         self.assertRedirects(response, reverse("v2_settings"))
         self.pref.refresh_from_db()
+        self.assertTrue(self.pref.email_enabled)
         self.assertFalse(self.pref.discord_enabled)
-        self.assertFalse(self.pref.quarterly_email)
-        self.assertFalse(self.pref.urgent_discord)
-        self.assertTrue(self.pref.urgent_email)
-        self.assertTrue(self.pref.data_discord)
+        self.assertEqual(self.pref.destination_email, "new@example.test")
+        # Category columns aren't part of the form any more and stay as stored.
+        self.assertTrue(self.pref.quarterly_email)
 
     def test_delivery_log_owner_scoped_and_scheduler_admin_only(self):
         NotificationDelivery.objects.create(
@@ -101,17 +95,16 @@ class OwnerAlertMatrixTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["last_receipts"]), 1)
         self.assertNotContains(response, "private_other")
-        self.assertNotContains(response, "Notification scheduler")
+        self.assertNotContains(response, "Alert sender")
         self.owner.is_staff = True
         self.owner.save(update_fields=["is_staff"])
         response = self.client.get(reverse("v2_settings"))
-        self.assertContains(response, "Notification scheduler")
-        self.assertContains(response, "2")
+        self.assertContains(response, "Alert sender last ran")
 
-    def test_turning_off_urgent_email_suspends_its_pending_retry(self):
+    def test_turning_off_email_suspends_its_pending_retry(self):
         user = self.owner
-        self.pref.urgent_email = False
-        self.pref.save(update_fields=["urgent_email"])
+        self.pref.email_enabled = False
+        self.pref.save(update_fields=["email_enabled"])
         NotificationDelivery.objects.create(
             owner=user, channel="email", event_key="signal:my:spike",
             subject="Unverified reference", message="Do not trade",
@@ -129,16 +122,16 @@ class OwnerAlertMatrixTests(TestCase):
             event_key="signal:old:spike", status="FAILED", attempts=1,
             subject="Old source warning", message="Already expired",
             next_retry_at=timezone.now() - timedelta(minutes=10))
-        self.pref.urgent_email = False
-        self.pref.urgent_discord = False
-        self.pref.save(update_fields=["urgent_email", "urgent_discord"])
+        self.pref.email_enabled = False
+        self.pref.discord_enabled = False
+        self.pref.save(update_fields=["email_enabled", "discord_enabled"])
         with patch("tracker.notification_scheduler.dispatch") as sender:
             self.assertEqual(retry_due_deliveries(), (0, 0))
             sender.assert_not_called()
         delivery.refresh_from_db()
         self.assertEqual(delivery.status, "CANCELLED")
-        self.pref.urgent_email = True
-        self.pref.save(update_fields=["urgent_email"])
+        self.pref.email_enabled = True
+        self.pref.save(update_fields=["email_enabled"])
         with patch("tracker.services._send_message") as sender:
             response = route_notice(
                 self.owner, "urgent", "signal:old:spike",

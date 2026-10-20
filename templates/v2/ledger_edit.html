@@ -5,12 +5,12 @@
     <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Back to ledger</a>
   </div>
   {% if edit_error %}<p class="w2-form-error" role="alert">{{ edit_error }}</p>{% endif %}
-  {% if edit_entry and edit_entry.imported or edit_entry.linked_fill %}
-    <p class="w2-notice">This broker-imported or review-linked transaction cannot be overwritten. Reconcile against source evidence.</p>
+  {% if edit_entry and edit_entry.linked_fill %}
+    <p class="w2-notice">This entry is a quarterly-review fill and can't be edited here.</p>
   {% elif not edit_preview %}
     <form method="post" class="w2-wizard-form" id="w2-transaction-form">
       {% csrf_token %}
-      <input type="hidden" name="intent" value="preview">
+      <input type="hidden" name="intent" value="{% if edit_operation == 'new' %}save{% else %}preview{% endif %}">
       {% if edit_operation == 'new' or edit_operation == 'edit' %}
         <div class="w2-form-grid">
           <label class="w2-field">Actual transaction date
@@ -62,7 +62,7 @@
           <div><dt>Shares</dt><dd>{{ edit_entry.quantity }}</dd></div>
         </dl>
       {% endif %}
-      <button class="w2-button w2-button-primary" type="submit">Preview impact</button>
+      <button class="w2-button w2-button-primary" type="submit">{% if edit_operation == 'new' %}Save{% else %}Preview impact{% endif %}</button>
     </form>
   {% endif %}
 

@@ -72,7 +72,7 @@ class Phase5BreakdownBrowserTests(BrowserHarness):
             title="Saved Q2 audit", message="Read-only earlier period",
         )
 
-    def test_read_only_breakdown_390_and_1440(self):
+    def test_review_calculation_390_and_1440(self):
         screenshots = Path(settings.BASE_DIR) / "docs/design/screenshots"
         keep = os.environ.get("WEALTHARR_CAPTURE_V2_BASELINES") == "1"
         with TemporaryDirectory() as temp:
@@ -80,11 +80,9 @@ class Phase5BreakdownBrowserTests(BrowserHarness):
                 with self.subTest(width=width):
                     self.new_page(width)
                     self.sign_in()
-                    self.visit("v2_instance_page", self.instance.pk, "breakdown")
-                    self.page.get_by_role(
-                        "heading", name="Quarterly decision evidence"
-                    ).wait_for()
+                    self.visit("v2_instance_page", self.instance.pk, "review")
                     self.page.get_by_role("heading", name="Saved Q3 audit").wait_for()
+                    self.page.get_by_text("How this was calculated").wait_for()
                     self.page.get_by_text("981.52").first.wait_for()
                     self.assertNotIn("SECRET_OTHER_OWNER_PORTFOLIO", self.page.content())
                     self.assertNotIn("OTHER_SECRET_QUARTER", self.page.content())
@@ -93,24 +91,20 @@ class Phase5BreakdownBrowserTests(BrowserHarness):
                         self.page.evaluate("document.documentElement.scrollWidth"),
                         width + 1,
                     )
-                    self.page.get_by_text("Growth drawdown · information only").wait_for()
-                    path = (screenshots if keep else Path(temp)) / f"phase5-breakdown-{width}.png"
+                    path = (screenshots if keep else Path(temp)) / f"phase5-review-{width}.png"
                     path.parent.mkdir(parents=True, exist_ok=True)
                     self.page.screenshot(path=str(path), full_page=True)
                     self.assertTrue(path.exists())
-                    self.page.get_by_label("Saved review quarter").select_option("2025-06-30")
-                    self.page.get_by_role("button", name="Inspect review").click()
-                    self.page.get_by_role("heading", name="Quarterly decision evidence").wait_for()
-                    self.assertIn("quarter=2025-06-30", self.page.url)
+                    self.page.get_by_role("link", name="View", exact=True).first.click()
                     self.page.get_by_role("heading", name="Saved Q2 audit").wait_for()
                     self.assertEqual(self.browser_errors, [])
 
     def test_export_audit_with_zero_side_effects(self):
         self.new_page(1440)
         self.sign_in()
-        self.visit("v2_instance_page", self.instance.pk, "breakdown")
+        self.visit("v2_instance_page", self.instance.pk, "review")
         with self.page.expect_download() as download:
-            self.page.get_by_role("link", name="Export audit CSV").click()
+            self.page.get_by_role("link", name="Download CSV").click()
         self.assertTrue(download.value.suggested_filename.endswith(".csv"))
         self.assertEqual(self.instance.signals.count(), 2)
         self.assertEqual(self.instance.baselines.count(), 0)

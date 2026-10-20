@@ -14,8 +14,9 @@ class LegacyEnrollmentRoutingTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_user(
             "former_enrollment_owner", password="a-long-test-password")
-        self.legacy_url = reverse("start_real_9sig")
-        self.editor_url = reverse("new_strategy")
+        # Retired enrolment addresses no longer exist at all.
+        self.legacy_url = "/app/9sig/start/"
+        self.editor_url = "/app/strategies/new/"
         self.modern_url = reverse("v2_add_strategy")
         self.old_payload = {
             "account_name": "Custom Trading 212 GIA", "account_kind": "GIA",
@@ -26,24 +27,21 @@ class LegacyEnrollmentRoutingTests(TestCase):
         }
 
     def test_legacy_entrypoints_require_signin(self):
-        self.assertEqual(self.client.get(self.legacy_url).status_code, 302)
-        self.assertEqual(self.client.post(self.editor_url, self.old_payload).status_code, 302)
+        self.assertEqual(self.client.get(self.legacy_url).status_code, 404)
+        self.assertEqual(self.client.post(self.editor_url, self.old_payload).status_code, 404)
         self.assertFalse(Account.objects.exists())
 
-    def test_get_routes_both_old_enrollment_pages_to_new_owner_setup(self):
+    def test_old_enrollment_pages_are_gone_and_new_setup_loads(self):
         self.client.force_login(self.owner)
-        self.assertRedirects(self.client.get(self.legacy_url), self.modern_url, status_code=301)
-        self.assertRedirects(self.client.get(self.editor_url), self.modern_url, status_code=301)
-        page = self.client.get(reverse("v2_catalogue"))
-        self.assertContains(page, "LQQ3")
-        self.assertContains(page, "ERNS")
+        self.assertEqual(self.client.get(self.legacy_url).status_code, 404)
+        self.assertEqual(self.client.get(self.editor_url).status_code, 404)
         self.assertEqual(self.client.get(self.modern_url).status_code, 200)
 
     def test_legacy_post_never_creates_a_gia_or_invents_cash(self):
         self.client.force_login(self.owner)
         for url in (self.legacy_url, self.editor_url):
             response = self.client.post(url, self.old_payload)
-            self.assertEqual(response.status_code, 405)
+            self.assertEqual(response.status_code, 404)
         self.assertFalse(Account.objects.filter(owner=self.owner).exists())
         self.assertFalse(StrategyInstance.objects.filter(owner=self.owner).exists())
         self.assertFalse(LedgerEntry.objects.exists())

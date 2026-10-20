@@ -2,20 +2,16 @@
 from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from tracker.models import MarketObservation, StrategyInstance, StrategyValueSnapshot, WealthSnapshot
+from tracker.models import MarketObservation, StrategyInstance, StrategyValueSnapshot
 from tracker.market_signals import review_strategy, sync_ticker
-from tracker.services import consolidated, ledger_summary
+from tracker.services import ledger_summary
 from tracker.instrument_mapping import for_strategy
-from tracker.models import OpeningReconciliation, InstanceOpeningSnapshot
 
 
 def save_verified_strategy_snapshot(strategy):
     """Capture source-verified quote-day growth without inventing a historical fill."""
-    # Never write a verified snapshot for an owner-reported or revised ledger
-    # before the exact account and historical cashflows are reconciled.
-    if (strategy.tracking_only or for_strategy(strategy) is None or
-            InstanceOpeningSnapshot.objects.filter(strategy=strategy,
-                reconciliation__isnull=True).exists()):
+    # No snapshot for a strategy that isn't live or has no mapped instruments.
+    if strategy.tracking_only or for_strategy(strategy) is None:
         return None
     summary = ledger_summary(strategy)
     if summary["value"] is None or not summary["positions"]:
@@ -58,9 +54,7 @@ class Command(BaseCommand):
                 preset__slug="nasdaq-quarterly-target", preset__active=True):
             owners.add(strategy.owner)
             try:
-                if (for_strategy(strategy) is None or
-                        InstanceOpeningSnapshot.objects.filter(strategy=strategy,
-                            reconciliation__isnull=True).exists()):
+                if for_strategy(strategy) is None:
                     fail += 1
                     continue
                 result = review_strategy(strategy)
@@ -78,47 +72,4 @@ class Command(BaseCommand):
                     sync_ticker(symbol)
                 except Exception:
                     pass
-        for owner in owners:
-            # One unverified/changed component blocks an aggregated GBP NAV.
-            # Omit neither a real owner strategy nor its cash silently.
-            if (StrategyInstance.objects.filter(owner=owner,
-                    tracking_only=True).exclude(account__kind="PAPER").exists() or
-                    InstanceOpeningSnapshot.objects.filter(strategy__owner=owner,
-                        reconciliation__isnull=True).exists()):
-                continue
-            report = consolidated(owner)
-            if report["total"] is None or not report["items"]:
-                continue
-            # All included positions must have *automated*, GBP-verified closes;
-            # a stale manual mark cannot silently become a daily market snapshot.
-            observed_days = []
-            valid = True
-            for item in report["items"]:
-                for symbol, qty in item["positions"].items():
-                    if qty <= 0:
-                        continue
-                    mark = item["marks"].get(symbol)
-                    if (not mark or mark.source != "yahoo" or
-                            mark.as_of < timezone.localdate() - timedelta(days=8) or
-                            not MarketObservation.objects.filter(symbol=symbol, as_of=mark.as_of,
-                                currency="GBP", price=mark.price).exists()):
-                        valid = False
-                        break
-                    observed_days.append(mark.as_of)
-                if not valid:
-                    break
-            if not valid or not observed_days:
-                continue
-            date_to_record = min(observed_days)
-            # Do not combine shares purchased AFTER a quote with an old quote.
-            if any(day != date_to_record for day in observed_days):
-                continue
-            if any(item["strategy"].ledger.filter(occurred_on__gt=date_to_record).exists()
-                   for item in report["items"]):
-                continue
-            WealthSnapshot.objects.update_or_create(
-                owner=owner, as_of=date_to_record,
-                defaults={"total_value": report["total"],
-                          "net_contributed": report["net_contributed"]},
-            )
         self.stdout.write("Yahoo monitoring: %d verified, %d awaiting usable data" % (ok, fail))

@@ -52,9 +52,7 @@ class Phase7SettingsBrowserTests(BrowserHarness):
                     self.new_page(width)
                     self.sign_in()
                     self.visit("v2_settings")
-                    self.page.get_by_role(
-                        "heading", name="Notification destinations"
-                    ).wait_for()
+                    self.page.get_by_role("heading", name="Where alerts go").wait_for()
                     self.assertNotIn(
                         "CROSS_OWNER_PRIVATE_SECRET", self.page.content()
                     )
@@ -62,28 +60,16 @@ class Phase7SettingsBrowserTests(BrowserHarness):
                         'input[name="destination_email"]'
                     ).fill("receipt@example.test")
                     self.page.locator('input[name="email_enabled"]').check()
-                    self.page.get_by_role(
-                        "button", name="Save notification preferences"
-                    ).click()
+                    self.page.get_by_role("button", name="Save", exact=True).click()
                     self.assertIn("/settings/", self.page.url)
-                    self.page.get_by_text(
-                        "Notification destinations", exact=True
-                    ).wait_for()
-                    strategy_form = self.page.locator(
-                        'form:has(input[name="strategy_id"][value="%s"])'
-                        % self.strategy.pk
-                    )
-                    strategy_form.locator(
-                        'input[name="route_urgent_email"]'
-                    ).uncheck()
-                    strategy_form.get_by_role(
-                        "button", name="Save Owner alert test alerts"
-                    ).click()
-                    self.assertIn("/settings/", self.page.url)
-                    self.assertFalse(self.page.locator(
-                        'form:has(input[name="strategy_id"][value="%s"]) '
-                        'input[name="route_urgent_email"]' % self.strategy.pk
-                    ).is_checked())
+                    self.page.get_by_text("Alert destinations saved.").wait_for()
+                    # Which alerts go where is set on the strategy itself.
+                    self.visit("v2_instance_page", self.strategy.pk, "strategy")
+                    self.page.locator('input[name="route_urgent_email"]').uncheck()
+                    self.page.get_by_role("button", name="Save alerts").click()
+                    self.assertIn("/strategy/", self.page.url)
+                    self.assertFalse(
+                        self.page.locator('input[name="route_urgent_email"]').is_checked())
                     self.assertLessEqual(
                         self.page.evaluate(
                             "document.documentElement.scrollWidth"
@@ -120,6 +106,6 @@ class Phase7SettingsBrowserTests(BrowserHarness):
                     "link", name="Change", exact=True
                 ).click()
                 self.page.get_by_role(
-                    "heading", name="Notification destinations"
+                    "heading", name="Where alerts go"
                 ).wait_for()
                 self.assertEqual(self.browser_errors, [])

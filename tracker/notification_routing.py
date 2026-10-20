@@ -8,27 +8,26 @@ from .models import NotificationDelivery, NotificationPreference
 from .services import dispatch
 
 CATEGORIES = (
-    ("quarterly", "Quarterly decision digest"),
-    ("urgent", "Urgent strategy warnings"),
-    ("data", "Missing or unverified market information"),
-    ("followup", "Outstanding review follow-up"),
-    ("contribution", "Monthly planned contribution"),
+    ("quarterly", "Quarterly instruction"),
+    ("urgent", "Big market drop"),
+    ("data", "Price problem"),
+    ("followup", "Review reminder"),
+    ("contribution", "Monthly deposit reminder"),
 )
 CATEGORY_KEYS = {value for value, _ in CATEGORIES}
 CHANNELS = ("email", "discord")
 
 
 def selected_channels(pref, category):
+    """Destinations switched on in Settings; which alerts go where is per strategy."""
     if category not in CATEGORY_KEYS:
         raise ValueError("Unknown notification category")
     return tuple(channel for channel in CHANNELS
-                 if getattr(pref, channel + "_enabled", False)
-                 and getattr(pref, category + "_" + channel, False)
-                 and (category != "contribution" or pref.monthly_reminders))
+                 if getattr(pref, channel + "_enabled", False))
 
 
 def strategy_channels(pref, category, strategy=None):
-    """Intersect owner-wide choices with the enrolled strategy's explicit routes.
+    """Intersect switched-on destinations with the strategy's explicit routes.
 
     Legacy strategies without a route matrix preserve existing owner-wide
     preferences; a v2 enrolment with missing/malformed routes fails closed.

@@ -94,8 +94,6 @@ class SiteTests(TestCase):
         self.assertEqual(self.client.post(reverse("v2_ledger_add", args=[s.pk]),{}).status_code,404)
     def test_create_account_strategy_deposit_and_snapshot(self):
         self.client.force_login(self.user)
-        self.assertRedirects(self.client.get(reverse("new_strategy")),
-                             reverse("v2_add_strategy"), status_code=301)
         url = reverse("v2_add_strategy")
         self.client.get(url + "?restart=1")
         self.client.post(url, {"step": "1", "strategy": "nasdaq-quarterly-target"})
@@ -189,13 +187,12 @@ class TemplateAndSecurityTests(TestCase):
         self.assertTrue(response.url.startswith(reverse("login")))
     def test_all_owner_pages_render(self):
         self.client.force_login(self.owner)
-        for url in (reverse("v2_overview"), reverse("v2_catalogue"),
+        for url in (reverse("v2_overview"),
                     reverse("v2_instance_page", args=[self.strategy.pk, "strategy"]),
                     reverse("v2_settings"), reverse("change_password"), reverse("control")):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code,200)
-        self.assertRedirects(self.client.get(reverse("new_strategy")),
-                             reverse("v2_add_strategy"), status_code=301)
+        self.assertEqual(self.client.get("/app/strategies/new/").status_code, 404)
     def test_snapshot_is_not_saved_when_price_is_missing(self):
         self.client.force_login(self.owner)
         validate_and_record(self.strategy,LedgerEntry(kind="DEPOSIT",amount=D("200"),occurred_on=timezone.localdate()))

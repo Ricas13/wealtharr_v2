@@ -12,9 +12,23 @@ from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from .v2_legacy import preferred_url
+from .models import StrategyInstance
+
+
+def owner_instances(user):
+    return StrategyInstance.objects.filter(
+        owner=user, account__owner=user
+    ).exclude(account__kind="PAPER").order_by("created_at", "pk")
+
+
+def preferred_url(user, section="today"):
+    ids = list(owner_instances(user).values_list("pk", flat=True)[:2])
+    if len(ids) == 1:
+        return reverse("v2_instance_page", args=[ids[0], section])
+    return reverse("v2_overview")
 
 
 def _turnstile_verified(request):
