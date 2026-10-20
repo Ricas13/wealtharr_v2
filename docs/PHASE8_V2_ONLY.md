@@ -1,3 +1,11 @@
+## Continuation: reset choice and TOTP redirect
+
+- Reused existing `choose_manual_reserve_reset` service from `tracker.cockpit_manual_reset` inside v2 guided review. Only current versioned exhausted-reserve notices can offer the owner-elected alternative; the original all-in proposal stays intact. A separate review never creates trades or a baseline; actual fills and verified later GBP closes remain required. `tracker/test_manual_reserve_reset.py` now exercises this v2 path without relaxing financial assertions.
+- Fixed remaining successful TOTP challenge redirects to use `preferred_url(request.user)` rather than `/cockpit/`. Original tests uncovered a real redirect regression.
+- Interim CI on `b9583ea` (before later porting): 385 Django tests, 52 failures and 2 errors, seven skipped, versus 72 failures and three errors initially. **Not a final pass**. More old test and browser journeys still require porting. No live database was changed.
+
+---
+
 # Phase 8 — continuation: v2-only owner tests and saved-notice feedback (20 October 2026)
 
 - Ported legacy safety assertions to v2 in `tracker/test_cockpit.py` (partial fills, verified-close baseline, rollback, duplicate CSV import, preview gate, actual cash), `tracker/test_g_single_fill.py` (idempotency, partial and final completion), `tracker/test_owner_totp.py`, `tracker/test_i_security_and_recovery.py`, `tracker/test_real_9sig_setup.py`, `tracker/test_layout_cleanup.py`, `tracker/test_h_notification_matrix.py`, `tracker/test_signal_review.py`, and `tracker/tests.py`. These remain regression tests: none was skipped merely to clear CI.
