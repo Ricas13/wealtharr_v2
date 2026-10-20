@@ -1,3 +1,9 @@
+## Phase 8 continuation — v2-only tests (20 October 2026)
+
+Continue **draft** PR #26 on `feature/phase8-v2-only-app` (not merged or deployed). `docs/PHASE8_V2_ONLY.md` documents the additional ported safety tests, preserved shared strategy/ledger links, safe v2 feedback on saved signals, screenshot artifact and remaining legacy-regression failures. Do not change the financial engine or merge until CI passes and the old financial/browser assertions are matched on v2. No local before/after test count was possible. Phase 8 is **not** complete.
+
+---
+
 # Phase 8 handoff (20 October 2026)
 
 Phase 8 works from latest main, with shared models and data link migration 0021, v2-only owner entrypoints, secure 301 GET bookmarks, no legacy writes, restyled authentication, compact status copy and requested browser screenshot tests. Financial engine and 9Sig parity fixtures unchanged. See docs/PHASE8_V2_ONLY.md for data limits, visual differences and the old HTTP test dependency. Do not merge a failing CI draft or reset the database.
