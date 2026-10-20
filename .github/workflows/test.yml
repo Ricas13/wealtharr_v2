@@ -64,6 +64,30 @@ jobs:
           printf 'ci-test-db-only-not-real-secret' > secrets/postgres_password
           printf 'ci-test-django-key-only-not-real-secret' > secrets/django_secret_key
           docker compose config --quiet
+          # Regression: Compose must preserve the shell variable in BOTH
+          # checksum filenames. A single '$stamp' in YAML is interpolated
+          # by Compose before the backup shell executes and produces a
+          # permanent unhealthy backup service.
+          docker compose config --format json > /tmp/wealtharr-compose.json 2> /tmp/wealtharr-compose-warnings.log
+          if grep -qi 'variable is not set' /tmp/wealtharr-compose-warnings.log; then
+            cat /tmp/wealtharr-compose-warnings.log >&2
+            echo 'Compose expanded backup stamp before the shell ran' >&2
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          with open("/tmp/wealtharr-compose.json") as f:
+              cfg = json.load(f)
+          cmd = cfg["services"]["backups"]["command"]
+          script = cmd[-1] if isinstance(cmd, list) else cmd
+          checksum_line = next((line for line in script.splitlines() if "sha256sum" in line), "")
+          assert checksum_line.count("$completed") >= 2, (
+              "Compose stripped the completed archive variable from the checksum command: "
+              + checksum_line
+          )
+          assert ".sha256" in checksum_line
+          print("Backup filename shell variables survived Compose interpolation")
+          PY
           WEALTHARR_HOST=wealtharr.vpn4u.cc \
           TRAEFIK_DOCKER_NETWORK=ci_private_proxy \
           TRAEFIK_CERT_RESOLVER=ci_resolver \
