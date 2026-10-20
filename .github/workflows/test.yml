@@ -200,4 +200,4 @@ jobs:
           retention-days: 14
       - name: Test real owner journeys in Chromium
         if: always()
-        run: python manage.py test browser_tests tracker.test_browser_e2e --verbosity 2
+        run: python manage.py test browser_tests --verbosity 2
