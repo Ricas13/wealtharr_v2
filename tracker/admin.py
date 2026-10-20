@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import (Account, LedgerEntry, NotificationDelivery, NotificationPreference,
+from .models import (Account, InviteRequest, LedgerEntry, NotificationDelivery, NotificationPreference,
                      PriceMark, StrategyInstance, StrategyPreset, StrategyBaseline, SystemIntegration, WealthSnapshot)
 
 admin.site.site_header = "Wealtharr | Advanced administration"
@@ -92,3 +92,9 @@ def _secure_admin_login(request, extra_context=None):
         return redirect("login")
     return _original_admin_login(request, extra_context=extra_context)
 admin.site.login = _secure_admin_login
+
+
+@admin.register(InviteRequest)
+class InviteRequestAdmin(admin.ModelAdmin):
+    list_display = ("email", "created_at", "notified")
+    readonly_fields = ("email", "created_at", "notified")

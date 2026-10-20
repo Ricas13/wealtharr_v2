@@ -538,3 +538,17 @@ class BrokerImportRow(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "fingerprint"], name="unique_t212_event")]
+
+
+class InviteRequest(models.Model):
+    """An email left on the signed-out homepage. Not an account and not signup:
+    the owner reads these and creates any account by hand."""
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    notified = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.email

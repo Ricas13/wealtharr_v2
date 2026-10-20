@@ -2,10 +2,12 @@
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
-from tracker import totp_views, v2_auth
+from tracker import totp_views, v2_auth, v2_home
 
 urlpatterns = [
-    path("", v2_auth.home, name="home"),
+    path("", v2_home.landing, name="home"),
+    path("compare.json", v2_home.compare_json, name="home_compare"),
+    path("invite/", v2_home.request_invite, name="request_invite"),
     path("login/", v2_auth.sign_in, name="login"),
     path("logout/", v2_auth.sign_out, name="logout"),
     path("security/authenticator/", totp_views.configure, name="totp_setup"),
