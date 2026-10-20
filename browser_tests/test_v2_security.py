@@ -61,7 +61,9 @@ class V2OwnerSecurityBrowserTests(BrowserHarness):
         skip.focus()
         skip.press("Enter")
         self.assertEqual(self.page.evaluate("document.activeElement.id"), "v2-main")
-        toggle = self.page.get_by_role("button", name="Open navigation")
+        # Located by its controlled region: v2.js renames the button to
+        # "Close navigation" while the drawer is open.
+        toggle = self.page.locator('[aria-controls="v2-sidebar"]')
         toggle.click()
         self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
         self.page.keyboard.press("Escape")

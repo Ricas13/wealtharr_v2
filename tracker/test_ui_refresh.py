@@ -60,7 +60,8 @@ class PersonalPortalRedesignTests(TestCase):
         response = self.client.get(reverse("v2_overview"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["overview_contributed"], D("1000.00"))
-        self.assertIsNone(response.context["overview_total"])
+        # A cash-only strategy needs no market quote: GBP cash is its verified value.
+        self.assertEqual(response.context["overview_total"], D("1000.00"))
         self.assertContains(response, "Recorded net contributions")
         self.assertContains(response, "No combined return chart is certified")
         self.assertContains(response, 'href="#v2-main"')
@@ -77,8 +78,10 @@ class PersonalPortalRedesignTests(TestCase):
         # Persisted snapshots without certified raw source/quote units are
         # historical observations, never instant certified investment returns.
         after = self.client.get(reverse("v2_overview"))
-        self.assertIsNone(after.context["overview_total"])
-        self.assertIsNone(after.context["overview_gain"])
+        # Only today's cash-only valuation counts; the uncertified snapshots
+        # (including the 1200 value) never inflate the total or the gain.
+        self.assertEqual(after.context["overview_total"], D("1000.00"))
+        self.assertEqual(after.context["overview_gain"], D("0.00"))
         self.assertContains(after, "No combined return chart is certified")
 
     def test_strategy_tabs_preserve_manual_forms_and_instruments(self):
