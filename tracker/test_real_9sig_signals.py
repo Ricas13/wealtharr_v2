@@ -1,4 +1,5 @@
 """End-to-end real ledger, market settlement, and signal alert behaviour."""
+from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal as D
 from unittest.mock import patch
@@ -7,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from tracker.market_signals import quarter_end_before, review_strategy
+from tracker.market_signals import NINE_SIG_RULE_VERSION, quarter_end_before, quarter_number, review_strategy
 from tracker.cockpit_notifications import send_due_cockpit_notices
 from tracker.models import (
     Account, LedgerEntry, MarketObservation, NotificationPreference,
@@ -38,6 +39,17 @@ class RealQuarterlySignalTests(TestCase):
             MarketObservation.objects.create(
                 symbol=symbol, as_of=self.older,
                 price=price, currency=currency)
+        # The live adapter now requires the SAME eight complete historical
+        # SPY quarter closes as the typed pure evaluator. All are real dated
+        # fixture observations, never inferred from one preceding close.
+        q = quarter_number(self.end)
+        for offset in range(2, 9):
+            y, index = divmod(q - offset, 4)
+            month = (index + 1) * 3
+            close = date(y, month, monthrange(y, month)[1])
+            MarketObservation.objects.create(
+                symbol="SPY", as_of=close,
+                price=D("100"), currency="USD")
 
     def save(self, kind, day, **data):
         return validate_and_record(self.strategy, LedgerEntry(
@@ -81,6 +93,7 @@ class RealQuarterlySignalTests(TestCase):
         alert = StrategySignal.objects.get(
             strategy=self.strategy, kind="QUARTERLY")
         self.assertIn("£904.00", alert.message)
+        self.assertEqual(alert.strategy_version, NINE_SIG_RULE_VERSION)
         self.assertTrue(any(x["side"] == "BUY" for x in alert.actions))
         # No instant duplicate quarterly alert; the reconciled instruction
         # is sent once by the scheduled digest instead.
@@ -89,6 +102,91 @@ class RealQuarterlySignalTests(TestCase):
             send_due_cockpit_notices()
         self.assertEqual(digest_dispatch.call_count, 1)
         self.assertIn('quarterly-digest:', digest_dispatch.call_args.args[1])
+
+    def test_provisional_quarterly_tqqq_spike_has_no_executable_reset_orders(self):
+        # Regression: the typed pure evaluator already suppresses orders
+        # based solely on a TQQQ calendar-close proxy; the persisted Django
+        # advisory must not suggest a 60/40 trade on that unverified anchor.
+        self.save(LedgerEntry.DEPOSIT, self.begin, amount=D("1000"))
+        self.save(LedgerEntry.BUY, self.first_trade,
+                  symbol="LQQ3.L", quantity=D("6"), unit_price=D("100"))
+        self.save(LedgerEntry.BUY, self.first_trade,
+                  symbol="ERNS.L", quantity=D("4"), unit_price=D("100"))
+        cached = self.market(D("100"))
+        MarketObservation.objects.filter(
+            symbol="TQQQ", as_of=self.end).update(price=D("160"))
+        cached["TQQQ"].price = D("160")
+        with patch("tracker.market_signals.sync_ticker",
+                   side_effect=lambda symbol: cached[symbol]), \
+             patch("tracker.market_signals.dispatch") as dispatch:
+            result = review_strategy(self.strategy)
+        self.assertEqual(result["status"], "ok")
+        quarter = StrategySignal.objects.get(
+            strategy=self.strategy, kind="QUARTERLY")
+        self.assertEqual(quarter.actions, [])
+        self.assertEqual(quarter.reset_reason, "")
+        self.assertEqual(quarter.strategy_version, NINE_SIG_RULE_VERSION)
+        self.assertIn("No executable reset quantities", quarter.message)
+        warning = StrategySignal.objects.get(
+            strategy=self.strategy, kind="SPIKE_WATCH")
+        self.assertEqual(warning.actions, [])
+        self.assertEqual(warning.strategy_version, NINE_SIG_RULE_VERSION)
+        self.assertIn("actual previous rebalance price", warning.message)
+        self.assertEqual(dispatch.call_count, 1)
+        # Exactly one owner warning and no automatic broker transactions.
+        self.assertEqual(
+            self.strategy.ledger.filter(kind=LedgerEntry.SELL).count(), 0)
+        self.assertEqual(
+            self.strategy.ledger.filter(kind=LedgerEntry.BUY).count(), 2)
+        with patch("tracker.market_signals.sync_ticker",
+                   side_effect=lambda symbol: cached[symbol]), \
+             patch("tracker.market_signals.dispatch") as repeated:
+            result_again = review_strategy(self.strategy)
+        self.assertEqual(result_again["status"], "ok")
+        repeated.assert_not_called()
+        self.assertEqual(
+            StrategySignal.objects.filter(kind="SPIKE_WATCH").count(), 1)
+
+    def test_incomplete_spy_history_or_missing_tqqq_close_fails_closed(self):
+        self.save(LedgerEntry.DEPOSIT, self.begin, amount=D("1000"))
+        self.save(LedgerEntry.BUY, self.first_trade,
+                  symbol="LQQ3.L", quantity=D("6"), unit_price=D("100"))
+        self.save(LedgerEntry.BUY, self.first_trade,
+                  symbol="ERNS.L", quantity=D("4"), unit_price=D("100"))
+        cached = self.market(D("100"))
+        historical_spy = MarketObservation.objects.filter(
+            symbol="SPY", as_of__lt=self.older).order_by("as_of").first()
+        self.assertIsNotNone(historical_spy)
+        historical_spy.delete()
+        with patch("tracker.market_signals.sync_ticker",
+                   side_effect=lambda symbol: cached[symbol]):
+            refused = review_strategy(self.strategy)
+        self.assertEqual(refused["status"], "cannot_compute")
+        self.assertIn("SPY eight-quarter", refused["reason"])
+        self.assertFalse(StrategySignal.objects.exists())
+        # Even if the SPY history is restored, the TQQQ previous close is
+        # mandatory; two arbitrary price points must not count as parity.
+        MarketObservation.objects.create(
+            symbol="SPY", as_of=historical_spy.as_of,
+            price=D("100"), currency="USD")
+        MarketObservation.objects.filter(
+            symbol="TQQQ", as_of=self.older).delete()
+        with patch("tracker.market_signals.sync_ticker",
+                   side_effect=lambda symbol: cached[symbol]):
+            refused = review_strategy(self.strategy)
+        self.assertEqual(refused["status"], "cannot_compute")
+        self.assertIn("TQQQ", refused["reason"])
+        self.assertFalse(StrategySignal.objects.exists())
+
+    def test_unknown_growth_line_cannot_generate_advice(self):
+        self.strategy.equity_symbol = "UNVERIFIED.L"
+        self.strategy.save(update_fields=["equity_symbol"])
+        with patch("tracker.market_signals.sync_ticker") as sync:
+            refused = review_strategy(self.strategy)
+        self.assertEqual(refused["status"], "cannot_compute")
+        self.assertIn("mapping", refused["reason"])
+        sync.assert_not_called()
+        self.assertFalse(StrategySignal.objects.exists())
 
     def test_no_action_quarter_is_saved_without_sending_a_rebalance_alert(self):
         self.save(LedgerEntry.DEPOSIT, self.begin, amount=D("1000"))
