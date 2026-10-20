@@ -31,9 +31,10 @@ def trade_lines(signal):
     return lines
 
 
-def _send(owner, category, key, subject, message):
+def _send(strategy, owner, category, key, subject, message):
     return newly_delivered(route_notice(
-        owner, category, key, subject, message, sender=dispatch))
+        owner, category, key, subject, message,
+        sender=dispatch, strategy=strategy))
 
 
 def send_due_cockpit_notices(today=None, remind_after_days=3):
@@ -58,7 +59,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
             week = today.isocalendar()
             key = "data:%s:%04d-W%02d:%s" % (
                 strategy.pk, week.year, week.week, fingerprint)
-            count += _send(owner, "data", key,
+            count += _send(strategy, owner, "data", key,
                 "Wealtharr — review market data",
                 "%s: an accurate review is currently unavailable. %s "
                 "Open Today to see the data status. Do not trade from old "
@@ -79,7 +80,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
             reconciled = (fresh and not strategy.ledger.filter(
                 occurred_on__gt=recent.as_of).exists())
             if actions and reconciled and not partial:
-                count += _send(owner, "quarterly",
+                count += _send(strategy, owner, "quarterly",
                     "quarterly-digest:%s:%s" % (strategy.pk, recent.signal_key),
                     "Wealtharr — quarterly review (%s)" % recent.as_of,
                     "Recorded review %s\n\n%s\n\n"
@@ -95,7 +96,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                          if partial else
                          "This review is not confirmed. Open Today, verify "
                          "freshness and record only actual broker fills.")
-                count += _send(owner, "followup",
+                count += _send(strategy, owner, "followup",
                     "rebalance-reminder:%s:%s:%04d-W%02d" % (
                         strategy.pk, recent.signal_key, week.year, week.week),
                     "Wealtharr — outstanding quarterly review",
@@ -108,7 +109,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                 kind="DEPOSIT", occurred_on__year=today.year,
                 occurred_on__month=today.month)), D("0"))
             if contributed < strategy.monthly_target:
-                count += _send(owner, "contribution",
+                count += _send(strategy, owner, "contribution",
                     "monthly:%s:%04d-%02d" % (
                         strategy.pk, today.year, today.month),
                     "Wealtharr — planned monthly £%s contribution" % (
