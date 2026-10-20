@@ -150,7 +150,7 @@ def _send_message(channel, owner, cfg, prefs, subject, message):
         raise ValueError("Unsupported notification channel")
 
 
-def dispatch(owner, key, subject, message, channels=None, *, category=""):
+def dispatch(owner, key, subject, message, channels=None, *, category="", strategy=None):
     """Persist and deliver each alert with bounded, retryable, per-channel status.
 
     A network acknowledgement can be lost after the remote service accepts a
@@ -158,6 +158,8 @@ def dispatch(owner, key, subject, message, channels=None, *, category=""):
     an alert in that rare case. Trade orders are never sent.
     """
     from datetime import timedelta
+    if strategy is not None and strategy.owner_id != owner.pk:
+        raise ValueError("Strategy does not belong to notification owner")
     prefs, _ = NotificationPreference.objects.get_or_create(owner=owner)
     cfg = SystemIntegration.current()
     channels = channels if channels is not None else ("email", "discord")
@@ -175,8 +177,11 @@ def dispatch(owner, key, subject, message, channels=None, *, category=""):
                 record, created = NotificationDelivery.objects.select_for_update().get_or_create(
                     owner=owner, channel=channel, event_key=key,
                     defaults={"subject": subject[:200], "message": message,
-                              "category": category},
+                              "category": category, "strategy": strategy},
                 )
+                if (record.strategy_id != (strategy.pk if strategy is not None else None)):
+                    outcomes[channel] = "failed"
+                    continue
                 if record.category and category and record.category != category:
                     outcomes[channel] = "failed"
                     continue

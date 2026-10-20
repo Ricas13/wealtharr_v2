@@ -31,12 +31,13 @@ def trade_lines(signal):
     return lines
 
 
-def _send(owner, category, key, subject, message):
+def _send(strategy, owner, category, key, subject, message):
     return newly_delivered(route_notice(
-        owner, category, key, subject, message, sender=dispatch))
+        owner, category, key, subject, message,
+        sender=dispatch, strategy=strategy))
 
 
-def send_due_cockpit_notices(today=None, remind_after_days=3):
+def send_due_cockpit_notices(today=None, remind_after_days=None):
     """Send owner-selected, deterministic advisory notices only once per key.
 
     Previously recorded partial fills suppress stale trade quantities, but
@@ -48,6 +49,9 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
             preset__slug="nasdaq-quarterly-target").exclude(account__kind="PAPER"):
         owner = strategy.owner
         pref, _ = NotificationPreference.objects.get_or_create(owner=owner)
+        delay = (remind_after_days if remind_after_days is not None
+                 else pref.followup_delay_days)
+        delay = max(1, min(30, delay))
         report = ledger_summary(strategy)
         fresh, why, marks = _price_status(strategy, report)
         # A recurring source issue is never converted to a trade instruction.
@@ -58,7 +62,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
             week = today.isocalendar()
             key = "data:%s:%04d-W%02d:%s" % (
                 strategy.pk, week.year, week.week, fingerprint)
-            count += _send(owner, "data", key,
+            count += _send(strategy, owner, "data", key,
                 "Wealtharr — review market data",
                 "%s: an accurate review is currently unavailable. %s "
                 "Open Today to see the data status. Do not trade from old "
@@ -79,7 +83,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
             reconciled = (fresh and not strategy.ledger.filter(
                 occurred_on__gt=recent.as_of).exists())
             if actions and reconciled and not partial:
-                count += _send(owner, "quarterly",
+                count += _send(strategy, owner, "quarterly",
                     "quarterly-digest:%s:%s" % (strategy.pk, recent.signal_key),
                     "Wealtharr — quarterly review (%s)" % recent.as_of,
                     "Recorded review %s\n\n%s\n\n"
@@ -87,7 +91,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                     "prices, quantities and fees. No orders have been placed." % (
                         recent.as_of, "\n".join(actions)))
             if (actions and recent.created_at.date() <= today - timedelta(
-                    days=remind_after_days) and (partial or reconciled)):
+                    days=delay) and (partial or reconciled)):
                 week = today.isocalendar()
                 label = ("You have saved actual partial fills. Complete the "
                          "review only after all broker fills and verified "
@@ -95,7 +99,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                          if partial else
                          "This review is not confirmed. Open Today, verify "
                          "freshness and record only actual broker fills.")
-                count += _send(owner, "followup",
+                count += _send(strategy, owner, "followup",
                     "rebalance-reminder:%s:%s:%04d-W%02d" % (
                         strategy.pk, recent.signal_key, week.year, week.week),
                     "Wealtharr — outstanding quarterly review",
@@ -108,7 +112,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=3):
                 kind="DEPOSIT", occurred_on__year=today.year,
                 occurred_on__month=today.month)), D("0"))
             if contributed < strategy.monthly_target:
-                count += _send(owner, "contribution",
+                count += _send(strategy, owner, "contribution",
                     "monthly:%s:%04d-%02d" % (
                         strategy.pk, today.year, today.month),
                     "Wealtharr — planned monthly £%s contribution" % (

@@ -1,0 +1,78 @@
+<div class="w2-two-columns w2-space-top">
+  <div class="w2-column">
+    <section class="w2-panel">
+      <h2>How this strategy works</h2>
+      {% if strategy_description %}
+      <p class="w2-muted">{{ strategy_description.summary }}</p>
+      <p class="w2-note"><strong>Review cadence:</strong> {{ strategy_description.cadence }}</p>
+      <ol class="w2-rules-list">
+        {% for rule in strategy_description.rules %}<li>{{ rule }}</li>{% endfor %}
+      </ol>
+      <p class="w2-note">{{ strategy_description.target_explanation }}</p>
+      <p class="w2-notice">{{ strategy_description.caution }}</p>
+      {% else %}
+      <div class="w2-notice">This legacy strategy has no released read-only description. The app will not infer any strategy rules.</div>
+      {% endif %}
+    </section>
+    <section class="w2-panel">
+      <h2>Account &amp; fixed identity</h2>
+      <dl class="w2-settings-details">
+        <div><dt>Strategy</dt><dd>{{ selected_instance.name }}</dd></div>
+        <div><dt>Account</dt><dd>{{ selected_instance.account.name }} · {{ selected_instance.account.kind }}</dd></div>
+        <div><dt>Platform</dt><dd>{{ selected_instance.account.broker }}</dd></div>
+        <div><dt>Jurisdiction</dt><dd>{{ selected_instance.account.country }}</dd></div>
+        <div><dt>Started</dt><dd>{{ selected_instance.started_on|date:"j M Y"|default:"Legacy start not pinned" }}</dd></div>
+        <div><dt>Strategy version</dt><dd>{{ selected_instance.strategy_version|default:"Legacy version not pinned" }}</dd></div>
+        <div><dt>Mapping version</dt><dd>{{ selected_instance.mapping_version|default:"Legacy mapping not pinned" }}</dd></div>
+        <div><dt>Execution access</dt><dd>{% if strategy_tracking_only %}Tracking only — no trade instructions{% else %}Subject to independently verified data and broker permission{% endif %}</dd></div>
+      </dl>
+      <p class="w2-note">These identities cannot be edited. Changing broker or account type requires a separate strategy instance.</p>
+    </section>
+    <section class="w2-panel">
+      <h2>Recorded rule and baseline history</h2>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Recorded date</th><th>Milestone</th><th>Rule version</th><th>Mapping version</th></tr></thead>
+        <tbody>{% for row in strategy_history %}
+          <tr><td>{{ row.date|date:"j M Y" }}</td><td>{{ row.title }}</td><td>{{ row.strategy }}</td><td>{{ row.mapping }}</td></tr>
+        {% empty %}<tr><td colspan="4"><div class="w2-empty">No versioned baseline evidence is recorded.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+  </div>
+  <div class="w2-column">
+    <section class="w2-panel">
+      <h2>Mapped instruments</h2>
+      <p class="w2-muted">Read-only trading lines, with explicit source checks. Issuer eligibility does not establish Trading 212 permissions in your account.</p>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Role</th><th>Instrument</th><th>Trading line</th><th>Status</th></tr></thead>
+        <tbody>{% for line in strategy_catalogue_rows %}
+          <tr><td>{{ line.role_label }}</td><td class="w2-wrap">{{ line.name }}<small class="w2-muted">{{ line.isin }}</small></td>
+              <td>{{ line.ticker }} · {{ line.raw_quote_unit }}</td>
+              <td>{% if line.status == 'account_check_pending' %}<span class="w2-badge w2-warning">Account check pending</span>
+                  {% elif line.status == 'draft' %}<span class="w2-badge">Draft</span>
+                  {% else %}<span class="w2-badge">Reviewed</span>{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="4"><div class="w2-empty">No released, account-specific instrument mapping. Do not infer replacements.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+      <a href="{% url 'v2_catalogue' %}">View evidence and source URLs in the Catalogue →</a>
+    </section>
+    {% if selected_instance.onboarding_mode == 'hold' %}
+    <section class="w2-panel">
+      <h2>Owner-reported opening holdings</h2>
+      <p class="w2-note">Historical average cost is not a market quote. Reconciliation requires original broker transaction evidence.</p>
+      {% if selected_instance.opening_snapshot %}
+      <p class="w2-muted">Reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }} · cash £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:2 }}</p>
+      <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Role</th><th>Shares</th><th>Reported GBP cost</th></tr></thead><tbody>
+      {% for role, holding in selected_instance.opening_snapshot.positions.items %}
+      <tr><td>{{ role|capfirst }}</td><td>{{ holding.shares }}</td><td>{{ holding.average_cost_gbp }}</td></tr>
+      {% endfor %}</tbody></table></div>
+      {% endif %}
+    </section>{% endif %}
+    <section class="w2-panel">
+      <h2>Alerts for this strategy</h2>
+      <p class="w2-muted">Email and Discord destinations are configured centrally. Each strategy can narrow those choices independently without changing its rules or holdings.</p>
+      <p><a class="w2-button" href="{% url 'v2_settings' %}#strategy-{{ selected_instance.pk }}">Edit strategy alert preferences</a></p>
+      {% if not selected_instance.strategy_key %}
+      <p class="w2-note">Legacy instances without a pinned alert matrix retain their existing account-wide routing until explicitly configured.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>

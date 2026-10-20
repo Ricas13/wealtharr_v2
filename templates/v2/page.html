@@ -32,29 +32,7 @@
 {% elif ledger_import %}{% include 'v2/ledger_import.html' %}
 {% else %}{% include 'v2/ledger.html' %}{% endif %}
 {% elif section == 'strategy' %}
-<section class="w2-panel w2-space-top"><h2>How it works</h2>
-  <p class="w2-muted">Fixed strategy rules and version information will be displayed here, read-only.</p>
-  {% if selected_instance.strategy_version %}<p class="w2-note">Recorded strategy version: {{ selected_instance.strategy_version }}</p>{% endif %}
-</section>
-{% if selected_instance.onboarding_mode == 'hold' %}
-<section class="w2-panel w2-space-top"><h2>Owner-reported opening holdings</h2>
-  <p class="w2-muted">Recorded as a snapshot, NOT as purchases or verified current valuations. Reconcile these against the ledger in Phase 3.</p>
-  {% if selected_instance.opening_snapshot %}
-    <p class="w2-note">Opening cash: £{{ selected_instance.opening_snapshot.cash_gbp|floatformat:2 }} · as reported {{ selected_instance.opening_snapshot.reported_on|date:"j M Y" }}.</p>
-    <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Role</th><th>Trading line</th><th>Shares reported</th><th>Average cost reported (£)</th></tr></thead><tbody>
-    {% for role, holding in selected_instance.opening_snapshot.positions.items %}
-      <tr><td>{{ role|capfirst }}</td><td>{{ holding.ticker }}</td><td class="w2-number">{{ holding.shares }}</td><td class="w2-number">{{ holding.average_cost_gbp }}</td></tr>
-    {% endfor %}
-    </tbody></table></div>
-  {% endif %}
-</section>
-{% endif %}
-<section class="w2-panel w2-space-top"><h2>Instruments</h2>
-  <p class="w2-muted">Instrument mapping version: {{ selected_instance.mapping_version|default:"Legacy mapping not pinned" }}.</p>
-  <p><a href="{% url 'v2_catalogue' %}">View the fixed read-only catalogue →</a></p>
-</section>
-<section class="w2-panel w2-space-top"><h2>Alerts for this strategy</h2>
-  <div class="w2-empty">Routing is configured in Phase 7.</div></section>
+{% include 'v2/strategy_info.html' %}
 {% elif section == 'breakdown' %}
 {% include 'v2/breakdown.html' %}
 {% endif %}
@@ -63,20 +41,7 @@
 {% include 'v2/catalogue.html' %}
 
 {% elif page_key == 'settings' %}
-<div class="w2-two-columns w2-space-top">
-  <div class="w2-column">
-    <section class="w2-panel"><h2>Notification destinations</h2><div class="w2-empty">Email, Discord and optional push configuration arrive in Phase 7.</div></section>
-    <section class="w2-panel"><h2>Your strategies &amp; accounts</h2>
-      {% for item in shell_instances %}<div class="w2-setting-row"><span>{{ item.name }}</span>
-        <span class="w2-muted">{{ item.account.kind }} · {{ item.account.broker }}</span></div>
-      {% empty %}<div class="w2-empty">No strategies yet.</div>{% endfor %}
-    </section>
-  </div>
-  <div class="w2-column">
-    <section class="w2-panel"><h2>Security</h2><div class="w2-empty">Private authentication is handled by the existing application. New settings arrive in Phase 7.</div></section>
-    <section class="w2-panel"><h2>Data &amp; health</h2><div class="w2-empty">Backup, restore and scheduler health details arrive in Phase 7.</div></section>
-  </div>
-</div>
+{% include 'v2/settings.html' %}
 
 {% else %}
 {% include 'v2/onboarding.html' %}

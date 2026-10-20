@@ -265,6 +265,8 @@ class NotificationPreference(models.Model):
     email_enabled = models.BooleanField(default=False)
     discord_enabled = models.BooleanField(default=False)
     monthly_reminders = models.BooleanField(default=True)
+    # Owner-selected delay before a weekly outstanding-review reminder.
+    followup_delay_days = models.PositiveSmallIntegerField(default=7)
     # Category-by-channel routing: master destination toggles still apply.
     quarterly_email = models.BooleanField(default=True)
     quarterly_discord = models.BooleanField(default=True)
@@ -311,6 +313,11 @@ class SystemIntegration(models.Model):
 
 class NotificationDelivery(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    # Persist immutable original strategy provenance for opt-out-safe retries.
+    strategy = models.ForeignKey(
+        StrategyInstance, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="notification_receipts",
+    )
     channel = models.CharField(max_length=12)
     # Fixed-category provenance lets due retries honor changed owner preferences.
     # Empty for legacy one-off notices which must not be guessed as a category.

@@ -555,3 +555,47 @@ body.v2 {
 .w2-history-table td a{display:block}
 .w2-history-table .w2-number{font-variant-numeric:tabular-nums}
 @media(max-width:550px){.w2-history-table{min-width:640px}.w2-history-figure{gap:5px}}
+
+/* Phase 7: real owner Settings, responsive routing tables and health labels. */
+.w2-settings-stack{display:grid;gap:18px;min-width:0}
+.w2-settings-stack>.w2-panel{min-width:0}
+.w2-settings-stack .w2-panel h2{margin:0 0 8px}
+.w2-settings-stack .w2-panel h3{margin:8px 0;font-size:.94rem}
+.w2-settings-form{display:grid;gap:14px;margin-top:14px}
+.w2-settings-form>.w2-button{justify-self:start}
+.w2-settings-field{display:grid;gap:6px;font-size:.85rem;font-weight:550;max-width:520px}
+.w2-settings-field .field{background:#101419;color:var(--w2-text);border:1px solid var(--w2-stroke);border-radius:6px;min-height:36px;padding:7px 10px;width:100%}
+.w2-delay span{display:flex;gap:10px;align-items:center}
+.w2-delay span .field{width:80px;min-width:70px}
+.w2-settings-stack .w2-setting-row{gap:14px;flex-wrap:wrap}
+.w2-settings-stack .w2-setting-row>div{flex:1 1 180px;min-width:0}
+.w2-settings-stack .w2-setting-row strong{font-weight:600}
+.w2-settings-stack .w2-setting-row p{margin-top:3px}
+.w2-settings-stack .w2-table-wrap{max-width:100%;overflow:auto}
+.w2-settings-stack .w2-alert-matrix{width:100%;min-width:360px}
+.w2-settings-stack .w2-alert-matrix th:first-child{text-align:left}
+.w2-settings-stack .w2-alert-matrix th{font-weight:500}
+.w2-settings-stack .w2-check{gap:6px;align-items:center;white-space:nowrap}
+.w2-settings-stack .w2-check input{width:17px;height:17px}
+.w2-settings-instance{border-top:1px solid var(--w2-stroke);margin-top:18px;padding-top:14px;scroll-margin-top:70px}
+.w2-settings-instance form{display:grid;gap:12px;margin-top:12px}
+.w2-settings-instance form .w2-button{justify-self:start}
+.w2-settings-tests{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:16px;border-top:1px solid var(--w2-stroke-soft);padding-top:16px}
+.w2-settings-tests p{flex:1 1 100%}
+.w2-settings-columns{align-items:start}
+.w2-settings-columns>.w2-panel{min-width:0;height:100%}
+.w2-settings-stack .w2-notice{line-height:1.5}
+@media(max-width:700px){
+  .w2-settings-columns{grid-template-columns:1fr}
+  .w2-settings-form>.w2-button,.w2-settings-instance form>.w2-button{justify-self:stretch}
+  .w2-settings-stack .w2-setting-row{align-items:start}
+}
+
+/* Phase 7 read-only pinned strategy profile and recorded version events. */
+.w2-rules-list{margin:12px 0 16px;padding-left:23px;color:var(--w2-text);line-height:1.65}
+.w2-rules-list li{padding:2px 0}
+.w2-settings-details{display:grid;gap:0;margin:12px 0}
+.w2-settings-details>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--w2-stroke-soft);padding:10px 0}
+.w2-settings-details dt{font-size:.85rem;color:var(--w2-muted)}
+.w2-settings-details dd{margin:0;max-width:60%;overflow-wrap:anywhere;text-align:right;font-size:.85rem}
+@media(max-width:500px){.w2-settings-details>div{align-items:flex-start;flex-direction:column;gap:4px}.w2-settings-details dd{max-width:100%;text-align:left}}

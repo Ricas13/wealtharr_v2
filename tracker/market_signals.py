@@ -285,7 +285,7 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
                      "signal:%s:%s" % (strategy.pk, key),
                      "Wealtharr — " + signal.title,
                      strategy.name + "\n" + message + "\nNo orders placed.",
-                     sender=dispatch)
+                     sender=dispatch, strategy=strategy)
 
 
 def review_strategy(strategy):
@@ -517,7 +517,7 @@ def review_strategy(strategy):
                              "Wealtharr — " + signal.title,
                              strategy.name + "\n" + signal.message + "\n" + details +
                              "\nReview this in Wealtharr. No orders have been placed.",
-                             sender=dispatch)
+                             sender=dispatch, strategy=strategy)
             elif not actionable:
                 signal.acknowledged_at = timezone.now()
                 signal.save(update_fields=["acknowledged_at"])
