@@ -1,0 +1,140 @@
+<div class="w2-settings-stack w2-space-top">
+  {% if settings_error %}<div class="w2-form-error" role="alert">{{ settings_error }}</div>{% endif %}
+  {% if notification_form.errors %}<div class="w2-form-error" role="alert">{{ notification_form.errors }}</div>{% endif %}
+
+  <section class="w2-panel" aria-labelledby="w2-destination-title">
+    <h2 id="w2-destination-title">Notification destinations</h2>
+    <p class="w2-muted">Master destination switches apply to every account. Categories and each strategy can only narrow them further. No message places a trade.</p>
+    <form method="post" action="{% url 'v2_settings' %}" class="w2-settings-form">
+      {% csrf_token %}
+      <input type="hidden" name="form_kind" value="owner">
+      <div class="w2-setting-row">
+        <div><strong>Email</strong><p class="w2-muted">{% if smtp_configured %}SMTP configured; delivery not independently verified{% else %}SMTP transport not configured{% endif %}</p></div>
+        <label class="w2-check">{{ notification_form.email_enabled }} Enable</label>
+      </div>
+      <label class="w2-settings-field" for="{{ notification_form.destination_email.id_for_label }}">
+        Email address for notifications
+        {{ notification_form.destination_email }}
+      </label>
+      <div class="w2-setting-row">
+        <div><strong>Discord</strong><p class="w2-muted">{% if discord_configured %}Webhook stored securely; delivery not independently verified{% else %}Webhook not configured{% endif %}</p></div>
+        <label class="w2-check">{{ notification_form.discord_enabled }} Enable</label>
+      </div>
+      <div class="w2-setting-row">
+        <div><strong>Push (ntfy)</strong><p class="w2-muted">Not available: no push transport or device subscription is configured.</p></div>
+        <span class="w2-badge">Unavailable</span>
+      </div>
+      <div class="w2-setting-row">
+        <div><strong>Monthly contribution reminders</strong><p class="w2-muted">Only recorded deposits count; no automatic transfers.</p></div>
+        <label class="w2-check">{{ notification_form.monthly_reminders }} Enable</label>
+      </div>
+      <label class="w2-settings-field w2-delay" for="w2-review-delay">
+        Remind me about an uncompleted review after
+        <span><input id="w2-review-delay" class="field" type="number" name="followup_delay_days" min="1" max="30" step="1" required value="{{ followup_delay }}"> days</span>
+      </label>
+      <p class="w2-muted">If still relevant, at most one review follow-up is sent each week. Notifications stop when the review is completed or no longer supports action.</p>
+      <h3>Choose categories per destination</h3>
+      <div class="w2-table-wrap">
+        <table class="w2-table w2-alert-matrix">
+          <thead><tr><th scope="col">Alert type</th><th scope="col">Email</th><th scope="col">Discord</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Quarterly decision digest</th><td><label class="w2-check">{{ notification_form.quarterly_email }}<span class="w2-sr-only">Email quarterly digest</span></label></td><td><label class="w2-check">{{ notification_form.quarterly_discord }}<span class="w2-sr-only">Discord quarterly digest</span></label></td></tr>
+            <tr><th scope="row">Urgent strategy warnings</th><td><label class="w2-check">{{ notification_form.urgent_email }}<span class="w2-sr-only">Email urgent warnings</span></label></td><td><label class="w2-check">{{ notification_form.urgent_discord }}<span class="w2-sr-only">Discord urgent warnings</span></label></td></tr>
+            <tr><th scope="row">Missing market data</th><td><label class="w2-check">{{ notification_form.data_email }}<span class="w2-sr-only">Email data problems</span></label></td><td><label class="w2-check">{{ notification_form.data_discord }}<span class="w2-sr-only">Discord data problems</span></label></td></tr>
+            <tr><th scope="row">Outstanding review follow-ups</th><td><label class="w2-check">{{ notification_form.followup_email }}<span class="w2-sr-only">Email review follow-up</span></label></td><td><label class="w2-check">{{ notification_form.followup_discord }}<span class="w2-sr-only">Discord review follow-up</span></label></td></tr>
+            <tr><th scope="row">Monthly contributions</th><td><label class="w2-check">{{ notification_form.contribution_email }}<span class="w2-sr-only">Email monthly contributions</span></label></td><td><label class="w2-check">{{ notification_form.contribution_discord }}<span class="w2-sr-only">Discord monthly contributions</span></label></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <button type="submit" class="w2-button w2-button-primary">Save notification preferences</button>
+    </form>
+    {% if request.user.is_staff %}
+    <div class="w2-settings-tests">
+      <form method="post" action="{% url 'v2_notification_test' channel='email' %}">{% csrf_token %}<button type="submit" class="w2-button">Send email test</button></form>
+      <form method="post" action="{% url 'v2_notification_test' channel='discord' %}">{% csrf_token %}<button type="submit" class="w2-button">Send Discord test</button></form>
+      <p class="w2-muted">Tests attempt real delivery and create private receipts. A successful transport response is not proof your device received the message.</p>
+    </div>
+    {% else %}
+      <p class="w2-muted">Transport configuration and test sending require staff access.</p>
+    {% endif %}
+  </section>
+
+  <section class="w2-panel" aria-labelledby="w2-strategy-notification-title">
+    <h2 id="w2-strategy-notification-title">Your strategies &amp; accounts</h2>
+    <p class="w2-muted">Choose separate destinations for each strategy. Unchecked channels do not receive that strategy's scheduled alerts or urgent warnings. These options cannot enable a globally disabled destination.</p>
+    {% for group in strategy_routes %}
+      <div id="strategy-{{ group.instance.pk }}" class="w2-settings-instance">
+        <div class="w2-setting-row">
+          <div><strong>{{ group.instance.name }}</strong><p class="w2-muted">{{ group.instance.account.kind }} · {{ group.instance.account.broker }} · {{ group.instance.strategy_version|default:"Legacy version" }}</p></div>
+          <a href="{% url 'v2_instance_page' instance_id=group.instance.pk section='today' %}">Open Today →</a>
+        </div>
+        <form method="post" action="{% url 'v2_settings' %}">
+          {% csrf_token %}
+          <input type="hidden" name="form_kind" value="strategy">
+          <input type="hidden" name="strategy_id" value="{{ group.instance.pk }}">
+          <div class="w2-table-wrap">
+            <table class="w2-table w2-alert-matrix">
+              <thead><tr><th scope="col">Alert type</th><th scope="col">Email</th><th scope="col">Discord</th></tr></thead>
+              <tbody>
+              {% for option in group.rows %}
+                <tr>
+                  <th scope="row">{{ option.title }}</th>
+                  <td><label class="w2-check"><input type="checkbox" name="route_{{ option.key }}_email" {% if option.email %}checked{% endif %}><span class="w2-sr-only">Email {{ group.instance.name }} {{ option.title }}</span></label></td>
+                  <td><label class="w2-check"><input type="checkbox" name="route_{{ option.key }}_discord" {% if option.discord %}checked{% endif %}><span class="w2-sr-only">Discord {{ group.instance.name }} {{ option.title }}</span></label></td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <button type="submit" class="w2-button">Save {{ group.instance.name }} alerts</button>
+        </form>
+      </div>
+    {% empty %}
+      <div class="w2-empty">No active strategies yet. <a href="{% url 'v2_add_strategy' %}">Add a strategy</a> to choose alert routing.</div>
+    {% endfor %}
+    <div class="w2-setting-row"><div><strong>Base currency</strong><p class="w2-muted">This UK private tracker presents GBP values; no hidden FX assumptions.</p></div><strong>GBP</strong></div>
+    <p class="w2-muted">ISA information uses actual recorded contributions. It is not a complete broker-wide ISA allowance check.</p>
+  </section>
+
+  <div class="w2-two-columns w2-settings-columns">
+    <section class="w2-panel" aria-labelledby="w2-security-title">
+      <h2 id="w2-security-title">Security</h2>
+      <div class="w2-setting-row"><div><strong>Password</strong><p class="w2-muted">Existing Django account login</p></div><a class="w2-button" href="{% url 'change_password' %}">Change password</a></div>
+      <div class="w2-setting-row"><div><strong>Two-factor authentication</strong><p class="w2-muted">{% if has_authenticator %}Authenticator enrolled{% else %}Not enrolled{% endif %}; changes require password and a real code</p></div><a class="w2-button" href="{% url 'totp_setup' %}">{% if has_authenticator %}Manage 2FA{% else %}Enable 2FA{% endif %}</a></div>
+      <p class="w2-muted">No instant session-revocation action is provided here. Use Sign out to end this session.</p>
+    </section>
+    <section class="w2-panel" aria-labelledby="w2-diagnostics-title">
+      <h2 id="w2-diagnostics-title">Data &amp; health</h2>
+      <div class="w2-setting-row"><div><strong>Export your ledger</strong><p class="w2-muted">Use each strategy's Ledger export to download factual audited entries.</p></div><span class="w2-badge">Per strategy</span></div>
+      <div class="w2-setting-row"><div><strong>Last off-host backup</strong><p class="w2-muted">Not observable in this app; check Oracle and the encrypted backup destination.</p></div><span class="w2-badge">Unverified</span></div>
+      <div class="w2-setting-row"><div><strong>Isolated restore drill</strong><p class="w2-muted">No recorded owner restore evidence. Never restore over live data.</p></div><span class="w2-badge">Unverified</span></div>
+      {% if request.user.is_staff %}
+        <div class="w2-setting-row"><div><strong>Notification scheduler</strong>
+          <p class="w2-muted">{% if scheduler_run %}Last {{ scheduler_run.status|lower }} run started {{ scheduler_run.started_at|date:"j M Y H:i" }} (UTC/system timezone).{% if scheduler_run.error_code %} Error code {{ scheduler_run.error_code }}.{% endif %}{% else %}No scheduled run recorded.{% endif %}</p>
+        </div><span class="w2-badge">{% if scheduler_recent %}Recent success{% else %}Not verified healthy{% endif %}</span></div>
+        <p class="w2-muted">This heartbeat only covers advisory deliveries; it does not prove market data validity, backup recovery, email receipt or production uptime.</p>
+        <p><a href="{% url 'control' %}">Staff-only transport configuration and diagnostics →</a></p>
+      {% else %}
+        <div class="w2-setting-row"><div><strong>Scheduler diagnostics</strong><p class="w2-muted">Detailed global operational health is staff-only.</p></div><span class="w2-badge">Restricted</span></div>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="w2-panel" aria-labelledby="w2-receipts-title">
+    <h2 id="w2-receipts-title">Your recent notification receipts</h2>
+    <p class="w2-muted">Private delivery attempts and retry status. Transport acknowledgments are not proof of inbox or device receipt. Message contents and credentials are not displayed.</p>
+    <div class="w2-table-wrap">
+      <table class="w2-table">
+        <thead><tr><th scope="col">Created</th><th scope="col">Channel</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col">Attempts</th></tr></thead>
+        <tbody>
+        {% for receipt in last_receipts %}
+          <tr><td>{{ receipt.created_at|date:"j M Y H:i" }}</td><td>{{ receipt.channel }}</td><td>{{ receipt.category|default:"Manual / legacy" }}</td><td>{{ receipt.status }}</td><td>{{ receipt.attempts }}</td></tr>
+        {% empty %}
+          <tr><td colspan="5">No delivery receipts recorded for this account.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <p class="w2-notice">Dangerous account-wide data reset is deliberately unavailable here. History and confirmed fills are preserved for auditing.</p>
+</div>
