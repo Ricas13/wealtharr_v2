@@ -46,7 +46,12 @@ jobs:
           from django.test import Client
           client = Client(raise_request_exception=True)
           # Signed out, "/" is the public homepage (no private data) with its
-          # own hashed static files.
+          # own hashed static files. This job has no database, so the study
+          # comparison is stubbed; its data is covered by the unit tests.
+          from unittest.mock import patch
+          patch("tracker.v2_home.compare", return_value={
+              "ready": False, "amount": 1000, "monthly": 100, "range": "10y",
+              "range_words": "10 years"}).start()
           response = client.get("/", secure=True, HTTP_HOST="wealtharr.vpn4u.cc")
           print("/", response.status_code)
           body = response.content.decode()
