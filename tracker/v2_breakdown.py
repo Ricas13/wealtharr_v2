@@ -290,7 +290,8 @@ def _detail(strategy, signal):
         spy_result = None
     warn = ("Stored signals predate an edited ledger. No saved order may be "
             "certified as matching that revised history."
-            if strategy.ledger_revisions.filter(created_at__gt=signal.created_at).exists()
+            if strategy.ledger_revisions.filter(created_at__gt=signal.created_at)
+                    .exclude(operation="ADD").exists()
             else "")
     return {
         "signal": signal, "as_of": as_of, "quality": quality,

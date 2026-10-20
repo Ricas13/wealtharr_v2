@@ -209,7 +209,9 @@ def evidence_impact(strategy, changed_from):
         "baseline_ids": [b.pk for b in baselines],
         "valuation_dates": [v.as_of.isoformat() for v in valuations],
         "requires_recheck": bool(signals or baselines or valuations),
-        "blocks_change": bool(confirmed or baselines or valuations),
+        # Saved daily valuations and confirmed reviews stay as recorded history
+        # and don't block corrections; only a confirmed 60/40 reset anchor does.
+        "blocks_change": bool(baselines),
     }
 
 

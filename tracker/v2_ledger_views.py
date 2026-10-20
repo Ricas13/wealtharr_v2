@@ -188,7 +188,7 @@ def _input_payload(post, strategy):
         raise ValidationError("Choose a supported ledger event type.")
     day = _date(post.get("occurred_on", ""))
     if strategy.started_on and day < strategy.started_on:
-        raise ValidationError("Transactions before this instance's start require broker-history reconciliation.")
+        raise ValidationError("Entries can't be dated before this strategy's start date.")
     note = str(post.get("note", "")).strip()
     if len(note) > 280:
         raise ValidationError("Note must not exceed 280 characters.")
@@ -257,16 +257,10 @@ def _validate_proposal(strategy, operation, entry_id, payload):
     impact = evidence_impact(strategy, earliest)
     if impact["blocks_change"]:
         raise ValidationError(
-            "Confirmed reviews, baselines or saved valuations would change. "
-            "These require a separate audited re-check before editing this period."
+            "This date is before a confirmed 60/40 reset. Entries before a reset "
+            "can't be changed; record a new entry dated today instead."
         )
     if operation == "new":
-        last = strategy.ledger.order_by("-occurred_on", "-pk").first()
-        if last and new_day < last.occurred_on:
-            raise ValidationError(
-                "Earlier events need a full broker-history reconciliation. "
-                "New manual entries must follow the last recorded date."
-            )
         after = replay(
             [e for e in current_rows if not e.deleted] +
             [_candidate(strategy, payload)], strict=True

@@ -84,9 +84,7 @@ class Phase6HistoryBrowserTests(BrowserHarness):
                         "heading",name="Your strategy accounts"
                     ).wait_for()
                     self.assertNotIn("SECRET_UNRELATED_PORTFOLIO",self.page.content())
-                    self.page.get_by_text(
-                        "Withheld: some accounts lack a same-date verified valuation"
-                    ).wait_for()
+                    self.page.get_by_text("Combined value").wait_for()
                     self.assertLessEqual(
                         self.page.evaluate("document.documentElement.scrollWidth"),width+1,
                     )

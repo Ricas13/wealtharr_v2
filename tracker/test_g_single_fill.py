@@ -186,11 +186,20 @@ class ConfirmedSingleFillTests(TestCase):
         self.assertEqual(self.client.post(self.url, self.fill(0, "1", "100")).status_code, 404)
         self.assertEqual(self.strategy.ledger.count(), before)
 
-    def test_any_other_post_review_ledger_event_invalidates_partial_completion(self):
+    def test_top_up_after_review_still_lets_fills_be_recorded(self):
         self.client.post(self.url, self.fill(0, "1", "100"))
         validate_and_record(self.strategy, LedgerEntry(
             kind="DEPOSIT", occurred_on=self.trade_day,
             amount=D("50"), note="Actual later top-up"))
+        self.client.post(self.url, self.fill(1, "2", "50"))
+        self.assertEqual(SignalFill.objects.filter(signal=self.signal).count(), 2)
+
+    def test_other_post_review_trade_or_withdrawal_invalidates_partial_completion(self):
+        # A top-up doesn't change the quarter's trades; a withdrawal does.
+        self.client.post(self.url, self.fill(0, "1", "100"))
+        validate_and_record(self.strategy, LedgerEntry(
+            kind="WITHDRAW", occurred_on=self.trade_day,
+            amount=D("5"), note="Actual later withdrawal"))
         response = self.client.post(self.url, self.fill(1, "2", "50"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(SignalFill.objects.filter(signal=self.signal).count(), 1)

@@ -166,7 +166,7 @@ class Phase5BreakdownTests(TestCase):
         self.client.logout()
         self.assertEqual(self.client.get(self.url()+"?export=csv").status_code, 302)
 
-    def test_corrections_hold_arithmetic_no_undisclosed_reanchor(self):
+    def test_corrections_recalculate_from_the_corrected_ledger(self):
         payload = {
             "occurred_on": self.purchase.occurred_on.isoformat(),
             "kind": self.purchase.kind, "symbol": self.purchase.symbol,
@@ -180,9 +180,10 @@ class Phase5BreakdownTests(TestCase):
             before=payload, after=payload,
         )
         detail = _detail(self.instance, self.signal)
-        self.assertIsNone(detail["trace"])
-        self.assertIn("historical re-evaluation", detail["trace_error"])
-        self.assertFalse(detail["checks"][0]["passed"])
+        # The calculation now replays the corrected ledger instead of refusing.
+        self.assertIsNotNone(detail["trace"])
+        self.assertFalse(detail["trace_error"])
+        # The saved review itself is unchanged; it's flagged as predating the edit.
         self.assertEqual(detail["saved_actions"][0]["quantity"], "1.2345")
 
     def test_mismatched_mapping_or_unmapped_holding_cannot_build_trace(self):

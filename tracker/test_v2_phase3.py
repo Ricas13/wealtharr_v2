@@ -170,15 +170,16 @@ class LedgerVersioningTests(TestCase):
         self.assertContains(unknown, "exact mapped")
         self.assertEqual(bought.revisions.count(), 0)
 
-    def test_edit_preview_refuses_confirmed_history_and_saved_valuation(self):
+    def test_saved_valuation_does_not_block_a_correction(self):
         d = self._entry()
         StrategyValueSnapshot.objects.create(
             strategy=self.instance, as_of=self.day,
             total_value=D("1000"), net_contributed=D("1000"),
         )
         res = self.client.post(self._edit(d), self._payload(amount="700"))
-        self.assertContains(res, "Confirmed reviews, baselines or saved valuations")
-        self.assertEqual(d.revisions.count(), 0)
+        self.assertNotContains(res, "would change. These require")
+        self.client.post(self._edit(d), dict(self._payload(amount="700"), intent="confirm"))
+        self.assertEqual(d.revisions.count(), 1)
 
     def test_atomic_preview_prevents_stale_tab_confirmation(self):
         entry = self._entry()

@@ -12,6 +12,7 @@ from tracker.core.catalogue import (
     ALL_WEATHER, CATALOGUE, CATALOGUE_VERSION, OFFERS, STRATEGY_9SIG,
     MappingNotAvailable, onboarding_manifest, rows_for, selection_available,
 )
+from tracker.v2_onboarding import OPENING_NOTE
 from tracker.models import (
     Account, InstanceOpeningSnapshot, LedgerEntry, StrategyInstance,
 )
@@ -160,7 +161,7 @@ class Phase2WizardTests(TestCase):
         self.assertNotContains(response, "SELL LQQ3")
         self.assertNotContains(response, "£14,820")
 
-    def test_existing_shares_record_snapshot_never_fake_trades_or_prices(self):
+    def test_existing_shares_become_a_labelled_opening_position(self):
         self.to_start(account_type="GIA")
         self.assertContains(self.submit(
             4, mode="hold", name="Existing 9Sig", start=self.day.isoformat(),
@@ -171,16 +172,18 @@ class Phase2WizardTests(TestCase):
         instance = StrategyInstance.objects.get(owner=self.owner)
         self.assertEqual(instance.account.kind, "GIA")
         self.assertEqual(instance.onboarding_mode, "hold")
-        self.assertEqual(instance.ledger.count(), 0)
+        # Funding = cash + holdings at the start-date prices; one buy per holding.
+        self.assertEqual(sorted(instance.ledger.values_list("kind", "symbol", "quantity", "unit_price", "amount")), [
+            ("BUY", "ERNS.L", D("8"), D("101.20"), D("0")),
+            ("BUY", "LQQ3.L", D("2.125"), D("55.50"), D("0")),
+            ("DEPOSIT", "", D("0"), D("0"), D("1102.74")),
+        ])
+        self.assertTrue(all(e.note == OPENING_NOTE for e in instance.ledger.all()))
         self.assertEqual(instance.prices.count(), 0)
-        opening = InstanceOpeningSnapshot.objects.get(strategy=instance)
-        self.assertEqual(opening.cash_gbp, D("175.20"))
-        self.assertEqual(opening.positions["growth"]["shares"], "2.125")
-        self.assertEqual(opening.positions["growth"]["average_cost_gbp"], "55.50")
-        self.assertEqual(opening.positions["safe"]["ticker"], "ERNS.L")
+        self.assertFalse(InstanceOpeningSnapshot.objects.filter(strategy=instance).exists())
         self.assertTrue(instance.tracking_only)
-        page = self.client.get(reverse("v2_instance_page", args=[instance.pk, "strategy"]))
-        self.assertContains(page, "Owner-reported opening holdings")
+        page = self.client.get(reverse("v2_instance_page", args=[instance.pk, "today"]))
+        self.assertContains(page, "Based on holdings you entered")
         self.assertNotContains(page, "SECRET_OTHER")
 
     def test_requires_ack_and_actual_deposit_confirmation(self):
@@ -248,12 +251,14 @@ class Phase2WizardTests(TestCase):
         self.assertEqual(StrategyInstance.objects.count(), 0)
 
     def test_snapshot_cannot_be_mutated_after_recording(self):
+        # Older instances may still carry an opening snapshot; it stays immutable.
         self.to_start(account_type="GIA")
-        self.submit(4, mode="hold", name="Hold", start=self.day.isoformat(),
-                    cash="250", shares_growth="0", cost_growth="0",
-                    shares_safe="0", cost_safe="0")
+        self.submit(4, mode="fresh", name="Hold", start=self.day.isoformat(),
+                    amount="250", deposited="yes")
         self.submit(5)
-        opening = InstanceOpeningSnapshot.objects.get()
+        opening = InstanceOpeningSnapshot.objects.create(
+            strategy=StrategyInstance.objects.get(owner=self.owner),
+            reported_on=self.day, cash_gbp=D("250"), positions={})
         opening.cash_gbp = D("1000")
         with self.assertRaises(ValidationError):
             opening.save()

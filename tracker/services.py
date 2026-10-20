@@ -60,9 +60,6 @@ def validate_and_record(strategy, entry):
     """Append-only, strictly account-funded trades. No negative positions or cash."""
     with transaction.atomic():
         locked = type(strategy).objects.select_for_update().get(pk=strategy.pk, owner=strategy.owner)
-        last = locked.ledger.order_by("-occurred_on", "-pk").first()
-        if last and entry.occurred_on < last.occurred_on:
-            raise ValidationError("Enter transactions in chronological order. Earlier dates would invalidate later balances.")
         summary = ledger_summary(locked)
         qty = summary["positions"].get(entry.symbol, ZERO)
         cash = summary["cash"]
@@ -76,6 +73,14 @@ def validate_and_record(strategy, entry):
             raise ValidationError("Cannot sell more units than this strategy owns.")
         if entry.kind == LedgerEntry.SELL and money(entry.quantity * entry.unit_price) < entry.fee:
             raise ValidationError("Selling fees exceed the sale proceeds.")
+        # Back-dated entries are fine as long as every balance from that date
+        # on stays valid (no negative cash or shares at any point).
+        from .v2_ledger_core import EffectiveEntry, effective_entries, replay
+        replay(list(effective_entries(locked)) + [EffectiveEntry(
+            pk=2**62, strategy_id=locked.pk, occurred_on=entry.occurred_on,
+            kind=entry.kind, symbol=entry.symbol or "", quantity=entry.quantity or ZERO,
+            unit_price=entry.unit_price or ZERO, amount=entry.amount or ZERO,
+            fee=entry.fee or ZERO, note="", created_at=None)])
         entry.strategy = locked
         entry.save()
     return entry

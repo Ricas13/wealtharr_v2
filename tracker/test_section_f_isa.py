@@ -221,4 +221,4 @@ class OneScreenOwnerEnrolmentTests(TestCase):
         self.assertNotEqual(strategy.account_id, prior.pk)
         self.assertEqual(strategy.account.kind, "ISA")
         self.assertEqual(strategy.account.broker, "TRADING212")
-        self.assertEqual(strategy.ledger.count(), 0)
+        self.assertEqual(strategy.ledger.get().amount, D("100.00"))

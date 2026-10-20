@@ -25,7 +25,7 @@ from .core.metrics import (
     evaluate_inception, evaluate_period,
 )
 from .models import (
-    InstanceOpeningSnapshot, MarketObservation, StrategyInstance,
+    MarketObservation, StrategyInstance,
     StrategyValueSnapshot, YahooSync,
 )
 from .v2_ledger_core import effective_entries, replay
@@ -62,14 +62,6 @@ def _blocked(strategy):
         return "The account owner and strategy owner differ."
     if strategy.account.currency != "GBP":
         return "GBP history requires an actual GBP account and exact currency data."
-    if InstanceOpeningSnapshot.objects.filter(
-        strategy=strategy, reconciliation__isnull=True
-    ).exists():
-        return "Existing opening holdings require original broker-history reconciliation."
-    if strategy.ledger_revisions.filter(
-        operation__in=("EDIT", "DELETE", "RESTORE")
-    ).exists():
-        return "Historical ledger corrections require separately approved valuation replay."
     return ""
 
 

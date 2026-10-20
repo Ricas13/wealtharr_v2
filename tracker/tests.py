@@ -55,8 +55,13 @@ class LedgerTests(TestCase):
             self.entry(self.one,"SELL",symbol="QQQ3",quantity=D("1"),unit_price=D("5"))
         with self.assertRaisesMessage(ValidationError,"exceeds"):
             self.entry(self.one,"WITHDRAW",amount=D("101"))
-        with self.assertRaisesMessage(ValidationError,"chronological"):
-            self.entry(self.one,"DEPOSIT",when=TODAY-timedelta(days=1),amount=D("5"))
+        # A back-dated buy is refused when cash didn't exist yet on that date.
+        with self.assertRaisesMessage(ValidationError,"cash negative at an earlier"):
+            self.entry(self.one,"BUY",when=TODAY-timedelta(days=1),symbol="QQQ3",
+                       quantity=D("1"),unit_price=D("5"))
+        # A back-dated deposit keeps every balance valid, so it is accepted.
+        self.entry(self.one,"DEPOSIT",when=TODAY-timedelta(days=1),amount=D("5"))
+        self.assertEqual(ledger_summary(self.one)["cash"],D("105.00"))
     def test_invalid_form_and_cross_owner(self):
         form=LedgerForm(data={"kind":"BUY","occurred_on":TODAY,"symbol":"QQQ3",
                               "quantity":"1","unit_price":"30","amount":"5"})

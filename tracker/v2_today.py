@@ -150,7 +150,8 @@ def today_page(request, instance_id):
     if notice and notice.kind == "QUARTERLY" and not partial and (
             strategy.ledger.filter(occurred_on__gt=notice.as_of,
                                    kind__in=("BUY", "SELL", "WITHDRAW")).exists()
-            or strategy.ledger_revisions.filter(created_at__gt=notice.created_at).exists()):
+            or strategy.ledger_revisions.filter(created_at__gt=notice.created_at)
+                .exclude(operation="ADD").exists()):
         ready = False
         reason = (
             "The ledger changed after this review. An updated, verified "

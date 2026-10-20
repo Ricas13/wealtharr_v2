@@ -157,7 +157,7 @@ class OwnerEnrollmentTests(TestCase):
     def test_optional_notifications_and_monthly_zero_remain_planning(self):
         s = self.finish(mode="hold", cash="50")
         self.assertEqual(s.monthly_target, D("0"))
-        self.assertEqual(s.ledger.count(), 0)
+        self.assertEqual(s.ledger.get().note, OPENING_NOTE)
         self.assertTrue(s.alert_routes["quarterly"]["email"])
         self.assertFalse(s.alert_routes["quarterly"]["discord"])
 
