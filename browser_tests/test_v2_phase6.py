@@ -121,7 +121,7 @@ class Phase6HistoryBrowserTests(BrowserHarness):
         self.new_page(390)
         self.sign_in()
         self.visit("v2_instance_page",self.invested.pk,"history")
-        self.page.get_by_label("Range").select_option("1y")
+        self.page.locator('select[name="range"]').select_option("1y")
         self.page.get_by_role("heading",name="Recorded investment history").wait_for()
         self.assertIn("range=1y",self.page.url)
         self.assertIn("Not certified",self.page.content())
