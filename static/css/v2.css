@@ -590,3 +590,12 @@ body.v2 {
   .w2-settings-form>.w2-button,.w2-settings-instance form>.w2-button{justify-self:stretch}
   .w2-settings-stack .w2-setting-row{align-items:start}
 }
+
+/* Phase 7 read-only pinned strategy profile and recorded version events. */
+.w2-rules-list{margin:12px 0 16px;padding-left:23px;color:var(--w2-text);line-height:1.65}
+.w2-rules-list li{padding:2px 0}
+.w2-settings-details{display:grid;gap:0;margin:12px 0}
+.w2-settings-details>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--w2-stroke-soft);padding:10px 0}
+.w2-settings-details dt{font-size:.85rem;color:var(--w2-muted)}
+.w2-settings-details dd{margin:0;max-width:60%;overflow-wrap:anywhere;text-align:right;font-size:.85rem}
+@media(max-width:500px){.w2-settings-details>div{align-items:flex-start;flex-direction:column;gap:4px}.w2-settings-details dd{max-width:100%;text-align:left}}

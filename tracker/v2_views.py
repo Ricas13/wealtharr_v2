@@ -70,6 +70,9 @@ def instance_page(request, instance_id, section):
     if section == "history":
         from .v2_history import history_page
         return history_page(request, instance_id)
+    if section == "strategy":
+        from .v2_strategy import strategy_page
+        return strategy_page(request, instance_id)
     instance = get_object_or_404(
         StrategyInstance.objects.select_related("account", "preset"),
         pk=instance_id,

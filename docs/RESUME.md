@@ -1,6 +1,10 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
 ## APPROVED v2 DESIGN — Phase 7 completion checkpoint (20 October 2026)
+ 
+- Phase 7 reconciliation: Two independent draft PRs (#23 and #24) were created concurrently. #24 is the canonical implementation because queued/retried messages keep immutable source-strategy provenance and enforce per-instance opt-out. Integrated the safe read-only Strategy rule/version/instrument profile from #23 without copying conflicting routing migrations or adding reset/session/export controls. Do not merge both Phase 7 PRs; #23 should be closed as superseded after #24 passes final CI.
+- Strategy page renders source-controlled rule descriptions, reviewed trading line evidence, pinned identity and actual confirmed baseline version history, with a link to central Settings alerts. GET cannot modify the portfolio and POST returns 405. Tests cover cross-owner 404 and real Chromium at 390px/1440px. No automatic broker access or unlocking tracking-only.
+
 
 - Phase 7 branch `feature/v2-phase7-notifications-settings` stacks on Phase 6 `feature/v2-phase6-history-overview` commit `7c6d6c31492223c55db50e501410e3d382f7e605`. Open a **draft** Phase 7 PR targeting Phase 6; keep merge order #12 → #13 → #15 → #17 → #19 → #22 → Phase 7. Methodology PR #14 was independently merged on main and must be reconciled with the stack during proper merge order; do not force-merge or deploy it blindly.
 - Implemented editable authenticated v2 Settings in `tracker/v2_settings.py` and `templates/v2/settings.html`: global email/Discord master switches/category choices, validated 1–30 day review delay, individual per-strategy routing, read-only private receipt status, staff-only transport tests and carefully bounded scheduler diagnostics. Existing Django password/TOTP setup and staff-only encrypted integration management remain authoritative.

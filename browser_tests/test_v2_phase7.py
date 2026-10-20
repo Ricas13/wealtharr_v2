@@ -95,3 +95,31 @@ class Phase7SettingsBrowserTests(BrowserHarness):
                     self.page.screenshot(path=str(img), full_page=True)
                     self.assertTrue(img.is_file())
                     self.assertEqual(self.browser_errors, [])
+
+    def test_strategy_profile_read_only_mobile_and_desktop(self):
+        for width in (390, 1440):
+            with self.subTest(width=width):
+                self.new_page(width)
+                self.sign_in()
+                self.visit("v2_instance_page", self.strategy.pk, "strategy")
+                self.page.get_by_role(
+                    "heading", name="How this strategy works"
+                ).wait_for()
+                self.page.get_by_role(
+                    "heading", name="Mapped instruments"
+                ).wait_for()
+                self.page.get_by_role(
+                    "heading", name="Recorded rule and baseline history"
+                ).wait_for()
+                self.assertNotIn("CROSS_OWNER_PRIVATE_SECRET", self.page.content())
+                self.assertLessEqual(
+                    self.page.evaluate("document.documentElement.scrollWidth"),
+                    width + 1,
+                )
+                self.page.get_by_role(
+                    "link", name="Edit strategy alert preferences"
+                ).click()
+                self.page.get_by_role(
+                    "heading", name="Notification destinations"
+                ).wait_for()
+                self.assertEqual(self.browser_errors, [])

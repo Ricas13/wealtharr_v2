@@ -62,3 +62,11 @@ Phase 5 #19 → Phase 6 #22 → Phase 7. Each PR should be retargeted to
 `main` only after its predecessor has merged and CI remains green. Separately
 merged 9Sig methodology and deployment changes already on `main` must
 be reconciled and retested before the stack's production release.
+
+## Read-only strategy profile
+
+The strategy profile page contains fixed source-controlled rules, mapping evidence, actual pinned identity and recorded confirmed baseline versions. Trading 212 account permissions are not inferred from an issuer's general eligibility page. Notification editing remains centralized under Settings; a profile GET does not mutate investment state.
+
+## Concurrent implementation reconciliation
+
+Phase 7 PR #23 was independently drafted on the same Phase 6 base. Its valuable read-only strategy explanation has been incorporated into PR #24. Competing notification migrations must not be applied together; #24 retains strict strategy provenance and opt-out retry protections. PR #23's broader ZIP, reset and session controls were deliberately not adopted in the owner dashboard; unverified operational actions are not presented as implemented.
