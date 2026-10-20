@@ -41,6 +41,11 @@ def select_next_step(*, signal_kind: str, signal_title: str,
     if not price_ready:
         return NextStep("blocked", "An instruction is unavailable",
                         unavailable_reason or "The required verified information is missing.")
+    if (signal_kind == "QUARTERLY" and
+            "Your reserve is now empty" in signal_message and
+            not any(row.get("side") in ("BUY", "SELL") for row in proposed_actions)):
+        return NextStep("review", "Your reserve is empty",
+                        signal_message)
     if signal_kind == "QUARTERLY" and any(
             row.get("side") in ("BUY", "SELL") for row in proposed_actions):
         return NextStep("trade", "Review the proposed transactions",
