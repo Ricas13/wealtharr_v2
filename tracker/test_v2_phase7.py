@@ -151,13 +151,18 @@ class SettingsAndRoutingTests(TestCase):
         self.own.alert_routes = {}
         self.own.save(update_fields=["alert_routes"])
         self.assertEqual(strategy_channels(self.pref, "urgent", self.own), ())
-        self.own.strategy_key = ""
-        self.own.save(update_fields=["strategy_key"])
-        self.assertEqual(strategy_channels(self.pref, "urgent", self.own),
+        # Enrolment identity is immutable: create a genuine legacy fixture
+        # rather than rewriting an already pinned v2 portfolio's identity.
+        legacy = StrategyInstance.objects.create(
+            owner=self.owner, account=self.own.account, preset=self.own.preset,
+            name="Legacy notification fixture", strategy_key="",
+            alert_routes={}, tracking_only=True,
+        )
+        self.assertEqual(strategy_channels(self.pref, "urgent", legacy),
                          ("email", "discord"))
-        self.own.alert_routes = {"urgent": {"email": "yes", "discord": False}}
-        self.own.save(update_fields=["alert_routes"])
-        self.assertEqual(strategy_channels(self.pref, "urgent", self.own), ())
+        legacy.alert_routes = {"urgent": {"email": "yes", "discord": False}}
+        legacy.save(update_fields=["alert_routes"])
+        self.assertEqual(strategy_channels(self.pref, "urgent", legacy), ())
 
     def test_pending_scoped_retry_is_cancelled_after_strategy_opt_out(self):
         row = NotificationDelivery.objects.create(
