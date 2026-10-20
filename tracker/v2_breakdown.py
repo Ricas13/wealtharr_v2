@@ -156,6 +156,17 @@ def _trace(strategy, as_of):
     opening = InstanceOpeningSnapshot.objects.filter(strategy=strategy).first()
     if opening and not hasattr(opening, "reconciliation"):
         return None, "The reported opening positions are not reconciled against original broker history."
+    prior_resets = strategy.signals.filter(
+        as_of__lt=as_of, reset_reason__gt=""
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"))
+    for reset_signal in prior_resets:
+        if not RebalanceExecution.objects.filter(
+                strategy=strategy, signal=reset_signal,
+                baseline__isnull=False).exists():
+            return None, (
+                "A previous 60/40 reset was proposed but no owner-confirmed "
+                "execution and pinned baseline were recorded."
+            )
     events = [e for e in effective_entries(strategy) if e.occurred_on <= as_of]
     try:
         position = replay(events)
@@ -169,6 +180,10 @@ def _trace(strategy, as_of):
     ).order_by("-as_of", "-pk")[:1])
     if baselines:
         baseline = baselines[0]
+        if not RebalanceExecution.objects.filter(
+                strategy=strategy, signal=baseline.reset_signal,
+                baseline=baseline).exists():
+            return None, "Reset baseline lacks a linked owner-confirmed execution."
         if (baseline.strategy_version != VERSION or
                 baseline.mapping_version != MAPPING_VERSION or
                 not baseline.quote_evidence):

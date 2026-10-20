@@ -207,6 +207,16 @@ class Phase5BreakdownTests(TestCase):
         self.assertEqual(r.context["breakdown_current"].pk, older.pk)
         self.assertContains(r, "Export audit CSV")
 
+    def test_unconfirmed_prior_reset_never_silently_reanchors_signal_line(self):
+        pending = self._signal(self.instance, date(2025, 6, 30), "Pending owner reset")
+        pending.reset_reason = "Reset requires actual confirmed 60/40 fills"
+        pending.save(update_fields=["reset_reason"])
+        trace, reason = _trace(self.instance, self.period)
+        self.assertIsNone(trace)
+        self.assertIn("no owner-confirmed execution", reason)
+        response = self.client.get(self.url())
+        self.assertContains(response, "previous 60/40 reset")
+
     def test_growth_drawdown_never_substitutes_for_spy(self):
         MarketObservation.objects.create(
             symbol="LQQ3.L", as_of=date(2025, 4, 30),
