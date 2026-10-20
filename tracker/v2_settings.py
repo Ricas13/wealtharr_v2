@@ -4,6 +4,7 @@ Notification secrets remain in existing staff-only IntegrationForm; this
 view never renders them, never accesses a broker and never certifies backups.
 """
 from uuid import uuid4
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -18,7 +19,7 @@ from .models import (
     NotificationDelivery, NotificationPreference, NotificationSchedulerRun,
     OwnerTOTP, StrategyInstance, SystemIntegration,
 )
-from .notification_routing import CATEGORIES, CHANNELS, strategy_channels
+from .notification_routing import CATEGORIES, CHANNELS
 from .services import dispatch
 from .v2_views import _render, _instances
 
@@ -68,10 +69,14 @@ def settings_page(request):
                     messages.success(request, "Notification destinations and categories saved.")
                     return redirect("v2_settings")
         elif kind == "strategy":
+            try:
+                strategy_id = int(request.POST.get("strategy_id", ""))
+            except (TypeError, ValueError):
+                raise Http404("Unknown strategy")
             strategy = get_object_or_404(
                 StrategyInstance.objects.select_related("account"),
                 owner=request.user, account__owner=request.user,
-                pk=request.POST.get("strategy_id"),
+                pk=strategy_id,
             )
             if strategy.account.kind == "PAPER":
                 raise Http404("Unsupported account type")
@@ -128,7 +133,7 @@ def settings_page(request):
     scheduler_recent = bool(
         latest_run and latest_run.status == "SUCCEEDED" and
         latest_run.finished_at and
-        latest_run.finished_at >= timezone.now() - timezone.timedelta(hours=3)
+        latest_run.finished_at >= timezone.now() - timedelta(hours=3)
     )
     return _render(
         request, page_key="settings", page_title="Settings",
