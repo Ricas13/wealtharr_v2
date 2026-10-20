@@ -1,3 +1,14 @@
+# Phase 8 — continuation: v2-only owner tests and saved-notice feedback (20 October 2026)
+
+- Ported legacy safety assertions to v2 in `tracker/test_cockpit.py` (partial fills, verified-close baseline, rollback, duplicate CSV import, preview gate, actual cash), `tracker/test_g_single_fill.py` (idempotency, partial and final completion), `tracker/test_owner_totp.py`, `tracker/test_i_security_and_recovery.py`, `tracker/test_real_9sig_setup.py`, `tracker/test_layout_cleanup.py`, `tracker/test_h_notification_matrix.py`, `tracker/test_signal_review.py`, and `tracker/tests.py`. These remain regression tests: none was skipped merely to clear CI.
+- Restored saved-signal `CONFIRMED` / `FALSE_POSITIVE` / `NOT_APPLICABLE` **assessment** via `POST /s/<id>/notice/<signal_id>/feedback/`. Requires owner scope and a reason for false positives; cannot modify a signal with actual linked fills or completed execution. This does not confirm broker orders. Today offers a collapsed feedback form.
+- Fixed deprecated `/app/strategies/<id>/...` owner scope before POST/405. Other people's strategies return 404.
+- Screenshot suite on head `9b6481f` **passed** (2 tests, 1440px and 390px capture); GitHub Actions uploaded its screenshot artifact. This is a geometry/overflow comparison, not exact visual parity.
+- Baseline remains 395 Django tests (7 skips) and 27 Chromium tests on merged main. Before the continuation, head `9b6481f` CI ran 385 Django (72 failures, 3 errors, 7 skips) and 29 Chromium (1 failure, 13 errors); after the continuation, new suite changes are **not yet confirmed**. CI must pass before merging. Local before/after execution is unavailable: no local GitHub checkout, Django installation or complete test runner in this execution environment.
+- Many old single-page ISA, legacy signal controls, manual 60/40 reserve reset and old browser journeys still target retired UI. Their safeguards must be ported without changing calculations before this PR can be merge-ready. No production data was touched or deployed.
+
+---
+
 # Phase 8 — v2-only entry and legacy data audit
 
 ## In-place link (no database reset)
