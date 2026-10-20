@@ -91,7 +91,7 @@ services:
           completed="/backups/wealtharr-$$stamp.dump"
           if pg_dump -Fc -f "$$pending" && pg_restore --list "$$pending" >/dev/null; then
             mv "$$pending" "$$completed"
-            (cd /backups && sha256sum "wealtharr-$stamp.dump" > "wealtharr-$stamp.dump.sha256")
+            (cd /backups && sha256sum "wealtharr-$$stamp.dump" > "wealtharr-$$stamp.dump.sha256")
             chmod 600 "$$completed" "$$completed.sha256"
             find /backups -type f \( -name 'wealtharr-*.dump' -o -name 'wealtharr-*.dump.sha256' \) -mtime +30 -delete
             echo "Wealtharr backup archive and checksum created: $$stamp"
