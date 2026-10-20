@@ -70,6 +70,19 @@
     } catch (_) { /* UI continues without persistence. */ }
   });
   updateCollapse();
+  var modeInputs = document.querySelectorAll("input[name=mode]");
+  function updateMode() {
+    var checked = document.querySelector("input[name=mode]:checked");
+    if (!checked) return;
+    var fresh = document.getElementById("w2-fresh-fields");
+    var hold = document.getElementById("w2-hold-fields");
+    if (fresh) fresh.hidden = checked.value !== "fresh";
+    if (hold) hold.hidden = checked.value !== "hold";
+  }
+  Array.prototype.forEach.call(modeInputs, function (input) {
+    input.addEventListener("change", updateMode);
+  });
+  updateMode();
   Array.prototype.forEach.call(
     sidebar.querySelectorAll(".w2-strategy-group > summary"), function (summary) {
       summary.addEventListener("click", function (event) {

@@ -1,0 +1,56 @@
+<section class="w2-panel w2-space-top">
+  <div class="w2-section-heading">
+    <div><h2>Reviewed instrument mappings</h2>
+      <p class="w2-muted">Read-only · mapping {{ catalogue_version }} · not a promise of personal account eligibility.</p></div>
+    <span class="w2-badge w2-warning">Verification required</span>
+  </div>
+  <form class="w2-filterbar" method="get" action="{% url 'v2_catalogue' %}">
+    <label>Strategy
+      <select name="strategy" class="w2-input">
+        <option value="">All strategies</option>
+        {% for offer in catalogue_offers %}
+        <option value="{{ offer.key }}" {% if catalogue_filter == offer.key %}selected{% endif %}>{{ offer.title }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Account type
+      <select name="account_type" class="w2-input">
+        <option value="">All account types</option>
+        {% for value, label in catalogue_types %}
+        <option value="{{ value }}" {% if catalogue_type_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="w2-button" type="submit">Filter</button>
+  </form>
+  <div class="w2-table-wrap">
+    <table class="w2-table">
+      <thead>
+        <tr><th>Strategy</th><th>Role</th><th>Target</th><th>Platform</th><th>Account</th>
+            <th>Instrument</th><th>Ticker</th><th>ISIN</th><th>Unit</th><th>Status</th><th>Evidence</th></tr>
+      </thead>
+      <tbody>
+        {% for line in catalogue_rows %}
+        <tr>
+          <td>{% if line.strategy_key == 'all-weather' %}All Weather{% else %}9Sig{% endif %}</td>
+          <td>{{ line.role_label }}</td>
+          <td class="w2-number">{{ line.weight_pct|floatformat:1 }}%</td>
+          <td>Trading 212</td><td>{{ line.account_type }}</td>
+          <td class="w2-wrap">{{ line.name }}</td>
+          <td>{{ line.ticker|default:"—" }}</td><td>{{ line.isin|default:"—" }}</td>
+          <td>{{ line.raw_quote_unit|default:"—" }}</td>
+          <td>{% if line.status == 'draft' %}<span class="w2-badge">Draft · no tradable line</span>
+            {% elif line.status == 'account_check_pending' %}<span class="w2-badge w2-warning">Account check pending</span>
+            {% else %}<span class="w2-badge">Verified</span>{% endif %}</td>
+          <td>{% if line.issuer_url %}<a href="{{ line.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer ↗</a>{% else %}—{% endif %}
+              {% if line.broker_evidence_url %}<a href="{{ line.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">Invest ↗</a>{% endif %}
+              {% if line.verified_on %}<small class="w2-muted">Reviewed {{ line.verified_on|date:"j M Y" }}</small>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="11"><div class="w2-empty">No mappings match these filters. No instrument will be guessed.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="w2-note">LQQ3 is a daily-reset leveraged ETP, not TQQQ. ERNS is a distributing GBP ultrashort UCITS ETF, not AGG. Trading 212's public Invest listing is not evidence of permission to buy in your individual ISA or GIA. Yahoo raw quote-unit verification is still pending. The All Weather rows are role placeholders only, with no claimed trading line or identifier.</p>
+</section>

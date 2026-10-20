@@ -22,6 +22,19 @@ class Account(models.Model):
         ordering = ["name"]
         constraints = [models.UniqueConstraint(fields=["owner", "name"], name="account_unique_owner_name")]
 
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = type(self).objects.filter(pk=self.pk).values(
+                "owner_id", "kind", "broker", "country", "currency"
+            ).first()
+            if original and any(original[key] != getattr(self, key)
+                                for key in original):
+                if self.strategies.exclude(strategy_key="").exists():
+                    raise ValidationError(
+                        "Platform, account type and owner are immutable for enrolled strategies."
+                    )
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
 
@@ -47,6 +60,16 @@ class StrategyInstance(models.Model):
     monthly_target = models.DecimalField(max_digits=16, decimal_places=2, default=Decimal("0"))
     equity_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the 3× equity trading line")
     safe_symbol = models.CharField(max_length=24, blank=True, help_text="Exact Yahoo ticker of the safe asset")
+    # V2 enrolment identity snapshots. Old instances stay unconverted until an
+    # explicit owner-approved migration, never silently inherit a new version.
+    strategy_key = models.CharField(max_length=100, blank=True, default="", editable=False)
+    platform_code = models.CharField(max_length=32, blank=True, default="", editable=False)
+    account_type_code = models.CharField(max_length=12, blank=True, default="", editable=False)
+    started_on = models.DateField(blank=True, null=True, editable=False)
+    owner_checked_on = models.DateField(blank=True, null=True, editable=False)
+    tracking_only = models.BooleanField(default=False, editable=False)
+    alert_routes = models.JSONField(default=dict, blank=True)
+    onboarding_mode = models.CharField(max_length=12, blank=True, default="", editable=False)
     # Source-controlled, owner-enrolment instrument manifest; empty for legacy
     # instances until an explicit, owner-approved migration is implemented.
     strategy_version = models.CharField(max_length=48, blank=True, default="", editable=False)
@@ -64,8 +87,54 @@ class StrategyInstance(models.Model):
         if self.account_id and self.owner_id and self.account.owner_id != self.owner_id:
             raise ValidationError("This account does not belong to the strategy owner.")
 
+    V2_IDENTITY_FIELDS = (
+        "owner_id", "account_id", "preset_id", "strategy_key",
+        "platform_code", "account_type_code", "started_on",
+        "strategy_version", "mapping_version", "resolved_instruments",
+        "onboarding_mode", "owner_checked_on",
+    )
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).values(
+                *self.V2_IDENTITY_FIELDS
+            ).first()
+            if previous and previous["strategy_key"]:
+                if any(previous[field] != getattr(self, field)
+                       for field in self.V2_IDENTITY_FIELDS):
+                    raise ValidationError(
+                        "An enrolled strategy's identity and mapping are immutable. "
+                        "Create a separate instance for another account."
+                    )
+        if self.strategy_key:
+            self.clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
+
+
+class InstanceOpeningSnapshot(models.Model):
+    """Owner-reported initial positions; NOT verified trades or prices.
+
+    Phase 3 must reconcile before the snapshot enters ledger-based performance.
+    This immutable record deliberately does not create fictional BUY entries.
+    """
+    strategy = models.OneToOneField(
+        StrategyInstance, on_delete=models.PROTECT, related_name="opening_snapshot"
+    )
+    reported_on = models.DateField()
+    cash_gbp = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    positions = models.JSONField(default=dict)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("Opening snapshot is immutable. Reconciliation is audited separately.")
+        if self.cash_gbp < 0:
+            raise ValidationError("Opening cash cannot be negative.")
+        return super().save(*args, **kwargs)
+
 
 class LedgerEntry(models.Model):
     DEPOSIT = "DEPOSIT"

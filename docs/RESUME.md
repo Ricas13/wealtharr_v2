@@ -1,42 +1,19 @@
 # RESUME HERE — Wealtharr personal 9Sig cockpit
 
-## NEW SEVEN-PHASE DESIGN IMPLEMENTATION — Phase 1 (2026-10-19)
+## APPROVED v2 DESIGN — Phase 2 handoff (19 October 2026)
 
-The owner's approved \`docs/design/app_v2.html\` and phase brief supersede the
-previous lettered A–J UX/implementation sequencing for this **new branch only**.
-Branch: \`feature/v2-phase1-shell-styling\` (based on \`main\`), draft PR.
-The previous A–J work is preserved on \`main\`; legacy \`/cockpit/\` and
-its financially guarded actions remain untouched and authoritative.
+The attached and committed reference is docs/design/app_v2.html. The newer seven-phase product brief governs this redesign; the older lettered A–J summary below remains historical context.
 
-**Phase 1 complete in this branch (scope limited to shell and styling):**
-- Committed the complete approved sample-data prototype as design reference;
-  it is NOT used for real valuations, instrument permissions or trades.
-- Added independent server-rendered Django v2 base template, graphite design
-  tokens, Lucide-compatible sprite icons, fixed 52px bar, 248px nested strategy
-  sidebar, owner-scoped collapsible strategy groups, mobile drawer, desktop
-  collapse with preference persistence, focus/skip/reduced-motion states.
-- Reserved URLs \`/overview/\`, \`/s/<instance_id>/today|history|ledger|strategy|breakdown/\`,
-  \`/catalogue/\`, \`/settings/\` and \`/add-strategy/\` for later phase integrations.
-  They are login protected; inaccessible/foreign strategy ids return 404.
-- The nine new page skeletons show **no fabricated values** and provide no
-  trade instructions. Sample ledger, charts and fake statuses are not ported.
-- Added owner-scope/unit smoke tests and an isolated Chromium 1440/390px test
-  for every touched route; its screenshot capture flag is
-  \`WEALTHARR_CAPTURE_V2_BASELINES=1\`. Browser comparisons verify shared
-  shell geometry against the approved HTML, not fake financial card contents.
-- **Not included:** actual instance model refactor, five-step onboarding,
-  live metrics/evaluations, ledger rewrite, settings/alerts or strategy rules.
-  These belong to Phases 2–7. The existing source-safe pages keep working.
-
-**Next turn:** implement **Phase 2 only** on a NEW branch based on updated
-\`main\` when the owner requests it; do not silently use PR #11 or broaden
-this Phase 1 PR. Keep owner evidence requirements in the existing
-\`docs/OWNER_TODO.md\` and never invent eligibility, parity or prices.
-The new phase route/base architecture is intentionally isolated to avoid
-breaking pre-existing financial safety while the design is rolled out.
+- Phase 1: draft PR #12, branch feature/v2-phase1-shell-styling. Original CI found duplicate slug in test setup and a Playwright button locator that changed its ARIA name; correction fa72df277c2c724767409e4e53c1f92643495381 is committed. Check current CI before declaring Phase 1 green.
+- Phase 2: feature/v2-phase2-instances-catalogue, created from main and advanced to contain Phase 1 fixes. Draft PR for Phase 2 targets the Phase 1 branch to avoid duplicating the Phase 1 diff. After PR #12 merges, retarget Phase 2 to main. Do not merge out of order.
+- Added immutable v2 strategy enrollment identity and pinned mapping/version, account type/platform/start date, owner acknowledgement, per-instance staged alert choices, owner-reported immutable opening snapshot, migration 0016.
+- New code-defined catalogue: UK Trading 212 9Sig ISA/GIA LQQ3.L and ERNS.L with explicit status account_check_pending and evidence; unreleased All Weather roles are draft without ticker/ISIN assertions. Unmapped SIPP/platform combinations disabled. HTML Catalogue filters and 5-step onboarding create independent strategy/account records.
+- Financial refusal: all new instances start tracking_only=True with market_data_enabled=False. No broker link or orders. Fresh starting cash only enters ledger after owner confirms an actual deposit. Existing positions and average historical cost remain an unvalued onboarding snapshot, NOT fake trades or current prices; reconcile in Phase 3. The older cockpit remains intact.
+- Tests: tracker/test_v2_phase2.py and browser_tests/test_v2_phase2.py with 1440px/390px screenshots and source-prototype shell comparisons. Verify CI results after the draft PR is opened; do not assert local execution without evidence.
+- External owner checks already appear once in docs/OWNER_TODO.md; no duplicate request.
+- Next phase (only when requested): Phase 3 ledger edits/versioning, impact preview, rebalances and Trading 212 CSV import/export; no silent confirmed baseline changes.
 
 ---
-
 Repository: `Ricas13/wealtharr_v2`  
 Working branch: `feature/owner-9sig-cockpit-resumable`  
 Pull request: https://github.com/Ricas13/wealtharr_v2/pull/11  

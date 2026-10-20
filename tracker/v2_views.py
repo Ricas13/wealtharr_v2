@@ -9,6 +9,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 
 from .models import StrategyInstance
+from .core.catalogue import CATALOGUE, OFFERS, ACCOUNT_TYPES, CATALOGUE_VERSION
 
 
 SECTIONS = ("today", "history", "ledger", "strategy", "breakdown")
@@ -31,7 +32,7 @@ def _instances(request):
     )
 
 
-def _render(request, *, page_key, page_title, instance=None, section=None):
+def _render(request, *, page_key, page_title, instance=None, section=None, **extra):
     items = _instances(request)
     return render(
         request, "v2/page.html",
@@ -42,6 +43,7 @@ def _render(request, *, page_key, page_title, instance=None, section=None):
             "page_key": page_key,
             "page_title": page_title,
             "instance_count": len(items),
+            **extra,
         },
     )
 
@@ -71,7 +73,21 @@ def instance_page(request, instance_id, section):
 
 @login_required
 def catalogue(request):
-    return _render(request, page_key="catalogue", page_title="Instrument catalogue")
+    strategy_filter = request.GET.get("strategy", "")
+    type_filter = request.GET.get("account_type", "")
+    if strategy_filter not in OFFERS:
+        strategy_filter = ""
+    if type_filter not in dict(ACCOUNT_TYPES):
+        type_filter = ""
+    rows = tuple(row for row in CATALOGUE.values()
+                 if (not strategy_filter or row.strategy_key == strategy_filter)
+                 and (not type_filter or row.account_type == type_filter))
+    return _render(
+        request, page_key="catalogue", page_title="Instrument catalogue",
+        catalogue_rows=rows, catalogue_offers=OFFERS.values(),
+        catalogue_types=ACCOUNT_TYPES, catalogue_filter=strategy_filter,
+        catalogue_type_filter=type_filter, catalogue_version=CATALOGUE_VERSION,
+    )
 
 
 @login_required
@@ -81,4 +97,5 @@ def settings(request):
 
 @login_required
 def add_strategy(request):
-    return _render(request, page_key="add", page_title="Add strategy")
+    from .v2_onboarding import wizard
+    return wizard(request)

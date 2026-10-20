@@ -1,0 +1,161 @@
+<section class="w2-panel w2-space-top w2-wizard" aria-labelledby="w2-wizard-title">
+  <div class="w2-section-heading">
+    <div><h2 id="w2-wizard-title">Add a strategy · step {{ wizard.step }} of 5</h2>
+      <p class="w2-muted">Create an independent account-linked strategy. No broker connections or orders.</p></div>
+    <a href="{% url 'v2_add_strategy' %}?restart=1" class="w2-button">Start again</a>
+  </div>
+  <ol class="w2-step-meter" aria-label="Setup steps">
+    <li {% if wizard.step >= 1 %}class="current"{% endif %}>Strategy</li>
+    <li {% if wizard.step >= 2 %}class="current"{% endif %}>Account</li>
+    <li {% if wizard.step >= 3 %}class="current"{% endif %}>Instruments</li>
+    <li {% if wizard.step >= 4 %}class="current"{% endif %}>Starting point</li>
+    <li {% if wizard.step >= 5 %}class="current"{% endif %}>Alerts</li>
+  </ol>
+  {% if wizard_error %}<div class="w2-form-error" role="alert">{{ wizard_error }}</div>{% endif %}
+  <form action="{% url 'v2_add_strategy' %}" method="post" class="w2-wizard-form" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="step" value="{{ wizard.step }}">
+
+    {% if wizard.step == 1 %}
+      <p class="w2-field-help">Choose a released, fixed strategy. Unreleased strategies cannot be activated.</p>
+      <div class="w2-option-list">
+        {% for offer in wizard_offers %}
+        <label class="w2-option {% if not offer.enabled %}w2-disabled{% endif %}">
+          <input type="radio" name="strategy" value="{{ offer.key }}" {% if not offer.enabled %}disabled{% endif %}
+                 {% if wizard.strategy == offer.key %}checked{% endif %} required>
+          <span><strong>{{ offer.title }}{% if not offer.enabled %} · coming later{% endif %}</strong>
+            <small>{{ offer.risk }} · {{ offer.cadence }} reviews</small>
+            <small>{{ offer.explanation }}</small></span>
+        </label>
+        {% endfor %}
+      </div>
+
+    {% elif wizard.step == 2 %}
+      <h3>Where will you run {{ wizard.strategy|default:"this strategy" }}?</h3>
+      <label class="w2-field">Platform
+        <select name="platform" class="w2-input" id="w2-platform">
+        {% for key, label, available in wizard_platforms %}
+          <option value="{{ key }}" {% if wizard.platform == key %}selected{% endif %}
+            {% if not available %}disabled{% endif %}>{{ label }}{% if not available %} · not mapped yet{% endif %}</option>
+        {% endfor %}
+        </select>
+      </label>
+      <div class="w2-field-help">Account type · unavailable combinations are disabled with a reason.</div>
+      <div class="w2-option-list">
+        {% for option in wizard_account_options %}
+        <label class="w2-option {% if not option.enabled %}w2-disabled{% endif %}">
+          <input type="radio" name="account_type" value="{{ option.key }}"
+                 {% if wizard.type == option.key %}checked{% endif %}
+                 {% if not option.enabled %}disabled{% endif %} required>
+          <span><strong>{{ option.name }}</strong>
+            <small>{% if option.enabled %}Exact code-defined mapping available; personal dealing checks pending.{% if option.duplicate %} You already run this strategy here; the new instance will have a separate account and ledger.{% endif %}{% else %}{{ option.reason }}{% endif %}</small></span>
+        </label>
+        {% endfor %}
+      </div>
+      {% if wizard_duplicate %}
+      <div class="w2-notice">You already run 9Sig in a {{ wizard.type }}. You can create another separate instance with its own account and ledger.</div>
+      {% endif %}
+
+    {% elif wizard.step == 3 %}
+      <h3>Fixed instruments for {{ wizard.type }} · Trading 212</h3>
+      <p class="w2-field-help">These cannot be substituted in the app. The issuer and public Invest listing were reviewed, but personal dealing and quote-unit verification remain pending.</p>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Role</th><th>Target</th><th>Instrument</th><th>Trading line</th><th>Status</th><th>Evidence</th></tr></thead>
+        <tbody>
+        {% for line in wizard_lines %}
+          <tr><td>{{ line.role_label }}</td><td>{{ line.weight_pct|floatformat:0 }}%</td>
+              <td class="w2-wrap">{{ line.name }}<small class="w2-muted">{{ line.isin }}</small></td>
+              <td>{{ line.ticker }} · {{ line.raw_quote_unit }}</td>
+              <td><span class="w2-badge w2-warning">Account check pending</span></td>
+              <td><a href="{{ line.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer ↗</a>
+                  <a href="{{ line.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">Invest ↗</a></td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      <div class="w2-notice"><strong>Tracking only until verified.</strong> The app will not produce a trade instruction while personal account access, raw price units, or required historical evidence are unconfirmed.</div>
+      <label class="w2-check">
+        <input type="checkbox" name="ack" value="yes" {% if wizard.ack %}checked{% endif %} required>
+        <span>I've checked the exact LQQ3 and ERNS instruments in my own Trading 212 {{ wizard.type }} account, and I understand this remains tracking-only until required checks pass.</span>
+      </label>
+
+    {% elif wizard.step == 4 %}
+      <h3>Your starting point</h3>
+      <div class="w2-form-grid">
+        <label class="w2-field">Name in the menu
+          <input class="w2-input" name="name" maxlength="100" required
+                 value="{{ wizard.name|default:'9Sig' }}"></label>
+        <label class="w2-field">Actual start date
+          <input class="w2-input" name="start" type="date" required
+                 max="{% now 'Y-m-d' %}" value="{{ wizard.start }}"></label>
+      </div>
+      <fieldset class="w2-mode-fieldset">
+        <legend>Where are you starting?</legend>
+        <div class="w2-form-grid">
+          <label class="w2-option"><input type="radio" name="mode" value="fresh" {% if wizard.mode == 'fresh' %}checked{% endif %}>
+            <span><strong>Starting fresh</strong><small>I have already deposited real cash</small></span></label>
+          <label class="w2-option"><input type="radio" name="mode" value="hold" {% if wizard.mode == 'hold' %}checked{% endif %}>
+            <span><strong>I already hold these</strong><small>Record existing cash and share counts; no trades invented</small></span></label>
+        </div>
+      </fieldset>
+      <div id="w2-fresh-fields" {% if wizard.mode != 'fresh' %}hidden{% endif %}>
+        <label class="w2-field">Money already deposited (£)
+          <input class="w2-input" name="amount" inputmode="decimal" type="number" min="0.01" step="0.01"
+                 value="{{ wizard.amount }}" placeholder="1000.00"></label>
+        <label class="w2-check"><input type="checkbox" name="deposited" value="yes">
+          <span>I confirm I have already deposited this amount. It is not a planned future contribution.</span></label>
+      </div>
+      <div id="w2-hold-fields" {% if wizard.mode != 'hold' %}hidden{% endif %}>
+        <p class="w2-field-help">Enter owner-reported holdings and *average historical cost*, not a current market price. These are recorded as an unvalued opening snapshot, never as made-up buys.</p>
+        <label class="w2-field">Existing cash in account (£)
+          <input class="w2-input" name="cash" inputmode="decimal" type="number" min="0" step="0.01"
+                 value="{{ wizard.cash }}" placeholder="0.00"></label>
+        {% for holding in wizard_hold_rows %}
+        <div class="w2-opening-role"><strong>{{ holding.line.role_label }} · {{ holding.line.ticker }}</strong>
+          <div class="w2-form-grid">
+            <label class="w2-field">Shares held
+              <input class="w2-input" name="shares_{{ holding.line.role }}" type="number"
+                     min="0" step="0.00000001" value="{{ holding.shares }}"></label>
+            <label class="w2-field">Average purchase cost per share (£)
+              <input class="w2-input" name="cost_{{ holding.line.role }}" type="number"
+                     min="0" step="0.00000001" value="{{ holding.cost }}"></label>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if wizard.type == 'ISA' %}
+      <div class="w2-notice">
+        <strong>ISA allowance (warning only)</strong>
+        {% if wizard_tax_year_verified %}
+          Recorded deposits into Wealtharr ISA strategies this tax year: £{{ wizard_known_isa|floatformat:2 }} of £{{ wizard_isa_limit|floatformat:0 }}.
+          This does not include subscriptions to other ISAs or flexible replacements.
+        {% else %}
+          Current tax-year limit not confirmed by this application's policy; check HMRC directly.
+        {% endif %}
+      </div>
+      {% elif wizard.type == 'GIA' %}
+      <div class="w2-notice">A GIA may incur dividend and capital-gains tax. This is tracking, not tax advice.</div>
+      {% endif %}
+
+    {% elif wizard.step == 5 %}
+      <h3>Where should alerts go?</h3>
+      <p class="w2-field-help">These preferences are stored for this strategy. Actual delivery and per-instance routing are activated in Phase 7, after destinations are configured.</p>
+      <div class="w2-table-wrap"><table class="w2-table w2-alert-matrix">
+        <thead><tr><th>Alert</th><th>Email</th><th>Discord</th></tr></thead>
+        <tbody>{% for row in wizard_route_rows %}
+        <tr><td>{{ row.label }}</td>
+          <td><label class="w2-check"><input type="checkbox" name="alert_{{ row.key }}_email" {% if row.email %}checked{% endif %}><span class="w2-sr-only">{{ row.label }} email</span></label></td>
+          <td><label class="w2-check"><input type="checkbox" name="alert_{{ row.key }}_discord" {% if row.discord %}checked{% endif %}><span class="w2-sr-only">{{ row.label }} Discord</span></label></td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      <div class="w2-notice"><strong>Review:</strong> {{ wizard.name }} · {{ wizard.type }} at Trading 212 ·
+        since {{ wizard.start }} · {% if wizard.mode == 'fresh' %}actual £{{ wizard.amount }} deposit{% else %}owner-reported existing holdings{% endif %}.
+        Trading only when independent data and eligibility checks permit; manual confirmation always required. A separate owner-owned strategy, account and ledger are created.
+      </div>
+    {% endif %}
+    <div class="w2-wizard-actions">
+      {% if wizard.step > 1 %}<button type="submit" name="direction" value="back" class="w2-button" formnovalidate>Back</button>{% endif %}
+      <button type="submit" name="direction" value="next" class="w2-button w2-button-primary">
+        {% if wizard.step == 5 %}Create strategy{% else %}Continue{% endif %}</button>
+    </div>
+  </form>
+</section>

@@ -199,6 +199,11 @@ def resolve_instruments(strategy_slug, country, account_type, broker):
 
 def for_strategy(strategy):
     """No guesswork for older accounts without recorded broker metadata."""
+    # New v2 enrolments explicitly remain tracking-only while instrument,
+    # owner account eligibility and quote-unit checks are outstanding.
+    # Old instances default False, so established legacy behaviour is unchanged.
+    if getattr(strategy, "tracking_only", False):
+        return None
     try:
         profile = resolve_instruments(
             strategy.preset.slug, strategy.account.country,
