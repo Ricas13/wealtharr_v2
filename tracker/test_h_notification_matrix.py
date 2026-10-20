@@ -101,11 +101,11 @@ class OwnerAlertMatrixTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["last_receipts"]), 1)
         self.assertNotContains(response, "private_other")
-        self.assertNotContains(response, "Scheduler health")
+        self.assertNotContains(response, "Notification scheduler")
         self.owner.is_staff = True
         self.owner.save(update_fields=["is_staff"])
         response = self.client.get(reverse("v2_settings"))
-        self.assertContains(response, "Scheduler health")
+        self.assertContains(response, "Notification scheduler")
         self.assertContains(response, "2")
 
     def test_turning_off_urgent_email_suspends_its_pending_retry(self):
