@@ -311,6 +311,12 @@ class SystemIntegration(models.Model):
 
 class NotificationDelivery(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    # Original strategy scope survives retries and must never be inferred from
+    # a display name or message text. Legacy receipts remain unscoped.
+    strategy = models.ForeignKey(
+        StrategyInstance, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="notification_receipts",
+    )
     channel = models.CharField(max_length=12)
     # Fixed-category provenance lets due retries honor changed owner preferences.
     # Empty for legacy one-off notices which must not be guessed as a category.
