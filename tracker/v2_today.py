@@ -24,7 +24,7 @@ from .cockpit_execution import (
 from .cockpit_forms import SingleSignalFillForm
 from .core.presentation import account_value, holding_rows
 from .instrument_mapping import for_strategy
-from .market_signals import quarter_end_before
+from .market_signals import NINE_SIG_RULE_VERSION, quarter_end_before
 from .models import (
     LedgerRevision, RebalanceExecution, SignalFill, StrategyInstance,
     StrategySignal, StrategyValueSnapshot,
@@ -235,11 +235,17 @@ def _review_context(strategy, notice, *, form=None, error=""):
         not current or completed or
         notice.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")
     )
+    can_manual_reset = bool(
+        not blocked and not partial_fills and not notice.reset_reason
+        and notice.strategy_version == NINE_SIG_RULE_VERSION
+        and "Your reserve is now empty. Review whether to reset to 60/40." in notice.message
+    )
     return {
         "review_signal": notice, "review_rows": rows,
         "review_completed": completed, "review_is_current": current,
         "review_blocked": blocked,
         "review_can_submit": not blocked and bool(rows),
+        "review_can_manual_reset": can_manual_reset,
         "review_can_finalize": not blocked and bool(rows)
                                and all(r["complete"] for r in rows),
         "review_form": form, "review_error": error,
@@ -268,6 +274,19 @@ def guided_review(request, instance_id, signal_id):
             )
         intent = request.POST.get("intent", "")
         try:
+            if intent == "request_manual_reset":
+                if not context["review_can_manual_reset"]:
+                    raise ValidationError("This saved review cannot offer a manual reset.")
+                from .cockpit_manual_reset import choose_manual_reserve_reset
+                chosen = choose_manual_reserve_reset(
+                    owner=request.user, strategy_id=strategy.pk, signal_id=notice.pk,
+                )
+                messages.success(
+                    request, "Separate 60/40 review created. No trade or reset was executed."
+                )
+                return redirect(
+                    "v2_guided_review", instance_id=strategy.pk, signal_id=chosen.pk,
+                )
             if intent == "record_one":
                 form = SingleSignalFillForm(request.POST)
                 if not form.is_valid():
