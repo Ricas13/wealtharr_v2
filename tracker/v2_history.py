@@ -30,7 +30,8 @@ from .models import (
 )
 from .v2_ledger_core import effective_entries, replay
 from .v2_views import _render
-from .market_signals import quarter_end_before
+from .strategies.instruments import symbol_labels, symbols as fund_symbols
+from .strategies.registry import last_review_before
 
 ZERO = Decimal("0")
 WINDOWS = (("all", "All"), ("ytd", "YTD"), ("1y", "1 year"),
@@ -94,10 +95,16 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
     """
     if strategy.account.country != "GB":
         return None
-    expected = {"LQQ3.L": ("GBp", "GBX", Decimal("100")),
-                "ERNS.L": ("GBP", Decimal("1"))}
-    if (strategy.equity_symbol != "LQQ3.L" or
-            strategy.safe_symbol != "ERNS.L" or not state["positions"]):
+    from .core.catalogue import expected_quote_units
+    from .strategies.instruments import symbols
+    units_by_symbol = expected_quote_units()
+    funds = symbols(strategy)
+    # Only catalogued GBP/GBX trading lines of this strategy count as evidence.
+    expected = {
+        s: units_by_symbol[s] + (Decimal("100") if "GBX" in units_by_symbol[s] else Decimal("1"),)
+        for s in funds if s in units_by_symbol and set(units_by_symbol[s]) <= {"GBp", "GBX", "GBP"}
+    }
+    if not expected or len(expected) != len(funds) or not state["positions"]:
         return None
     value = state["cash"]
     ids = []
@@ -434,7 +441,7 @@ def _open_action(strategy, summary, today):
         return {"kind": "start", "title": "Buy your opening position",
                 "detail": "Split your cash at the target weights"}
     signal = strategy.signals.filter(
-        kind="QUARTERLY", as_of=quarter_end_before(today),
+        kind="QUARTERLY", as_of=last_review_before(strategy, today),
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-pk").first()
     if signal and proposed_actions(signal) and not RebalanceExecution.objects.filter(
             signal=signal).exists():
@@ -474,8 +481,7 @@ def _overview_extras(request, items, rows, today):
             for symbol, qty in summary["positions"].items():
                 mark = summary["marks"].get(symbol)
                 if mark and qty > ZERO:
-                    label = ("Growth" if symbol == strategy.equity_symbol else
-                             "Safe" if symbol == strategy.safe_symbol else symbol)
+                    label = symbol_labels(strategy).get(symbol, symbol)
                     assets[label] = assets.get(label, ZERO) + qty * mark.price
             assets["Cash"] = assets.get("Cash", ZERO) + summary["cash"]
     asset_total = sum(assets.values(), ZERO)
@@ -508,7 +514,7 @@ def _overview_extras(request, items, rows, today):
         coming.append({"date": isa["resets"], "strategy": "All ISAs", "event": "New ISA tax year",
                        "todo": "Allowance resets"})
     coming.sort(key=lambda c: (c["date"] is not None, c["date"] or today))
-    symbols = sorted({x for s in live for x in (s.equity_symbol, s.safe_symbol) if x})
+    symbols = sorted({x for s in live for x in fund_symbols(s)})
     prices = [MarketObservation.objects.filter(symbol=x, currency="GBP").order_by("-as_of").first()
               for x in symbols]
     last_sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()

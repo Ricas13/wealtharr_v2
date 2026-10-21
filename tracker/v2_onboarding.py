@@ -179,8 +179,9 @@ def _enroll(owner, state):
             account_type_code=account_type, started_on=start,
             strategy_version=released_version(strategy),
             mapping_version=CATALOGUE_VERSION, resolved_instruments=manifest,
-            equity_symbol=instruments["growth"].ticker,
-            safe_symbol=instruments["safe"].ticker,
+            # Legacy two-column fields; every role lives in resolved_instruments.
+            equity_symbol=lines[0].ticker,
+            safe_symbol=lines[1].ticker if len(lines) > 1 else "",
             owner_checked_on=timezone.localdate(),
             tracking_only=True, market_data_enabled=False,
             onboarding_mode=state["mode"], alert_routes=state["routes"],

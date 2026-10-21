@@ -24,6 +24,7 @@ from .models import (
     SignalFill, StrategyInstance, StrategySignal,
 )
 from .services import ledger_summary, validate_and_record
+from .strategies.instruments import symbols as fund_symbols
 from .v2_review_refresh import rebuild_value_history, retire_stale_reviews
 from .v2_ledger_core import (
     ZERO, EffectiveEntry, effective_entries, evidence_impact, find_entry,
@@ -180,7 +181,7 @@ def ledger_page(request, instance_id):
         ledger_recent_changes=LedgerRevision.objects.filter(strategy=strategy).exclude(
             operation="ADD").select_related("entry").order_by("-created_at", "-pk")[:3],
         ledger_today=timezone.localdate(),
-        ledger_symbols=tuple(x for x in (strategy.equity_symbol, strategy.safe_symbol) if x),
+        ledger_symbols=fund_symbols(strategy),
         ledger_tab=tab, ledger_kind=kind, ledger_search=search,
         ledger_sort=order, ledger_deleted=show_deleted,
         ledger_entries=entries[:200], ledger_count=len(entries),
@@ -250,7 +251,7 @@ def _input_payload(post, strategy):
     }
     if kind in ("BUY", "SELL"):
         symbol = post.get("symbol", "").strip()
-        if symbol not in (strategy.equity_symbol, strategy.safe_symbol) or not symbol:
+        if not symbol or symbol not in fund_symbols(strategy):
             raise ValidationError("Choose one exact mapped trading line for this strategy.")
         if symbol not in {
             role.get("yahoo_ticker") for role in

@@ -15,7 +15,7 @@ from .models import (
 from .services import dispatch, ledger_summary
 from .notification_routing import route_notice, newly_delivered
 from .signal_status import _price_status, changed_since_review
-from .market_signals import quarter_end_before
+from .strategies.registry import last_review_before, plugin_keys
 
 D = Decimal
 
@@ -46,7 +46,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
     today = today or timezone.localdate()
     count = 0
     for strategy in StrategyInstance.objects.select_related("owner", "account").filter(
-            preset__slug="nasdaq-quarterly-target").exclude(account__kind="PAPER"):
+            preset__slug__in=plugin_keys()).exclude(account__kind="PAPER"):
         owner = strategy.owner
         pref, _ = NotificationPreference.objects.get_or_create(owner=owner)
         delay = (remind_after_days if remind_after_days is not None
@@ -70,7 +70,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
 
         recent = StrategySignal.objects.filter(
             strategy=strategy, kind="QUARTERLY",
-            as_of=quarter_end_before(today)).exclude(
+            as_of=last_review_before(strategy, today)).exclude(
                 review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"),
             ).order_by("-as_of", "-pk").first()
         if (strategy.market_data_enabled and recent and

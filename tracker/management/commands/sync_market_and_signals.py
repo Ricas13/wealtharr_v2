@@ -1,12 +1,13 @@
-"""Check Yahoo quotes and review 9Sig portfolios; safe for an hourly scheduler."""
+"""Check Yahoo quotes and review every live strategy; safe for an hourly scheduler."""
 from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from tracker.models import MarketObservation, StrategyInstance, StrategyValueSnapshot
-from tracker.market_signals import review_strategy, sync_ticker
+from tracker.market_data import sync_ticker
 from tracker.services import ledger_summary
 from tracker.instrument_mapping import for_strategy
 from tracker.review_autofinish import auto_finish_reviews
+from tracker.strategies.registry import module_for, plugin_keys
 
 
 def save_verified_strategy_snapshot(strategy):
@@ -52,13 +53,15 @@ class Command(BaseCommand):
         owners = set()
         for strategy in StrategyInstance.objects.select_related("account", "preset", "owner").filter(
                 market_data_enabled=True, tracking_only=False,
-                preset__slug="nasdaq-quarterly-target", preset__active=True):
+                preset__slug__in=plugin_keys(), preset__active=True):
             owners.add(strategy.owner)
             try:
-                if for_strategy(strategy) is None:
+                plugin = module_for(strategy)
+                if plugin is None or for_strategy(strategy) is None:
                     fail += 1
                     continue
-                result = review_strategy(strategy)
+                # Each strategy refreshes its own prices and saved reviews.
+                result = plugin.review(strategy)
                 save_verified_strategy_snapshot(strategy)
                 if result["status"] == "ok":
                     ok += 1

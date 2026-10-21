@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
 
-from . import study
+from .strategies.registry import module_for
 from .models import StrategyInstance, StudyPrice
 from .v2_views import _render
 
@@ -25,18 +25,18 @@ def _number(raw, default, low, high):
     return float(value.quantize(Decimal("0.01"))), False
 
 
-def _data():
+def _data(engine):
     """Cache the built series until the next download."""
     latest = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
     key = "study-data:%s" % (latest.isoformat() if latest else "none")
     data = cache.get(key)
     if data is None:
-        data = study.load_data()
+        data = engine.load_data()
         cache.set(key, data, 3600)
     return data
 
 
-def _chart(result, scale):
+def _chart(engine, result, scale):
     """SVG polylines for the four series plus money put in."""
     days = result["dates"]
     step = max(1, len(days) // MAX_POINTS)
@@ -44,7 +44,7 @@ def _chart(result, scale):
     if index[-1] != len(days) - 1:
         index.append(len(days) - 1)
     lines = []
-    for name, label in study.SERIES:
+    for name, label in engine.SERIES:
         s = result["series"].get(name)
         if s:
             lines.append((label, CSS[name], [s["values"][i] for i in index]))
@@ -87,12 +87,17 @@ def study_page(request, instance_id):
     )
     amount, bad_amount = _number(request.GET.get("amount", ""), "1000", 1, 10_000_000)
     monthly, bad_monthly = _number(request.GET.get("monthly", ""), "0", 0, 1_000_000)
+    plugin = module_for(strategy)
+    study = plugin.study if plugin else None
+    if study is None:
+        return _render(request, page_key="instance", page_title="Study", instance=strategy,
+                       section="study", study_supported=False)
     key = request.GET.get("range", "10y")
     if key not in dict((k, l) for k, l, _ in study.TIMEFRAMES):
         key = "10y"
     scale = "log" if request.GET.get("scale") == "log" else "linear"
-    supported = strategy.preset.slug == "nasdaq-quarterly-target"
-    data = _data() if supported else study.StudyData()
+    supported = True
+    data = _data(study)
     rows, selected = [], None
     if data.ready:
         for k, label, _ in study.TIMEFRAMES:
@@ -118,7 +123,7 @@ def study_page(request, instance_id):
         study_rows=rows, study_selected=selected, study_best=best,
         study_selected_rows=[(n, label, CSS[n], selected["series"].get(n))
                              for n, label in study.SERIES] if selected else (),
-        study_chart=_chart(selected, scale) if selected else None,
+        study_chart=_chart(study, selected, scale) if selected else None,
         study_growth_real_from=data.growth_real_from,
         study_safe_real_from=data.safe_real_from,
         study_first_day=data.days[0] if data.ready else None,

@@ -71,7 +71,7 @@ class PriceSanityContractTests(SimpleTestCase):
         self.assertIn("actually_actionable_gbp", row)
         self.assertTrue(all(isinstance(value, str) for value in row.values()))
 
-    @patch("tracker.market_signals.urlopen")
+    @patch("tracker.market_data.urlopen")
     def test_yahoo_gbp_gbx_mismatch_refused_before_normalizing(self, urlopen):
         response = MagicMock()
         response.status = 200
@@ -86,7 +86,7 @@ class PriceSanityContractTests(SimpleTestCase):
 
 
 class PersistedMarketPriceHoldTests(TestCase):
-    @patch("tracker.market_signals.fetch_chart")
+    @patch("tracker.market_data.fetch_chart")
     def test_suspicious_batch_is_not_saved_or_used(self, fetch):
         today = timezone.localdate()
         previous = today - timedelta(days=1)
@@ -99,7 +99,7 @@ class PersistedMarketPriceHoldTests(TestCase):
         state = YahooSync.objects.get(symbol="ERNS.L")
         self.assertEqual(state.last_error, "PRICE_HOLD:LARGE_MOVE")
 
-    @patch("tracker.market_signals.fetch_chart")
+    @patch("tracker.market_data.fetch_chart")
     def test_accepted_batch_can_be_committed(self, fetch):
         today = timezone.localdate()
         fetch.return_value = ("GBP", [(today, D("100"))])
@@ -108,7 +108,7 @@ class PersistedMarketPriceHoldTests(TestCase):
         self.assertEqual(saved.price, D("100"))
         self.assertEqual(YahooSync.objects.get(symbol="ERNS.L").last_error, "")
 
-    @patch("tracker.market_signals.fetch_chart")
+    @patch("tracker.market_data.fetch_chart")
     def test_missing_current_quote_is_held_and_does_not_create_history(self, fetch):
         today = timezone.localdate()
         fetch.return_value = ("GBP", [(today - timedelta(days=9), D("100"))])
@@ -118,7 +118,7 @@ class PersistedMarketPriceHoldTests(TestCase):
             YahooSync.objects.get(symbol="ERNS.L").last_error,
             "PRICE_HOLD:STALE_PRICE")
 
-    @patch("tracker.market_signals.fetch_chart")
+    @patch("tracker.market_data.fetch_chart")
     def test_historical_close_cannot_be_rewritten(self, fetch):
         today = timezone.localdate()
         MarketObservation.objects.create(
@@ -130,7 +130,7 @@ class PersistedMarketPriceHoldTests(TestCase):
         self.assertEqual(YahooSync.objects.get(symbol="ERNS.L").last_error,
                          "PRICE_HOLD:REVISED_HISTORICAL_CLOSE")
 
-    @patch("tracker.market_signals.fetch_chart")
+    @patch("tracker.market_data.fetch_chart")
     def test_vendor_unit_change_creates_persistent_hold(self, fetch):
         fetch.side_effect = ValueError("PRICE_HOLD:RAW_UNIT_MISMATCH")
         self.assertIsNone(sync_ticker("LQQ3.L", force=True))

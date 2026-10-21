@@ -1,0 +1,31 @@
+{% load w2_format %}    <section class="w2-card">
+      <div class="w2-ch"><h2 class="w2-ct">Growth vs quarter target</h2>{% if dash_target.available %}<span class="w2-chip w2-info">Q to {{ dash_target.quarter_end|date:"j M" }}</span>{% endif %}</div>
+      {% if dash_target.available %}
+        <div class="w2-kv"><span>Target at {{ dash_target.quarter_end|date:"j M" }} (+9%)</span><strong>£{{ dash_target.target|floatformat:"2g" }}</strong></div>
+        <div class="w2-kv"><span>Growth ({{ selected_instance.equity_symbol }}) now</span><strong>{% if dash_target.growth is not None %}£{{ dash_target.growth|floatformat:"2g" }}{% else %}—{% endif %}</strong></div>
+        <div class="w2-kv"><span>{% if dash_target.difference >= 0 %}Above{% else %}Below{% endif %} target</span><strong class="{% if dash_target.difference >= 0 %}w2-pos{% else %}w2-neg{% endif %}">{% if dash_target.difference is not None %}{{ dash_target.difference|signed_money }} · {{ dash_target.difference_pct|signed_pct }}{% else %}—{% endif %}</strong></div>
+        <div class="w2-kv"><span>30 Down rule</span><span>{% if dash_target.spy %}{% if dash_target.spy.triggered %}<strong class="w2-warn">Triggered</strong>{% else %}Not triggered{% endif %} · S&amp;P {{ dash_target.spy.decline_pct|signed_pct }} vs 8-quarter peak{% else %}Needs 9 quarters of S&amp;P closes{% endif %}</span></div>
+        {% if dash_target.bar %}<div class="w2-target-bar" role="img" aria-label="Growth against target"><span style="width:{{ dash_target.bar.growth|floatformat:1 }}%"></span><i style="left:{{ dash_target.bar.target|floatformat:1 }}%"></i></div>{% endif %}
+        <p class="w2-note">Estimate only. The instruction is issued after the quarter-end close.</p>
+      {% elif dash_target %}
+        <div class="w2-empty">{{ dash_target.reason }}</div>
+      {% else %}
+        <div class="w2-empty">Shown once the strategy is live with prices and holdings.</div>
+      {% endif %}
+    </section>
+
+    <section class="w2-card w2-span2" aria-labelledby="w2-quarter-heading">
+      <div class="w2-ch"><h2 class="w2-ct" id="w2-quarter-heading">Quarter by quarter</h2><a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}">Reviews</a></div>
+      <div class="w2-table-wrap"><table class="w2-table">
+        <thead><tr><th>Quarter</th><th class="w2-r">Growth start</th><th class="w2-r">Target +9%</th><th class="w2-r">Growth at end</th><th class="w2-r">Difference</th><th>Signal</th><th class="w2-r">Amount</th><th>Status</th></tr></thead>
+        <tbody>{% for row in dash_quarters %}
+          <tr><td>{{ row.label }}</td><td class="w2-r">{{ row.opening|floatformat:"2g" }}</td><td class="w2-r">{{ row.target|floatformat:"2g" }}</td>
+            <td class="w2-r {% if row.current %}w2-muted{% endif %}">{% if row.growth is not None %}{{ row.growth|floatformat:"2g" }}{% if row.current %} now{% endif %}{% else %}—{% endif %}</td>
+            <td class="w2-r {{ row.difference|tone }}">{% if row.difference is not None %}{{ row.difference|signed_num }}{% else %}—{% endif %}</td>
+            <td>{% if row.side == 'SELL' %}Sell growth{% elif row.side == 'BUY' %}Buy growth{% elif row.signal %}No trade{% else %}<span class="w2-muted">—</span>{% endif %}</td>
+            <td class="w2-r">{% if row.amount is not None %}£{{ row.amount|floatformat:"2g" }}{% else %}<span class="w2-muted">—</span>{% endif %}</td>
+            <td>{% if row.status == 'done' %}<span class="w2-chip w2-ok">Done {{ row.done|date:"j M" }}</span>{% elif row.status == 'todo' %}<span class="w2-chip w2-wait">To do</span>{% elif row.status == 'partial' %}<span class="w2-chip w2-wait">Part recorded</span>{% elif row.current %}<span class="w2-chip w2-info">In progress</span>{% else %}<span class="w2-muted">—</span>{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="8"><div class="w2-empty">The quarter table starts after your first growth purchase.</div></td></tr>{% endfor %}
+        </tbody></table></div>
+    </section>
+

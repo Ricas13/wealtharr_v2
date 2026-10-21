@@ -169,13 +169,13 @@ class V2HistoryTests(TestCase):
         day = self.day
         source = FetchedChart("GBP", [(day, D("150"))], "GBp",
                               {day: D("15000")})
-        with patch("tracker.market_signals.fetch_chart", return_value=source):
+        with patch("tracker.market_data.fetch_chart", return_value=source):
             result = sync_ticker("LQQ3.L", force=True)
         self.assertEqual(result.raw_close, D("15000"))
         self.assertEqual(result.raw_quote_unit, "GBp")
         self.assertEqual(result.source, "yahoo")
         self.assertTrue(result.raw_unit_verified)
-        with patch("tracker.market_signals.fetch_chart",
+        with patch("tracker.market_data.fetch_chart",
                    return_value=("GBP", [(day,D("104"))])):
             result = sync_ticker("ERNS.L", force=True)
         self.assertEqual(result.source, "")

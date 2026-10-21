@@ -9,20 +9,22 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .cockpit_execution import completion_rows, finalize_manual_review
-from .market_signals import quarter_end_before
+from .strategies.registry import last_review_before
 from .models import RebalanceExecution, SignalFill, StrategySignal
 
 
 def auto_finish_reviews(today=None):
     """Finish every ready review; returns how many were finished. Idempotent."""
-    quarter = quarter_end_before(today or timezone.localdate())
+    today = today or timezone.localdate()
     finished = 0
     # The current quarter, plus late reviews whose fills are all recorded.
     signals = StrategySignal.objects.select_related("strategy").filter(
-        kind="QUARTERLY", as_of__lte=quarter, reset_reason="",
+        kind="QUARTERLY", as_of__lt=today, reset_reason="",
         strategy__tracking_only=False,
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE", "CONFIRMED"))
     for signal in signals:
+        if signal.as_of > last_review_before(signal.strategy, today):
+            continue
         if RebalanceExecution.objects.filter(signal=signal).exists():
             continue
         fills = list(SignalFill.objects.filter(signal=signal, strategy=signal.strategy)

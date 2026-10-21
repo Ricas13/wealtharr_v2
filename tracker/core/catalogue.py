@@ -41,7 +41,7 @@ class StrategyOffer:
     enabled: bool
 
 
-OFFERS = MappingProxyType({
+_OFFERS = {
     STRATEGY_9SIG: StrategyOffer(
         STRATEGY_9SIG, "9Sig", "High risk", "Quarterly",
         "A leveraged Nasdaq-100 growth sleeve with a defensive sleeve. "
@@ -52,7 +52,8 @@ OFFERS = MappingProxyType({
         "Five diversifying asset roles; instruments and rules are not released.",
         False,
     ),
-})
+}
+OFFERS = MappingProxyType(_OFFERS)
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,7 @@ class CatalogueLine:
     broker_evidence_url: str = ""
     verified_on: date | None = None
     note: str = ""
+    issuer: str = ""
 
     @property
     def role_label(self):
@@ -151,7 +153,23 @@ for account_type in ("ISA", "GIA"):
         ] = row
 
 CATALOGUE = MappingProxyType(_CATALOGUE)
-del _CATALOGUE
+
+# Raw Yahoo quote units for reference series that no strategy holds.
+REFERENCE_QUOTE_UNITS = {"TQQQ": ("USD",), "SPY": ("USD",), "QQQ": ("USD",)}
+
+
+def expected_quote_units():
+    """Symbol -> accepted raw Yahoo currency codes, from every catalogued fund.
+
+    A GBX line accepts Yahoo's "GBp"/"GBX"; a GBP line only "GBP". A unit
+    change on the feed then holds the price instead of valuing at 100x.
+    """
+    units = dict(REFERENCE_QUOTE_UNITS)
+    for line in CATALOGUE.values():
+        if line.ticker and line.raw_quote_unit:
+            units[line.ticker] = (("GBp", "GBX") if line.raw_quote_unit == "GBX"
+                                  else (line.raw_quote_unit,))
+    return units
 
 
 class MappingNotAvailable(ValueError):
@@ -173,12 +191,40 @@ def rows_for(strategy_key, platform, account_type, *, country="GB",
 
 def selection_available(strategy_key, platform, account_type):
     offer = OFFERS.get(strategy_key)
+    description = describe_strategy(strategy_key)
+    rows = rows_for(strategy_key, platform, account_type)
     return bool(
-        offer and offer.enabled and platform == "TRADING212"
+        offer and offer.enabled and description and platform == "TRADING212"
         and account_type in ("ISA", "GIA")
-        and len(rows_for(strategy_key, platform, account_type)) == 2
-        and all(row.status != "draft" for row in rows_for(strategy_key, platform, account_type))
+        # One reviewed line for every role the strategy's rules define.
+        and {row.role for row in rows} == {role for role, _ in description.role_targets}
+        and all(row.status != "draft" and row.ticker and row.isin for row in rows)
     )
+
+
+def _manifest_from_lines(strategy_key, platform, account_type):
+    """Pinned snapshot for a catalogue-defined strategy (any number of roles)."""
+    import hashlib
+    import json
+    roles = {}
+    for line in rows_for(strategy_key, platform, account_type):
+        roles[line.role] = {
+            "name": line.name, "issuer": line.issuer, "isin": line.isin,
+            "broker_ticker": line.ticker.split(".")[0], "yahoo_ticker": line.ticker,
+            "trading_line": line.trading_line, "raw_quote_unit": line.raw_quote_unit,
+            "normalised_currency": line.currency,
+            "raw_to_gbp_factor": "100" if line.raw_quote_unit == "GBX" else "1",
+            "weight": str(line.weight),
+            "broker_isa_confirmed": False, "owner_product_permission_confirmed": False,
+            "issuer_url": line.issuer_url, "broker_evidence_url": line.broker_evidence_url,
+        }
+    manifest = {
+        "strategy_key": strategy_key, "mapping_version": CATALOGUE_VERSION,
+        "country": "GB", "broker": platform, "account_type": account_type, "roles": roles,
+    }
+    serial = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+    manifest["sha256"] = hashlib.sha256(serial.encode()).hexdigest()
+    return manifest
 
 
 def availability_reason(strategy_key, platform, account_type):
@@ -195,6 +241,9 @@ def onboarding_manifest(strategy_key, platform, account_type):
     """Return a pinned snapshot; never upgrade a legacy instance implicitly."""
     if not selection_available(strategy_key, platform, account_type):
         raise MappingNotAvailable(availability_reason(strategy_key, platform, account_type))
+    if strategy_key != STRATEGY_9SIG:
+        return _manifest_from_lines(strategy_key, platform, account_type)
+    # 9Sig keeps its original manifest so existing pinned snapshots still match.
     if account_type == "ISA":
         return enrolment_manifest(
             strategy_key, country="GB", broker="TRADING212",

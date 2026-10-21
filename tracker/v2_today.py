@@ -25,12 +25,13 @@ from .cockpit_execution import (
 from .cockpit_forms import SingleSignalFillForm
 from .core.presentation import account_value, holding_rows
 from .instrument_mapping import for_strategy
-from .market_signals import NINE_SIG_RULE_VERSION, quarter_end_before
 from .models import (
     RebalanceExecution, SignalFill, StrategyInstance,
     StrategySignal, StrategyValueSnapshot,
 )
 from .services import ledger_summary
+from .strategies.instruments import symbol_labels, symbols
+from .strategies.registry import last_review_before, module_for, next_review
 from .v2_views import _render
 from .v2_go_live import setup_missing
 
@@ -201,7 +202,7 @@ def today_page(request, instance_id):
         status = "idle"
         headline = "Nothing to do right now"
         explanation = "No currently outstanding verified quarterly instruction."
-    next_end = _next_end(timezone.localdate())
+    next_end = next_review(strategy, timezone.localdate())
     price_date = min((m.as_of for m in marks if m is not None), default=None) if ready else None
     display_value = account_value(
         net_cash=report["cash"], portfolio_value=report["value"],
@@ -211,10 +212,7 @@ def today_page(request, instance_id):
         report["profit"] if ready and report["value"] is not None
         else None
     )
-    symbol_roles = {
-        strategy.equity_symbol: "Growth",
-        strategy.safe_symbol: "Safe",
-    }
+    symbol_roles = symbol_labels(strategy)
     return _render(
         request, page_key="instance", page_title="Dashboard",
         instance=strategy, section="today",
@@ -247,6 +245,7 @@ def _dashboard(request, strategy, report, ready, roles, next_end):
                          strategy.account.broker, strategy.account.kind)
     except MappingNotAvailable:
         lines = ()
+    plugin = module_for(strategy)
     points = dash.recorded_points(strategy)
     span = dash.pick_range(request)
     mode = dash.pick_mode(request)
@@ -262,16 +261,18 @@ def _dashboard(request, strategy, report, ready, roles, next_end):
             if ready and report["value"] is not None and report["net_contributed"] > ZERO
             else None),
         "dash_xirr": dash.xirr_pct(strategy, points) if ready else None,
-        "dash_target": dash.growth_target(strategy, report, next_end) if ready else None,
         "dash_allocation": dash.allocation(report, lines, roles) if ready else None,
-        "dash_quarters": dash.quarter_rows(strategy, next_end, report) if ready else (),
+        "dash_allocation_label": plugin.allocation_label if plugin else "Target",
+        "dash_plugin_template": plugin.dashboard_template if plugin else "",
+        **(plugin.dashboard_context(strategy, report, next_end)
+           if plugin and plugin.dashboard_context and ready else {}),
         "dash_holdings": dash.holdings_detail(strategy, report, roles) if ready else (),
         "dash_returns": tuple(r for r in returns if r["label"] in (
             "1 week", "1 month", "3 months", "Since start")),
         "dash_recent": dash.recent_entries(strategy),
         "dash_isa": dash.isa_allowance([strategy]),
         "dash_alerts": dash.alerts_summary(request.user, strategy),
-        "dash_symbols": tuple(x for x in (strategy.equity_symbol, strategy.safe_symbol) if x),
+        "dash_symbols": symbols(strategy),
         "dash_today": timezone.localdate(),
     }
 
@@ -289,17 +290,17 @@ def _review_context(strategy, notice, *, form=None, error=""):
     completed = RebalanceExecution.objects.filter(
         strategy=strategy, signal=notice
     ).exists()
-    current = notice.as_of == quarter_end_before(timezone.localdate())
+    current = notice.as_of == last_review_before(strategy, timezone.localdate())
     late = not current and not completed and late_review_allowed(strategy, notice)
     blocked = (
         strategy.tracking_only or
         not current or completed or
         notice.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")
     )
+    plugin = module_for(strategy)
     can_manual_reset = bool(
         not blocked and not partial_fills and not notice.reset_reason
-        and notice.strategy_version == NINE_SIG_RULE_VERSION
-        and "Your reserve is now empty. Review whether to reset to 60/40." in notice.message
+        and plugin and plugin.offers_manual_reset(notice)
     )
     return {
         "review_signal": notice, "review_rows": rows,
@@ -324,8 +325,10 @@ def guided_review(request, instance_id, signal_id):
         StrategySignal, pk=signal_id, strategy=strategy, kind="QUARTERLY",
     )
     if request.method == "GET" and request.GET.get("export") == "csv":
-        from .v2_breakdown import _detail, _export
-        return _export(strategy, _detail(strategy, notice))
+        plugin = module_for(strategy)
+        if not (plugin and plugin.review_export):
+            raise Http404("No calculation export for this strategy")
+        return plugin.review_export(strategy, notice)
     context = _review_context(strategy, notice)
     if request.method == "POST":
         late_finish = request.POST.get("intent") == "finalize" and context["review_can_finalize"]
@@ -343,8 +346,7 @@ def guided_review(request, instance_id, signal_id):
             if intent == "request_manual_reset":
                 if not context["review_can_manual_reset"]:
                     raise ValidationError("This saved review cannot offer a manual reset.")
-                from .cockpit_manual_reset import choose_manual_reserve_reset
-                chosen = choose_manual_reserve_reset(
+                chosen = module_for(strategy).manual_reset(
                     owner=request.user, strategy_id=strategy.pk, signal_id=notice.pk,
                 )
                 messages.success(
@@ -415,7 +417,7 @@ def guided_review(request, instance_id, signal_id):
 
 def _review_extras(strategy, notice):
     """Calculation steps and past reviews shown beside the fills form."""
-    from .v2_breakdown import _detail
+    plugin = module_for(strategy)
     past = []
     for signal in strategy.signals.filter(kind="QUARTERLY").order_by("-as_of", "-pk")[:12]:
         if notice and signal.pk == notice.pk:
@@ -430,7 +432,8 @@ def _review_extras(strategy, notice):
             "filled_on": max((f.ledger_entry.occurred_on for f in fills), default=None),
             "execution": execution,
         })
-    detail = _detail(strategy, notice) if notice else None
+    detail = (plugin.review_detail(strategy, notice)
+              if notice and plugin and plugin.review_detail else None)
     return {
         "review_detail": detail,
         "review_past": tuple(past),

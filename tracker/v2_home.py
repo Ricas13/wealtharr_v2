@@ -13,7 +13,6 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from . import study
 from .models import InviteRequest, StudyPrice
 from .services import dispatch
 from .v2_auth import _turnstile_verified, preferred_url
@@ -58,7 +57,11 @@ def compare(amount, monthly, frame):
         return out
     out = {"ready": False, "amount": amount, "monthly": monthly, "range": frame,
            "range_words": FRAME_WORDS[frame]}
-    data = _data()
+    # The homepage compares the flagship strategy's Study against benchmarks.
+    from .instrument_mapping import STRATEGY_9SIG
+    from .strategies.registry import module_for_key
+    study = module_for_key(STRATEGY_9SIG).study
+    data = _data(study)
     result = study.run(data, frame, amount, monthly) if data.ready else None
     if result:
         days = result["dates"]
