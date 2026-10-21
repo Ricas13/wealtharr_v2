@@ -22,7 +22,7 @@
   <section class="w2-card" id="monthly-plan">
     <div class="w2-ch"><h2 class="w2-ct">Monthly top-up plan</h2></div>
     <form method="post" action="{% url 'v2_strategy_plan' instance_id=selected_instance.pk %}" class="w2-row" style="flex-wrap:nowrap">
-      {% csrf_token %}<label class="w2-field" style="margin:0">£ per month <input class="w2-input" name="monthly_target" type="number" min="0" step="0.01" style="width:120px" value="{{ selected_instance.monthly_target|floatformat:'2' }}"></label>
+      {% csrf_token %}<label class="w2-field" style="margin:0">{{ cur }} per month <input class="w2-input" name="monthly_target" type="number" min="0" step="0.01" style="width:120px" value="{{ selected_instance.monthly_target|floatformat:'2' }}"></label>
       <button type="submit" class="w2-button" style="align-self:flex-end">Save</button>
     </form>
     <p class="w2-note">If a month's deposit hasn't been recorded by the 3rd, you get a reminder (when that alert is ticked above). 0 turns it off. Past deposits aren't changed.</p>
@@ -59,7 +59,7 @@
     <div class="w2-kv"><span>Rules</span><span>{{ selected_instance.strategy_version|default:"Legacy version not pinned" }} · fixed</span></div>
     <div class="w2-kv"><span>Account</span><span>{{ selected_instance.account.kind }} · {{ selected_instance.account.broker_label }} · {{ selected_instance.account.country }}</span></div>
     <div class="w2-kv"><span>Started</span><span>{{ selected_instance.started_on|date:"j M Y"|default:"Not pinned" }}{% if selected_instance.onboarding_mode == 'hold' %} · from holdings you entered{% elif selected_instance.onboarding_mode %} · from cash{% endif %}</span></div>
-    <div class="w2-kv"><span>Monthly plan</span><span>{% if selected_instance.monthly_target %}£{{ selected_instance.monthly_target|floatformat:"2g" }}{% else %}Not set{% endif %}</span></div>
+    <div class="w2-kv"><span>Monthly plan</span><span>{% if selected_instance.monthly_target %}{{ cur }}{{ selected_instance.monthly_target|floatformat:"2g" }}{% else %}Not set{% endif %}</span></div>
     {% if strategy_go_live %}<p class="w2-note">You confirmed: “{{ strategy_go_live.attestation }}”</p>{% endif %}
   </section>
   {% endif %}

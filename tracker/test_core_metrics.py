@@ -143,6 +143,14 @@ class UniversalMetricTests(TestCase):
         self.assertEqual(result.cash_gain_gbp, D("-82"))
         self.assertEqual(result.audit[-1].unit_nav, D("1.08"))
 
+    def test_one_currency_per_period(self):
+        usd = evaluate_period(PortfolioPeriod(VerifiedValuation(START, D("100"), ("a",), True, "USD"),
+                                              VerifiedValuation(END, D("110"), ("b",), True, "USD")))
+        self.assertEqual(usd.status, "ok")
+        odd = evaluate_period(PortfolioPeriod(VerifiedValuation(START, D("100"), ("a",), True, "JPY"),
+                                              VerifiedValuation(END, D("110"), ("b",), True, "JPY")))
+        self.assertEqual(odd.status, "cannot_compute")
+
     def test_unverified_valuation_currency_cannot_calculate(self):
         invalid = VerifiedValuation(END, D("110"), ("source",), True, "USD")
         for closing in (invalid, v(END, "110", verified=False),

@@ -25,7 +25,7 @@
         <div class="w2-notice w2-space-top">Recording against this review is unavailable right now. Check the strategy is live and its setup on Strategy &amp; alerts.</div>
       {% endif %}
       <div class="w2-table-wrap w2-space-top"><table class="w2-table">
-        <thead><tr><th>#</th><th>Side</th><th>Ticker</th><th class="w2-r">Suggested</th><th class="w2-r">Recorded</th><th class="w2-r">Left</th>{% if review_can_submit %}<th>Date done</th><th>Shares got</th><th>Price £</th><th>Fee £</th><th></th>{% endif %}</tr></thead>
+        <thead><tr><th>#</th><th>Side</th><th>Ticker</th><th class="w2-r">Suggested</th><th class="w2-r">Recorded</th><th class="w2-r">Left</th>{% if review_can_submit %}<th>Date done</th><th>Shares got</th><th>Price {{ cur }}</th><th>Fee {{ cur }}</th><th></th>{% endif %}</tr></thead>
         <tbody>
         {% for action in review_rows %}
           <tr>
@@ -55,7 +55,7 @@
             {% endif %}
           </tr>
           {% for fill in action.fills %}
-          <tr><td></td><td colspan="2" class="w2-muted">↳ fill {{ fill.ledger_entry.occurred_on|date:"j M Y" }}</td><td></td><td class="w2-r">{{ fill.ledger_entry.quantity|floatformat:-4 }}</td><td class="w2-r w2-muted">£{{ fill.ledger_entry.unit_price|floatformat:-4 }}</td>{% if review_can_submit %}<td colspan="5" class="w2-muted">fee £{{ fill.ledger_entry.fee|floatformat:2 }}</td>{% endif %}</tr>
+          <tr><td></td><td colspan="2" class="w2-muted">↳ fill {{ fill.ledger_entry.occurred_on|date:"j M Y" }}</td><td></td><td class="w2-r">{{ fill.ledger_entry.quantity|floatformat:-4 }}</td><td class="w2-r w2-muted">{{ cur }}{{ fill.ledger_entry.unit_price|floatformat:-4 }}</td>{% if review_can_submit %}<td colspan="5" class="w2-muted">fee {{ cur }}{{ fill.ledger_entry.fee|floatformat:2 }}</td>{% endif %}</tr>
           {% endfor %}
         {% empty %}<tr><td colspan="11"><div class="w2-empty">This review has no trades to record.</div></td></tr>{% endfor %}
         </tbody></table></div>
@@ -71,8 +71,8 @@
           <thead><tr><th>Quarter</th><th class="w2-r">Line start</th><th class="w2-r">× 1.09</th><th class="w2-r">New money (half added)</th><th class="w2-r">Target</th></tr></thead>
           <tbody>{% for q in t.quarters %}<tr><td>{{ q.quarter }}</td><td class="w2-r">{{ q.opening|floatformat:"2g" }}</td><td class="w2-r">{{ q.growth|floatformat:"2g" }}</td><td class="w2-r">{{ q.net_flows|floatformat:"2g" }}</td><td class="w2-r"><strong>{{ q.closing|floatformat:"2g" }}</strong></td></tr>{% endfor %}</tbody>
         </table></div>
-        <div class="w2-kv w2-space-top"><span>Starting point</span><span>{{ t.anchor_label }} · {{ t.anchor_date|date:"j M Y" }} · £{{ t.starting|floatformat:"2g" }}</span></div>
-        <div class="w2-kv"><span>Target at {{ review_detail.as_of|date:"j M Y" }}</span><strong>£{{ t.line|floatformat:"2g" }}</strong></div>
+        <div class="w2-kv w2-space-top"><span>Starting point</span><span>{{ t.anchor_label }} · {{ t.anchor_date|date:"j M Y" }} · {{ cur }}{{ t.starting|floatformat:"2g" }}</span></div>
+        <div class="w2-kv"><span>Target at {{ review_detail.as_of|date:"j M Y" }}</span><strong>{{ cur }}{{ t.line|floatformat:"2g" }}</strong></div>
         {% else %}<p class="w2-muted w2-space-top">{{ review_detail.trace_error|default:"The calculation can't be reproduced for this review." }}</p>{% endif %}
         {% endwith %}
         {% if review_detail.spy_result %}<div class="w2-kv"><span>30 Down rule</span><span>{% if review_detail.spy_result.triggered %}Triggered{% else %}Not active{% endif %} · S&amp;P (SPY) {{ review_detail.spy_result.current }} vs 8-quarter peak {{ review_detail.spy_result.peak }} ({{ review_detail.spy_result.decline_pct }}%; triggers at {{ review_detail.spy_result.threshold }})</span></div>
@@ -91,7 +91,7 @@
     <section class="w2-card">
       <div class="w2-ch"><h2 class="w2-ct">Past reviews</h2></div>
       <div class="w2-table-wrap"><table class="w2-table">
-        <thead><tr><th>Quarter end</th><th>Review</th><th class="w2-r">Suggested £</th><th class="w2-r">Recorded £</th><th>Filled</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Quarter end</th><th>Review</th><th class="w2-r">Suggested {{ cur }}</th><th class="w2-r">Recorded {{ cur }}</th><th>Filled</th><th>Status</th><th></th></tr></thead>
         <tbody>{% for row in review_past %}
           <tr><td>{{ row.signal.as_of|date:"j M Y" }}</td><td>{{ row.signal.title|truncatechars:48 }}</td>
             <td class="w2-r">{% if row.trades %}{{ row.suggested|floatformat:"2g" }}{% else %}—{% endif %}</td>
@@ -112,7 +112,7 @@
       <div class="w2-kv"><span>Calculated</span><span>{{ review_signal.created_at|date:"j M H:i" }}</span></div>
       <div class="w2-kv"><span>Rules</span><span>{{ review_signal.strategy_version|default:"—" }}</span></div>
       <div class="w2-kv"><span>Type</span><span>{% if review_signal.reset_reason %}60/40 reset{% else %}Quarterly rebalance{% endif %}</span></div>
-      {% for a in review_trades %}<div class="w2-kv"><span>{{ a.side|title }} {{ a.symbol }}</span><span>≈ {{ a.quantity }} sh{% if a.estimated_gbp %} · £{{ a.estimated_gbp }}{% endif %}</span></div>{% endfor %}
+      {% for a in review_trades %}<div class="w2-kv"><span>{{ a.side|title }} {{ a.symbol }}</span><span>≈ {{ a.quantity }} sh{% if a.estimated_gbp %} · {{ cur }}{{ a.estimated_gbp }}{% endif %}</span></div>{% endfor %}
     </section>
     {% if review_can_manual_reset %}
     <section class="w2-card">

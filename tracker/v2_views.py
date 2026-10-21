@@ -40,7 +40,7 @@ def _price_freshness(instance):
     from .strategies.instruments import symbols as fund_symbols
     symbols = list(fund_symbols(instance))
     latest = MarketObservation.objects.filter(
-        symbol__in=symbols, currency="GBP").order_by("-as_of").first()
+        symbol__in=symbols, currency=instance.account.currency).order_by("-as_of").first()
     sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()
     return {
         "date": latest.as_of if latest else None,
@@ -63,18 +63,22 @@ def _render(request, *, page_key, page_title, instance=None, section=None, **ext
         extra.setdefault("weight_label", "Weight at reset"
                          if plugin and plugin.allocation_label == "Reset" else "Target weight")
         extra.setdefault("fund_symbols", fund_symbols(instance))
-    return render(
-        request, "v2/page.html",
-        {
-            "shell_instances": items,
-            "selected_instance": instance,
-            "section": section,
-            "page_key": page_key,
-            "page_title": page_title,
-            "instance_count": len(items),
-            **extra,
-        },
-    )
+    from .money import rendering_in, symbol_for
+    currency = instance.account.currency if instance is not None else extra.pop("page_currency", "GBP")
+    extra.setdefault("cur", symbol_for(currency))
+    with rendering_in(currency):
+        return render(
+            request, "v2/page.html",
+            {
+                "shell_instances": items,
+                "selected_instance": instance,
+                "section": section,
+                "page_key": page_key,
+                "page_title": page_title,
+                "instance_count": len(items),
+                **extra,
+            },
+        )
 
 
 @login_required

@@ -147,7 +147,7 @@ def _decimal(value):
 def _approved(point):
     return (isinstance(point, VerifiedValuation) and
             type(point.as_of) is date and _decimal(point.value_gbp) and
-            point.value_gbp >= ZERO and point.currency == "GBP" and
+            point.value_gbp >= ZERO and point.currency in ("GBP", "USD", "EUR") and
             point.verified is True and
             isinstance(point.observation_ids, tuple) and
             bool(point.observation_ids) and
@@ -214,7 +214,8 @@ def _exact_unit_nav(period: PortfolioPeriod, flows):
     if len(by_id) != len(flows) or set(by_id) != {f.event_id for f in flows}:
         return None, (), "FLOW_BOUNDARY_MISMATCH"
 
-    if any(not _approved(p) or p.as_of <= period.opening.as_of or
+    if any(not _approved(p) or p.currency != period.opening.currency or
+           p.as_of <= period.opening.as_of or
            p.as_of >= period.closing.as_of for p in period.observations):
         return None, (), "UNVERIFIED_INTERMEDIATE_VALUATION"
     dates = [p.as_of for p in period.observations]
@@ -228,6 +229,8 @@ def _exact_unit_nav(period: PortfolioPeriod, flows):
             return None, (), "FLOW_BOUNDARY_MISMATCH"
         before, after = boundary.before, boundary.after
         if (not _approved(before) or not _approved(after) or
+                before.currency != period.opening.currency or
+                after.currency != period.opening.currency or
                 before.as_of != flow.occurred_on or after.as_of != flow.occurred_on or
                 before.observation_ids != after.observation_ids or
                 before.value_gbp <= ZERO or after.value_gbp <= ZERO or
@@ -299,6 +302,7 @@ def evaluate_period(period: PortfolioPeriod) -> PeriodMetrics:
     if not isinstance(period, PortfolioPeriod):
         return _result("INVALID_PORTFOLIO_PERIOD")
     if (not _approved(period.opening) or not _approved(period.closing) or
+            period.opening.currency != period.closing.currency or
             period.opening.value_gbp <= ZERO or
             period.opening.as_of >= period.closing.as_of):
         return _result("UNVERIFIED_VALUATION_ENDPOINTS")

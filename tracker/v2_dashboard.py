@@ -153,7 +153,9 @@ def chart(points, *, span, mode, indexes=True):
             else:
                 lines.append({"label": label, "css": css, "points": " ".join(
                     "%s,%.1f" % (a, b) for a, b in zip(x, ys))})
-        labels = ["£{:,.0f}".format(hi), "£{:,.0f}".format((hi + lo) / 2), "£{:,.0f}".format(lo)]
+        from .money import current_symbol
+        cur = current_symbol()
+        labels = [cur + "{:,.0f}".format(v) for v in (hi, (hi + lo) / 2, lo)]
         zero = None
     ticks = [first + timedelta(days=round(days * i / 4)) for i in range(5)]
     return {
@@ -304,7 +306,7 @@ def holdings_detail(strategy, report, roles):
             continue
         mark = report["marks"].get(symbol)
         closes = list(MarketObservation.objects.filter(
-            symbol=symbol, currency="GBP").order_by("-as_of")[:2])
+            symbol=symbol, currency=strategy.account.currency).order_by("-as_of")[:2])
         move = None
         if len(closes) == 2 and closes[1].price > ZERO:
             move = ((closes[0].price / closes[1].price - 1) * HUNDRED).quantize(Decimal("0.1"))

@@ -20,7 +20,7 @@ def yearly_review(instance, *, key, rules):
     from tracker.strategies.instruments import role_symbols
     from tracker.v2_ledger_core import effective_entries
 
-    if not instance.market_data_enabled or instance.account.currency != "GBP":
+    if not instance.market_data_enabled:
         return {"status": "disabled"}
     if instance.strategy_version and instance.strategy_version != rules.VERSION:
         return {"status": "cannot_compute", "reason": "Pinned rule version differs; owner review required"}
@@ -31,7 +31,7 @@ def yearly_review(instance, *, key, rules):
     for symbol in roles.values():
         close = sync_ticker(symbol)
         # Dashboard marks: the latest verified GBP close, never a guess.
-        if close and close.currency == "GBP" and close.as_of >= today - timedelta(days=8):
+        if close and close.currency == instance.account.currency and close.as_of >= today - timedelta(days=8):
             previous = PriceMark.objects.filter(strategy=instance, symbol=symbol).first()
             if not previous or previous.as_of <= close.as_of:
                 PriceMark.objects.update_or_create(
@@ -52,7 +52,7 @@ def yearly_review(instance, *, key, rules):
     quotes = {}
     for fund in funds:
         close = settlement_close(fund.symbol, as_of)
-        if close and close.currency == "GBP":
+        if close and close.currency == instance.account.currency:
             quotes[fund.symbol] = rules.Quote(fund.symbol, Decimal(close.price), close.as_of)
     result = rules.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes, as_of=as_of)
     if result.status == "cannot_compute":

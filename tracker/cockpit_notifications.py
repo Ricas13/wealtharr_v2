@@ -20,13 +20,18 @@ from .strategies.registry import last_review_before, plugin_keys
 D = Decimal
 
 
+def symbol_for(currency):
+    from .money import symbol_for as lookup
+    return lookup(currency)
+
+
 def trade_lines(signal):
     lines = []
     for action in signal.actions:
         if action.get("side") not in ("BUY", "SELL"):
             continue
-        lines.append("%s approximately £%s of %s (%s units at %s close)" % (
-            action["side"].title(), action["estimated_gbp"],
+        lines.append("%s approximately %s%s of %s (%s units at %s close)" % (
+            action["side"].title(), symbol_for(signal.strategy.account.currency), action["estimated_gbp"],
             action["symbol"], action["quantity"], signal.as_of))
     return lines
 
@@ -122,13 +127,13 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
                 count += _send(strategy, owner, "contribution",
                     "monthly:%s:%04d-%02d" % (
                         strategy.pk, today.year, today.month),
-                    "Wealtharr — planned monthly £%s contribution" % (
-                        strategy.monthly_target),
-                    "Your plan this month: £%s. Actual recorded: £%s. "
-                    "Amount still planned: £%s. After depositing with "
-                    "%s, record it in Wealtharr. This is a "
-                    "reminder, not an automatic transfer." % (
-                        strategy.monthly_target, contributed,
-                        strategy.monthly_target - contributed,
-                        strategy.account.broker_label))
+                    "Wealtharr — planned monthly %s%s contribution" % (
+                        symbol_for(strategy.account.currency), strategy.monthly_target),
+                    "Your plan this month: {c}{plan}. Actual recorded: {c}{done}. "
+                    "Amount still planned: {c}{left}. After depositing with "
+                    "{broker}, record it in Wealtharr. This is a "
+                    "reminder, not an automatic transfer.".format(
+                        c=symbol_for(strategy.account.currency), plan=strategy.monthly_target,
+                        done=contributed, left=strategy.monthly_target - contributed,
+                        broker=strategy.account.broker_label))
     return count

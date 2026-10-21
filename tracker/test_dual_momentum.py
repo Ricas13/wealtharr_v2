@@ -217,7 +217,7 @@ class DualMomentumStudyTests(TestCase):
         seed("XUSE.L", TODAY - timedelta(days=300), lambda d, i: 20.0, currency="GBP")
         seed("VAGS.L", TODAY - timedelta(days=300), lambda d, i: 10.0, currency="GBP")
         seed("CSH2.L", TODAY - timedelta(days=300), lambda d, i: 11.0, currency="GBP")
-        study = module_for_key("dual-momentum").study
+        study = module_for_key("dual-momentum").study["GBP"]
         data = study.load_data()
         self.assertTrue(data.ready)
         result = study.run(data, "1y", 1000, 0)

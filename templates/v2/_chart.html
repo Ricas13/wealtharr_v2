@@ -2,7 +2,7 @@
 <div class="w2-ch"><h2 class="w2-ct">{{ label }}</h2>
   <div class="w2-row">
     <div class="w2-seg" role="group" aria-label="Period">{% for key, name in ranges %}<a href="?range={{ key }}&amp;mode={{ c.mode }}" {% if c.span == key %}class="w2-on" aria-current="true"{% endif %}>{{ name }}</a>{% endfor %}</div>
-    <div class="w2-seg" role="group" aria-label="Units"><a href="?range={{ c.span }}&amp;mode=gbp" {% if c.mode == 'gbp' %}class="w2-on" aria-current="true"{% endif %}>£</a><a href="?range={{ c.span }}&amp;mode=pct" {% if c.mode == 'pct' %}class="w2-on" aria-current="true"{% endif %}>%</a></div>
+    <div class="w2-seg" role="group" aria-label="Units"><a href="?range={{ c.span }}&amp;mode=gbp" {% if c.mode == 'gbp' %}class="w2-on" aria-current="true"{% endif %}>{{ cur }}</a><a href="?range={{ c.span }}&amp;mode=pct" {% if c.mode == 'pct' %}class="w2-on" aria-current="true"{% endif %}>%</a></div>
   </div>
 </div>
 {% if c.empty %}

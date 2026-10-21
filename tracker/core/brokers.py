@@ -15,6 +15,7 @@ class Broker:
     name: str
     country: str
     account_types: tuple
+    currency: str = "GBP"  # the account's currency: every amount is tracked in it
 
 
 _BROKERS = {
@@ -22,8 +23,19 @@ _BROKERS = {
     "AJBELL": Broker("AJBELL", "AJ Bell", "GB", ("ISA", "GIA", "SIPP")),
     "HL": Broker("HL", "Hargreaves Lansdown", "GB", ("ISA", "GIA", "SIPP")),
     "IBKR_UK": Broker("IBKR_UK", "Interactive Brokers UK", "GB", ("ISA", "GIA", "SIPP")),
+    "FIDELITY": Broker("FIDELITY", "Fidelity", "US", ("BROKERAGE", "TRAD_IRA", "ROTH_IRA"), "USD"),
+    "TRADE_REPUBLIC": Broker("TRADE_REPUBLIC", "Trade Republic", "DE", ("DEPOT",), "EUR"),
 }
 BROKERS = MappingProxyType(_BROKERS)
+
+
+# Every account type any broker offers, in display order.
+ACCOUNT_TYPE_NAMES = {
+    "ISA": "Stocks & Shares ISA", "GIA": "General Investment Account", "SIPP": "SIPP (pension)",
+    "BROKERAGE": "Individual brokerage account", "TRAD_IRA": "Traditional IRA", "ROTH_IRA": "Roth IRA",
+    "DEPOT": "Securities account (Depot)",
+}
+CURRENCY_SYMBOLS = {"GBP": "£", "USD": "$", "EUR": "€"}
 
 
 def broker_name(key):

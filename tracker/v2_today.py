@@ -93,7 +93,7 @@ def _opening_buys(strategy, cash):
             continue
         amount = (cash * weight).quantize(Decimal("0.01"))
         quote = MarketObservation.objects.filter(
-            symbol=line.ticker, currency="GBP", as_of__gte=fresh_after,
+            symbol=line.ticker, currency=strategy.account.currency, as_of__gte=fresh_after,
         ).order_by("-as_of").first()
         rows.append({
             "symbol": line.ticker, "role": line.role_label, "pct": weight * 100,

@@ -66,7 +66,9 @@ def go_live(strategy, user, started_on=None):
                 raise ValidationError(
                     f"The start date can't be after your first ledger entry ({first:%d %b %Y}).")
         key = strategy.strategy_key or strategy.preset.slug
-        if key != strategy.preset.slug or strategy.account.currency != "GBP":
+        from .core.brokers import BROKERS
+        broker = BROKERS.get(strategy.account.broker)
+        if key != strategy.preset.slug or not broker or strategy.account.currency != broker.currency:
             raise ValidationError("This strategy's account doesn't match a supported mapping.")
         try:
             manifest = onboarding_manifest(key, strategy.account.broker, strategy.account.kind)

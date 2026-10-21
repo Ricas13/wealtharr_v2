@@ -35,13 +35,14 @@ def _price_status(strategy, report):
     from .strategies.instruments import symbols
     from .strategies.registry import module_for
     today = timezone.localdate()
-    if not strategy.market_data_enabled or strategy.account.currency != 'GBP':
-        return False, 'Price monitoring must be enabled for a GBP account before trading.', []
+    if not strategy.market_data_enabled:
+        return False, 'Price monitoring must be enabled before trading.', []
     if for_strategy(strategy) is None:
         return False, 'Your broker/account instruments are not mapped to an exact verified GBP trading line.', []
     plugin = module_for(strategy)
     funds = symbols(strategy)
-    required_symbols = funds + (plugin.reference_symbols if plugin else ())
+    references = plugin.reference_symbols if plugin else ()
+    required_symbols = funds + tuple(references(strategy) if callable(references) else references)
     if YahooSync.objects.filter(symbol__in=required_symbols,
                                 last_error__startswith='PRICE_HOLD:').exists():
         return False, 'A required market price is on hold for verification. No trade instruction is available.', []
@@ -68,7 +69,7 @@ def _price_status(strategy, report):
         return False, "The funds' prices have mismatched closing dates.", marks
     for m in marks:
         if not MarketObservation.objects.filter(symbol=m.symbol, as_of=m.as_of,
-                                                currency='GBP', price=m.price).exists():
+                                                currency=strategy.account.currency, price=m.price).exists():
             return False, 'Price currency or source cannot be verified against market observations.', marks
     if strategy.ledger.filter(occurred_on__gt=min(m.as_of for m in marks)).exists():
         return False, 'Your newest transaction is later than the verified closing prices.', marks

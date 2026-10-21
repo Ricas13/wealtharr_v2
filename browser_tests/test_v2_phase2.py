@@ -49,8 +49,8 @@ class V2OnboardingBrowserTests(BrowserHarness):
                         'select[name="strategy"] option[value="all-weather"]').evaluate("(el) => el.disabled"))
                     self.assertEqual(self.page.locator('select[name="strategy"]').input_value(),
                                      "nasdaq-quarterly-target")
-                    self.assertTrue(self.page.locator(
-                        'input[name="account_type"][value="SIPP"]').is_disabled())
+                    # Only the chosen broker's account types are offered (Trading 212 has no SIPP).
+                    self.assertEqual(self.page.locator('input[name="account_type"][value="SIPP"]').count(), 0)
                     self.assertTrue(self.page.locator(
                         'input[name="account_type"][value="ISA"]').is_checked())
                     self.assertTrue(self.page.get_by_text("IE00BLRPRL42").first.is_visible())

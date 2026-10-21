@@ -168,9 +168,11 @@ def _enroll(owner, state):
                 "summary": OFFERS[strategy].explanation, "active": True,
             },
         )
+        from .core.brokers import BROKERS
+        broker = BROKERS[platform]
         account = Account.objects.create(
             owner=owner, name=_unique_account_name(owner, name, account_type),
-            country="GB", kind=account_type, broker=platform,
+            country=broker.country, currency=broker.currency, kind=account_type, broker=platform,
         )
         instruments = {line.role: line for line in lines}
         instance = StrategyInstance.objects.create(
@@ -235,10 +237,11 @@ def wizard(request):
     post = request.POST if request.method == "POST" else {}
     chosen = request.GET.get("strategy", "")
     strategy = post.get("strategy", chosen if chosen in OFFERS and OFFERS[chosen].enabled else default_key)
-    from .core.brokers import BROKERS
+    from .core.brokers import BROKERS, CURRENCY_SYMBOLS
     chosen_platform = request.GET.get("platform", "")
     platform = post.get("platform", chosen_platform if chosen_platform in BROKERS else "TRADING212")
-    types = [kind for kind, _ in ACCOUNT_TYPES if selection_available(strategy, platform, kind)]
+    offered = BROKERS[platform].account_types if platform in BROKERS else ()
+    types = [kind for kind in offered if selection_available(strategy, platform, kind)]
     account_type = post.get("account_type", "ISA" if "ISA" in types else (types[0] if types else ""))
     state = {"owner_id": request.user.pk, "strategy": strategy, "platform": platform,
              "type": account_type, "ack": post.get("ack") == "yes",
@@ -283,8 +286,11 @@ def wizard(request):
         request, page_key="add", page_title="Add strategy",
         wizard=state, wizard_error=error, wizard_offers=offers,
         wizard_platforms=platforms(),
-        wizard_account_options=[{"key": kind, "name": title, "enabled": kind in types}
-                                for kind, title in ACCOUNT_TYPES],
+        wizard_account_options=[{"key": kind, "name": dict(ACCOUNT_TYPES)[kind], "enabled": kind in types}
+                                for kind in offered],
+        wizard_currency=BROKERS[platform].currency if platform in BROKERS else "GBP",
+        page_currency=BROKERS[platform].currency if platform in BROKERS else "GBP",
+        cur=CURRENCY_SYMBOLS.get(BROKERS[platform].currency if platform in BROKERS else "GBP", ""),
         wizard_lines=lines, wizard_duplicate=duplicate, wizard_hold_rows=hold_rows,
         wizard_known_isa=known_isa, wizard_isa_limit=OVERALL_LIMIT_2026_GBP,
         wizard_tax_year_verified=verified_year,
