@@ -6,9 +6,11 @@ found with `tracker.strategies.registry.module_for(instance)`. A test
 (`tracker/test_strategy_plugins.py`) fails if a generic module imports a strategy's
 rules directly, and runs a test-only three-fund strategy through the whole loop.
 
-Worked examples: `strategies/nine_sig/` (quarterly signal line) and
-`strategies/all_weather/` (five fixed weights, yearly rebalance: `v1.py` rules,
-`plugin.py` wiring, funds in `core/catalogue.py`).
+Worked examples: `strategies/nine_sig/` (quarterly signal line),
+`strategies/all_weather/` and `strategies/golden_butterfly/` (fixed weights, yearly
+rebalance). A fixed-weight strategy needs only a `v1.py` with `VERSION`, `WEIGHTS`
+and an `evaluate` calling the shared pure `strategies/fixed_weights.py::rebalance`,
+and a two-line `plugin.py` using `strategies/yearly_plugin.py`.
 
 ## What a new strategy needs
 
@@ -33,7 +35,9 @@ Worked examples: `strategies/nine_sig/` (quarterly signal line) and
    listings in preference order in `ROLE_LISTINGS`, plus a `StrategyOffer`. For a
    broker and account type, the first listing with evidence for that broker is
    used; setup only offers the strategy when every role resolves. Quote units feed
-   the price checks automatically. Keep the rules true to the original; only the
+   the price checks automatically. A USD-quoted line (`raw_quote_unit="USD"`) is
+   stored in pounds at that day's Yahoo `GBPUSD=X` close; a day without a rate has
+   no price. Keep the rules true to the original; only the
    funds are local equivalents (say so in the caution).
 5. **Tests**: pure rule tests, plus an end-to-end test like the one in
    `test_strategy_plugins.py`.

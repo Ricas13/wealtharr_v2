@@ -24,6 +24,7 @@ from tracker.strategies.registry import describe_strategy
 
 CATALOGUE_VERSION = MAPPING_VERSION
 ALL_WEATHER = "all-weather"
+GOLDEN_BUTTERFLY = "golden-butterfly"
 ACCOUNT_TYPES = (
     ("ISA", "Stocks & Shares ISA"),
     ("GIA", "General Investment Account"),
@@ -52,6 +53,11 @@ _OFFERS = {
         "Five funds at the published weights: stocks, long-term and intermediate government "
         "bonds, gold and commodities, rebalanced once a year. Not affiliated with Bridgewater.", True,
     ),
+    GOLDEN_BUTTERFLY: StrategyOffer(
+        GOLDEN_BUTTERFLY, "Golden Butterfly", "Moderate risk", "Yearly",
+        "Five equal parts: stocks, small-cap value, long-term and short-term government bonds, "
+        "and gold, rebalanced once a year. Not affiliated with Portfolio Charts.", True,
+    ),
 }
 OFFERS = MappingProxyType(_OFFERS)
 
@@ -63,7 +69,7 @@ class Listing:
     issuer: str
     isin: str
     ticker: str  # Yahoo symbol of this exact line
-    raw_quote_unit: str  # GBX (pence) or GBP
+    raw_quote_unit: str  # GBX (pence), GBP, or USD (converted at that day's GBP/USD close)
     trading_line: str
     issuer_url: str
     note: str
@@ -103,6 +109,7 @@ class CatalogueLine:
             "stocks": "Equities", "long": "Long bonds",
             "inter": "Intermediate bonds", "gold": "Gold",
             "comm": "Commodities",
+            "scv": "Small-cap value", "short": "Short bonds",
         }.get(self.role, self.role)
 
     @property
@@ -158,6 +165,24 @@ CMOP = _aw("Invesco Bloomberg Commodity UCITS ETF (Acc)", "Invesco",
            "https://www.invesco.com/content/dam/invesco/uk/en/product-documents/etf/share-class/factsheet/IE00BD6FTQ80_factsheet_en-uk.pdf",
            "Swap-based (synthetic); broad commodities including precious metals.")
 
+GB_VERIFIED_ON = date(2026, 10, 21)
+USSC = Listing(
+    "SPDR MSCI USA Small Cap Value Weighted UCITS ETF (Acc)", "State Street",
+    "IE00BSPLC413", "USSC.L", "USD", "LSE USSC (USD line)",
+    "https://www.ssga.com/uk/en_gb/intermediary/etfs/funds/spdr-msci-usa-small-cap-value-weighted-ucits-etf-zprv-gy",
+    "US small-cap value, the only such index fund found on the London market. Quoted in US dollars: "
+    "Wealtharr converts each close at that day's GBP/USD close, and your broker charges its own "
+    "currency fee. Record fills in pounds (total paid divided by shares). Source-cited, not read "
+    "first-hand. " + ACCOUNT_HOLD,
+    GB_VERIFIED_ON, brokers={"TRADING212": T212 % "USSC"})
+IGLS = Listing(
+    "iShares UK Gilts 0-5yr UCITS ETF (Dist)", "iShares",
+    "IE00B4WXJK79", "IGLS.L", "GBP", "LSE IGLS (GBP line)",
+    "https://www.ishares.com/gls-download/literature/fact-sheet/igls-ishares-uk-gilts-0-5yr-ucits-etf-fund-fact-sheet-en-gb.pdf",
+    "UK equivalent of short-term US Treasuries: gilts up to 5 years. Distributing. Source-cited, "
+    "not read first-hand. " + ACCOUNT_HOLD,
+    GB_VERIFIED_ON, brokers={"TRADING212": T212 % "IGLS"})
+
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
     (STRATEGY_9SIG, "growth", "GB"): (_from_instrument(EQUITY_UK),),
@@ -167,6 +192,11 @@ ROLE_LISTINGS = {
     (ALL_WEATHER, "inter", "GB"): (IGLT,),
     (ALL_WEATHER, "gold", "GB"): (SGLN,),
     (ALL_WEATHER, "comm", "GB"): (CMOP,),
+    (GOLDEN_BUTTERFLY, "stocks", "GB"): (VUAG,),
+    (GOLDEN_BUTTERFLY, "scv", "GB"): (USSC,),
+    (GOLDEN_BUTTERFLY, "long", "GB"): (GLTL,),
+    (GOLDEN_BUTTERFLY, "short", "GB"): (IGLS,),
+    (GOLDEN_BUTTERFLY, "gold", "GB"): (SGLN,),
 }
 
 
@@ -212,7 +242,7 @@ def platforms():
 
 
 # Raw Yahoo quote units for reference series that no strategy holds.
-REFERENCE_QUOTE_UNITS = {"TQQQ": ("USD",), "SPY": ("USD",), "QQQ": ("USD",)}
+REFERENCE_QUOTE_UNITS = {"TQQQ": ("USD",), "SPY": ("USD",), "QQQ": ("USD",), "GBPUSD=X": ("USD",)}
 
 
 def expected_quote_units():
@@ -269,7 +299,7 @@ def _manifest_from_lines(strategy_key, platform, account_type):
             "broker_ticker": line.ticker.split(".")[0], "yahoo_ticker": line.ticker,
             "trading_line": line.trading_line, "raw_quote_unit": line.raw_quote_unit,
             "normalised_currency": line.currency,
-            "raw_to_gbp_factor": "100" if line.raw_quote_unit == "GBX" else "1",
+            "raw_to_gbp_factor": {"GBX": "100", "GBP": "1"}.get(line.raw_quote_unit, "GBPUSD=X daily close"),
             "weight": str(line.weight),
             "broker_isa_confirmed": False, "owner_product_permission_confirmed": False,
             "issuer_url": line.issuer_url, "broker_evidence_url": line.broker_evidence_url,

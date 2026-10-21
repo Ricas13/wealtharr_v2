@@ -8,6 +8,9 @@ from decimal import Decimal
 from types import MappingProxyType
 
 from tracker.strategies.all_weather.v1 import VERSION as ALL_WEATHER_VERSION, WEIGHTS as ALL_WEATHER_WEIGHTS
+from tracker.strategies.golden_butterfly.v1 import (
+    VERSION as GOLDEN_BUTTERFLY_VERSION, WEIGHTS as GOLDEN_BUTTERFLY_WEIGHTS,
+)
 from tracker.strategies.nine_sig.v2 import VERSION as NINE_SIG_VERSION
 
 
@@ -82,6 +85,32 @@ _RELEASED = {
         release_label="all-weather@1",
         version_history=("all-weather@1 (all_weather.v1.0.0): yearly rebalance to fixed weights.",),
     ),
+    "golden-butterfly": StrategyDescription(
+        key="golden-butterfly",
+        version=GOLDEN_BUTTERFLY_VERSION,
+        title="Golden Butterfly",
+        summary=("The published Golden Butterfly mix, five equal parts put back to 20% each once a "
+                 "year: total stock market, small-cap value, long-term and short-term government "
+                 "bonds, and gold. All transactions are made by you."),
+        cadence="One review after each calendar year end.",
+        rules=(
+            "Target weights, as published: 20% US total stock market, 20% US small-cap value, 20% long-term government bonds, 20% short-term government bonds, 20% gold.",
+            "The original uses US Treasuries; in a UK account the bond roles use the UK equivalent, gilts. Each fund is shown with its evidence at setup.",
+            "After each 31 December, holdings are valued at verified year-end GBP closes.",
+            "Funds above their weight are sold back to it; the proceeds and any cash buy the funds below their weight.",
+            "Buys never exceed the cash available; orders under £1 are skipped as too small to place.",
+            "New money waits as cash until the next yearly review, or you can split it at the weights yourself.",
+            "Only owner-confirmed actual fills are recorded. No trade is ever placed for you.",
+        ),
+        role_targets=GOLDEN_BUTTERFLY_WEIGHTS,
+        target_explanation="These weights are restored at every yearly review.",
+        caution=("Not affiliated with Portfolio Charts. The rules are the published ones; the funds are "
+                 "local equivalents, so results differ from the US original (gilts instead of US "
+                 "Treasuries, an S&P 500 fund instead of the total US market). Your own account's "
+                 "access to each fund is unverified."),
+        release_label="golden-butterfly@1",
+        version_history=("golden-butterfly@1 (golden_butterfly.v1.0.0): yearly rebalance to five equal weights.",),
+    ),
 }
 STRATEGIES = MappingProxyType(_RELEASED)
 
@@ -95,8 +124,9 @@ def describe_strategy(key: str) -> StrategyDescription | None:
 # behaviour here and never imports a strategy's rules directly.
 def _plugins():
     from tracker.strategies.all_weather.plugin import ALL_WEATHER
+    from tracker.strategies.golden_butterfly.plugin import GOLDEN_BUTTERFLY
     from tracker.strategies.nine_sig.plugin import NINE_SIG
-    return {NINE_SIG.key: NINE_SIG, ALL_WEATHER.key: ALL_WEATHER}
+    return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY)}
 
 
 _MODULES = {}

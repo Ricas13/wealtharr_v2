@@ -7,6 +7,7 @@ ROLE_LABELS = {
     "growth": "Growth", "safe": "Safe",
     "stocks": "Equities", "long": "Long bonds", "inter": "Intermediate bonds",
     "gold": "Gold", "comm": "Commodities", "bonds": "Bonds", "cash": "Cash",
+    "scv": "Small-cap value", "short": "Short bonds",
 }
 
 
