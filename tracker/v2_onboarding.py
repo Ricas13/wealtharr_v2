@@ -282,8 +282,11 @@ def wizard(request):
          "cost": state["holdings"].get(line.role, {}).get("average_cost_gbp", "")}
         for line in lines
     ]
+    from .v2_home import FRAMES, compare
     return _render(
         request, page_key="add", page_title="Add strategy",
+        # Hypothetical past performance of every strategy, before choosing one.
+        compare=compare(1000, 100, "10y", real_names=True), compare_frames=FRAMES,
         wizard=state, wizard_error=error, wizard_offers=offers,
         wizard_platforms=platforms(),
         wizard_account_options=[{"key": kind, "name": dict(ACCOUNT_TYPES)[kind], "enabled": kind in types}

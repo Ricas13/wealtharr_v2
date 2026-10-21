@@ -1,7 +1,7 @@
 """Stable URLs for the phased, server-rendered Wealtharr v2 design."""
 from django.urls import path
 
-from . import v2_views, v2_ledger_views, v2_today, v2_settings, v2_go_live, v2_strategy
+from . import v2_views, v2_ledger_views, v2_today, v2_settings, v2_go_live, v2_strategy, v2_home
 
 urlpatterns = [
     path("overview/", v2_views.overview, name="v2_overview"),
@@ -25,4 +25,5 @@ urlpatterns = [
     path("settings/test/<str:channel>/",
          v2_settings.test_channel, name="v2_notification_test"),
     path("add-strategy/", v2_views.add_strategy, name="v2_add_strategy"),
+    path("add-strategy/compare.json", v2_home.compare_named_json, name="v2_compare_json"),
 ]

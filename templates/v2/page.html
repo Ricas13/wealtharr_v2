@@ -1,5 +1,9 @@
 {% extends 'v2/base.html' %}
+{% load static %}
 {% block title %}{% if selected_instance %}{{ selected_instance.name }} · {% endif %}{{ page_title }}{% endblock %}
+{% block extra_head %}{% if page_key == 'add' %}
+  <link rel="stylesheet" href="{% static 'css/compare.css' %}">
+  <script defer src="{% static 'js/compare.js' %}"></script>{% endif %}{% endblock %}
 {% block content %}
 {% if page_key == 'instance' %}
 <header class="w2-strategy-head">
