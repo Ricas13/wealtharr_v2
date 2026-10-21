@@ -15,6 +15,18 @@ from .models import MarketObservation, RebalanceExecution, YahooSync
 ZERO = Decimal("0")
 
 
+def changed_since_review(strategy, notice):
+    """Whether the ledger changed in a way that alters a quarterly review.
+
+    New money, dividends or interest after quarter-end don't change the
+    quarter's trades; trades, withdrawals or corrections made since do.
+    """
+    return (strategy.ledger.filter(occurred_on__gt=notice.as_of,
+                                   kind__in=("BUY", "SELL", "WITHDRAW")).exists()
+            or strategy.ledger_revisions.filter(created_at__gt=notice.created_at)
+            .exclude(operation="ADD").exists())
+
+
 def _next_end(day):
     from calendar import monthrange
     from datetime import date

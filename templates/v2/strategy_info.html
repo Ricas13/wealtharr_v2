@@ -19,6 +19,15 @@
     </form>
   </section>
 
+  <section class="w2-card" id="monthly-plan">
+    <div class="w2-ch"><h2 class="w2-ct">Monthly top-up plan</h2></div>
+    <form method="post" action="{% url 'v2_strategy_plan' instance_id=selected_instance.pk %}" class="w2-row" style="flex-wrap:nowrap">
+      {% csrf_token %}<label class="w2-field" style="margin:0">£ per month <input class="w2-input" name="monthly_target" type="number" min="0" step="0.01" style="width:120px" value="{{ selected_instance.monthly_target|floatformat:'2' }}"></label>
+      <button type="submit" class="w2-button" style="align-self:flex-end">Save</button>
+    </form>
+    <p class="w2-note">If a month's deposit hasn't been recorded by the 3rd, you get a reminder (when that alert is ticked above). 0 turns it off. Past deposits aren't changed.</p>
+  </section>
+
   <section class="w2-card">
     <div class="w2-ch"><h2 class="w2-ct">Where alerts go</h2><a href="{% url 'v2_settings' %}">Change</a></div>
     <div class="w2-kv"><span>Email</span><span>{% if strategy_alerts.email %}<span class="w2-chip w2-ok">On</span> {{ strategy_preference.destination_email }}{% else %}<span class="w2-chip">Off</span>{% endif %}</span></div>
@@ -31,9 +40,14 @@
   <section class="w2-card w2-card-action w2-go-live" id="go-live">
     <h2 class="w2-ct w2-big" style="margin-bottom:6px">{% if strategy_tracking_only %}Go live{% else %}Finish setup{% endif %}</h2>
     {% if strategy_tracking_only %}<p class="w2-muted">This strategy is tracking-only: no live prices and no instructions. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm.</p>
-    {% else %}<p class="w2-muted">This strategy went live before its start date and instruments were pinned, so the ledger can't record anything yet. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm. The start date becomes your first ledger entry's date, or today.</p>{% endif %}
+    {% else %}<p class="w2-muted">This strategy went live before its start date and instruments were pinned, so the ledger can't record anything yet. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm. Confirm the date it started below.</p>{% endif %}
     <form method="post" action="{% url 'v2_go_live' instance_id=selected_instance.pk %}" class="w2-space-top">
       {% csrf_token %}
+      {% if not selected_instance.started_on %}
+      <label class="w2-field" style="max-width:260px">When did this strategy start?
+        <input class="w2-input" type="date" name="started_on" required value="{{ strategy_default_start|date:'Y-m-d' }}" max="{{ strategy_default_start|date:'Y-m-d' }}">
+        <small class="w2-muted">Pre-filled with your first ledger entry. Change it if you started earlier.</small></label>
+      {% endif %}
       <label class="w2-check"><input type="checkbox" name="confirm" value="yes" required> <span>{{ strategy_attestation }}</span></label>
       <button type="submit" class="w2-button w2-button-primary w2-space-top">{% if strategy_tracking_only %}Go live{% else %}Finish setup{% endif %}</button>
     </form>

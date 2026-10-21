@@ -17,6 +17,8 @@
       {% if review_error %}<div class="w2-form-error w2-space-top" role="alert">{{ review_error }}</div>{% endif %}
       {% if review_completed %}
         <div class="w2-notice w2-space-top">Completed and immutable. A confirmed quarterly execution can't be reopened as a new trade.</div>
+      {% elif review_late and review_can_finalize %}
+        <div class="w2-notice w2-space-top">From an earlier quarter, but every trade is recorded, so it can still be finished.</div>
       {% elif not review_is_current %}
         <div class="w2-notice w2-space-top">Historical review: read-only. Old advice can't be used to record a new trade.</div>
       {% elif review_blocked %}
@@ -36,7 +38,7 @@
             {% if review_can_submit %}
               {% if not action.complete %}
               <td colspan="5">
-                <form method="post" class="w2-row" style="flex-wrap:nowrap">
+                <form method="post" action="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=review_signal.pk %}" class="w2-row" style="flex-wrap:nowrap">
                   {% csrf_token %}
                   <input type="hidden" name="intent" value="record_one">
                   <input type="hidden" name="action_index" value="{{ action.index }}">
@@ -115,7 +117,7 @@
     {% if review_can_manual_reset %}
     <section class="w2-card">
       <h2 class="w2-ct" style="margin-bottom:6px">Reserve empty</h2>
-      <form method="post">{% csrf_token %}<input type="hidden" name="intent" value="request_manual_reset">
+      <form method="post" action="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=review_signal.pk %}">{% csrf_token %}<input type="hidden" name="intent" value="request_manual_reset">
         <p class="w2-note" style="margin-top:0">You can instead ask for a separate 60/40 reset review using verified closes. The saved review stays as it is.</p>
         <button type="submit" class="w2-button w2-full">Choose manual 60/40 reset review</button></form>
     </section>
@@ -123,7 +125,7 @@
     <section class="w2-card">
       <h2 class="w2-ct" style="margin-bottom:8px">Finish</h2>
       {% if review_can_finalize %}
-      <form method="post">{% csrf_token %}<input type="hidden" name="intent" value="finalize">
+      <form method="post" action="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=review_signal.pk %}">{% csrf_token %}<input type="hidden" name="intent" value="finalize">
         <button class="w2-button w2-button-primary w2-full" type="submit">Verify and complete review</button></form>
       <p class="w2-note">{% if review_signal.reset_reason %}Needs a closing price after your last fill, then your click.{% else %}Finishes by itself after the next closing prices; this button just does it sooner.{% endif %}</p>
       {% elif review_completed %}<p class="w2-muted">Done.</p>

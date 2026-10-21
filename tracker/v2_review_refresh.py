@@ -30,3 +30,36 @@ def retire_stale_reviews(strategy, changed_on):
         signal.save(update_fields=["review_outcome", "review_note", "signal_key"])
         retired += 1
     return retired
+
+
+def rebuild_value_history(strategy, changed_on):
+    """Recompute saved daily values on or after a corrected date.
+
+    Each value is rebuilt from the corrected ledger and the verified GBP close
+    stored for that same day; a day that can no longer be valued is dropped
+    rather than left showing a pre-correction figure. Returns rows touched.
+    """
+    from .models import MarketObservation
+    from .services import money, replay
+    from .v2_ledger_core import effective_entries
+    if changed_on is None:
+        return 0
+    entries = sorted(effective_entries(strategy), key=lambda e: e.occurred_on)
+    touched = 0
+    for row in strategy.value_snapshots.filter(as_of__gte=changed_on):
+        cash, net, positions = replay(e for e in entries if e.occurred_on <= row.as_of)
+        value = cash
+        for symbol, qty in positions.items():
+            close = MarketObservation.objects.filter(
+                symbol=symbol, as_of=row.as_of, currency="GBP").first() if qty > 0 else None
+            if close is None:
+                value = None
+                break
+            value += qty * close.price
+        if value is None or cash < 0:
+            row.delete()
+        else:
+            row.total_value, row.net_contributed = money(value), money(net)
+            row.save(update_fields=["total_value", "net_contributed"])
+        touched += 1
+    return touched

@@ -85,9 +85,25 @@ def completion_rows(signal, fills):
     return tuple(result)
 
 
-def _check_current(locked, signal):
+def late_review_allowed(strategy, signal):
+    """A past quarter's review with recorded fills that nothing later has built on.
+
+    It can still be finished against the fills already recorded (never new
+    fills: trades after the quarter belong to the next review).
+    """
+    if signal.kind != "QUARTERLY" or signal.as_of >= quarter_end_before(timezone.localdate()):
+        return False
+    if not SignalFill.objects.filter(signal=signal, strategy=strategy).exists():
+        return False
+    later = StrategySignal.objects.filter(strategy=strategy, kind="QUARTERLY", as_of__gt=signal.as_of)
+    return not (SignalFill.objects.filter(signal__in=later).exists()
+                or RebalanceExecution.objects.filter(signal__in=later).exists())
+
+
+def _check_current(locked, signal, *, allow_late=False):
+    current = signal.as_of == quarter_end_before(timezone.localdate())
     if (signal.strategy_id != locked.pk or signal.kind != "QUARTERLY" or
-            signal.as_of != quarter_end_before(timezone.localdate()) or
+            not (current or (allow_late and late_review_allowed(locked, signal))) or
             signal.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")):
         raise ValidationError("Only the current valid quarterly review can receive fills.")
     if RebalanceExecution.objects.filter(signal=signal).exists():
@@ -194,7 +210,7 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
             "account", "preset").get(pk=strategy_id, owner=owner)
         signal = StrategySignal.objects.select_for_update().get(
             pk=signal_id, strategy=locked)
-        _check_current(locked, signal)
+        _check_current(locked, signal, allow_late=True)
         fills = _linked(locked, signal)
         if not fills:
             raise ValidationError("Record at least one actual broker fill first.")

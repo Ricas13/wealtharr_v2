@@ -17,9 +17,10 @@ from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from .signal_status import _last_action, _next_end, _price_status
+from .signal_status import _last_action, _next_end, _price_status, changed_since_review
 from .cockpit_execution import (
-    completion_rows, finalize_manual_review, proposed_actions, record_single_fill,
+    completion_rows, finalize_manual_review, late_review_allowed, proposed_actions,
+    record_single_fill,
 )
 from .cockpit_forms import SingleSignalFillForm
 from .core.presentation import account_value, holding_rows
@@ -143,13 +144,8 @@ def today_page(request, instance_id):
             ready = False
     elif notice and notice.kind not in ("THIRTY_DOWN", "SPIKE_WATCH"):
         notice = None
-    # New money after quarter-end doesn't change the quarter's trades; trades,
-    # withdrawals or corrections made since the review do.
-    if notice and notice.kind == "QUARTERLY" and not partial and (
-            strategy.ledger.filter(occurred_on__gt=notice.as_of,
-                                   kind__in=("BUY", "SELL", "WITHDRAW")).exists()
-            or strategy.ledger_revisions.filter(created_at__gt=notice.created_at)
-                .exclude(operation="ADD").exists()):
+    if (notice and notice.kind == "QUARTERLY" and not partial
+            and changed_since_review(strategy, notice)):
         ready = False
         reason = (
             "The ledger changed after this review. An updated, verified "
@@ -294,6 +290,7 @@ def _review_context(strategy, notice, *, form=None, error=""):
         strategy=strategy, signal=notice
     ).exists()
     current = notice.as_of == quarter_end_before(timezone.localdate())
+    late = not current and not completed and late_review_allowed(strategy, notice)
     blocked = (
         strategy.tracking_only or
         not current or completed or
@@ -310,8 +307,9 @@ def _review_context(strategy, notice, *, form=None, error=""):
         "review_blocked": blocked,
         "review_can_submit": not blocked and bool(rows),
         "review_can_manual_reset": can_manual_reset,
-        "review_can_finalize": not blocked and bool(rows)
-                               and all(r["complete"] for r in rows),
+        "review_can_finalize": (not blocked or (late and not strategy.tracking_only))
+                               and bool(rows) and all(r["complete"] for r in rows),
+        "review_late": late,
         "review_form": form, "review_error": error,
         "review_nonce": uuid4(),
         "review_actual_fills": partial_fills,
@@ -330,7 +328,8 @@ def guided_review(request, instance_id, signal_id):
         return _export(strategy, _detail(strategy, notice))
     context = _review_context(strategy, notice)
     if request.method == "POST":
-        if context["review_blocked"]:
+        late_finish = request.POST.get("intent") == "finalize" and context["review_can_finalize"]
+        if context["review_blocked"] and not late_finish:
             messages.error(
                 request,
                 "This review is historical, completed, tracking-only, "

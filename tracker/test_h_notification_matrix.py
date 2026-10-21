@@ -227,6 +227,38 @@ class ScheduledDigestBehaviourTests(TestCase):
         self.assertEqual(NotificationDelivery.objects.filter(
             owner=self.owner, status="SENT").count(), 1)
 
+    def _send_with_fresh_prices(self):
+        from tracker.cockpit_notifications import send_due_cockpit_notices
+        with (patch("tracker.cockpit_notifications._price_status",
+                    return_value=(True, "", [])),
+              patch("tracker.cockpit_notifications.ledger_summary",
+                    return_value={"positions": {}}),
+              patch("tracker.services._send_message")):
+            return send_due_cockpit_notices(today=self.today)
+
+    def test_top_up_after_quarter_end_still_sends_the_digest(self):
+        from datetime import timedelta
+        day = self.signal.as_of + timedelta(days=1)
+        if day > self.today:
+            self.skipTest("No day after quarter end yet.")
+        self.strategy.ledger.create(kind="DEPOSIT", amount="500", occurred_on=day)
+        self.assertEqual(self._send_with_fresh_prices(), 1)
+
+    def test_trade_after_quarter_end_supersedes_digest_and_cancels_retry(self):
+        from datetime import timedelta
+        day = self.signal.as_of + timedelta(days=1)
+        if day > self.today:
+            self.skipTest("No day after quarter end yet.")
+        key = "quarterly-digest:%s:%s" % (self.strategy.pk, self.signal.signal_key)
+        NotificationDelivery.objects.create(owner=self.owner, channel="email", event_key=key,
+                                            subject="old", message="old", status="FAILED",
+                                            category="quarterly", attempts=1)
+        self.strategy.ledger.create(kind="DEPOSIT", amount="500", occurred_on=day)
+        self.strategy.ledger.create(kind="BUY", symbol="LQQ3.L", quantity="1",
+                                    unit_price="100", occurred_on=day)
+        self.assertEqual(self._send_with_fresh_prices(), 0)
+        self.assertEqual(NotificationDelivery.objects.get(event_key=key).status, "CANCELLED")
+
     def test_one_weekly_source_problem_no_executable_quarterly_notice(self):
         from tracker.cockpit_notifications import send_due_cockpit_notices
         with (patch("tracker.cockpit_notifications._price_status",

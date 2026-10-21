@@ -21,14 +21,12 @@ PENNY = Decimal("0.01")
 def money(value):
     return value.quantize(PENNY)
 
-def ledger_summary(strategy):
+def replay(entries):
+    """Cash, net contributions and positions after the given ledger entries."""
     cash = ZERO
     net_contributed = ZERO
     positions = defaultdict(lambda: ZERO)
-    # Phase 3 append-only corrections are projected here, never by mutating
-    # the original source entry or double-counting an obsolete version.
-    from .v2_ledger_core import effective_entries
-    for e in effective_entries(strategy):
+    for e in entries:
         if e.kind == LedgerEntry.DEPOSIT:
             cash += e.amount
             net_contributed += e.amount
@@ -45,7 +43,14 @@ def ledger_summary(strategy):
         elif e.kind == LedgerEntry.SELL:
             cash += money(e.quantity * e.unit_price) - e.fee
             positions[e.symbol] -= e.quantity
-    positions = {symbol: qty for symbol, qty in positions.items() if qty != ZERO}
+    return cash, net_contributed, {symbol: qty for symbol, qty in positions.items() if qty != ZERO}
+
+
+def ledger_summary(strategy):
+    # Phase 3 append-only corrections are projected here, never by mutating
+    # the original source entry or double-counting an obsolete version.
+    from .v2_ledger_core import effective_entries
+    cash, net_contributed, positions = replay(effective_entries(strategy))
     prices = {p.symbol: p for p in strategy.prices.all()}
     missing = sorted(symbol for symbol, qty in positions.items() if qty > ZERO and symbol not in prices)
     stock_value = sum((qty * prices[symbol].price for symbol, qty in positions.items() if symbol in prices), ZERO)
