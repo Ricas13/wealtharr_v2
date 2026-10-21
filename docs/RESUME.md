@@ -16,6 +16,12 @@ Branch `feature/audit-fixes` from main (after PR #33). From an external audit, v
 
 ---
 
+## SEO (21 October 2026)
+
+Branch `feature/seo`. White-hat only; owner asked for "cheat codes", declined black-hat tactics (cloaking, hidden text, keyword stuffing, link schemes, fake review markup) as penalty risks. Added `SITE_URL` (env) with a 301 canonical-host redirect (`tracker/seo.py` middleware), `X-Robots-Tag: noindex` on every non-public response, `/robots.txt`, `/sitemap.xml`, `/site.webmanifest`, a shared public template (`templates/public/base.html`: title, description, canonical, hreflang, Open Graph/Twitter, Organization/WebSite JSON-LD, icons) used by the homepage and five guides at `/guides/` (`tracker/guides.py`, `templates/public/guides/`) with Article, BreadcrumbList and visible-FAQ markup. Owner asked to avoid brand terms: no "9Sig" on any public page (homepage label now "Quarterly signal"). OG image and icons in `static/img/` (rendered once with Playwright). Owner is getting their own domain: set SITE_URL and list both hosts in ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS.
+
+---
+
 ## Fixes and simpler setup / review (21 October 2026)
 
 Branch `feature/fixes-and-setup` from main after PR #32. (1) Bug: a linked legacy strategy that went live under the PR #27 go-live (which didn't fill `started_on`) was live with rules pinned but no start date, so every ledger save returned 404 and the Strategy page offered nothing. `v2_go_live.setup_missing()` detects it; go-live doubles as "Finish setup" (pins blanks once, keeps the single `StrategyGoLive`), the ledger redirects there instead of 404, Today/Overview show "Finish setup". A live strategy with nothing recorded now says "Add your first deposit". New browser test `browser_tests/test_owner_forms.py` clicks every everyday form. (2) PR B: one-screen setup (`v2_onboarding.wizard`, single POST, default alert routes) and auto-finish of ordinary quarterly reviews in the hourly `sync_market_and_signals` (`tracker/review_autofinish.py`, same `finalize_manual_review` checks; resets still manual). CLAUDE.md boundary 6 updated.
