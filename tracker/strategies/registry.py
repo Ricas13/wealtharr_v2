@@ -59,23 +59,26 @@ _RELEASED = {
     "all-weather": StrategyDescription(
         key="all-weather",
         version=ALL_WEATHER_VERSION,
-        title="All Weather (UK)",
-        summary=("Five funds at fixed weights, rebalanced once a year: US shares, long and "
-                 "intermediate UK gilts, gold and broad commodities. All transactions are made by you."),
+        title="All Weather",
+        summary=("The published All Weather mix, put back to its weights once a year: stocks, "
+                 "long-term and intermediate government bonds, gold and broad commodities. "
+                 "All transactions are made by you."),
         cadence="One review after each calendar year end.",
         rules=(
-            "Target weights: 30% US shares, 40% long-dated UK gilts, 15% intermediate UK gilts, 7.5% gold, 7.5% broad commodities.",
+            "Target weights, as published: 30% US stocks, 40% long-term government bonds, 15% intermediate government bonds, 7.5% gold, 7.5% broad commodities.",
+            "The original uses US Treasuries; in a UK account the bond roles use the UK equivalent, gilts. Each fund is shown with its evidence at setup.",
             "After each 31 December, holdings are valued at verified year-end GBP closes.",
             "Funds above their weight are sold back to it; the proceeds and any cash buy the funds below their weight.",
-            "Buys never exceed the cash available; trades under £25 are skipped.",
+            "Buys never exceed the cash available; orders under £1 are skipped as too small to place.",
             "New money waits as cash until the next yearly review, or you can split it at the weights yourself.",
             "Only owner-confirmed actual fills are recorded. No trade is ever placed for you.",
         ),
         role_targets=ALL_WEATHER_WEIGHTS,
         target_explanation="These weights are restored at every yearly review.",
-        caution=("A UK adaptation inspired by the All Weather idea; not affiliated with Bridgewater "
-                 "Associates. Gilts replace US Treasuries, so it behaves differently from the original. "
-                 "Personal Trading 212 ISA access to each fund is unverified."),
+        caution=("Not affiliated with Bridgewater Associates. The rules are the published ones; the funds "
+                 "are local equivalents, so results differ from the US original (gilts instead of US "
+                 "Treasuries, an S&P 500 fund instead of the total US market). Your own account's "
+                 "access to each fund is unverified."),
         release_label="all-weather@1",
         version_history=("all-weather@1 (all_weather.v1.0.0): yearly rebalance to fixed weights.",),
     ),
