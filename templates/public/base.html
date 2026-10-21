@@ -45,9 +45,25 @@
 {% block content %}{% endblock %}
 </main>
 <div class="wrap">
-  <footer class="foot">
-    <span>© Wealtharr · Private tracker · Educational information, not financial advice. Capital at risk.</span>
-    <span><a href="{% url 'guides' %}">Guides</a> · <a href="{% url 'login' %}" rel="nofollow">Sign in</a></span>
+  <footer class="foot" aria-label="About Wealtharr">
+    <div class="foot-col">
+      <a class="brand" href="/"><span class="logo">W</span>Wealtharr</a>
+      <p>Rules-based strategy tracking. You place every trade yourself.</p>
+      <div class="row nevers"><span class="chip">No broker connection</span><span class="chip">No automatic trades</span><span class="chip">No rule tinkering</span><span class="chip">No made-up prices</span></div>
+    </div>
+    <div class="foot-col">
+      <h2>Works with</h2>
+      <ul><li>Trading 212 <span class="mut">· £</span></li><li>Fidelity <span class="mut">· $</span></li><li>Trade Republic <span class="mut">· €</span></li></ul>
+    </div>
+    <div class="foot-col">
+      <h2>Learn</h2>
+      <ul><li><a href="{% url 'guides' %}">Guides</a></li><li><a href="/#compare">Compare strategies</a></li><li><a href="/#invite">How it works</a></li><li><a href="{% url 'login' %}" rel="nofollow">Sign in</a></li></ul>
+    </div>
+    <div class="foot-col foot-small">
+      <h2>The small print</h2>
+      <p>Educational information, not financial advice. Capital at risk. Comparisons are hypothetical, based on past prices, and not a guide to future returns. Strategy names belong to their authors; Wealtharr is not affiliated with them.</p>
+      <p><a href="{% url 'privacy' %}">Privacy</a> · © Wealtharr</p>
+    </div>
   </footer>
 </div>
 {% block scripts %}{% endblock %}

@@ -10,6 +10,7 @@ urlpatterns = [
     path("invite/", v2_home.request_invite, name="request_invite"),
     path("guides/", guides.guides_index, name="guides"),
     path("guides/<slug:slug>/", guides.guide, name="guide"),
+    path("privacy/", guides.privacy, name="privacy"),
     path("robots.txt", seo.robots_txt, name="robots_txt"),
     path("sitemap.xml", seo.sitemap_xml, name="sitemap_xml"),
     path("site.webmanifest", seo.web_manifest, name="web_manifest"),

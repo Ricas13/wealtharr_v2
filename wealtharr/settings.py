@@ -135,6 +135,8 @@ TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
 # The one public origin search engines should index, e.g. https://wealtharr.com.
 # When set, every other host 301-redirects to it; add both hosts to ALLOWED_HOSTS.
 SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/")
+# Shown on the privacy page for access and deletion requests; optional.
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "").strip()
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
 # Production login intentionally fails closed if Turnstile is not configured.
 TURNSTILE_REQUIRED = not DEBUG

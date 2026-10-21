@@ -107,12 +107,18 @@ input[type=checkbox]{accent-color:#2f6fd6;width:15px;height:15px;margin:0;vertic
 .big{font-size:15px}
 .email{display:flex;gap:8px;margin-top:10px}
 .email input{flex:1;min-width:0;height:42px;border-radius:7px;border:1px solid #2a313b;background:#0d1014;color:#e4e7eb;padding:0 12px}
-.foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#7d8692;font-size:12px;padding:24px 0 40px}
+.foot{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) minmax(0,.8fr) minmax(0,1.5fr);gap:24px;margin-top:40px;padding:28px 0 40px;border-top:1px solid #1f242c;color:#7d8692;font-size:12.5px;line-height:1.55}
+.foot h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#aeb5bf;margin:0 0 10px}
+.foot ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.foot p{margin:8px 0 10px}
+.foot a{color:#aeb5bf}
+.foot .brand{color:#e4e7eb}
+.foot-small p{font-size:12px}
 
 @media (max-width:900px){
   h1{font-size:32px}
   .wrap{padding:0 16px}
-  .hero,.cta,.steps3,.ctrl{grid-template-columns:1fr}
+  .hero,.cta,.steps3,.ctrl,.foot{grid-template-columns:1fr}
   .links{display:none}
   .email{flex-direction:column}
   .cta{padding:20px}

@@ -1,6 +1,6 @@
 {% extends "public/base.html" %}{% load static %}
-{% block title %}Wealtharr · Leveraged ISA rebalancing without the spreadsheet{% endblock %}
-{% block description %}Follow a fixed, rules-based plan in your UK Stocks &amp; Shares ISA. Wealtharr checks prices hourly and tells you exactly what to buy or sell, and when.{% endblock %}
+{% block title %}Wealtharr · Rules-based investing without the spreadsheet{% endblock %}
+{% block description %}Follow a fixed, rules-based investing strategy in pounds, dollars or euros. Wealtharr checks prices hourly and tells you exactly what to buy or sell, and when.{% endblock %}
 {% block og_title %}Wealtharr · Skip the spreadsheet{% endblock %}
 {% block og_description %}Compare rules-based strategies on real past prices, then get told exactly what to do and when. No broker connection.{% endblock %}
 {% block path %}/{% endblock %}
@@ -125,16 +125,15 @@
     <div class="cta">
       <div>
         <h2>Set up once. Act only when it tells you.</h2>
-        <p class="sub">Two minutes to set up, then usually four nudges a year.</p>
+        <p class="sub">Two minutes to set up, then a nudge only when a trade is due.</p>
         <div class="steps3" role="group" aria-label="How it works" data-steps>
           <button type="button" class="step on" aria-pressed="true" data-step="0"><span class="num">1</span><strong>Pick a strategy</strong></button>
           <button type="button" class="step" aria-pressed="false" data-step="1"><span class="num">2</span><strong>Record what you hold</strong></button>
           <button type="button" class="step" aria-pressed="false" data-step="2"><span class="num">3</span><strong>Follow the nudges</strong></button>
         </div>
-        <p class="mut steptext" data-step-text="0">Each strategy is a fixed set of rules with the exact funds for your account locked in. A quarterly growth-target plan for a UK ISA is available now.</p>
+        <p class="mut steptext" data-step-text="0">Each strategy is a fixed set of rules with the exact funds for your account locked in. Five strategies are available, from a quarterly growth target to four equal parts, at Trading 212 (£), Fidelity ($) and Trade Republic (€).</p>
         <p class="mut steptext" data-step-text="1" hidden>Starting from cash? Enter the deposit and you get the exact opening buys. Already invested? Type your shares once.</p>
         <p class="mut steptext" data-step-text="2" hidden>Prices are checked hourly. When action is due you get an email or Discord message with the exact trades, then tap "I did this".</p>
-        <div class="row nevers"><span class="chip">No broker connection</span><span class="chip">No automatic trades</span><span class="chip">No rule tinkering</span><span class="chip">No made-up prices</span></div>
       </div>
       <form method="post" action="{% url 'request_invite' %}" class="invite">
         {% csrf_token %}
