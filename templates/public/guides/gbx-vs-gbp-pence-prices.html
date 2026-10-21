@@ -1,0 +1,23 @@
+<h2>Two units, one currency</h2>
+<p>London prices come in two units:</p>
+<ul>
+  <li><strong>GBP</strong>: pounds. A price of 4.52 means £4.52.</li>
+  <li><strong>GBX</strong> (sometimes shown as GBp): pence. A price of 452 means £4.52.</li>
+</ul>
+<p>Many London-listed ETFs and ETPs are quoted in pence. For example, the 3x Nasdaq-100 product LQQ3 is quoted in GBX, while the short-dated bond fund ERNS is quoted in GBP.</p>
+
+<h2>The 100× spreadsheet bug</h2>
+<p>Price feeds and spreadsheet functions often return the raw exchange price. If you hold 20 shares of a fund quoted at 25,000 GBX and multiply 20 × 25,000, your spreadsheet says <strong>£500,000</strong>. The real value is 20 × £250 = <strong>£5,000</strong>.</p>
+<p>In a rebalancing plan the damage is worse than a silly total. It can tell you to sell almost everything, or to buy far too much, because the growth fund looks 100 times bigger than its target.</p>
+
+<h2>How to avoid it</h2>
+<ol>
+  <li>Look up the exact line you hold (ticker and exchange) and note its unit.</li>
+  <li>Convert GBX prices to pounds once, in a single clearly labelled column, by dividing by 100.</li>
+  <li>Sanity-check totals against your broker's valuation after every update.</li>
+  <li>Watch for funds with several lines: the same fund can trade in USD, GBP and GBX under different tickers.</li>
+</ol>
+
+<h2>How Wealtharr handles it</h2>
+<p>Each instrument's quote unit is part of its fixed definition. Pence prices are converted before any valuation, and a price in an unexpected unit stops instructions rather than guessing.</p>
+<p>Related: <a href="/guides/rebalancing-spreadsheet-vs-app/">tracking a rebalancing plan: spreadsheet or app?</a></p>

@@ -1,0 +1,55 @@
+{% load static %}<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d1014">
+<title>{% block title %}Wealtharr{% endblock %}</title>
+<meta name="description" content="{% block description %}{% endblock %}">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<link rel="canonical" href="{{ site_url }}{% block path %}{{ request.path }}{% endblock %}">
+<link rel="alternate" hreflang="en-GB" href="{{ site_url }}{{ request.path }}">
+<meta property="og:site_name" content="Wealtharr">
+<meta property="og:locale" content="en_GB">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:title" content="{% block og_title %}{{ page_title }}{% endblock %}">
+<meta property="og:description" content="{% block og_description %}{% endblock %}">
+<meta property="og:url" content="{{ site_url }}{{ request.path }}">
+<meta property="og:image" content="{{ site_url }}{% static 'img/og.png' %}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Wealtharr: follow a fixed investing strategy without the spreadsheet">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+<link rel="icon" href="{% static 'img/icon-192.png' %}" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+<link rel="manifest" href="{% url 'web_manifest' %}">
+<link rel="stylesheet" href="{% static 'css/home.css' %}">
+{% block head %}{% endblock %}
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[
+{"@type":"Organization","@id":"{{ site_url }}/#org","name":"Wealtharr","url":"{{ site_url }}/","logo":"{{ site_url }}{% static 'img/icon-512.png' %}"},
+{"@type":"WebSite","@id":"{{ site_url }}/#website","name":"Wealtharr","url":"{{ site_url }}/","inLanguage":"en-GB","publisher":{"@id":"{{ site_url }}/#org"}}{% block jsonld %}{% endblock %}
+]}</script>
+</head>
+<body class="home">
+<a class="skip" href="#main">Skip to main content</a>
+<div class="wrap">
+  <nav class="nav" aria-label="Main">
+    <a class="brand" href="/"><span class="logo">W</span>Wealtharr</a>
+    <div class="links"><a href="/#compare">Compare</a><a href="{% url 'guides' %}">Guides</a><a href="/#invite">How it works</a></div>
+    <div class="row"><a class="btn g" href="{% url 'login' %}" rel="nofollow">Sign in</a><a class="btn" href="/#invite">Request an invite</a></div>
+  </nav>
+</div>
+<main id="main">
+{% block content %}{% endblock %}
+</main>
+<div class="wrap">
+  <footer class="foot">
+    <span>© Wealtharr · Private tracker · Educational information, not financial advice. Capital at risk.</span>
+    <span><a href="{% url 'guides' %}">Guides</a> · <a href="{% url 'login' %}" rel="nofollow">Sign in</a></span>
+  </footer>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

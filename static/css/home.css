@@ -53,7 +53,7 @@ h2{font-size:26px;letter-spacing:-.015em;margin:0 0 6px;font-weight:700}
 .notif{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;background:rgba(40,48,60,.85);border:1px solid #2f3845;border-radius:16px;padding:11px 13px;color:#e4e7eb;font-size:12px;cursor:pointer;animation:pop .5s ease-out,pulse 2s 1s infinite}
 .notif .nt{font-size:13px;color:#fff}
 .tap{text-align:center;color:#6d7682;font-size:11px;margin:18px 0 0}
-.screen{animation:pop .35s ease-out}.screen h2{margin:8px 0 4px;font-size:19px}.screen p{margin:0;font-size:12.5px}
+.screen{animation:pop .35s ease-out}.screen h3{margin:8px 0 4px;font-size:19px}.screen p{margin:0;font-size:12.5px}
 .tick{width:46px;height:46px;border-radius:50%;background:#173a2a;color:#4fc48a;display:grid;place-items:center;font-size:24px;font-weight:700;animation:pop .45s cubic-bezier(.3,1.6,.6,1)}
 .mix .bar{position:relative;height:12px;border-radius:6px;background:#3f8f6a;margin-top:6px}
 .mix .fill{height:100%;border-radius:6px 0 0 6px;background:#5b9cf5;transition:width .9s cubic-bezier(.3,1.2,.5,1)}
@@ -118,3 +118,29 @@ input[type=checkbox]{accent-color:#2f6fd6;width:15px;height:15px;margin:0;vertic
   .cta{padding:20px}
 }
 @media (prefers-reduced-motion:reduce){.notif,.screen,.tick,.trades{animation:none}.mix .fill{transition:none}}
+
+/* Guides */
+.article{max-width:760px;padding:24px 0 8px}
+.article h1{font-size:36px;margin:8px 0 8px}
+.article h2{font-size:21px;margin:30px 0 8px}
+.article p,.article li{font-size:15px;line-height:1.65;color:#cfd5dc}
+.article ul,.article ol{padding-left:20px}
+.article li{margin:4px 0}
+.article .lead{font-size:17px;color:#aeb6c0}
+.article table{font-size:14px;margin:8px 0}
+.article .tw{border:1px solid #1f242c;border-radius:10px;padding:4px 8px}
+.crumbs{font-size:12px;color:#8f98a3}.crumbs a{color:#8f98a3}
+.meta{font-size:12px;margin:0 0 6px}
+.faq{margin-top:30px}
+.faq details{border-bottom:1px solid #1c2129;padding:10px 0}
+.faq summary{cursor:pointer;font-weight:600;font-size:15px;color:#e4e7eb}
+.faq details p{margin:8px 0 0}
+.cta-box{margin:28px 0 14px;padding:18px;border:1px solid #24456f;border-radius:12px;background:linear-gradient(135deg,#101a28,#12161c)}
+.cta-box strong{font-size:16px;color:#fff}
+.cta-box p{margin:6px 0 12px;font-size:14px}
+.related{max-width:1200px;padding:10px 0 24px}
+.related h2{font-size:18px;margin:18px 0 10px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding-bottom:20px}
+.card.link{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:#e4e7eb;transition:border-color .15s}
+.card.link:hover{border-color:#2f6fd6;color:#fff}
+@media (max-width:900px){.article h1{font-size:28px}}

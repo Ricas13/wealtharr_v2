@@ -1,25 +1,14 @@
-{% load static %}<!doctype html>
-<html lang="en-GB">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
-<meta name="description" content="Follow a fixed investing strategy without the spreadsheet. Wealtharr checks prices and tells you exactly what to do, and when.">
-<title>Wealtharr · Follow a proven strategy</title>
-<link rel="stylesheet" href="{% static 'css/home.css' %}">
-{% if turnstile_required %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
-</head>
-<body class="home">
-<a class="skip" href="#main">Skip to main content</a>
-<div class="wrap">
-  <nav class="nav" aria-label="Main">
-    <a class="brand" href="#top"><span class="logo">W</span>Wealtharr</a>
-    <div class="links"><a href="#compare">Strategies</a><a href="#invite">How it works</a></div>
-    <div class="row"><a class="btn g" href="{% url 'login' %}">Sign in</a><a class="btn" href="#invite">Request an invite</a></div>
-  </nav>
-</div>
+{% extends "public/base.html" %}{% load static %}
+{% block title %}Wealtharr · Leveraged ISA rebalancing without the spreadsheet{% endblock %}
+{% block description %}Follow a fixed, rules-based plan in your UK Stocks &amp; Shares ISA. Wealtharr checks prices hourly and tells you exactly what to buy or sell, and when.{% endblock %}
+{% block og_title %}Wealtharr · Skip the spreadsheet{% endblock %}
+{% block og_description %}Compare rules-based strategies on real past prices, then get told exactly what to do and when. No broker connection.{% endblock %}
+{% block path %}/{% endblock %}
+{% block head %}{% if turnstile_required %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}{% endblock %}
+{% block jsonld %},
+{"@type":"WebApplication","name":"Wealtharr","url":"{{ site_url }}/","applicationCategory":"FinanceApplication","operatingSystem":"Web","inLanguage":"en-GB","description":"Tracks a fixed, rules-based investing plan for a UK Stocks & Shares ISA and tells you when to rebalance. Never connects to your broker.","offers":{"@type":"Offer","price":"0","priceCurrency":"GBP"},"publisher":{"@id":"{{ site_url }}/#org"}}{% endblock %}
+{% block content %}
 
-<main id="main">
 <div class="wrap">
   <header class="hero" id="top">
     <div>
@@ -43,11 +32,11 @@
           <p class="tap">Tap the notification</p>
         </div>
         <div data-stage="1" hidden>
-          <div class="screen"><span class="chip wait">To do</span><h2>Growth ran ahead</h2>
+          <div class="screen"><span class="chip wait">To do</span><h3>Growth ran ahead</h3>
             <p class="mut">It beat its 9% quarterly target. Bank the extra in the safe fund.</p></div>
         </div>
         <div data-stage="2" hidden>
-          <div class="screen"><div class="tick" aria-hidden="true">✓</div><h2>Back on target</h2>
+          <div class="screen"><div class="tick" aria-hidden="true">✓</div><h3>Back on target</h3>
             <p class="mut">Nothing to do until 31 Dec. We'll nudge you.</p></div>
         </div>
         <div class="mix" data-mix hidden>
@@ -125,6 +114,7 @@
       <p class="mut tiny gap-top"><strong>Hypothetical, not anyone's real results.</strong> Real daily prices from Yahoo, converted to pounds, replayed through each strategy's fixed rules with no dealing costs or tax.
         <span data-simulated{% if not compare.simulated %} hidden{% endif %}>Before the 3× Nasdaq fund launched, its history is rebuilt from 3× QQQ's daily moves, which can look better than reality.</span>
         Past performance doesn't guarantee future returns.</p>
+      <p class="mut tiny">New to this? <a href="{% url 'guide' '3x-nasdaq-etf-stocks-and-shares-isa' %}">3x Nasdaq ETFs in an ISA</a> · <a href="{% url 'guide' 'volatility-decay-leveraged-etfs' %}">Volatility decay explained</a> · <a href="{% url 'guide' 'quarterly-signal-rebalancing' %}">How quarterly signal rebalancing works</a></p>
     </div>
   </div>
 </section>
@@ -140,7 +130,7 @@
           <button type="button" class="step" aria-pressed="false" data-step="1"><span class="num">2</span><strong>Record what you hold</strong></button>
           <button type="button" class="step" aria-pressed="false" data-step="2"><span class="num">3</span><strong>Follow the nudges</strong></button>
         </div>
-        <p class="mut steptext" data-step-text="0">Each strategy is a fixed set of rules with the exact funds for your account locked in. 9Sig is available now.</p>
+        <p class="mut steptext" data-step-text="0">Each strategy is a fixed set of rules with the exact funds for your account locked in. A quarterly growth-target plan for a UK ISA is available now.</p>
         <p class="mut steptext" data-step-text="1" hidden>Starting from cash? Enter the deposit and you get the exact opening buys. Already invested? Type your shares once.</p>
         <p class="mut steptext" data-step-text="2" hidden>Prices are checked hourly. When action is due you get an email or Discord message with the exact trades, then tap "I did this".</p>
         <div class="row nevers"><span class="chip">No broker connection</span><span class="chip">No automatic trades</span><span class="chip">No rule tinkering</span><span class="chip">No made-up prices</span></div>
@@ -160,11 +150,10 @@
           {% if invite_state == 'thanks' %}Thanks, you're on the list.{% elif invite_state == 'invalid' %}That email address doesn't look right.{% else %}No spam. One email when your invite is ready.{% endif %}</p>
       </form>
     </div>
-    <footer class="foot"><span>© Wealtharr · Private tracker · Not financial advice</span><span>Already have access? <a href="{% url 'login' %}">Sign in</a></span></footer>
   </div>
 </section>
-</main>
+{% endblock %}
+{% block scripts %}
 {{ compare|json_script:"compare-data" }}
 <script src="{% static 'js/home.js' %}" defer></script>
-</body>
-</html>
+{% endblock %}

@@ -44,7 +44,8 @@ class HomepageTests(TestCase):
         self.assertTrue(data["simulated"])
         self.assertLessEqual(len(spy["points"]), 170)
         page = self.client.get("/?range=1y")
-        self.assertContains(page, "9Sig")
+        self.assertContains(page, "Quarterly signal")
+        self.assertNotContains(page, "9Sig")
         self.assertContains(page, 'id="compare-data"')
 
     def test_comparison_inputs_are_snapped_to_the_sliders(self):
