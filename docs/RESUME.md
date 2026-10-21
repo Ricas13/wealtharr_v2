@@ -1,3 +1,9 @@
+## Add strategy layout (21 October 2026)
+
+Branch `feature/add-strategy-layout` from main (after PR #48). Owner asked for the decisions first and the backtest last, with the narrow decisions side by side. The page now shows three cards in a row (1 · Strategy and account, 2 · The funds you'll buy, 3 · Your starting point; two columns under 1200px, stacked under 760px), then one action bar (Go live now + Create strategy), then "How each strategy did in the past". Funds are compact cards instead of a wide table. Form fields, names and behaviour are unchanged.
+
+---
+
 ## Past performance on Add strategy (21 October 2026)
 
 Branch `feature/add-strategy-compare` from main (after PR #47). Owner asked to see the homepage comparison chart when adding a strategy, to check past performance first. The Add strategy page now opens with "How each strategy did in the past" (open by default, collapsible) above the setup form: the same hypothetical Study comparison (sliders, timeframe, tick boxes, linear/log chart, same footnotes), with the strategies' own names (9Sig, All Seasons, ...) because it's signed in; the public homepage keeps generic names. Shared pieces: `templates/partials/compare_card.html`, `static/js/compare.js` (moved out of `home.js`, URL from `data-compare-url`), `static/css/compare.css` (scoped `.cmp`, Add page only). `v2_home.compare(..., real_names=True)` and a login-required `add-strategy/compare.json`. Figures are in pounds whatever broker is picked. Tests: `tracker/test_add_strategy_compare.py`, `browser_tests/test_add_strategy_compare.py`.

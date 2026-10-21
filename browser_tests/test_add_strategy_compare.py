@@ -20,7 +20,7 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
 
     def test_comparison_is_interactive_at_360_and_1280(self):
         shots = os.environ.get("WEALTHARR_SCREENSHOT_DIR")
-        for width in (1280, 360):
+        for width in (1440, 360):
             with self.subTest(width=width):
                 page = self.new_page(width)
                 self.sign_in()
@@ -35,8 +35,15 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 page.get_by_label("Show All Seasons").click()
                 self.assertEqual(page.locator("[data-compare] tr.off").count(), 1)
                 self.assertEqual(page.locator("[data-compare] .chart polyline").count(), 5)
-                # The setup form is still there below it.
+                # The setup choices sit above it: side by side on desktop, stacked on phones.
                 self.assertTrue(page.locator("select[name='strategy']").is_visible())
+                cards = [page.locator(".w2-wizard-card").nth(i).bounding_box() for i in range(3)]
+                chart = page.locator("#past-performance").bounding_box()
+                self.assertLess(max(c["y"] for c in cards), chart["y"])
+                if width > 1200:
+                    self.assertAlmostEqual(cards[0]["y"], cards[2]["y"], delta=2)
+                else:
+                    self.assertLess(cards[0]["y"], cards[2]["y"])
                 if shots:
-                    page.screenshot(path=str(Path(shots) / ("add-compare-%d.png" % width)), full_page=False)
+                    page.screenshot(path=str(Path(shots) / ("add-layout-%d.png" % width)), full_page=True)
                 self.assert_reachable_mobile()

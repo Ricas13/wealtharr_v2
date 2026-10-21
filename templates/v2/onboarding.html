@@ -1,26 +1,11 @@
-<details class="w2-panel w2-space-top cmp" open>
-  <summary class="cmp-summary"><span><strong>How each strategy did in the past</strong> <span class="w2-muted">· hypothetical, from the same history as each Study tab</span></span></summary>
-  <div class="row between gap-top">
-    <p class="mut flush">Tick the ones you want to see and try your own amounts. Figures are in pounds.</p>
-    <div class="seg" role="group" aria-label="Timeframe">
-      {% for key, label in compare_frames %}<button type="button" data-range="{{ key }}" aria-pressed="{% if key == compare.range %}true{% else %}false{% endif %}"{% if key == compare.range %} class="on"{% endif %}>{{ label }}</button>{% endfor %}
-    </div>
-  </div>
-  <div class="gap-top" data-compare data-compare-url="{% url 'v2_compare_json' %}">
-    {% include 'partials/compare_card.html' with signal_name='9Sig strategy' %}
-  </div>
-  {{ compare|json_script:"compare-data" }}
-</details>
-
-<section class="w2-panel w2-space-top w2-wizard" aria-labelledby="w2-wizard-title">
-  <div class="w2-section-heading">
-    <div><h2 id="w2-wizard-title">Add a strategy</h2>
-      <p class="w2-muted">One page, about two minutes. Wealtharr never connects to your broker or places orders.</p></div>
-  </div>
+<section class="w2-space-top w2-wizard w2-wizard-wide" aria-labelledby="w2-wizard-title">
+  <h2 class="w2-sr-only" id="w2-wizard-title">Add a strategy</h2>
+  <p class="w2-muted w2-wizard-intro">Three choices, about two minutes. Wealtharr never connects to your broker or places orders. Past performance of every strategy is below.</p>
   {% if wizard_error %}<div class="w2-form-error" role="alert">{{ wizard_error }}</div>{% endif %}
   <form action="{% url 'v2_add_strategy' %}" method="post" class="w2-wizard-form" novalidate>
     {% csrf_token %}
-
+    <div class="w2-wizard-cards">
+    <div class="w2-panel w2-wizard-card">
     <h3>1 · Strategy and account</h3>
     <div class="w2-form-grid">
       <label class="w2-field">Strategy
@@ -39,22 +24,24 @@
       </div>
     </fieldset>
     {% if wizard_duplicate %}<p class="w2-note">You already run this strategy in a {{ wizard.type }}. This one gets its own account and ledger.</p>{% endif %}
+    </div>
 
+    <div class="w2-panel w2-wizard-card">
     <h3>2 · The funds you'll buy (fixed)</h3>
     <noscript><p class="w2-note">Changed the strategy or broker? Show the funds for:{% for offer in wizard_offers %}{% if offer.enabled %} <a href="{% url 'v2_add_strategy' %}?strategy={{ offer.key }}&amp;platform={{ wizard.platform }}">{{ offer.title }}</a>{% endif %}{% endfor %}</p></noscript>
     {% if not wizard_lines %}<p class="w2-note" role="status">No reviewed funds for this strategy at this broker yet. Pick another broker or strategy.</p>{% endif %}
-    <div class="w2-table-wrap"><table class="w2-table">
-      <thead><tr><th>Role</th><th>Target</th><th>Fund</th><th>Ticker</th><th>Evidence</th></tr></thead>
-      <tbody>{% for line in wizard_lines %}
-        <tr><td>{{ line.role_label }}</td><td>{% if line.weight %}{{ line.weight_pct|floatformat:"-1" }}%{% else %}By signal{% endif %}</td>
-          <td class="w2-wrap">{{ line.name }} <small class="w2-muted">{{ line.isin }}</small></td>
-          <td>{{ line.ticker }}</td>
-          <td><a href="{{ line.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer ↗</a> <a href="{{ line.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">{{ line.broker_name }} ↗</a></td></tr>
-      {% endfor %}</tbody>
-    </table></div>
+    <ul class="w2-fund-list">{% for line in wizard_lines %}
+      <li>
+        <div class="w2-fund-head"><span>{{ line.role_label }} · <strong>{% if line.weight %}{{ line.weight_pct|floatformat:"-1" }}%{% else %}By signal{% endif %}</strong></span><span class="w2-fund-ticker">{{ line.ticker }}</span></div>
+        <div class="w2-fund-name">{{ line.name }} <small class="w2-muted">{{ line.isin }}</small></div>
+        <div class="w2-fund-links"><a href="{{ line.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer ↗</a> <a href="{{ line.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">{{ line.broker_name }} ↗</a></div>
+      </li>
+    {% endfor %}</ul>
     <label class="w2-check w2-space-top"><input type="checkbox" name="ack" value="yes" {% if wizard.ack %}checked{% endif %} required>
       <span>I checked I can buy these exact funds in my own {{ wizard_lines.0.broker_name|default:"broker" }} account.</span></label>
+    </div>
 
+    <div class="w2-panel w2-wizard-card">
     <h3>3 · Your starting point</h3>
     <div class="w2-form-grid">
       <label class="w2-field">Name in the menu
@@ -92,16 +79,32 @@
       </div>
       {% endfor %}
     </div>
-    <label class="w2-field" style="max-width:320px">Monthly top-up you plan ({{ cur }}, optional)
+    <label class="w2-field">Monthly top-up you plan ({{ cur }}, optional)
       <input class="w2-input" name="monthly" inputmode="decimal" type="number" min="0" step="0.01" value="{{ wizard_monthly }}" placeholder="e.g. 500">
       <small class="w2-muted">Used for a reminder if a month's deposit hasn't been recorded. Change it any time.</small></label>
     {% if wizard.type == 'ISA' and wizard_tax_year_verified %}<p class="w2-note">ISA allowance (advisory): £{{ wizard_known_isa|floatformat:"2g" }} of £{{ wizard_isa_limit|floatformat:0 }} recorded in Wealtharr this tax year, not counting other ISAs.</p>
     {% elif wizard.type == 'GIA' or wizard.type == 'BROKERAGE' or wizard.type == 'DEPOT' %}<p class="w2-note">This account type may incur dividend and capital-gains tax. This is tracking, not tax advice.</p>{% endif %}
+    </div>
+    </div>
 
-    <label class="w2-check w2-space-top"><input type="checkbox" name="go_live" value="yes" {% if wizard_go_live %}checked{% endif %}>
-      <span><strong>Go live now</strong> · check prices hourly and tell me when to act. Alerts use your Alerts &amp; settings; change them per strategy later.</span></label>
-    <div class="w2-wizard-actions">
+    <div class="w2-panel w2-wizard-actions">
+      <label class="w2-check"><input type="checkbox" name="go_live" value="yes" {% if wizard_go_live %}checked{% endif %}>
+        <span><strong>Go live now</strong> · check prices hourly and tell me when to act. Alerts use your Alerts &amp; settings; change them per strategy later.</span></label>
       <button type="submit" class="w2-button w2-button-primary">Create strategy</button>
     </div>
   </form>
 </section>
+
+<details class="w2-panel w2-space-top cmp" open id="past-performance">
+  <summary class="cmp-summary"><span><strong>How each strategy did in the past</strong> <span class="w2-muted">· hypothetical, from the same history as each Study tab</span></span></summary>
+  <div class="row between gap-top">
+    <p class="mut flush">Tick the ones you want to see and try your own amounts. Figures are in pounds.</p>
+    <div class="seg" role="group" aria-label="Timeframe">
+      {% for key, label in compare_frames %}<button type="button" data-range="{{ key }}" aria-pressed="{% if key == compare.range %}true{% else %}false{% endif %}"{% if key == compare.range %} class="on"{% endif %}>{{ label }}</button>{% endfor %}
+    </div>
+  </div>
+  <div class="gap-top" data-compare data-compare-url="{% url 'v2_compare_json' %}">
+    {% include 'partials/compare_card.html' with signal_name='9Sig strategy' %}
+  </div>
+  {{ compare|json_script:"compare-data" }}
+</details>
