@@ -73,7 +73,7 @@ def yearly_review(instance, *, key, rules, cadence="yearly"):
     return {"status": "ok"}
 
 
-def yearly_rebalance_plugin(key, rules, *, study=None, cadence="yearly"):
+def yearly_rebalance_plugin(key, rules, *, study=None, cadence="yearly", by_version=None):
     last_before, next_on_or_after, _ = SCHEDULES[cadence]
     return StrategyModule(
         key=key,
@@ -83,4 +83,5 @@ def yearly_rebalance_plugin(key, rules, *, study=None, cadence="yearly"):
         allocation_label="Target",
         cadence_word=cadence,
         study=study,
+        by_version=by_version or {},
     )

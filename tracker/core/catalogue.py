@@ -48,9 +48,11 @@ _OFFERS = {
         "Quarterly decisions use the versioned 9Sig rules.", True,
     ),
     ALL_WEATHER: StrategyOffer(
-        ALL_WEATHER, "All Weather", "Moderate risk", "Yearly",
-        "Five funds at the published weights: stocks, long-term and intermediate government "
-        "bonds, gold and commodities, rebalanced once a year. Not affiliated with Bridgewater.", True,
+        ALL_WEATHER, "All Seasons", "Moderate risk", "Yearly",
+        "Five funds at the published All Seasons weights (Tony Robbins' retail version of Ray "
+        "Dalio's ideas, not Bridgewater's All Weather fund): stocks, long-term and intermediate "
+        "government bonds, gold and commodities, rebalanced once a year. Not affiliated with "
+        "Robbins, Dalio or Bridgewater.", True,
     ),
     GOLDEN_BUTTERFLY: StrategyOffer(
         GOLDEN_BUTTERFLY, "Golden Butterfly", "Moderate risk", "Yearly",

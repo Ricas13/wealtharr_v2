@@ -124,7 +124,7 @@ class AllWeatherEndToEndTests(TestCase):
         from tracker.review_autofinish import auto_finish_reviews
         from tracker.strategies.instruments import symbols
         start = self.year_end - timedelta(days=180)
-        self.assertContains(self.client.get(reverse("v2_add_strategy")), "All Weather")
+        self.assertContains(self.client.get(reverse("v2_add_strategy")), "All Seasons")
         chosen = self.client.get(reverse("v2_add_strategy") + "?strategy=all-weather")
         for isin in ("IE00BFMXXD54", "IE00B6YX5L24", "IE00B1FZSB30", "IE00B4ND3602", "IE00BD6FTQ80"):
             self.assertContains(chosen, isin)
@@ -137,7 +137,7 @@ class AllWeatherEndToEndTests(TestCase):
         self.assertFalse(strategy.tracking_only)
         self.assertEqual(symbols(strategy), ("VUAG.L", "GLTL.L", "IGLT.L", "SGLN.L", "CMOP.L"))
         page = self.client.get(reverse("v2_instance_page", args=[strategy.pk, "strategy"]))
-        self.assertContains(page, "Not affiliated with Bridgewater")
+        self.assertContains(page, "Ray Dalio or Bridgewater Associates")
         # Opening buys at the weights (prices in pounds).
         buy = {"VUAG.L": ("30", "100"), "GLTL.L": ("125", "32"), "IGLT.L": ("150", "10"),
                "SGLN.L": ("12.5", "60"), "CMOP.L": ("30", "25")}

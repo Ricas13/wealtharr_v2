@@ -12,7 +12,8 @@ from tracker.strategies.dual_momentum.v1 import VERSION as DUAL_MOMENTUM_VERSION
 from tracker.strategies.golden_butterfly.v1 import (
     VERSION as GOLDEN_BUTTERFLY_VERSION, WEIGHTS as GOLDEN_BUTTERFLY_WEIGHTS,
 )
-from tracker.strategies.permanent_portfolio.v1 import (
+from tracker.strategies.permanent_portfolio.v1 import VERSION as PERMANENT_V1_VERSION
+from tracker.strategies.permanent_portfolio.v2 import (
     VERSION as PERMANENT_VERSION, WEIGHTS as PERMANENT_WEIGHTS,
 )
 from tracker.strategies.nine_sig.v2 import VERSION as NINE_SIG_VERSION
@@ -35,13 +36,17 @@ class StrategyDescription:
     # Rule version for new instances per account currency, where it differs
     # from ``version`` (the pound-account version): ((currency, version), ...).
     versions_by_currency: tuple[tuple[str, str], ...] = ()
+    # Superseded versions that existing instances may still be pinned to (no
+    # new instance pins them; changing an instance needs an explicit upgrade).
+    earlier_versions: tuple[str, ...] = ()
 
     def version_for(self, currency="GBP"):
         return dict(self.versions_by_currency).get(currency, self.version)
 
     def accepts(self, version):
         """A released rule version an instance may be pinned to."""
-        return version == self.version or version in dict(self.versions_by_currency).values()
+        return (version == self.version or version in dict(self.versions_by_currency).values()
+                or version in self.earlier_versions)
 
 
 _RELEASED = {
@@ -79,8 +84,10 @@ _RELEASED = {
     "all-weather": StrategyDescription(
         key="all-weather",
         version=ALL_WEATHER_VERSION,
-        title="All Weather",
-        summary=("The published All Weather mix, put back to its weights once a year: stocks, "
+        title="All Seasons",
+        summary=("The All Seasons mix as published in Tony Robbins' MONEY: Master the Game (2014), "
+                 "a simplified retail version of Ray Dalio's ideas, not Bridgewater's leveraged "
+                 "institutional All Weather fund. Put back to its weights once a year: stocks, "
                  "long-term and intermediate government bonds, gold and broad commodities. "
                  "All transactions are made by you."),
         cadence="One review after each calendar year end.",
@@ -95,7 +102,7 @@ _RELEASED = {
         ),
         role_targets=ALL_WEATHER_WEIGHTS,
         target_explanation="These weights are restored at every yearly review.",
-        caution=("Not affiliated with Bridgewater Associates. The rules are the published ones; the funds "
+        caution=("Not affiliated with Tony Robbins, Ray Dalio or Bridgewater Associates. The rules are the published ones; the funds "
                  "are local equivalents, so results differ from the US original (gilts instead of US "
                  "Treasuries, an S&P 500 fund instead of the total US market). Your own account's "
                  "access to each fund is unverified."),
@@ -107,11 +114,11 @@ _RELEASED = {
         version=GOLDEN_BUTTERFLY_VERSION,
         title="Golden Butterfly",
         summary=("The published Golden Butterfly mix, five equal parts put back to 20% each once a "
-                 "year: total stock market, small-cap value, long-term and short-term government "
+                 "year: US large-cap stocks, small-cap value, long-term and short-term government "
                  "bonds, and gold. All transactions are made by you."),
         cadence="One review after each calendar year end.",
         rules=(
-            "Target weights, as published: 20% US total stock market, 20% US small-cap value, 20% long-term government bonds, 20% short-term government bonds, 20% gold.",
+            "Target weights, as published: 20% US large-cap stocks (Portfolio Charts lists large-cap blend; earlier write-ups use the total market), 20% US small-cap value, 20% long-term government bonds, 20% short-term government bonds, 20% gold.",
             "The original uses US Treasuries; in a UK account the bond roles use the UK equivalent, gilts. Each fund is shown with its evidence at setup.",
             "After each 31 December, holdings are valued at verified year-end GBP closes.",
             "Funds above their weight are sold back to it; the proceeds and any cash buy the funds below their weight.",
@@ -122,8 +129,8 @@ _RELEASED = {
         role_targets=GOLDEN_BUTTERFLY_WEIGHTS,
         target_explanation="These weights are restored at every yearly review.",
         caution=("Not affiliated with Portfolio Charts. The rules are the published ones; the funds are "
-                 "local equivalents, so results differ from the US original (gilts instead of US "
-                 "Treasuries, an S&P 500 fund instead of the total US market). Your own account's "
+                 "local equivalents, so results differ from the US original (outside the US, local "
+                 "government bonds instead of US Treasuries). Your own account's "
                  "access to each fund is unverified."),
         release_label="golden-butterfly@1",
         version_history=("golden-butterfly@1 (golden_butterfly.v1.0.0): yearly rebalance to five equal weights.",),
@@ -159,12 +166,12 @@ _RELEASED = {
         version=PERMANENT_VERSION,
         title="Permanent Portfolio",
         summary=("Harry Browne's Permanent Portfolio as published: 25% each in stocks, long-term "
-                 "government bonds, cash and gold, left alone until one part drifts too far. "
+                 "government bonds, cash and gold, left alone unless a yearly check finds one part has drifted too far. "
                  "All transactions are made by you."),
-        cadence="A band check after each calendar month end; trades only when a part is outside 15-35%.",
+        cadence="A band check once a year, after 31 December; trades only when a part is outside 15-35%.",
         rules=(
             "Target weights, as published: 25% stocks, 25% long-term government bonds, 25% cash (Treasury bills), 25% gold.",
-            "After each month end, each part's share is measured at verified closes, counting uninvested cash in the total.",
+            "Once a year, after 31 December, as Browne wrote, each part's share is measured at verified closes, counting uninvested cash in the total.",
             "If every part is between 15% and 35%, nothing happens.",
             "If any part is below 15% or above 35%, all four are put back to 25%: sells first, then buys, never borrowing.",
             "The original uses US shares, 30-year Treasuries and T-bills. In a UK account the bonds are long gilts and cash is a sterling ultrashort bond fund; in a euro account, long euro government bonds and an overnight-rate fund. Each fund is shown with its evidence at setup.",
@@ -177,8 +184,13 @@ _RELEASED = {
                  "the funds are local equivalents (an S&P 500 fund for the US market, and outside the US "
                  "a bond-based cash fund for T-bills), so results differ from the original. Your own "
                  "account's access to each fund is unverified."),
-        release_label="permanent-portfolio@1",
-        version_history=("permanent-portfolio@1 (permanent_portfolio.v1.0.0): 25% each, 15-35% bands.",),
+        release_label="permanent-portfolio@2",
+        version_history=(
+            "permanent-portfolio@1 (permanent_portfolio.v1.0.0): 25% each, 15-35% bands, checked after each month end.",
+            "permanent-portfolio@2 (permanent_portfolio.v2.0.0): the same bands, checked once a year as Browne "
+            "wrote. Strategies already pinned to version 1 keep the monthly check until explicitly upgraded.",
+        ),
+        earlier_versions=(PERMANENT_V1_VERSION,),
     ),
 }
 STRATEGIES = MappingProxyType(_RELEASED)
@@ -215,8 +227,15 @@ def module_for_key(key):
 
 
 def module_for(instance):
-    """The plug-in for a strategy instance, or None for an unknown strategy."""
-    return module_for_key(getattr(instance, "strategy_key", "") or instance.preset.slug)
+    """The plug-in for a strategy instance, or None for an unknown strategy.
+
+    An instance pinned to an older rule version the plug-in still lists gets
+    that version's plug-in, so its schedule and reviews don't change under it.
+    """
+    plugin = module_for_key(getattr(instance, "strategy_key", "") or instance.preset.slug)
+    if plugin is None:
+        return None
+    return plugin.by_version.get(getattr(instance, "strategy_version", ""), plugin)
 
 
 def plugin_keys():

@@ -32,6 +32,11 @@ at setup) and gives its plug-in `current_weights` for the opening buy and alloca
    - Optional: `reference_symbols` (index series the rules need), extra
      `dashboard_template` and `dashboard_context`, `supports_reset`,
      `review_detail` and `review_export` ("How this was calculated"), `study`.
+   - Changing a released strategy's behaviour (even only its schedule) needs a
+     new rule version module. List the old version's plug-in in `by_version`
+     and the old version in the description's `earlier_versions`, so instances
+     already pinned to it keep its schedule, reviews and Study until explicitly
+     upgraded (see `permanent_portfolio/plugin.py`).
 4. **Funds** (CLAUDE.md boundary 2), in `tracker/core/catalogue.py`: one `Listing`
    per exact trading line (ticker, ISIN, raw quote unit GBX or GBP, issuer link)
    with a `brokers` map of broker key → evidence URL, then list each role's
@@ -47,6 +52,11 @@ at setup) and gives its plug-in `current_weights` for the opening buy and alloca
    per role (the fund, and a stand-in for before it existed, flagged on the page),
    and adds the symbols to `study_data.STUDY_SYMBOLS`. A test fails if a released
    strategy has no Study.
+   Study data rules: prices are never carried forward more than a week (days
+   without a fresh price for every fund are left out, so a Study ends on its
+   last fresh day); downloads drop an isolated bad row and refuse a lasting
+   implausible one-day move; any owner-confirmed step the Study assumes (such
+   as a reset) is stated on the page and counted per run.
 6. **Tests**: pure rule tests, plus an end-to-end test like the one in
    `test_strategy_plugins.py`.
 

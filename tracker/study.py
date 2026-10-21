@@ -9,6 +9,11 @@ Everything is in pounds; US funds are converted with daily GBP/USD rates.
 Before LQQ3 existed, growth is rebuilt from QQQ: three times its daily return,
 less the fund's ongoing charge, converted to pounds. Before ERNS existed, the
 safe sleeve is held as cash at 0%. Periods that include either are flagged.
+The 100%-up rule reads real TQQQ closes once TQQQ existed, as live reviews do.
+A price is never carried forward more than a week: days without a fresh
+price for every fund are left out, so the study ends on the last day all its
+prices are fresh. Resets are assumed confirmed and filled at the quarter close
+(live tracking waits for the owner), and each run reports how many it made.
 """
 from bisect import bisect_left
 from dataclasses import dataclass, field
@@ -32,7 +37,7 @@ SERIES = (("nine_sig", "9Sig"), ("hold", "Buy & hold (100% growth)"),
 D = Decimal
 TITLE = "9Sig"
 PRIMARY = "nine_sig"
-NEEDS = "QQQ, SPY, VTI, GBP/USD, LQQ3 and ERNS"
+NEEDS = "QQQ, TQQQ, SPY, VTI, GBP/USD, LQQ3 and ERNS"
 
 
 @dataclass
@@ -42,10 +47,11 @@ class StudyData:
     safe: list = field(default_factory=list)       # GBP per safe unit
     spy: list = field(default_factory=list)        # GBP, dividends reinvested
     vti: list = field(default_factory=list)        # GBP, None before launch
-    reference: list = field(default_factory=list)  # (date, USD) 3x Nasdaq, for the 100%-up rule
+    reference: list = field(default_factory=list)  # (date, USD) TQQQ, rebuilt before launch, for 100%-up
     spy_usd: list = field(default_factory=list)    # (date, USD close), for 30 Down
     growth_real_from: date | None = None
     safe_real_from: date | None = None
+    reference_real_from: date | None = None
     lines: "Lines | None" = None  # which funds and currency this data is for
 
     @property
@@ -74,7 +80,7 @@ def _series(symbol):
 
 def load_data(lines=GBP_LINES):
     """Build the daily series in the account currency on US trading days that have a rate."""
-    qqq, spy, vti = _series("QQQ"), _series("SPY"), _series("VTI")
+    qqq, spy, vti, tqqq = _series("QQQ"), _series("SPY"), _series("VTI"), _series("TQQQ")
     lqq3, erns = _series(lines.growth), _series(lines.safe)
     # US dollars per unit of account currency (1 for a dollar account).
     fx = ({day: (1.0, 1.0) for day in qqq} if lines.currency == "USD"
@@ -84,16 +90,17 @@ def load_data(lines=GBP_LINES):
         return data
     fx_days = sorted(fx)
     lq_days, er_days = sorted(lqq3), sorted(erns)
+    vti_days, tq_days = sorted(vti), sorted(tqqq)
 
-    def last_on_or_before(days, values, day, limit=7):
+    def last_on_or_before(days, values, day, limit=7, column=1):
         i = bisect_left(days, day + timedelta(days=1)) - 1
         if i < 0 or (day - days[i]).days > limit:
             return None
-        return values[days[i]][1]
+        return values[days[i]][column]
 
     synthetic, reference = [], []
     level, ref = 100.0, 100.0
-    prev, last_vti = None, None
+    prev = None
     for day in sorted(qqq):
         rate = last_on_or_before(fx_days, fx, day)
         spy_px = spy.get(day)
@@ -110,12 +117,10 @@ def load_data(lines=GBP_LINES):
         synthetic.append(level)
         reference.append((day, D(str(round(ref, 6)))))
         data.spy.append(spy_px[1] / rate)
-        vti_px = vti.get(day)
-        if vti_px:
-            last_vti = vti_px[1]
-        data.vti.append(last_vti / rate if last_vti else None)
+        vti_px = last_on_or_before(vti_days, vti, day)
+        data.vti.append(vti_px / rate if vti_px else None)
         data.spy_usd.append((day, D(str(spy_px[0]))))
-    data.reference = reference
+    data.reference = _real_reference(reference, tqqq, tq_days, data)
     # Splice the real growth fund on from its first price; scale the rebuilt
     # history so the two join without a jump.
     growth = synthetic[:]
@@ -128,8 +133,7 @@ def load_data(lines=GBP_LINES):
             for i in range(start):
                 growth[i] = synthetic[i] * scale
             for i in range(start, len(data.days)):
-                real = last_on_or_before(lq_days, lqq3, data.days[i])
-                growth[i] = real if real else growth[i - 1]
+                growth[i] = last_on_or_before(lq_days, lqq3, data.days[i])
     data.growth = growth
     safe = [1.0] * len(data.days)
     if er_days:
@@ -141,9 +145,49 @@ def load_data(lines=GBP_LINES):
                 if i < start:
                     safe[i] = first_real
                 else:
-                    real = last_on_or_before(er_days, erns, data.days[i])
-                    safe[i] = real if real else safe[i - 1]
+                    safe[i] = last_on_or_before(er_days, erns, data.days[i])
     data.safe = safe
+    return _fresh_days_only(data)
+
+
+def _real_reference(rebuilt, tqqq, tq_days, data):
+    """TQQQ's own closes from its first price, the rebuilt line scaled to join it before.
+
+    Live reviews compare TQQQ quarter closes; the rebuilt line only stands in
+    before TQQQ existed. Days with no TQQQ close within a week are left out.
+    """
+    if not tq_days:
+        return rebuilt
+    start = next((i for i, (day, _) in enumerate(rebuilt) if day >= tq_days[0]), None)
+    if start is None:
+        return rebuilt
+    data.reference_real_from = rebuilt[start][0]
+
+    def close_on(day):
+        i = bisect_left(tq_days, day + timedelta(days=1)) - 1
+        if i < 0 or (day - tq_days[i]).days > 7:
+            return None
+        return D(str(tqqq[tq_days[i]][0]))
+
+    first = close_on(rebuilt[start][0])
+    scale = first / rebuilt[start][1]
+    out = [(day, (value * scale).quantize(D("0.000001"))) for day, value in rebuilt[:start]]
+    for day, _ in rebuilt[start:]:
+        close = close_on(day)
+        if close:
+            out.append((day, close))
+    return out
+
+
+def _fresh_days_only(data):
+    """Leave out days where a fund has no price from the last week (never carry one forward)."""
+    keep = [i for i in range(len(data.days))
+            if data.growth[i] is not None and data.safe[i] is not None]
+    if len(keep) == len(data.days):
+        return data
+    for name in ("days", "growth", "safe", "spy", "vti"):
+        values = getattr(data, name)
+        setattr(data, name, [values[i] for i in keep])
     return data
 
 
@@ -170,6 +214,8 @@ def _quarter_end(day):
 def _buy_and_hold(prices, days, s, amount, monthly):
     if prices[s] is None:
         return None
+    if any(p is None for p in prices[s:]):
+        return None  # a gap of over a week: no comparison rather than a stale one
     units, put_in, values, flows = amount / prices[s], amount, [], [(days[s], amount)]
     for i in range(s, len(days)):
         if i > s and _new_month(days, i) and monthly:
@@ -187,7 +233,7 @@ def _nine_sig(data, s, amount, monthly):
     reserve = _floor_qty(D(amount) * D("0.4"), s0)
     cash = D(amount) - equity * g0 - reserve * s0
     start_day, start_cost = days[s], equity * g0
-    contributions, down_q, skipped, trades = [], None, 0, 0
+    contributions, down_q, skipped, trades, resets = [], None, 0, 0, 0
     flows, values = [(days[s], amount)], []
     for i in range(s, len(days)):
         day = days[i]
@@ -233,11 +279,14 @@ def _nine_sig(data, s, amount, monthly):
                         trades += 1
                 cash = max(cash, D("0"))
                 if plan.get("reset_reason"):
-                    # A completed 60/40 reset becomes the new starting point.
+                    # Modelling assumption: the owner confirms the 60/40 reset
+                    # and it fills at the quarter close; it becomes the new
+                    # starting point. Live tracking waits for that confirmation.
                     start_day, start_cost = qend, equity * g
                     contributions, down_q, skipped = [], None, 0
+                    resets += 1
         values.append(float(equity * g + reserve * sf + cash))
-    return {"values": values, "flows": flows, "trades": trades}
+    return {"values": values, "flows": flows, "trades": trades, "resets": resets}
 
 
 def _xirr(flows, end, value):
@@ -309,6 +358,7 @@ def run(data, key, amount, monthly):
         or data.safe_real_from is None,
         "dates": data.days[s:],
         "simulated_notes": _simulated_notes(data, start),
+        "assumed_resets": raw["nine_sig"]["resets"],
     }
 
 
@@ -321,6 +371,9 @@ def _simulated_notes(data, start):
     if data.safe_real_from is None or start < data.safe_real_from:
         notes.append("Before %s, the safe sleeve is cash at 0%%." % _day(
             data.safe_real_from, lines.safe_name + " data"))
+    if data.reference_real_from is None or start < data.reference_real_from:
+        notes.append("Before %s, the 100%%-up check uses the rebuilt 3x line instead of TQQQ." % _day(
+            data.reference_real_from, "TQQQ data"))
     return notes
 
 
@@ -335,7 +388,10 @@ def how_it_works(data):
         ("9Sig starts 60%% growth (%s) / 40%% safe (%s) and runs the live quarterly rule at each " % (
             lines.growth_name, lines.safe_name)) +
         "quarter end: the 9% signal line, half of new money, the large-buy throttle, 30 Down (from SPY), "
-        "the 100%-up reset and 60/40 resets.",
+        "the 100%-up reset (from TQQQ's quarter closes) and 60/40 resets.",
+        "Assumption: every 60/40 reset is treated as confirmed and filled at that quarter's close. In live "
+        "tracking a 100%-up reset is only a review warning and every reset waits for you to confirm it, "
+        "so real results can differ. The number of resets in each run is shown with its results.",
         "Monthly top-ups arrive on the first trading day of each month. In 9Sig they wait as cash for "
         "the next quarterly review; in the others they're invested that day.",
         ("All values are in %s. SPY, VTI and QQQ include reinvested dividends%s. Trades fill at that "
@@ -344,6 +400,8 @@ def how_it_works(data):
              " and are converted with daily %s/USD rates" % lines.currency)),
         "Rebuilt history is an estimate: real leveraged funds also pay borrowing and swap costs, so early "
         "periods may look better than reality. Buy & hold puts everything, and every top-up, into the growth fund.",
+        "A price is never carried forward more than a week. Days without a fresh price for every fund are "
+        "left out, so the study ends on the last day all its prices are fresh.",
     )
 
 
@@ -358,7 +416,7 @@ class NineSigStudy:
     def __init__(self, lines):
         self.lines = lines
         self.CURRENCY = lines.currency
-        self.NEEDS = "QQQ, SPY, VTI, %s%s and %s" % (
+        self.NEEDS = "QQQ, TQQQ, SPY, VTI, %s%s and %s" % (
             "" if lines.currency == "USD" else "%s/USD, " % lines.currency, lines.growth_name, lines.safe_name)
 
     def load_data(self):

@@ -42,3 +42,7 @@ class StrategyModule:
     # "How this was calculated" for a saved review, and its CSV. (instance, signal) -> ...
     review_detail: Callable | None = None
     review_export: Callable | None = None
+    # Plug-ins for older rule versions an instance may still be pinned to:
+    # {version: StrategyModule}. Instances pinned to a listed version use that
+    # plug-in (its schedule, review and Study) until explicitly upgraded.
+    by_version: dict = field(default_factory=dict)

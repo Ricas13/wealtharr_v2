@@ -95,4 +95,6 @@ class MomentumStudy(FixedWeightStudy):
             "dealing costs or tax." % (money, fx),
             "The first 12 months of data are only used to measure momentum. Before a fund existed, its "
             "role follows a stand-in, flagged on the page.",
+            "A price is never carried forward more than a week. Days without a fresh price for every fund "
+            "are left out, so the study ends on the last day all its prices are fresh.",
         )

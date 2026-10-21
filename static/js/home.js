@@ -149,7 +149,15 @@
     box.querySelector("[data-simulated]").hidden = !state.simulated;
     var other = box.querySelector("[data-simulated-other]");
     if (other) other.hidden = !state.simulated_other;
+    var leftOut = box.querySelector("[data-left-out]");
+    if (leftOut) {
+      leftOut.hidden = !(state.left_out && state.left_out.length);
+      text("[data-left-out-names]", (state.left_out || []).join(", "));
+    }
+    var period = box.querySelector("[data-period-wrap]");
+    if (period) period.hidden = !state.ready;
     if (!state.ready) return;
+    text("[data-period]", state.period);
     var ticks = box.querySelector("[data-ticks]");
     ticks.textContent = "";
     state.ticks.forEach(function (t) { ticks.appendChild(cell("span", "", t)); });

@@ -68,6 +68,9 @@ STUDY_SYMBOLS = {
 }
 FIRST_DAY = date(2000, 1, 1)
 EIGHT = Decimal("0.00000001")
+# Bounds for one day's close relative to the previous one (see _check_jumps).
+MIN_DAY_RATIO = Decimal("0.25")
+MAX_DAY_RATIO = Decimal("4")
 
 
 def fetch_study_chart(symbol, since):
@@ -98,20 +101,53 @@ def fetch_study_chart(symbol, since):
     if chart.get("meta", {}).get("currency") not in expected:
         raise ValueError("Unexpected quote currency for %s" % symbol)
     indicators = chart.get("indicators") or {}
+    stamps = chart.get("timestamp") or []
     closes = (indicators.get("quote") or [{}])[0].get("close") or []
     adjusted = (indicators.get("adjclose") or [{}])[0].get("adjclose") or closes
+    if not len(stamps) == len(closes) == len(adjusted):
+        raise ValueError("Yahoo's dates and closes for %s don't line up" % symbol)
     rows = {}
-    for epoch, close, adj in zip(chart.get("timestamp") or [], closes, adjusted):
-        if close is None:
+    for epoch, raw_close, raw_adj in zip(stamps, closes, adjusted):
+        if raw_close is None:
             continue
         day = datetime.fromtimestamp(epoch, tz=utc_timezone.utc).date()
-        close = (Decimal(str(close)) / divisor).quantize(EIGHT)
-        adj = (Decimal(str(adj if adj is not None else close)) / divisor).quantize(EIGHT)
+        # Convert each raw (quoted-unit) value once; a missing adjusted close
+        # falls back to the raw close before the unit conversion.
+        close = (Decimal(str(raw_close)) / divisor).quantize(EIGHT)
+        adj = (Decimal(str(raw_adj if raw_adj is not None else raw_close)) / divisor).quantize(EIGHT)
         if close > 0 and adj > 0 and day <= timezone.localdate():
             rows[day] = (close, adj)
     if not rows:
         raise ValueError("No usable daily closes for %s" % symbol)
-    return sorted((day, c, a) for day, (c, a) in rows.items())
+    return _without_glitches(symbol, sorted((day, c, a) for day, (c, a) in rows.items()))
+
+
+def _plausible(before, after):
+    return all(MIN_DAY_RATIO <= a / b <= MAX_DAY_RATIO for b, a in zip(before[1:], after[1:]))
+
+
+def _without_glitches(symbol, rows):
+    """Drop isolated bad rows; refuse a history with a lasting implausible jump.
+
+    No listed fund here closes under a quarter or over four times its previous
+    close in one day; a pence/pounds mix-up is a hundredfold move. A single
+    row out of line with both neighbours (which agree with each other) is a
+    data glitch and is left out. A jump that persists is refused, so the
+    stored history stays as it was.
+    """
+    clean = [rows[0]]
+    for n, row in enumerate(rows[1:], start=1):
+        if _plausible(clean[-1], row):
+            clean.append(row)
+            continue
+        following = rows[n + 1] if n + 1 < len(rows) else None
+        if following is None or _plausible(clean[-1], following):
+            continue  # an isolated glitch: leave this row out
+        if len(clean) == 1 and _plausible(row, following):
+            clean = [row]  # the first row was the glitch
+            continue
+        raise ValueError("Implausible one-day move for %s on %s" % (symbol, row[0].isoformat()))
+    return clean
 
 
 def sync_study_prices(*, fetch=fetch_study_chart, force=False):
