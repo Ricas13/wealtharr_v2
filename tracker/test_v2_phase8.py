@@ -53,54 +53,27 @@ class V2OnlyRoutingTests(TestCase):
         self.add()
         self.assertRedirects(self.client.get("/"),reverse("v2_overview"),fetch_redirect_response=False)
 
-    def test_legacy_gets_permanent_and_posts_never_execute(self):
+    def test_retired_addresses_are_gone_and_posts_never_execute(self):
         one = self.add()
         self.client.force_login(self.owner)
         old = ["/cockpit/", "/cockpit/history/", "/cockpit/ledger/",
-               "/cockpit/strategy/", "/cockpit/settings/",
+               "/cockpit/strategy/", "/cockpit/settings/", "/cockpit/rebalance/1/",
                "/app/", "/app/accounts/", "/app/settings/",
                "/app/strategies/%s/" % one.pk,
                "/app/strategies/%s/ledger/" % one.pk]
         for url in old:
             with self.subTest(url=url):
-                r = self.client.get(url)
-                self.assertEqual(r.status_code,301)
-                self.assertIn(r["Location"].split("?")[0],
-                    ("/overview/","/settings/","/s/%s/today/"%one.pk,
-                     "/s/%s/history/"%one.pk,"/s/%s/ledger/"%one.pk,
-                     "/s/%s/strategy/"%one.pk))
-                self.assertEqual(self.client.post(url,{"amount":"9999"}).status_code,405)
-        self.assertEqual(one.ledger.count(),0)
+                self.assertEqual(self.client.get(url).status_code, 404)
+                self.assertEqual(self.client.post(url, {"amount": "9999"}).status_code, 404)
+        self.assertEqual(one.ledger.count(), 0)
 
-    def test_owner_scope_and_multi_account_bookmarks(self):
-        a = self.add(self.owner)
-        b = self.add(self.owner)
+    def test_owner_scope_across_accounts(self):
+        self.add(self.owner)
+        self.add(self.owner)
         private = self.add(self.other)
         self.client.force_login(self.owner)
-        self.assertEqual(self.client.get("/cockpit/").status_code,301)
-        self.assertEqual(self.client.get("/cockpit/")["Location"],"/overview/")
-        self.assertEqual(self.client.get("/app/strategies/%s/" % private.pk).status_code,404)
-        self.assertContains(self.client.get("/overview/"),"Existing 9Sig")
-        self.assertEqual(self.client.get("/s/%s/today/" % private.pk).status_code,404)
-        # The legacy review ID must resolve to its *own* strategy, not the
-        # first account or a generic redirect that hides a foreign ID.
-        own_signal = StrategySignal.objects.create(
-            strategy=b, signal_key="quarter:owned", kind="QUARTERLY",
-            as_of=date(2026, 6, 30), title="Owned", message="Saved",
-        )
-        foreign_signal = StrategySignal.objects.create(
-            strategy=private, signal_key="quarter:private", kind="QUARTERLY",
-            as_of=date(2026, 6, 30), title="Private", message="Saved",
-        )
-        self.assertRedirects(
-            self.client.get("/cockpit/rebalance/%s/" % own_signal.pk),
-            reverse("v2_guided_review", args=[b.pk, own_signal.pk]),
-            status_code=301, fetch_redirect_response=False,
-        )
-        self.assertEqual(
-            self.client.get("/cockpit/rebalance/%s/" % foreign_signal.pk).status_code,
-            404,
-        )
+        self.assertContains(self.client.get("/overview/"), "Existing 9Sig")
+        self.assertEqual(self.client.get("/s/%s/today/" % private.pk).status_code, 404)
 
     def test_login_restyled_and_authentication_security_retained(self):
         res = self.client.get("/login/")

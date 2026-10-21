@@ -69,7 +69,7 @@ class OwnerAuthenticatorTests(TestCase):
         self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
         self.client.logout()
         self.client.force_login(self.user)
-        for url in (reverse("v2_overview"), reverse("v2_catalogue"),
+        for url in (reverse("v2_overview"), reverse("v2_settings"),
                     reverse("admin:index")):
             with self.subTest(url=url):
                 self.assertRedirects(self.client.get(url), reverse("totp_challenge"))

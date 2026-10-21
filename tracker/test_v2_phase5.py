@@ -1,4 +1,4 @@
-"""Phase 5 Breakdown: historical arithmetic, raw-unit holds, owner isolation.
+"""Quarterly review calculation: historical arithmetic, raw-unit holds, owner isolation.
 
 No input here enables brokerage trading; preserved signals are displayed, not
 re-issued. All monetary values are genuine test fixtures, never UI defaults.
@@ -21,7 +21,7 @@ from tracker.services import validate_and_record
 from tracker.v2_breakdown import _detail, _trace, _growth_drawdown
 
 
-class Phase5BreakdownTests(TestCase):
+class ReviewCalculationTests(TestCase):
     def setUp(self):
         User = get_user_model()
         self.owner = User.objects.create_user("breakdown-owner", password="test-safe-123")
@@ -75,7 +75,10 @@ class Phase5BreakdownTests(TestCase):
         )
 
     def url(self, inst=None):
-        return reverse("v2_instance_page", args=[(inst or self.instance).pk, "breakdown"])
+        return reverse("v2_instance_page", args=[(inst or self.instance).pk, "review"])
+
+    def review_url(self, signal):
+        return reverse("v2_guided_review", args=[signal.strategy_id, signal.pk])
 
     def test_exact_ledger_arithmetic_without_monthly_guessing(self):
         trace, error = _trace(self.instance, self.period)
@@ -92,8 +95,7 @@ class Phase5BreakdownTests(TestCase):
         r = self.client.get(self.url())
         self.assertContains(r, "981.52")
         self.assertContains(r, "762.86")
-        self.assertContains(r, "Reconstructed target")
-        self.assertContains(r, "9% growth")
+        self.assertContains(r, "How this was calculated")
 
     def test_saved_advice_is_not_recalculated_or_market_fetched_on_get(self):
         before = list(self.instance.ledger.values_list("pk", flat=True))
@@ -101,17 +103,14 @@ class Phase5BreakdownTests(TestCase):
             response = self.client.get(self.url())
         self.assertContains(response, "My saved 9Sig review")
         self.assertContains(response, "1.2345")
-        self.assertContains(response, "historical advice")
         self.assertEqual(before, list(self.instance.ledger.values_list("pk", flat=True)))
         self.assertEqual(self.instance.signals.count(), 1)
         self.assertEqual(self.instance.baselines.count(), 0)
 
     def test_missing_9_spy_closes_refuses_to_infer_30_down(self):
         r = self.client.get(self.url())
-        self.assertContains(r, "Cannot calculate the SPY rolling-peak")
-        self.assertNotContains(r, "meet the 30 Down threshold")
-        self.assertContains(r, "Raw quote units")
-        self.assertContains(r, "Information only")
+        self.assertContains(r, "Needs 9 quarters of SPY closes")
+        self.assertNotContains(r, "Triggered")
         self.assertFalse(_detail(self.instance, self.signal)["growth"]["available"])
 
     def test_spy_rolling_peak_requires_all_nine_dated_usd_closes(self):
@@ -130,7 +129,7 @@ class Phase5BreakdownTests(TestCase):
         self.assertTrue(details["spy_result"]["triggered"])
         self.assertEqual(details["spy_result"]["decline_pct"], D("35.00"))
         self.assertEqual(details["spy_result"]["threshold"], D("70.0000"))
-        self.assertContains(self.client.get(self.url()), "numerical cross-check")
+        self.assertContains(self.client.get(self.url()), "Triggered")
 
     def test_price_hold_refuses_spy_conclusion_even_when_reference_present(self):
         for d in (date(2023, 9, 29), date(2023, 12, 29),
@@ -145,16 +144,14 @@ class Phase5BreakdownTests(TestCase):
             symbol="SPY", last_error="PRICE_HOLD: suspect source units"
         )
         self.assertIsNone(_detail(self.instance, self.signal)["spy_result"])
-        self.assertContains(self.client.get(self.url()), "No 30 Down conclusion")
+        self.assertContains(self.client.get(self.url()), "Needs 9 quarters of SPY closes")
 
     def test_cross_owner_quarters_and_csv_are_private(self):
-        self._signal(self.outsider, date(2025, 6, 30), "SECRET_OTHER_PERSON_QUARTER")
+        foreign = self._signal(self.outsider, date(2025, 6, 30), "SECRET_OTHER_PERSON_QUARTER")
         self.assertEqual(self.client.get(self.url(self.outsider)).status_code, 404)
-        self.assertEqual(
-            self.client.get(self.url()+"?quarter=2025-06-30").status_code, 404,
-        )
-        self.assertEqual(self.client.get(self.url()+"?quarter=bad").status_code, 404)
-        csv_res = self.client.get(self.url()+"?export=csv")
+        self.assertEqual(self.client.get(self.review_url(foreign)).status_code, 404)
+        self.assertEqual(self.client.get(self.review_url(foreign) + "?export=csv").status_code, 404)
+        csv_res = self.client.get(self.review_url(self.signal)+"?export=csv")
         self.assertEqual(csv_res.status_code, 200)
         self.assertEqual(csv_res["Content-Type"], "text/csv; charset=utf-8")
         content = csv_res.content.decode("utf-8")
@@ -164,7 +161,7 @@ class Phase5BreakdownTests(TestCase):
         self.assertIn("'=SUM(A1)", content)
         self.assertNotIn("SECRET_OTHER_PERSON_QUARTER", content)
         self.client.logout()
-        self.assertEqual(self.client.get(self.url()+"?export=csv").status_code, 302)
+        self.assertEqual(self.client.get(self.review_url(self.signal)+"?export=csv").status_code, 302)
 
     def test_corrections_recalculate_from_the_corrected_ledger(self):
         payload = {
@@ -197,16 +194,16 @@ class Phase5BreakdownTests(TestCase):
     def test_absent_strategy_signal_is_explicit_empty_state(self):
         newcomer = self._instance(self.owner, "Brand new separate strategy")
         r = self.client.get(self.url(newcomer))
-        self.assertContains(r, "No completed-quarter")
+        self.assertContains(r, "No quarterly review yet")
         self.assertNotContains(r, "My saved 9Sig review")
         self.assertNotContains(r, "981.52")
 
     def test_quarter_selected_is_only_persisted_and_review_date(self):
         older = self._signal(self.instance, date(2025, 6, 30), "Historical Q2")
-        r = self.client.get(self.url()+"?quarter=2025-06-30")
+        r = self.client.get(self.review_url(older))
         self.assertContains(r, "Historical Q2")
-        self.assertEqual(r.context["breakdown_current"].pk, older.pk)
-        self.assertContains(r, "Export audit CSV")
+        self.assertEqual(r.context["review_signal"].pk, older.pk)
+        self.assertContains(r, "Download CSV")
 
     def test_unconfirmed_prior_reset_never_silently_reanchors_signal_line(self):
         pending = self._signal(self.instance, date(2025, 6, 30), "Pending owner reset")

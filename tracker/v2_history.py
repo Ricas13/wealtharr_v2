@@ -358,7 +358,7 @@ def _performance(request, strategy):
 
 
 def _next_quarter(today):
-    from .cockpit import _next_end
+    from .signal_status import _next_end
     return _next_end(today)
 
 

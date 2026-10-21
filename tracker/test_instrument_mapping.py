@@ -95,12 +95,12 @@ class InstrumentMappingWorkflowTests(TestCase):
     def test_market_monitoring_cannot_swap_mapped_tickers(self):
         # The retired mutable instrument/automation endpoint is no longer
         # writable. Saving per-instance v2 alert routes cannot swap tickers.
-        url = reverse("save_automation", args=[self.strategy.pk])
+        url = "/app/strategies/%s/monitor/" % self.strategy.pk
         response = self.client.post(url, {
             "equity_symbol": "TQQQ", "safe_symbol": "QQQ3.L",
             "market_data_enabled": "on",
         })
-        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.status_code, 404)
         response = self.client.post(reverse("v2_settings"), {
             "form_kind": "strategy", "strategy_id": self.strategy.pk,
             "equity_symbol": "TQQQ", "safe_symbol": "QQQ3.L",

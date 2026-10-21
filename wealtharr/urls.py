@@ -1,8 +1,8 @@
-"""Wealtharr has one owner UI: v2. Historical bookmarks redirect, never write."""
+"""Wealtharr has one owner UI: v2."""
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
-from tracker import totp_views, v2_auth, v2_legacy
+from tracker import totp_views, v2_auth
 
 urlpatterns = [
     path("", v2_auth.home, name="home"),
@@ -12,55 +12,7 @@ urlpatterns = [
     path("security/verify/", totp_views.challenge, name="totp_challenge"),
     path("", include("tracker.v2_urls")),
 
-    # Permanent, read-only bookmarks. Never replay old financial POST forms.
-    path("cockpit/", v2_legacy.cockpit_section, name="cockpit_today"),
-    path("cockpit/start/", v2_legacy.cockpit_section,
-         {"section": "start"}, name="cockpit_setup"),
-    path("cockpit/history/", v2_legacy.cockpit_section,
-         {"section": "history"}, name="cockpit_history"),
-    path("cockpit/ledger/", v2_legacy.cockpit_section,
-         {"section": "ledger"}, name="cockpit_ledger"),
-    path("cockpit/strategy/", v2_legacy.cockpit_section,
-         {"section": "strategy"}, name="cockpit_strategy"),
-    path("cockpit/deposit/", v2_legacy.cockpit_section,
-         {"section": "deposit"}, name="cockpit_deposit"),
-    path("cockpit/prices/check/", v2_legacy.cockpit_section,
-         {"section": "prices"}, name="cockpit_refresh"),
-    path("cockpit/rebalance/<int:signal_id>/", v2_legacy.cockpit_section,
-         {"section": "rebalance"}, name="cockpit_rebalance"),
-    path("cockpit/import/", v2_legacy.cockpit_section,
-         {"section": "import"}, name="cockpit_csv"),
-    path("cockpit/settings/", v2_legacy.cockpit_section,
-         {"section": "settings"}, name="cockpit_settings"),
-    path("cockpit/settings/test/<str:channel>/", v2_legacy.cockpit_section,
-         {"section": "settings"}, name="cockpit_test"),
-
-    path("app/", v2_legacy.app_section, name="dashboard"),
-    path("app/accounts/", v2_legacy.app_section, name="accounts"),
-    path("app/strategies/new/", v2_legacy.app_section,
-         {"section": "add"}, name="new_strategy"),
-    path("app/9sig/start/", v2_legacy.app_section,
-         {"section": "start"}, name="start_real_9sig"),
-    path("app/strategies/<int:instance_id>/", v2_legacy.app_section,
-         name="strategy_detail"),
-    path("app/strategies/<int:instance_id>/ledger/", v2_legacy.app_section,
-         {"section": "ledger"}, name="record_entry"),
-    path("app/strategies/<int:instance_id>/price/", v2_legacy.app_section,
-         {"section": "price"}, name="record_price"),
-    path("app/strategies/<int:instance_id>/refresh/", v2_legacy.app_section,
-         {"section": "refresh"}, name="refresh_market"),
-    path("app/strategies/<int:instance_id>/monitor/", v2_legacy.app_section,
-         {"section": "monitor"}, name="save_automation"),
-    path("app/strategies/<int:instance_id>/rebaseline/", v2_legacy.app_section,
-         {"section": "rebaseline"}, name="confirm_strategy_reset"),
-    path("app/strategies/<int:instance_id>/signal/<int:signal_id>/ack/",
-         v2_legacy.app_section, {"section": "signal"}, name="acknowledge_signal"),
-    path("app/strategies/<int:instance_id>/signal/<int:signal_id>/review/",
-         v2_legacy.app_section, {"section": "review"}, name="review_signal"),
-    path("app/snapshot/", v2_legacy.app_section, name="capture_snapshot"),
-    path("app/settings/", v2_legacy.app_section,
-         {"section": "settings"}, name="user_settings"),
-    path("app/settings/password/", v2_auth.change_password, name="change_password"),
+    path("settings/password/", v2_auth.change_password, name="change_password"),
 
     path("control/", v2_auth.control, name="control"),
     path("django-admin/login/",

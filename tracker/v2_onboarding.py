@@ -7,6 +7,7 @@ automatic market instructions. All creation is atomic.
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
@@ -275,6 +276,14 @@ def wizard(request):
                 state["routes"] = _routes(request.POST)
                 instance = _enroll(request.user, state)
                 del request.session[SESSION_KEY]
+                # Step 3 already confirmed the instruments are buyable in the
+                # owner's own account, which is what going live attests.
+                if request.POST.get("go_live") == "yes":
+                    from .v2_go_live import go_live
+                    try:
+                        go_live(instance, request.user)
+                    except ValidationError as exc:
+                        messages.error(request, "Created, but not live yet: " + " ".join(exc.messages))
                 return redirect("v2_instance_page", instance_id=instance.pk, section="today")
             request.session[SESSION_KEY] = state
         except (ValidationError, IntegrityError, ValueError, ArithmeticError) as exc:

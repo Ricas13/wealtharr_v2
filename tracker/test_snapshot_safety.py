@@ -7,7 +7,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from tracker.models import Account, LedgerEntry, MarketObservation, PriceMark, StrategyInstance, StrategyPreset, WealthSnapshot
+from tracker.models import Account, LedgerEntry, MarketObservation, PriceMark, StrategyInstance, StrategyPreset, StrategyValueSnapshot
 from tracker.services import validate_and_record
 
 
@@ -15,7 +15,7 @@ class SnapshotSafetyTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_user(
             "snapshot-owner", "snapshot@example.com", "a-long-password-for-testing")
-        account = Account.objects.create(owner=self.owner, name="ISA", kind="ISA")
+        account = Account.objects.create(owner=self.owner, name="ISA", kind="ISA", broker="TRADING212", country="GB")
         self.strategy = StrategyInstance.objects.create(
             owner=self.owner, account=account,
             preset=StrategyPreset.objects.get(slug="nasdaq-quarterly-target"),
@@ -44,12 +44,12 @@ class SnapshotSafetyTests(TestCase):
 
     def test_manual_price_does_not_become_automated_valuation(self):
         self.run_scheduler()
-        self.assertFalse(WealthSnapshot.objects.filter(owner=self.owner).exists())
+        self.assertFalse(StrategyValueSnapshot.objects.filter(strategy=self.strategy).exists())
 
     def test_yahoo_snapshot_records_quote_day_not_scheduler_day(self):
         self.verify_yahoo_mark()
         self.run_scheduler()
-        snapshot = WealthSnapshot.objects.get(owner=self.owner)
+        snapshot = StrategyValueSnapshot.objects.get(strategy=self.strategy)
         self.assertEqual(snapshot.as_of, self.quoted_day)
         self.assertEqual(snapshot.total_value, D("1040"))
 
@@ -58,4 +58,4 @@ class SnapshotSafetyTests(TestCase):
         validate_and_record(self.strategy, LedgerEntry(
             kind="DEPOSIT", occurred_on=timezone.localdate(), amount=D("100")))
         self.run_scheduler()
-        self.assertFalse(WealthSnapshot.objects.filter(owner=self.owner).exists())
+        self.assertFalse(StrategyValueSnapshot.objects.filter(strategy=self.strategy).exists())

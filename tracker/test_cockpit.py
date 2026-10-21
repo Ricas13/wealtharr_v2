@@ -14,7 +14,6 @@ from .models import (Account, LedgerEntry, MarketObservation, PriceMark,
 from .performance import (xirr, time_weighted_return, max_drawdown, simple_return,
                           annualized_return, cumulative_from_annualized)
 from .services import ledger_summary, validate_and_record
-from .cockpit import _performance
 from .management.commands.sync_market_and_signals import save_verified_strategy_snapshot
 from .cockpit_notifications import send_due_cockpit_notices
 from .market_signals import quarter_end_before
@@ -125,14 +124,6 @@ class GuidedRebalanceTests(TestCase):
         self.assertEqual(self.client.post(reverse('v2_guided_review', args=[self.strategy.pk, self.sig.pk]), self.single_payload(0, quantity='1', price='100')).status_code, 302)
         self.assertEqual(self.strategy.ledger.count(), previous)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.sig).exists())
-
-    def test_xirr_with_mismatched_sleeve_dates_is_unavailable(self):
-        safe_mark = PriceMark.objects.get(strategy=self.strategy, symbol='ERNS.L')
-        safe_mark.as_of = self.mark_day - timedelta(days=1)
-        safe_mark.save(update_fields=['as_of'])
-        MarketObservation.objects.update_or_create(symbol='ERNS.L', as_of=safe_mark.as_of,
-            defaults={'currency': 'GBP', 'price': safe_mark.price})
-        self.assertIsNone(_performance(self.strategy, ledger_summary(self.strategy))['xirr'])
 
     def test_mismatched_market_dates_do_not_create_snapshot(self):
         safe_mark = PriceMark.objects.get(strategy=self.strategy, symbol='ERNS.L')

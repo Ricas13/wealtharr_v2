@@ -78,17 +78,18 @@ class Phase3LedgerBrowserTests(BrowserHarness):
                     self.page.locator('input[name="occurred_on"]').fill(
                         timezone.localdate().isoformat()
                     )
-                    self.page.locator('input[name="amount"]').fill("600.00")
-                    self.page.get_by_role("button", name="Preview impact").click()
-                    self.page.get_by_role("heading", name="Impact preview", exact=False).wait_for()
-                    snap("ledger-impact")
-                    self.page.get_by_role("button", name="Confirm audited change").click()
+                    self.page.locator('#w2-transaction-form input[name="amount"]').fill("600.00")
+                    # New entries save in one step.
+                    self.page.get_by_role("button", name="Save", exact=True).click()
                     self.page.get_by_text("600.00").first.wait_for()
                     self.assertNotIn("£14,820", self.page.content())
                     snap("ledger-added")
+                    # Corrections still show their impact before confirming.
                     self.page.get_by_role("link", name="Edit", exact=True).first.click()
                     self.page.locator('input[name="amount"]').fill("500.00")
                     self.page.get_by_role("button", name="Preview impact").click()
+                    self.page.get_by_role("heading", name="Impact preview", exact=False).wait_for()
+                    snap("ledger-impact")
                     self.page.get_by_role("button", name="Confirm audited change").click()
                     self.page.get_by_role("link", name="Change history").click()
                     self.page.get_by_role("heading", name="Immutable change history").wait_for()

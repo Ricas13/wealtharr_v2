@@ -9,7 +9,7 @@ from django.views.decorators.cache import never_cache
 from django.utils import timezone
 
 from .models import OwnerTOTP
-from .v2_legacy import preferred_url
+from .v2_auth import preferred_url
 from .services import decrypt_secret, encrypt_secret
 from .totp import generate_secret, matching_step, provisioning_uri, verify_account_code
 

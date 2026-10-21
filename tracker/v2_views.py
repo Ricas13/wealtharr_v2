@@ -9,17 +9,15 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 
 from .models import StrategyInstance
-from .core.catalogue import CATALOGUE, OFFERS, ACCOUNT_TYPES, CATALOGUE_VERSION
 
 
-SECTIONS = ("today", "review", "history", "ledger", "strategy", "breakdown")
+SECTIONS = ("today", "review", "history", "ledger", "strategy")
 LABELS = {
     "today": "Dashboard",
     "review": "Quarterly review",
     "history": "Performance",
     "ledger": "Ledger",
     "strategy": "Strategy & alerts",
-    "breakdown": "Breakdown",
 }
 
 
@@ -86,9 +84,6 @@ def instance_page(request, instance_id, section):
     if section == "review":
         from .v2_today import review_page
         return review_page(request, instance_id)
-    if section == "breakdown":
-        from .v2_breakdown import breakdown_page
-        return breakdown_page(request, instance_id)
     if section == "history":
         from .v2_history import history_page
         return history_page(request, instance_id)
@@ -106,25 +101,6 @@ def instance_page(request, instance_id, section):
     return _render(
         request, page_key="instance", page_title=LABELS[section],
         instance=instance, section=section,
-    )
-
-
-@login_required
-def catalogue(request):
-    strategy_filter = request.GET.get("strategy", "")
-    type_filter = request.GET.get("account_type", "")
-    if strategy_filter not in OFFERS:
-        strategy_filter = ""
-    if type_filter not in dict(ACCOUNT_TYPES):
-        type_filter = ""
-    rows = tuple(row for row in CATALOGUE.values()
-                 if (not strategy_filter or row.strategy_key == strategy_filter)
-                 and (not type_filter or row.account_type == type_filter))
-    return _render(
-        request, page_key="catalogue", page_title="Instrument catalogue",
-        catalogue_rows=rows, catalogue_offers=OFFERS.values(),
-        catalogue_types=ACCOUNT_TYPES, catalogue_filter=strategy_filter,
-        catalogue_type_filter=type_filter, catalogue_version=CATALOGUE_VERSION,
     )
 
 

@@ -19,8 +19,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .models import (
-    InstanceOpeningSnapshot, LedgerEntry,
-    LedgerRevision, OpeningReconciliation, RebalanceExecution,
+    LedgerEntry, LedgerRevision, RebalanceExecution,
     SignalFill, StrategyInstance, StrategySignal,
 )
 from .services import ledger_summary, validate_and_record
@@ -40,6 +39,12 @@ KIND_GROUPS = (
     ("BUY", "Buys"), ("SELL", "Sells"), ("DIVIDEND", "Dividends"), ("INTEREST", "Interest"), ("FEE", "Fees"),
 )
 TABS = {"entries", "rebalances", "history"}
+# The All / Money / Trades tabs above the entries table.
+FILTER_GROUPS = {
+    "all": ("All", {"DEPOSIT", "WITHDRAW", "DIVIDEND", "INTEREST", "FEE", "BUY", "SELL"}),
+    "money": ("Money", {"DEPOSIT", "WITHDRAW", "DIVIDEND", "INTEREST", "FEE"}),
+    "trades": ("Trades", {"BUY", "SELL"}),
+}
 OPERATIONS = {"new", "edit", "delete", "restore"}
 
 
@@ -57,12 +62,6 @@ def _editable(strategy):
         strategy.strategy_key and strategy.started_on and
         strategy.resolved_instruments
     )
-
-
-def _unreconciled(strategy):
-    # Opening holdings are now entered as ledger entries, and there is no
-    # broker import to reconcile against, so nothing is ever "unreconciled".
-    return False
 
 
 def _safe(value):
@@ -86,9 +85,8 @@ def _export(strategy, entries):
             e.pk, e.version, "soft_deleted" if e.deleted else "active",
             e.occurred_on.isoformat(), e.kind, _safe(e.symbol),
             str(e.quantity), str(e.unit_price), str(e.amount), str(e.fee),
-            _safe(e.note), "broker_csv" if e.imported else (
-                "manual_rebalance" if e.linked_fill else "manual"
-            ), e.created_at.isoformat(),
+            _safe(e.note), "manual_rebalance" if e.linked_fill else "manual",
+            e.created_at.isoformat(),
         ])
     return response
 
@@ -134,7 +132,7 @@ def ledger_page(request, instance_id):
     if tab not in TABS:
         tab = "entries"
     kind = request.GET.get("kind", "all")
-    if kind not in dict(KIND_GROUPS):
+    if kind not in dict(KIND_GROUPS) and kind not in FILTER_GROUPS:
         kind = "all"
     search = request.GET.get("q", "").strip()[:100]
     order = request.GET.get("sort", "newest")
@@ -142,7 +140,10 @@ def ledger_page(request, instance_id):
         order = "newest"
     show_deleted = request.GET.get("deleted") == "1"
     entries = effective_entries(strategy, show_deleted=show_deleted)
-    if kind != "all":
+    counts = {key: sum(1 for e in entries if e.kind in kinds) for key, (_, kinds) in FILTER_GROUPS.items()}
+    if kind in FILTER_GROUPS:
+        entries = [e for e in entries if e.kind in FILTER_GROUPS[kind][1]]
+    elif kind != "all":
         entries = [e for e in entries if e.kind == kind]
     if search:
         entries = [
@@ -183,9 +184,9 @@ def ledger_page(request, instance_id):
         ledger_sort=order, ledger_deleted=show_deleted,
         ledger_entries=entries[:200], ledger_count=len(entries),
         ledger_kinds=KIND_GROUPS, ledger_revisions=revisions,
+        ledger_filters=tuple((key, label, counts[key]) for key, (label, _) in FILTER_GROUPS.items()),
         ledger_rebalances=_rebalance_rows(strategy) if tab == "rebalances" else (),
         ledger_summary=summary, ledger_can_edit=_editable(strategy),
-        ledger_unreconciled=_unreconciled(strategy),
     )
 
 
@@ -283,10 +284,6 @@ def _candidate(strategy, payload, pk=1_000_000_000):
 
 
 def _validate_proposal(strategy, operation, entry_id, payload):
-    if _unreconciled(strategy):
-        raise ValidationError(
-            "Reconcile the complete existing holdings using your Trading 212 CSV first."
-        )
     if not _editable(strategy):
         raise ValidationError("Only pinned v2 strategy instances support audited edits.")
     current_rows = effective_entries(strategy, show_deleted=True)
@@ -354,6 +351,24 @@ def _preview_key(strategy):
     return f"wealtharr_v2_ledger_preview_{strategy.pk}"
 
 
+def _add_entry(locked, actor, payload, report):
+    """Append one new entry and its ADD revision inside the caller's transaction."""
+    instance = LedgerEntry(
+        kind=payload["kind"], occurred_on=date.fromisoformat(payload["occurred_on"]),
+        symbol=payload["symbol"], quantity=D(payload["quantity"]),
+        unit_price=D(payload["unit_price"]), amount=D(payload["amount"]),
+        fee=D(payload["fee"]), note=payload["note"],
+    )
+    instance.full_clean(exclude=["strategy"])
+    validate_and_record(locked, instance)
+    LedgerRevision.objects.create(
+        strategy=locked, entry=instance, actor=actor, version=1,
+        operation="ADD", before=None, after=snapshot(instance),
+        impact=report["impact"],
+    )
+    return instance
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def edit_entry(request, instance_id, operation, entry_id=None):
@@ -374,6 +389,23 @@ def edit_entry(request, instance_id, operation, entry_id=None):
     error = ""
     if request.method == "POST":
         try:
+            if request.POST.get("intent") == "save" and operation == "new":
+                # New entries save in one step; edits and deletes keep the preview.
+                payload = _input_payload(request.POST, strategy)
+                view["form_values"] = payload
+                with transaction.atomic():
+                    locked = _get(request, instance_id, locked=True)
+                    report = _validate_proposal(locked, operation, None, payload)
+                    advisory = _isa_advisory(
+                        locked, payload, request.POST.get("other_isa_subscriptions", ""))
+                    entry = _add_entry(locked, request.user, payload, report)
+                    retire_stale_reviews(locked, entry.occurred_on)
+                messages.success(request, "Saved. You can edit or delete it from the Ledger.")
+                if advisory:
+                    messages.warning(request, advisory)
+                back = request.POST.get("return_to")
+                return redirect("v2_instance_page", instance_id=instance_id,
+                                section=back if back in ("today", "ledger") else "ledger")
             if request.POST.get("intent") == "confirm":
                 with transaction.atomic():
                     locked = _get(request, instance_id, locked=True)
@@ -389,20 +421,7 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                         locked, payload, approved.get("other_isa_subscriptions", ""),
                     ) if operation == "new" else ""
                     if operation == "new":
-                        instance = LedgerEntry(
-                            kind=payload["kind"], occurred_on=date.fromisoformat(payload["occurred_on"]),
-                            symbol=payload["symbol"], quantity=D(payload["quantity"]),
-                            unit_price=D(payload["unit_price"]), amount=D(payload["amount"]),
-                            fee=D(payload["fee"]), note=payload["note"],
-                        )
-                        instance.full_clean(exclude=["strategy"])
-                        validate_and_record(locked, instance)
-                        LedgerRevision.objects.create(
-                            strategy=locked, entry=instance, actor=request.user, version=1,
-                            operation="ADD", before=None, after=snapshot(instance),
-                            impact=report["impact"],
-                        )
-                        changed_on = instance.occurred_on
+                        changed_on = _add_entry(locked, request.user, payload, report).occurred_on
                     else:
                         prior = find_entry(locked, entry_id)
                         current_revision = LedgerRevision.objects.filter(

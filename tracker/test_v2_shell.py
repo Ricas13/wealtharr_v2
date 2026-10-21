@@ -31,12 +31,11 @@ class NewShellTests(TestCase):
     def test_all_new_shell_pages_require_login(self):
         routes = [
             reverse("v2_overview"),
-            reverse("v2_catalogue"),
             reverse("v2_settings"),
             reverse("v2_add_strategy"),
         ] + [
             reverse("v2_instance_page", args=[self.mine.pk, part])
-            for part in ("today", "history", "ledger", "strategy", "breakdown")
+            for part in ("today", "review", "history", "ledger", "strategy")
         ]
         for url in routes:
             with self.subTest(url=url):
@@ -48,7 +47,6 @@ class NewShellTests(TestCase):
         self.client.force_login(self.owner)
         for url in (
             reverse("v2_overview"),
-            reverse("v2_catalogue"),
             reverse("v2_settings"),
         ):
             with self.subTest(url=url):
@@ -65,7 +63,7 @@ class NewShellTests(TestCase):
         for part, title in (
             ("today", "Dashboard"), ("history", "Performance"),
             ("ledger", "Ledger"), ("strategy", "Strategy &amp; alerts"),
-            ("breakdown", "Quarterly review"),
+            ("review", "Quarterly review"),
         ):
             with self.subTest(part=part):
                 url = reverse("v2_instance_page", args=[self.mine.pk, part])

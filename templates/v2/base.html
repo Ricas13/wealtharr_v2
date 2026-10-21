@@ -53,10 +53,6 @@
          href="{% url 'v2_settings' %}" {% if page_key == 'settings' %}aria-current="page"{% endif %} title="Alerts &amp; settings">
         {% include 'partials/icon.html' with name='settings' %}<span class="w2-nav-label">Alerts &amp; settings</span>
       </a>
-      <a class="w2-nav-link {% if page_key == 'catalogue' %}w2-active{% endif %}"
-         href="{% url 'v2_catalogue' %}" {% if page_key == 'catalogue' %}aria-current="page"{% endif %} title="Instrument catalogue">
-        {% include 'partials/icon.html' with name='wallet' %}<span class="w2-nav-label">Instrument catalogue</span>
-      </a>
     </nav>
     <div class="w2-sidebar-footer">
       <button type="button" id="v2-collapse" class="w2-nav-link" aria-pressed="false"

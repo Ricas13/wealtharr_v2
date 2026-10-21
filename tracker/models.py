@@ -138,6 +138,7 @@ class StrategyGoLive(models.Model):
 
 
 class InstanceOpeningSnapshot(models.Model):
+    # Retired: no longer read or written. Kept so existing rows aren't dropped.
     """Owner-reported initial positions; NOT verified trades or prices.
 
     Phase 3 must reconcile before the snapshot enters ledger-based performance.
@@ -190,6 +191,7 @@ class LedgerEntry(models.Model):
 
 
 class OpeningReconciliation(models.Model):
+    # Retired: no longer read or written. Kept so existing rows aren't dropped.
     """Append-only evidence that imported events reproduce owner-reported holdings."""
     opening = models.OneToOneField(
         InstanceOpeningSnapshot, on_delete=models.PROTECT,
@@ -273,6 +275,7 @@ class PriceMark(models.Model):
         constraints = [models.UniqueConstraint(fields=["strategy", "symbol"], name="unique_strategy_mark")]
 
 class WealthSnapshot(models.Model):
+    # Retired: no longer read or written. Kept so existing rows aren't dropped.
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="wealth_snapshots")
     as_of = models.DateField()
     total_value = models.DecimalField(max_digits=24, decimal_places=2)
@@ -507,6 +510,7 @@ class SignalFill(models.Model):
 
 
 class BrokerImportRow(models.Model):
+    # Retired: no longer read or written. Kept so existing rows aren't dropped.
     """Idempotent identifier for an actual imported broker event."""
     strategy = models.ForeignKey(StrategyInstance, on_delete=models.PROTECT)
     fingerprint = models.CharField(max_length=64)

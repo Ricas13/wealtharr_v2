@@ -1,4 +1,4 @@
-"""Phase 2 actual Chromium journey for code-defined catalogue and enrollment.
+"""Phase 2 actual Chromium journey for code-defined enrolment.
 
 Run in the existing browser CI job. Capture source-backed layout screenshots at
 1440px and 390px. Pixel equivalence to the prototype's fictional financial
@@ -40,13 +40,6 @@ class V2OnboardingBrowserTests(BrowserHarness):
                         self.page.screenshot(path=str(target), full_page=True)
                         self.assertTrue(target.is_file())
 
-                    self.visit("v2_catalogue")
-                    self.page.get_by_role("heading", name="Instrument catalogue", level=1).wait_for()
-                    self.page.get_by_text("Account check pending").first.wait_for()
-                    self.assertTrue(
-                        self.page.get_by_text("IE00BLRPRL42").count() >= 1
-                    )
-                    screenshot("catalogue")
 
                     self.visit("v2_add_strategy")
                     self.page.get_by_text("step 1 of 5").wait_for()
@@ -100,6 +93,7 @@ class V2OnboardingBrowserTests(BrowserHarness):
                     screenshot("alerts")
                     self.page.get_by_role("button", name="Create strategy").click()
                     self.page.get_by_role("link", name="Dashboard").wait_for()
-                    self.page.get_by_text("Not live yet", exact=False).first.wait_for()
+                    # "Go live now" is ticked by default, so a cash start asks for the opening buys.
+                    self.page.get_by_text("Buy your opening position", exact=False).first.wait_for()
                     self.assertNotIn("OTHER_PERSON_PRIVATE_STRATEGY", self.page.content())
                     self.assertEqual(self.browser_errors, [])

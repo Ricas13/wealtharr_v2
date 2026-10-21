@@ -13,7 +13,7 @@ import json
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from .models import LedgerEntry, LedgerRevision, RebalanceExecution, SignalFill, BrokerImportRow
+from .models import LedgerEntry, LedgerRevision, RebalanceExecution, SignalFill
 
 
 ZERO = D("0")
@@ -40,7 +40,6 @@ class EffectiveEntry:
     created_at: object
     version: int = 0
     deleted: bool = False
-    imported: bool = False
     linked_fill: bool = False
 
     @property
@@ -62,7 +61,7 @@ def snapshot(row):
     }
 
 
-def _parse(row, payload, version=0, *, deleted=False, imported=False, linked=False):
+def _parse(row, payload, version=0, *, deleted=False, linked=False):
     return EffectiveEntry(
         pk=row.pk, strategy_id=row.strategy_id,
         occurred_on=date.fromisoformat(payload["occurred_on"]),
@@ -70,7 +69,7 @@ def _parse(row, payload, version=0, *, deleted=False, imported=False, linked=Fal
         quantity=D(payload["quantity"]), unit_price=D(payload["unit_price"]),
         amount=D(payload["amount"]), fee=D(payload["fee"]),
         note=payload.get("note", ""), created_at=row.created_at,
-        version=version, deleted=deleted, imported=imported, linked_fill=linked,
+        version=version, deleted=deleted, linked_fill=linked,
     )
 
 
@@ -82,8 +81,6 @@ def effective_entries(strategy, *, show_deleted=False):
     latest = {}
     for revision in revisions:
         latest[revision.entry_id] = revision
-    imported = set(BrokerImportRow.objects.filter(
-        strategy=strategy).values_list("ledger_entry_id", flat=True))
     fills = set(SignalFill.objects.filter(
         strategy=strategy).values_list("ledger_entry_id", flat=True))
     effective = []
@@ -106,7 +103,7 @@ def effective_entries(strategy, *, show_deleted=False):
             deleted = False
         effective.append(_parse(
             original, data, version, deleted=deleted,
-            imported=original.pk in imported, linked=original.pk in fills,
+            linked=original.pk in fills,
         ))
     return sorted(effective, key=lambda x: (x.occurred_on, x.pk))
 
@@ -186,7 +183,7 @@ def with_proposed_change(strategy, entry_id, replacement):
             base = strategy.ledger.get(pk=entry_id)
             updated.append(_parse(
                 base, replacement, row.version + 1,
-                imported=row.imported, linked=row.linked_fill,
+                linked=row.linked_fill,
             ))
     return previous, replay(updated, strict=True)
 
@@ -228,8 +225,7 @@ def state_digest(strategy):
 
 def linked_source(strategy, entry_id):
     return (
-        BrokerImportRow.objects.filter(strategy=strategy, ledger_entry_id=entry_id).exists()
-        or SignalFill.objects.filter(strategy=strategy, ledger_entry_id=entry_id).exists()
+        SignalFill.objects.filter(strategy=strategy, ledger_entry_id=entry_id).exists()
     )
 
 

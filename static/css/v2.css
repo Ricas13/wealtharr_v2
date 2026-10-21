@@ -717,3 +717,6 @@ body.v2 {
 .w2-card .w2-table :is(th,td){padding-left:6px;padding-right:6px}
 .w2-card .w2-table :is(th,td):first-child{padding-left:0}
 .w2-card .w2-table :is(th,td):last-child{padding-right:0}
+.w2-card input.field{background:#0d1014;border:1px solid #2a313b;border-radius:5px;color:var(--w2-text);font:inherit;min-height:28px;padding:3px 8px;width:100%}
+.w2-card input.check{accent-color:var(--w2-primary);width:14px;height:14px;margin:0}
+.w2-table th[scope=row]{font-size:11.5px;text-transform:none;letter-spacing:0;color:var(--w2-text);font-weight:400;border-bottom:1px solid var(--w2-stroke-soft)}

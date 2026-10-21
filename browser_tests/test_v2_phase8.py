@@ -45,9 +45,8 @@ class Phase8OnlyV2BrowserTests(BrowserHarness):
             ("history","v2_instance_page",(self.instance.pk,"history")),
             ("ledger","v2_instance_page",(self.instance.pk,"ledger")),
             ("strategy","v2_instance_page",(self.instance.pk,"strategy")),
-            ("breakdown","v2_instance_page",(self.instance.pk,"breakdown")),
+            ("review","v2_instance_page",(self.instance.pk,"review")),
             ("add-strategy","v2_add_strategy",()),
-            ("catalogue","v2_catalogue",()),
             ("settings","v2_settings",()),
         ]
         artifacts = Path(settings.BASE_DIR) / "docs/design/screenshots"
@@ -81,11 +80,3 @@ class Phase8OnlyV2BrowserTests(BrowserHarness):
                         self.page.screenshot(path=str(screenshot),full_page=True)
                         self.assertTrue(screenshot.exists())
                     self.assertEqual(self.browser_errors, [])
-
-    def test_legacy_bookmark_transparently_opens_v2(self):
-        self.new_page(390)
-        self.sign_in()
-        self.page.goto(self.live_server_url+"/cockpit/history/",wait_until="networkidle")
-        self.assertIn("/s/%s/history/"%self.instance.pk,self.page.url)
-        self.assertIsNotNone(self.page.locator(".w2-sidebar").bounding_box())
-        self.assertNotIn("SECRET_OTHER_OWNER",self.page.content())
