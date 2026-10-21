@@ -37,6 +37,7 @@
     <p class="w2-overline">
       {% if page_key == 'overview' %}All strategies · GBP
       {% elif page_key == 'settings' %}Applies to all strategies
+      {% elif page_key == 'admin' %}Site owner only · not visible to other users
       {% else %}Fixed, code-defined strategies{% endif %}
     </p>
   </div>
@@ -49,6 +50,7 @@
 </header>
 {% if page_key == 'overview' %}{% include 'v2/overview.html' %}
 {% elif page_key == 'settings' %}{% include 'v2/settings.html' %}
+{% elif page_key == 'admin' %}{% include 'v2/admin.html' %}
 {% else %}{% include 'v2/onboarding.html' %}{% endif %}
 {% endif %}
 {% endblock %}

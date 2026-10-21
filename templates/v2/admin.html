@@ -1,0 +1,51 @@
+{% if form.errors %}<div class="w2-form-error" role="alert">{{ form.non_field_errors }}{% for field in form %}{% for error in field.errors %}<p>{{ field.label }}: {{ error }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+<div class="w2-grid2">
+  <section class="w2-card" aria-labelledby="w2-admin-mail-title" id="mail">
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-mail-title">Mail server and Discord</h2>
+      <span class="w2-muted">SMTP {% if smtp_password_set %}set up{% else %}not set up{% endif %} · Discord {% if discord_set %}set up{% else %}not set up{% endif %}</span></div>
+    <p class="w2-note">Passwords and the webhook are stored encrypted and never shown again; leave them blank to keep the saved ones.</p>
+    <form method="post" action="{% url 'control' %}" class="w2-admin-form">
+      {% csrf_token %}
+      {% for field in form %}
+        {% if field.field.widget.input_type == 'checkbox' %}
+          <label class="w2-check" for="{{ field.id_for_label }}">{{ field }} <span>{{ field.label }}</span></label>
+        {% else %}
+          <label class="w2-field" for="{{ field.id_for_label }}">{{ field.label }} {{ field }}</label>
+        {% endif %}
+      {% endfor %}
+      <div class="w2-row w2-space-top"><button type="submit" class="w2-button w2-button-primary">Save mail and Discord</button></div>
+    </form>
+  </section>
+
+  <section class="w2-card" aria-labelledby="w2-admin-test-title">
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-test-title">Test and status</h2></div>
+    <p class="w2-note">A test goes to your own alert destinations from Alerts &amp; settings.</p>
+    <div class="w2-row w2-space-top">
+      <form method="post" action="{% url 'v2_notification_test' channel='email' %}">{% csrf_token %}<button type="submit" class="w2-button">Send email test</button></form>
+      <form method="post" action="{% url 'v2_notification_test' channel='discord' %}">{% csrf_token %}<button type="submit" class="w2-button">Send Discord test</button></form>
+    </div>
+    <div class="w2-setting-row w2-space-top"><span>Alert sender</span>
+      <span class="w2-muted">{% if scheduler_run %}Alert sender last ran {{ scheduler_run.started_at|date:"j M H:i" }} · {{ scheduler_run.status|lower }}{% if scheduler_run.error_code %} · {{ scheduler_run.error_code }}{% endif %}{% else %}The alert sender hasn't run yet{% endif %}</span></div>
+    <div class="w2-setting-row"><span>Signed-out bot check (Turnstile)</span>
+      <span class="w2-muted">{% if turnstile_set %}set up{% if turnstile_required %} · required{% endif %}{% else %}not set up{% endif %}</span></div>
+    <div class="w2-setting-row"><span>Invite requests</span>
+      <a href="{% url 'admin:tracker_inviterequest_changelist' %}">{{ invite_count }} waiting to be read</a></div>
+  </section>
+
+  <section class="w2-card w2-span2" aria-labelledby="w2-admin-prices-title">
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-prices-title">Price checks with a problem</h2><span class="w2-muted">From the hourly job</span></div>
+    <div class="w2-table-wrap">
+      <table class="w2-table">
+        <thead><tr><th scope="col">Ticker</th><th scope="col">Last tried</th><th scope="col">Problem</th></tr></thead>
+        <tbody>
+        {% for row in price_problems %}
+          <tr><td>{{ row.symbol }}</td><td>{{ row.last_attempt|date:"j M H:i"|default:"—" }}</td><td>{{ row.last_error }}</td></tr>
+        {% empty %}
+          <tr><td colspan="3"><span class="w2-muted">No price check has a problem.</span></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="w2-note">PRICE_HOLD means a price was held back for checking (for example a large one-day move or a wrong unit); strategies using it wait rather than act on it.</p>
+  </section>
+</div>

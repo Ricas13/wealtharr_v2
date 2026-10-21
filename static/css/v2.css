@@ -195,6 +195,15 @@ body.v2 {
   padding-top: 9px;
   margin-top: auto;
 }
+/* Admin links (staff only) sit at the bottom of the sidebar, above the footer. */
+.w2-sidebar-admin {
+  margin-top: auto;
+  border-top: 1px solid var(--w2-stroke-soft);
+  padding-bottom: 6px;
+}
+.w2-sidebar-admin .w2-nav-caption { margin-top: 10px !important; }
+.w2-sidebar-admin + .w2-sidebar-footer { margin-top: 0; }
+.w2-admin-form { display: grid; gap: 10px; }
 .w2-logout { margin: 0; }
 .w2-logout button { width: 100%; }
 .w2-nav-shade { display: none; }

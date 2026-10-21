@@ -96,9 +96,12 @@ class OwnerAlertMatrixTests(TestCase):
         self.assertEqual(len(response.context["last_receipts"]), 1)
         self.assertNotContains(response, "private_other")
         self.assertNotContains(response, "Alert sender")
+        self.assertEqual(self.client.get(reverse("control")).status_code, 302)
         self.owner.is_staff = True
         self.owner.save(update_fields=["is_staff"])
-        response = self.client.get(reverse("v2_settings"))
+        # Staff diagnostics live on the admin page, not in personal settings.
+        self.assertNotContains(self.client.get(reverse("v2_settings")), "Alert sender")
+        response = self.client.get(reverse("control"))
         self.assertContains(response, "Alert sender last ran")
 
     def test_turning_off_email_suspends_its_pending_retry(self):

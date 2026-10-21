@@ -16,14 +16,6 @@
       <div class="w2-row w2-space-top"><button type="submit" class="w2-button w2-button-primary">Save</button>
         <span class="w2-muted">Choose which alerts go where on each strategy's Strategy &amp; alerts tab.</span></div>
     </form>
-    {% if request.user.is_staff %}
-    <div class="w2-row w2-space-top">
-      <form method="post" action="{% url 'v2_notification_test' channel='email' %}">{% csrf_token %}<button type="submit" class="w2-button">Send email test</button></form>
-      <form method="post" action="{% url 'v2_notification_test' channel='discord' %}">{% csrf_token %}<button type="submit" class="w2-button">Send Discord test</button></form>
-      <a href="{% url 'control' %}">Mail server and webhook setup</a>
-    </div>
-    <p class="w2-note">{% if scheduler_run %}Alert sender last ran {{ scheduler_run.started_at|date:"j M H:i" }} · {{ scheduler_run.status|lower }}{% if scheduler_run.error_code %} · {{ scheduler_run.error_code }}{% endif %}.{% else %}The alert sender hasn't run yet.{% endif %}</p>
-    {% endif %}
   </section>
 
   <section class="w2-card" aria-labelledby="w2-strategy-notification-title">
