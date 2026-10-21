@@ -32,6 +32,13 @@ def attestation_text(strategy):
     )
 
 
+def setup_missing(strategy):
+    """Live but never fully pinned: a linked legacy strategy that went live
+    before go-live filled in the start date. The ledger can't record until
+    the owner finishes setup."""
+    return not (strategy.strategy_key and strategy.started_on and strategy.resolved_instruments)
+
+
 def go_live(strategy, user):
     """Switch one owner strategy live, or raise ValidationError and change nothing."""
     with transaction.atomic():
@@ -39,7 +46,7 @@ def go_live(strategy, user):
             "account", "preset").get(pk=strategy.pk)
         if strategy.owner_id != user.pk or strategy.account.owner_id != user.pk:
             raise ValidationError("This strategy doesn't belong to you.")
-        if not strategy.tracking_only:
+        if not strategy.tracking_only and not setup_missing(strategy):
             raise ValidationError("This strategy is already live.")
         key = strategy.strategy_key or strategy.preset.slug
         if key != strategy.preset.slug or strategy.account.currency != "GBP":
@@ -77,11 +84,11 @@ def go_live(strategy, user):
         if for_strategy(strategy) is None:
             raise ValidationError(
                 "These instruments aren't a verified trading line for this account, so it can't go live.")
-        return StrategyGoLive.objects.create(
-            strategy=strategy, confirmed_by=user,
-            strategy_version=version, mapping_version=CATALOGUE_VERSION,
-            attestation=attestation_text(strategy),
-        )
+        record, _ = StrategyGoLive.objects.get_or_create(strategy=strategy, defaults={
+            "confirmed_by": user, "strategy_version": version,
+            "mapping_version": CATALOGUE_VERSION, "attestation": attestation_text(strategy),
+        })
+        return record
 
 
 @login_required
@@ -100,6 +107,9 @@ def go_live_view(request, instance_id):
     except ValidationError as exc:
         messages.error(request, " ".join(exc.messages))
         return redirect("v2_instance_page", instance_id=strategy.pk, section="strategy")
+    if not strategy.tracking_only:
+        messages.success(request, f"{strategy.name} setup is finished. You can record entries now.")
+        return redirect("v2_instance_page", instance_id=strategy.pk, section="today")
     messages.success(
         request,
         f"{strategy.name} is live. Yahoo prices are fetched on the next hourly run; "

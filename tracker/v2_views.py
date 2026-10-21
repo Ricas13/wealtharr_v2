@@ -52,6 +52,9 @@ def _render(request, *, page_key, page_title, instance=None, section=None, **ext
     items = _instances(request)
     if instance is not None and "head_prices" not in extra:
         extra["head_prices"] = _price_freshness(instance)
+    if instance is not None:
+        from .v2_go_live import setup_missing
+        extra.setdefault("needs_setup", instance.tracking_only or setup_missing(instance))
     return render(
         request, "v2/page.html",
         {

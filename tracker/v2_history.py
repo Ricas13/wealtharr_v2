@@ -425,8 +425,11 @@ def _open_action(strategy, summary, today):
     """One short to-do for a strategy, from saved reviews and the ledger."""
     from .cockpit_execution import proposed_actions
     from .models import RebalanceExecution
+    from .v2_go_live import setup_missing
     if strategy.tracking_only:
         return {"kind": "golive", "title": "Not live yet", "detail": "Check the ledger, then go live"}
+    if setup_missing(strategy):
+        return {"kind": "golive", "title": "Setup not finished", "detail": "Confirm the instruments to start recording"}
     if not summary["positions"] and summary["cash"] > ZERO:
         return {"kind": "start", "title": "Buy your opening position",
                 "detail": "Split your cash at the target weights"}

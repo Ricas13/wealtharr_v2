@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -379,7 +380,8 @@ def edit_entry(request, instance_id, operation, entry_id=None):
     if entry_id is not None and old is None:
         raise Http404("Entry not found")
     if not _editable(strategy):
-        raise Http404("Legacy ledger edits are unavailable")
+        messages.error(request, "Finish this strategy's setup first, then you can record entries.")
+        return redirect(reverse("v2_instance_page", args=[strategy.pk, "strategy"]) + "#go-live")
     default = snapshot(old) if old else {
         "occurred_on": timezone.localdate().isoformat(), "kind": "DEPOSIT",
         "symbol": "", "quantity": "", "unit_price": "", "amount": "", "fee": "",

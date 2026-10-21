@@ -31,6 +31,7 @@ from .models import (
 )
 from .services import ledger_summary
 from .v2_views import _render
+from .v2_go_live import setup_missing
 
 
 ZERO = Decimal("0")
@@ -176,6 +177,18 @@ def today_page(request, instance_id):
             "Split your cash at the target weights, place the buys in "
             f"{strategy.account.broker_label}, "
             "then record what you actually bought.")
+    elif not strategy.tracking_only and setup_missing(strategy):
+        status = "setup"
+        headline = "Finish setting up"
+        explanation = ("This strategy is missing its start date or pinned instruments, "
+                       "so nothing can be recorded yet. It takes one confirmation.")
+    elif (not strategy.tracking_only and not report["positions"]
+          and report["cash"] <= ZERO):
+        status = "empty"
+        headline = "Add your first deposit"
+        explanation = ("Record the money you've put into your "
+                       f"{strategy.account.kind} with Add money. You'll then see "
+                       "exactly what to buy.")
     elif not ready:
         status = "blocked"
         headline = ("Not live yet" if strategy.tracking_only

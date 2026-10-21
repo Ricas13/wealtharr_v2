@@ -137,3 +137,64 @@ class GoLiveTests(TestCase):
         self.assertEqual(self.post(strategy, confirm="yes").status_code, 404)
         strategy.refresh_from_db()
         self.assertTrue(strategy.tracking_only)
+
+
+class HalfLiveTests(TestCase):
+    """A linked legacy strategy that went live before go-live filled the start
+    date: live, rules pinned, but no start date, so the ledger refused it."""
+    setUp = GoLiveTests.setUp
+    legacy_linked = GoLiveTests.legacy_linked
+    onboarded = GoLiveTests.onboarded
+    post = GoLiveTests.post
+
+    def half_live(self, with_entry=False):
+        strategy = self.legacy_linked(
+            tracking_only=False, market_data_enabled=True,
+            strategy_version=released_version(KEY), mapping_version=CATALOGUE_VERSION,
+            resolved_instruments=onboarding_manifest(KEY, "TRADING212", "ISA"))
+        if not with_entry:
+            strategy.ledger.all().delete()
+        StrategyGoLive.objects.create(strategy=strategy, confirmed_by=self.owner,
+                                      strategy_version=strategy.strategy_version,
+                                      mapping_version=CATALOGUE_VERSION, attestation="old")
+        return strategy
+
+    def test_ledger_points_to_finish_setup_instead_of_not_found(self):
+        strategy = self.half_live()
+        add = reverse("v2_ledger_add", args=[strategy.pk])
+        response = self.client.post(add, {"intent": "save", "kind": "DEPOSIT", "return_to": "today",
+                                          "occurred_on": "2026-10-02", "amount": "100"})
+        self.assertRedirects(response, reverse("v2_instance_page", args=[strategy.pk, "strategy"]) + "#go-live",
+                             fetch_redirect_response=False)
+        self.assertFalse(strategy.ledger.exists())
+        page = self.client.get(reverse("v2_instance_page", args=[strategy.pk, "strategy"]))
+        self.assertContains(page, "Finish setup")
+        today = self.client.get(reverse("v2_instance_page", args=[strategy.pk, "today"]))
+        self.assertContains(today, "Finish setting up")
+        self.assertNotContains(today, "Check strategy setup")
+
+    def test_finish_setup_pins_start_date_then_deposits_save(self):
+        strategy = self.half_live(with_entry=True)
+        response = self.post(strategy, confirm="yes")
+        self.assertRedirects(response, reverse("v2_instance_page", args=[strategy.pk, "today"]),
+                             fetch_redirect_response=False)
+        strategy.refresh_from_db()
+        self.assertEqual(strategy.started_on, date(2026, 10, 1))
+        self.assertFalse(strategy.tracking_only)
+        self.assertEqual(StrategyGoLive.objects.filter(strategy=strategy).count(), 1)
+        add = reverse("v2_ledger_add", args=[strategy.pk])
+        response = self.client.post(add, {"intent": "save", "kind": "DEPOSIT", "return_to": "today",
+                                          "occurred_on": "2026-10-02", "amount": "100"})
+        self.assertRedirects(response, reverse("v2_instance_page", args=[strategy.pk, "today"]),
+                             fetch_redirect_response=False)
+        self.assertTrue(strategy.ledger.filter(amount=D("100")).exists())
+        # Once finished, setup can't be re-run.
+        self.post(strategy, confirm="yes")
+        self.assertEqual(StrategyGoLive.objects.filter(strategy=strategy).count(), 1)
+
+    def test_live_strategy_with_nothing_recorded_asks_for_a_deposit(self):
+        strategy = self.onboarded()
+        StrategyInstance.objects.filter(pk=strategy.pk).update(tracking_only=False, market_data_enabled=True)
+        today = self.client.get(reverse("v2_instance_page", args=[strategy.pk, "today"]))
+        self.assertContains(today, "Add your first deposit")
+        self.assertContains(today, 'href="#w2-add-money"')
