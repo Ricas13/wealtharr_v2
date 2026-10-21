@@ -10,7 +10,8 @@ Worked examples: `strategies/nine_sig/` (quarterly signal line),
 `strategies/all_weather/` and `strategies/golden_butterfly/` (fixed weights, yearly
 rebalance). A fixed-weight strategy needs only a `v1.py` with `VERSION`, `WEIGHTS`
 and an `evaluate` calling the shared pure `strategies/fixed_weights.py::rebalance`,
-and a two-line `plugin.py` using `strategies/yearly_plugin.py`. A strategy without
+and a two-line `plugin.py` using `strategies/yearly_plugin.py` (`cadence="monthly"` checks
+after each month end instead; `strategies/permanent_portfolio/` uses it with a band rule). A strategy without
 fixed weights (`strategies/dual_momentum/`) sets its `role_targets` to 0 ("By signal"
 at setup) and gives its plug-in `current_weights` for the opening buy and allocation.
 

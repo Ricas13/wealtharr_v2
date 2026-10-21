@@ -81,15 +81,18 @@ class MomentumStudy(FixedWeightStudy):
         return {"values": values, "flows": flows, "trades": trades}
 
     def how_it_works(self, data):
+        money = {"GBP": "pounds", "USD": "US dollars", "EUR": "euros"}[self.CURRENCY]
+        fx = ("" if self.CURRENCY == "USD" else
+              " US-dollar series are converted with daily %s/USD rates (a hedged fund's stand-in uses "
+              "its own returns)." % self.CURRENCY)
         return (
             "At each month end the live rule compares 12-month total returns: if US shares beat cash, "
             "hold whichever of US or world ex-US shares did better, otherwise hold bonds. 100% sits in "
             "the chosen fund; switches sell everything else.",
             "Monthly top-ups arrive on the first trading day of each month and wait as cash for the "
             "month-end review; SPY and VTI invest them that day.",
-            "All values are in pounds with dividends reinvested. US-dollar series are converted with "
-            "daily GBP/USD rates (a GBP-hedged fund's stand-in uses its own returns). Trades fill at "
-            "that day's close with no dealing costs or tax.",
+            "All values are in %s with dividends reinvested.%s Trades fill at that day's close with no "
+            "dealing costs or tax." % (money, fx),
             "The first 12 months of data are only used to measure momentum. Before a fund existed, its "
             "role follows a stand-in, flagged on the page.",
         )

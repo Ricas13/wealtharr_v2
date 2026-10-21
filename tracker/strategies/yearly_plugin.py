@@ -1,10 +1,18 @@
-"""Plug-in wiring for fixed-weight strategies reviewed once after each year end."""
-from tracker.core.calendar import year_end_before, year_end_on_or_after
+"""Plug-in wiring for fixed-weight strategies reviewed after each year (or month) end."""
+from tracker.core.calendar import (
+    month_end_before, month_end_on_or_after, year_end_before, year_end_on_or_after,
+)
 from tracker.strategies.base import StrategyModule
 
+SCHEDULES = {
+    # cadence word: (last review before a day, next review on/after a day, title)
+    "yearly": (year_end_before, year_end_on_or_after, lambda d: "Yearly rebalance %d" % d.year),
+    "monthly": (month_end_before, month_end_on_or_after, lambda d: "Monthly check %s" % d.strftime("%B %Y")),
+}
 
-def yearly_review(instance, *, key, rules):
-    """Hourly: refresh prices; after a year end, save that year's review once.
+
+def yearly_review(instance, *, key, rules, cadence="yearly"):
+    """Hourly: refresh prices; after a year (or month) end, save that review once.
 
     ``rules`` is the strategy's pure versioned module: VERSION, WEIGHTS, Fund,
     Quote and evaluate(funds=, positions=, cash=, quotes=, as_of=).
@@ -37,9 +45,10 @@ def yearly_review(instance, *, key, rules):
                 PriceMark.objects.update_or_create(
                     strategy=instance, symbol=symbol,
                     defaults={"price": close.price, "as_of": close.as_of, "source": "yahoo"})
-    as_of = year_end_before(today)
+    last_before, _, title = SCHEDULES[cadence]
+    as_of = last_before(today)
     if instance.started_on and instance.started_on > as_of:
-        return {"status": "waiting for the first year end"}
+        return {"status": "waiting for the first review date"}
     signal_key = "%s:%s:%s" % (key, instance.pk, as_of.isoformat())
     if StrategySignal.objects.filter(strategy=instance, signal_key=signal_key).exists():
         return {"status": "ok"}
@@ -59,18 +68,19 @@ def yearly_review(instance, *, key, rules):
         return {"status": "cannot_compute", "reason": result.reason}
     StrategySignal.objects.create(
         strategy=instance, signal_key=signal_key, kind="QUARTERLY", as_of=as_of,
-        title="Yearly rebalance %d" % as_of.year, message=result.reason,
+        title=title(as_of), message=result.reason,
         actions=[t.as_action() for t in result.trades], strategy_version=rules.VERSION)
     return {"status": "ok"}
 
 
-def yearly_rebalance_plugin(key, rules, *, study=None):
+def yearly_rebalance_plugin(key, rules, *, study=None, cadence="yearly"):
+    last_before, next_on_or_after, _ = SCHEDULES[cadence]
     return StrategyModule(
         key=key,
-        review=lambda instance: yearly_review(instance, key=key, rules=rules),
-        next_review=year_end_on_or_after,
-        last_review_before=year_end_before,
+        review=lambda instance: yearly_review(instance, key=key, rules=rules, cadence=cadence),
+        next_review=next_on_or_after,
+        last_review_before=last_before,
         allocation_label="Target",
-        cadence_word="yearly",
+        cadence_word=cadence,
         study=study,
     )

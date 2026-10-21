@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
+from .core.calendar import month_end_on_or_after
 from .models import StudyPrice
 from .study import TIMEFRAMES, _buy_and_hold, _new_month, _summary, start_index  # noqa: F401
 
@@ -80,8 +81,9 @@ class FixedWeightStudy:
     TIMEFRAMES = TIMEFRAMES
     PRIMARY = "strategy"
 
-    def __init__(self, *, title, rules, sources, review_word="yearly", currency="GBP"):
+    def __init__(self, *, title, rules, sources, review_word="yearly", currency="GBP", rule_text=""):
         self.TITLE = title
+        self.rule_text = rule_text
         self.CURRENCY = currency
         self.rules = rules
         self.sources = sources  # {role: Source}
@@ -188,10 +190,15 @@ class FixedWeightStudy:
             if i > s and _new_month(days, i) and monthly:
                 cash += D(str(monthly))
                 flows.append((days[i], monthly))
-            year_end = i + 1 < len(days) and days[i + 1].year != days[i].year
-            if i > s and year_end:
+            if self.review_word == "monthly":
+                due = i + 1 < len(days) and days[i + 1].month != days[i].month
+                review_day = month_end_on_or_after(days[i])
+            else:
+                due = i + 1 < len(days) and days[i + 1].year != days[i].year
+                review_day = date(days[i].year, 12, 31)
+            if i > s and due:
                 apply(rules.evaluate(funds=funds, positions=positions, cash=cash,
-                                     quotes=quotes(i), as_of=date(days[i].year, 12, 31)))
+                                     quotes=quotes(i), as_of=review_day))
             values.append(float(cash + sum(positions[r] * D(str(round(data.prices[r][i], 6))) for r in roles)))
         return {"values": values, "flows": flows, "trades": trades}
 
@@ -221,12 +228,18 @@ class FixedWeightStudy:
     def how_it_works(self, data):
         weights = ", ".join("%s%% %s" % ((w * 100).normalize(), self.sources[r].fund_label)
                             for r, w in self.rules.WEIGHTS)
+        period = "month" if self.review_word == "monthly" else "year"
+        rule = self.rule_text or (
+            "sell what's above its weight, buy what's below, never borrowing.")
+        money = {"GBP": "pounds", "USD": "US dollars", "EUR": "euros"}[self.CURRENCY]
+        fx = ("" if self.CURRENCY == "USD" else
+              " US-dollar series are converted with daily %s/USD rates." % self.CURRENCY)
         return (
-            "Starts at the published weights (%s) and runs the live %s rule after each year end: "
-            "sell what's above its weight, buy what's below, never borrowing." % (weights, self.review_word),
+            "Starts at the published weights (%s) and runs the live %s rule after each %s end: %s"
+            % (weights, self.review_word, period, rule),
             "Monthly top-ups arrive on the first trading day of each month and wait as cash for the "
-            "next yearly review; SPY and VTI invest them that day.",
-            "All values are in pounds with dividends reinvested. US-dollar series are converted with "
-            "daily GBP/USD rates. Trades fill at that day's close with no dealing costs or tax.",
+            "next %s review; SPY and VTI invest them that day." % self.review_word,
+            "All values are in %s with dividends reinvested.%s Trades fill at that day's close with "
+            "no dealing costs or tax." % (money, fx),
             "Before a fund existed, its role follows a stand-in, flagged on the page.",
         )

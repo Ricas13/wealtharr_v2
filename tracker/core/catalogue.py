@@ -26,6 +26,7 @@ CATALOGUE_VERSION = MAPPING_VERSION
 ALL_WEATHER = "all-weather"
 GOLDEN_BUTTERFLY = "golden-butterfly"
 DUAL_MOMENTUM = "dual-momentum"
+PERMANENT_PORTFOLIO = "permanent-portfolio"
 from tracker.core.brokers import ACCOUNT_TYPE_NAMES  # noqa: E402
 ACCOUNT_TYPES = tuple(ACCOUNT_TYPE_NAMES.items())
 
@@ -60,6 +61,11 @@ _OFFERS = {
         DUAL_MOMENTUM, "Dual Momentum", "High risk", "Monthly",
         "100% in one fund, chosen each month: US shares, world ex-US shares, or bonds when shares "
         "aren't beating cash. Not affiliated with Gary Antonacci.", True,
+    ),
+    PERMANENT_PORTFOLIO: StrategyOffer(
+        PERMANENT_PORTFOLIO, "Permanent Portfolio", "Low risk", "Monthly check",
+        "25% each in stocks, long-term government bonds, cash and gold, rebalanced only when a "
+        "part drifts below 15% or above 35%.", True,
     ),
 }
 OFFERS = MappingProxyType(_OFFERS)
@@ -113,7 +119,7 @@ class CatalogueLine:
             "inter": "Intermediate bonds", "gold": "Gold",
             "comm": "Commodities",
             "scv": "Small-cap value", "short": "Short bonds",
-    "us": "US shares", "intl": "World ex-US shares", "bonds": "Bonds",
+    "us": "US shares", "intl": "World ex-US shares", "cashfund": "Cash fund", "bonds": "Bonds",
         }.get(self.role, self.role)
 
     @property
@@ -309,10 +315,19 @@ EU_ERNX = _eu("iShares € Ultrashort Bond UCITS ETF (Acc)", "iShares", "IE000RH
               "not the US AGG bond fund.",
               "https://www.onvista.de/etf/iShares-EUR-Ultrashort-Bond-UCITS-ETF-Acc-ETF-IE000RHYOR04")
 
+UK_ERNS = _from_instrument(SAFE_UK)
+US_BIL = _us("SPDR Bloomberg 1-3 Month T-Bill ETF", "State Street", "US78468R6633", "BIL",
+             "https://www.ssga.com/us/en/etfs/spdr-bloomberg-1-3-month-t-bill-etf-bil",
+             "1-3 month US Treasury bills, Browne's cash.")
+EU_XEON = _eu("Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C", "Xtrackers", "LU0290358497", "XEON.DE",
+              "https://live.deutsche-boerse.com/en/etf/xtrackers-ii-eur-overnight-rate-swap-ucits-etf-1c",
+              "Euro equivalent of Treasury bills: the €STR overnight rate (swap-based), accumulating.",
+              TR_BROWSE + "?q=LU0290358497")
+
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
     (STRATEGY_9SIG, "growth", "GB"): (_from_instrument(EQUITY_UK),),
-    (STRATEGY_9SIG, "safe", "GB"): (_from_instrument(SAFE_UK),),
+    (STRATEGY_9SIG, "safe", "GB"): (UK_ERNS,),
     (ALL_WEATHER, "stocks", "GB"): (VUAG,),
     (ALL_WEATHER, "long", "GB"): (GLTL,),
     (ALL_WEATHER, "inter", "GB"): (IGLT,),
@@ -352,6 +367,18 @@ ROLE_LISTINGS = {
     (DUAL_MOMENTUM, "us", "DE"): (EU_SXR8,),
     (DUAL_MOMENTUM, "intl", "DE"): (EU_EXUS,),
     (DUAL_MOMENTUM, "bonds", "DE"): (EU_VAGF,),
+    (PERMANENT_PORTFOLIO, "stocks", "GB"): (VUAG,),
+    (PERMANENT_PORTFOLIO, "long", "GB"): (GLTL,),
+    (PERMANENT_PORTFOLIO, "cashfund", "GB"): (UK_ERNS,),
+    (PERMANENT_PORTFOLIO, "gold", "GB"): (SGLN,),
+    (PERMANENT_PORTFOLIO, "stocks", "US"): (US_VTI,),
+    (PERMANENT_PORTFOLIO, "long", "US"): (US_TLT,),
+    (PERMANENT_PORTFOLIO, "cashfund", "US"): (US_BIL,),
+    (PERMANENT_PORTFOLIO, "gold", "US"): (US_GLD,),
+    (PERMANENT_PORTFOLIO, "stocks", "DE"): (EU_SXR8,),
+    (PERMANENT_PORTFOLIO, "long", "DE"): (EU_DBXF,),
+    (PERMANENT_PORTFOLIO, "cashfund", "DE"): (EU_XEON,),
+    (PERMANENT_PORTFOLIO, "gold", "DE"): (EU_PPFB,),
     (STRATEGY_9SIG, "growth", "US"): (US_TQQQ,),
     (STRATEGY_9SIG, "safe", "US"): (US_AGG,),
     (STRATEGY_9SIG, "growth", "DE"): (EU_3QQQ,),
