@@ -24,14 +24,14 @@ from .models import (
     SignalFill, StrategyInstance, StrategySignal,
 )
 from .services import ledger_summary, validate_and_record
-from .v2_review_refresh import retire_stale_reviews
+from .v2_review_refresh import rebuild_value_history, retire_stale_reviews
 from .v2_ledger_core import (
     ZERO, EffectiveEntry, effective_entries, evidence_impact, find_entry,
     latest_deleted_payload, linked_source, replay, snapshot, state_digest,
     with_proposed_change,
 )
 from .v2_views import _render
-from .v2_onboarding import OPENING_NOTE, _decimal, _date
+from .v2_onboarding import _decimal, _date, isa_deposits
 from .core.isa_allowance import estimate_allowance, tax_year_bounds
 
 
@@ -334,9 +334,7 @@ def _isa_advisory(strategy, payload, other_isa=""):
     other = _decimal(other_raw, "other ISA subscriptions") if other_raw else None
     day = date.fromisoformat(payload["occurred_on"])
     start, end = tax_year_bounds(day)
-    recorded = tuple(strategy.ledger.filter(
-        kind=LedgerEntry.DEPOSIT, occurred_on__range=(start, end),
-    ).exclude(note=OPENING_NOTE).values_list("occurred_on", "amount"))
+    recorded = isa_deposits(strategy.owner, start, end)
     try:
         estimate = estimate_allowance(
             as_of=day,
@@ -405,6 +403,7 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                         locked, payload, request.POST.get("other_isa_subscriptions", ""))
                     entry = _add_entry(locked, request.user, payload, report)
                     retire_stale_reviews(locked, entry.occurred_on)
+                    rebuild_value_history(locked, entry.occurred_on)
                 messages.success(request, "Saved. You can edit or delete it from the Ledger.")
                 if advisory:
                     messages.warning(request, advisory)
@@ -447,6 +446,7 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                         changed_on = min(dates)
                     # Only reviews dated on/after the changed entry are retired.
                     retire_stale_reviews(locked, changed_on)
+                    rebuild_value_history(locked, changed_on)
                     request.session.pop(key, None)
                 messages.success(request, "Ledger change saved with its full revision history.")
                 if advisory:

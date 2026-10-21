@@ -1,15 +1,16 @@
-"""Read-only owner strategy identity, released rules and actual baseline evidence.
+"""Owner strategy identity, released rules and actual baseline evidence.
 
-Notification editing remains centralized in Phase 7 owner Settings. This page
-never changes strategy identity, prices, executions, rules or alert routing.
+This page never changes strategy identity, prices, executions or rules; the
+only thing edited here is the planned monthly top-up used by reminders.
 """
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_GET
+from django.utils import timezone
+from django.views.decorators.http import require_GET, require_POST
 
 from .core.catalogue import rows_for, MappingNotAvailable
 from .models import StrategyGoLive, StrategyInstance
-from .v2_go_live import attestation_text
+from .v2_go_live import attestation_text, first_entry_date
 from .strategies.registry import describe_strategy
 from .v2_views import _render
 
@@ -72,4 +73,27 @@ def strategy_page(request, instance_id):
         strategy_tracking_only=instance.tracking_only,
         strategy_go_live=live,
         strategy_attestation=attestation_text(instance),
+        strategy_default_start=first_entry_date(instance) or timezone.localdate(),
     )
+
+
+@login_required
+@require_POST
+def plan_view(request, instance_id):
+    """Change the planned monthly top-up. Only reminders use it; history is untouched."""
+    from django.contrib import messages
+    from django.core.exceptions import ValidationError
+    from django.shortcuts import redirect
+    from django.urls import reverse
+    from .v2_onboarding import _decimal
+    instance = get_object_or_404(
+        StrategyInstance.objects.filter(owner=request.user, account__owner=request.user)
+        .exclude(account__kind="PAPER"), pk=instance_id)
+    try:
+        amount = _decimal(request.POST.get("monthly_target", ""), "Monthly plan")
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+    else:
+        StrategyInstance.objects.filter(pk=instance.pk).update(monthly_target=amount)
+        messages.success(request, "Monthly plan saved." if amount else "Monthly reminder turned off.")
+    return redirect(reverse("v2_instance_page", args=[instance.pk, "strategy"]) + "#monthly-plan")

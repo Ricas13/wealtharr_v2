@@ -76,6 +76,9 @@
       </div>
       {% endfor %}
     </div>
+    <label class="w2-field" style="max-width:320px">Monthly top-up you plan (£, optional)
+      <input class="w2-input" name="monthly" inputmode="decimal" type="number" min="0" step="0.01" value="{{ wizard_monthly }}" placeholder="e.g. 500">
+      <small class="w2-muted">Used for a reminder if a month's deposit hasn't been recorded. Change it any time.</small></label>
     {% if wizard.type == 'ISA' and wizard_tax_year_verified %}<p class="w2-note">ISA allowance (advisory): £{{ wizard_known_isa|floatformat:"2g" }} of £{{ wizard_isa_limit|floatformat:0 }} recorded in Wealtharr this tax year, not counting other ISAs.</p>
     {% elif wizard.type == 'GIA' %}<p class="w2-note">A GIA may incur dividend and capital-gains tax. This is tracking, not tax advice.</p>{% endif %}
 

@@ -17,8 +17,9 @@ def auto_finish_reviews(today=None):
     """Finish every ready review; returns how many were finished. Idempotent."""
     quarter = quarter_end_before(today or timezone.localdate())
     finished = 0
+    # The current quarter, plus late reviews whose fills are all recorded.
     signals = StrategySignal.objects.select_related("strategy").filter(
-        kind="QUARTERLY", as_of=quarter, reset_reason="",
+        kind="QUARTERLY", as_of__lte=quarter, reset_reason="",
         strategy__tracking_only=False,
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE", "CONFIRMED"))
     for signal in signals:

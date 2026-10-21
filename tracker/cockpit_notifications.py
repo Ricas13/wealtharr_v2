@@ -9,12 +9,12 @@ from hashlib import sha256
 
 from django.utils import timezone
 from .models import (
-    LedgerEntry, NotificationPreference, RebalanceExecution,
+    LedgerEntry, NotificationDelivery, NotificationPreference, RebalanceExecution,
     SignalFill, StrategyInstance, StrategySignal,
 )
 from .services import dispatch, ledger_summary
 from .notification_routing import route_notice, newly_delivered
-from .signal_status import _price_status
+from .signal_status import _price_status, changed_since_review
 from .market_signals import quarter_end_before
 
 D = Decimal
@@ -78,10 +78,16 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
             actions = trade_lines(recent)
             existing = SignalFill.objects.filter(strategy=strategy, signal=recent)
             partial = existing.exists()
-            # A proposal must not be sent with invented or stale quantities
-            # after any unrelated broker event. Stored partials are factual.
-            reconciled = (fresh and not strategy.ledger.filter(
-                occurred_on__gt=recent.as_of).exists())
+            # Same rule as Today: new money after quarter-end keeps the
+            # proposal valid; trades, withdrawals or corrections supersede it.
+            superseded = changed_since_review(strategy, recent)
+            reconciled = fresh and not superseded
+            if superseded and not partial:
+                # Never retry a digest whose advice no longer holds.
+                NotificationDelivery.objects.filter(
+                    owner=owner, event_key="quarterly-digest:%s:%s" % (strategy.pk, recent.signal_key),
+                    status__in=("PENDING", "FAILED", "SENDING"),
+                ).update(status="CANCELLED", next_retry_at=None, error="Review superseded")
             if actions and reconciled and not partial:
                 count += _send(strategy, owner, "quarterly",
                     "quarterly-digest:%s:%s" % (strategy.pk, recent.signal_key),
@@ -108,9 +114,10 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
 
         if (pref.monthly_reminders and strategy.contribution_alerts and
                 strategy.monthly_target > 0 and today.day >= 3):
-            contributed = sum((row.amount for row in strategy.ledger.filter(
-                kind="DEPOSIT", occurred_on__year=today.year,
-                occurred_on__month=today.month)), D("0"))
+            from .v2_ledger_core import effective_entries
+            contributed = sum((row.amount for row in effective_entries(strategy)
+                               if row.kind == "DEPOSIT" and row.occurred_on.year == today.year
+                               and row.occurred_on.month == today.month), D("0"))
             if contributed < strategy.monthly_target:
                 count += _send(strategy, owner, "contribution",
                     "monthly:%s:%04d-%02d" % (

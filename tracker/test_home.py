@@ -59,7 +59,7 @@ class InviteTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_superuser("boss", "boss@example.com", "a-long-test-password-1")
 
-    @patch("tracker.v2_home.dispatch")
+    @patch("tracker.v2_home.dispatch", return_value={"email": "sent"})
     def test_invite_is_stored_once_and_owner_notified(self, dispatch):
         response = self.client.post("/invite/", {"email": " Friend@Example.com "})
         self.assertRedirects(response, "/?invite=thanks#invite", fetch_redirect_response=False)
@@ -92,8 +92,13 @@ class InviteTests(TestCase):
         self.assertEqual(InviteRequest.objects.count(), 0)
         self.assertContains(self.client.get("/"), "cf-turnstile")
 
+    @patch("tracker.v2_home.dispatch", return_value={"email": "disabled", "discord": "disabled"})
+    def test_invite_not_marked_notified_when_no_destination_sent_it(self, dispatch):
+        self.client.post("/invite/", {"email": "quiet@example.com"})
+        self.assertFalse(InviteRequest.objects.get().notified)
+
     @patch("tracker.v2_home.DAILY_INVITE_ALERTS", 2)
-    @patch("tracker.v2_home.dispatch")
+    @patch("tracker.v2_home.dispatch", return_value={"email": "sent"})
     def test_alerts_are_capped_per_day_but_requests_kept(self, dispatch):
         for n in range(4):
             self.client.post("/invite/", {"email": "p%d@example.com" % n})

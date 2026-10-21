@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -40,8 +41,16 @@ def setup_missing(strategy):
     return pinned and not (strategy.strategy_key and strategy.started_on and strategy.resolved_instruments)
 
 
-def go_live(strategy, user):
-    """Switch one owner strategy live, or raise ValidationError and change nothing."""
+def first_entry_date(strategy):
+    return strategy.ledger.order_by("occurred_on").values_list("occurred_on", flat=True).first()
+
+
+def go_live(strategy, user, started_on=None):
+    """Switch one owner strategy live, or raise ValidationError and change nothing.
+
+    A strategy with no pinned start date takes the date the owner confirms
+    (by default its first ledger entry, or today when there is none).
+    """
     with transaction.atomic():
         strategy = StrategyInstance.objects.select_for_update().select_related(
             "account", "preset").get(pk=strategy.pk)
@@ -49,6 +58,13 @@ def go_live(strategy, user):
             raise ValidationError("This strategy doesn't belong to you.")
         if not strategy.tracking_only and not setup_missing(strategy):
             raise ValidationError("This strategy is already live.")
+        first = first_entry_date(strategy)
+        if not strategy.started_on and started_on is not None:
+            if started_on > timezone.localdate():
+                raise ValidationError("The start date can't be in the future.")
+            if first and started_on > first:
+                raise ValidationError(
+                    f"The start date can't be after your first ledger entry ({first:%d %b %Y}).")
         key = strategy.strategy_key or strategy.preset.slug
         if key != strategy.preset.slug or strategy.account.currency != "GBP":
             raise ValidationError("This strategy's account doesn't match a supported mapping.")
@@ -74,10 +90,7 @@ def go_live(strategy, user):
             mapping_version=CATALOGUE_VERSION,
             resolved_instruments=manifest,
             owner_checked_on=strategy.owner_checked_on or timezone.localdate(),
-            # A linked legacy strategy has no pinned start; its first entry is it.
-            started_on=strategy.started_on or (
-                strategy.ledger.order_by("occurred_on").values_list("occurred_on", flat=True).first()
-                or timezone.localdate()),
+            started_on=strategy.started_on or started_on or first or timezone.localdate(),
             tracking_only=False,
             market_data_enabled=True,
         )
@@ -103,8 +116,16 @@ def go_live_view(request, instance_id):
     if request.POST.get("confirm") != "yes":
         messages.error(request, "Tick the confirmation box to go live.")
         return redirect("v2_instance_page", instance_id=strategy.pk, section="strategy")
+    started_on = None
+    if request.POST.get("started_on"):
+        from datetime import date
+        try:
+            started_on = date.fromisoformat(request.POST["started_on"])
+        except ValueError:
+            messages.error(request, "Enter a valid start date.")
+            return redirect(reverse("v2_instance_page", args=[strategy.pk, "strategy"]) + "#go-live")
     try:
-        go_live(strategy, request.user)
+        go_live(strategy, request.user, started_on=started_on)
     except ValidationError as exc:
         messages.error(request, " ".join(exc.messages))
         return redirect("v2_instance_page", instance_id=strategy.pk, section="strategy")

@@ -122,14 +122,20 @@ def _notify_owners(invite):
     if InviteRequest.objects.filter(created_at__gte=since, notified=True).count() >= DAILY_INVITE_ALERTS:
         return
     owners = get_user_model().objects.filter(is_superuser=True, is_active=True)
+    delivered = False
     for owner in owners:
         try:
-            dispatch(owner, "invite:%d" % invite.pk, "Wealtharr invite request",
-                     "%s asked for an invite on the homepage. If you want to let them in, "
-                     "create their account in admin." % invite.email)
+            outcomes = dispatch(owner, "invite:%d" % invite.pk, "Wealtharr invite request",
+                                "%s asked for an invite on the homepage. If you want to let them in, "
+                                "create their account in admin." % invite.email)
         except Exception:  # An alert problem never loses the request itself.
             log.exception("Invite notification failed")
-    InviteRequest.objects.filter(pk=invite.pk).update(notified=True)
+            continue
+        # Sent now, or queued for the scheduler's retry; "disabled" sends nothing.
+        delivered = delivered or any(status in ("sent", "pending", "retrying")
+                                     for status in (outcomes or {}).values())
+    if delivered:
+        InviteRequest.objects.filter(pk=invite.pk).update(notified=True)
 
 
 @require_POST

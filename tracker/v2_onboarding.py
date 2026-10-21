@@ -10,7 +10,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -63,12 +62,19 @@ def _date(value):
 OPENING_NOTE = "Opening position you entered (not a broker trade)."
 
 
+def isa_deposits(owner, start, end):
+    """Real deposits into the owner's ISA strategies in a tax year, after corrections."""
+    from .v2_ledger_core import effective_entries
+    return tuple(
+        (e.occurred_on, e.amount)
+        for s in StrategyInstance.objects.filter(owner=owner, account__kind="ISA")
+        for e in effective_entries(s)
+        if e.kind == LedgerEntry.DEPOSIT and start <= e.occurred_on <= end and e.note != OPENING_NOTE)
+
+
 def _isa_recorded(owner, as_of):
     start, end = tax_year_bounds(as_of)
-    amount = (LedgerEntry.objects.filter(
-        strategy__owner=owner, strategy__account__kind="ISA",
-        kind=LedgerEntry.DEPOSIT, occurred_on__range=(start, end),
-    ).exclude(note=OPENING_NOTE).aggregate(total=Sum("amount"))["total"] or Decimal("0"))
+    amount = sum((amount for _, amount in isa_deposits(owner, start, end)), Decimal("0"))
     return amount, start.year == 2026
 
 
@@ -178,6 +184,7 @@ def _enroll(owner, state):
             owner_checked_on=timezone.localdate(),
             tracking_only=True, market_data_enabled=False,
             onboarding_mode=state["mode"], alert_routes=state["routes"],
+            monthly_target=state.get("monthly") or Decimal("0"),
         )
         if state["mode"] == "fresh":
             actual_amount = _decimal(state["amount"], "deposited amount", allow_zero=False)
@@ -242,6 +249,7 @@ def wizard(request):
                 raise ValidationError(availability_reason(strategy, platform, account_type))
             state.update(_draft_start(post, state))
             state.update(_validated_start(post, state))
+            state["monthly"] = _decimal(post.get("monthly", ""), "your monthly top-up")
             if not state["ack"]:
                 raise ValidationError("Tick the box to confirm you checked these instruments in your own account.")
             instance = _enroll(request.user, state)
@@ -278,5 +286,6 @@ def wizard(request):
         wizard_tax_year_verified=verified_year,
         wizard_today=timezone.localdate(),
         wizard_amount=post.get("amount", ""), wizard_deposited=post.get("deposited") == "yes",
+        wizard_monthly=post.get("monthly", ""),
         wizard_go_live=post.get("go_live") == "yes" or request.method == "GET",
     )
