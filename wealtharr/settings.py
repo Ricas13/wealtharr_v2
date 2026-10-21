@@ -36,6 +36,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "tracker.totp_middleware.RequireOwnerTOTP",
+    "tracker.seo.SeoMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -50,6 +51,7 @@ TEMPLATES = [{
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
         "tracker.context_processors.chrome",
+        "tracker.context_processors.public_site",
     ]},
 }]
 WSGI_APPLICATION = "wealtharr.wsgi.application"
@@ -130,6 +132,9 @@ if not DEBUG and ("*" in ALLOWED_HOSTS or not ALLOWED_HOSTS):
     raise RuntimeError("Production ALLOWED_HOSTS must enumerate the private hostname")
 X_FRAME_OPTIONS = "DENY"
 TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
+# The one public origin search engines should index, e.g. https://wealtharr.com.
+# When set, every other host 301-redirects to it; add both hosts to ALLOWED_HOSTS.
+SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/")
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
 # Production login intentionally fails closed if Turnstile is not configured.
 TURNSTILE_REQUIRED = not DEBUG

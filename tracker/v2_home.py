@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 FRAMES = (("ytd", "YTD"), ("1y", "1Y"), ("5y", "5Y"), ("10y", "10Y"), ("20y", "20Y"))
 FRAME_WORDS = {"ytd": "this year", "1y": "1 year", "5y": "5 years", "10y": "10 years", "20y": "20 years"}
 LINES = {
-    "nine_sig": ("9Sig", "quarterly", "4× a year", "#5b9cf5"),
+    "nine_sig": ("Quarterly signal", "60/40, 9% growth target", "4× a year", "#5b9cf5"),
     "hold": ("Buy & hold 3× Nasdaq", "100% growth fund", "Never", "#f0a050"),
     "spy": ("S&P 500 (SPY)", "benchmark", "Never", "#9aa3ad"),
     "vti": ("US total market (VTI)", "benchmark", "Never", "#b58cf0"),

@@ -60,3 +60,17 @@ class HomepageBrowserTests(BrowserHarness):
         self.page.wait_for_load_state("networkidle")
         self.assertTrue(self.page.get_by_text("Thanks, you're on the list.").is_visible())
         self.assertTrue(InviteRequest.objects.filter(email="friend@example.com").exists())
+
+    def test_guides_render_without_overflow_or_errors(self):
+        from tracker.guides import GUIDES
+        for width in (390, 1440):
+            page = self.new_page(width)
+            page.goto(self.live_server_url + "/guides/", wait_until="networkidle")
+            self.assertLessEqual(self.overflow(), 1)
+            page.get_by_role("link", name=GUIDES[1]["h1"]).first.click()
+            page.wait_for_load_state("networkidle")
+            self.assertTrue(page.get_by_role("heading", level=1, name=GUIDES[1]["h1"]).is_visible())
+            self.assertLessEqual(self.overflow(), 1)
+            page.get_by_text("Does volatility decay mean leveraged ETFs always lose?").click()
+            self.assertTrue(page.get_by_text("In steady trends").is_visible())
+        self.assertEqual(self.browser_errors, [])

@@ -1,0 +1,36 @@
+{% extends "public/base.html" %}{% load static %}
+{% block title %}{{ guide.title }}{% endblock %}
+{% block description %}{{ guide.description }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_title %}{{ guide.title }}{% endblock %}
+{% block og_description %}{{ guide.description }}{% endblock %}
+{% block head %}<meta property="article:modified_time" content="{{ guide.updated|date:'Y-m-d' }}">{% endblock %}
+{% block jsonld %},
+{"@type":"Article","headline":"{{ guide.h1|escapejs }}","description":"{{ guide.description|escapejs }}","dateModified":"{{ guide.updated|date:'Y-m-d' }}","datePublished":"{{ guide.updated|date:'Y-m-d' }}","inLanguage":"en-GB","mainEntityOfPage":"{{ site_url }}{{ request.path }}","author":{"@id":"{{ site_url }}/#org"},"publisher":{"@id":"{{ site_url }}/#org"},"image":"{{ site_url }}{% static 'img/og.png' %}"},
+{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"{{ site_url }}/"},{"@type":"ListItem","position":2,"name":"Guides","item":"{{ site_url }}{% url 'guides' %}"},{"@type":"ListItem","position":3,"name":"{{ guide.title|escapejs }}","item":"{{ site_url }}{{ request.path }}"}]},
+{"@type":"FAQPage","mainEntity":[{% for q, a in guide.faqs %}{"@type":"Question","name":"{{ q|escapejs }}","acceptedAnswer":{"@type":"Answer","text":"{{ a|escapejs }}"}}{% if not forloop.last %},{% endif %}{% endfor %}]}{% endblock %}
+{% block content %}
+<div class="wrap">
+  <article class="article">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> › <a href="{% url 'guides' %}">Guides</a> › <span aria-current="page">{{ guide.title }}</span></nav>
+    <h1>{{ guide.h1 }}</h1>
+    <p class="meta mut">Updated <time datetime="{{ guide.updated|date:'Y-m-d' }}">{{ guide.updated|date:"j F Y" }}</time> · {{ guide.minutes }} min read · Educational, not financial advice</p>
+    <p class="lead">{{ guide.description }}</p>
+    {% include body_template %}
+    <section class="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title">Common questions</h2>
+      {% for q, a in guide.faqs %}<details{% if forloop.first %} open{% endif %}><summary>{{ q }}</summary><p>{{ a }}</p></details>{% endfor %}
+    </section>
+    <aside class="cta-box">
+      <strong>Rather not keep the spreadsheet?</strong>
+      <p class="mut">Wealtharr tracks a fixed, rules-based plan in your ISA and tells you exactly what to do at each quarter end. It never connects to your broker.</p>
+      <div class="row"><a class="btn" href="/#compare">Compare strategies</a><a class="btn g" href="/#invite">Request an invite</a></div>
+    </aside>
+    <p class="mut tiny">This guide is general information, not personal financial advice. Leveraged products are high risk and can lose most of their value quickly. Tax treatment depends on your circumstances and can change. If you're unsure, speak to a regulated financial adviser.</p>
+  </article>
+  <section class="related" aria-labelledby="related-title">
+    <h2 id="related-title">Keep reading</h2>
+    <div class="cards">{% for g in related %}<a class="card link" href="{% url 'guide' g.slug %}"><strong>{{ g.h1 }}</strong><span class="mut">{{ g.minutes }} min read</span></a>{% endfor %}</div>
+  </section>
+</div>
+{% endblock %}
