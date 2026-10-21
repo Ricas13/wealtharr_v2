@@ -91,10 +91,11 @@ def _with_t212_evidence():
 
 
 class DualMomentumOfferTests(SimpleTestCase):
-    def test_not_offered_without_broker_evidence_and_offered_with_it(self):
+    def test_offered_at_trading_212_with_the_exact_lines(self):
         from unittest.mock import patch
         from tracker.core import catalogue
-        self.assertFalse(catalogue.selection_available("dual-momentum", "TRADING212", "ISA"))
+        self.assertTrue(catalogue.selection_available("dual-momentum", "TRADING212", "ISA"))
+        self.assertFalse(catalogue.selection_available("dual-momentum", "AJBELL", "ISA"))
         with patch.dict(catalogue._CATALOGUE, _with_t212_evidence(), clear=True):
             self.assertTrue(catalogue.selection_available("dual-momentum", "TRADING212", "ISA"))
             rows = catalogue.rows_for("dual-momentum", "TRADING212", "ISA")

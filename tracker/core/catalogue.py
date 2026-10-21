@@ -190,23 +190,24 @@ IGLS = Listing(
     "not read first-hand. " + ACCOUNT_HOLD,
     GB_VERIFIED_ON, brokers={"TRADING212": T212 % "IGLS"})
 
-# Dual Momentum. No broker evidence yet: Trading 212 pages for these lines were
-# not found, so the strategy isn't offered there until the owner confirms them.
+# Dual Momentum. Trading 212 pages for XUSE and VAGS weren't found by search; the
+# owner confirmed both lines are on Trading 212 (21 Oct 2026).
+T212_OWNER_CONFIRMED = " Owner confirmed it is listed on Trading 212 (21 Oct 2026)."
 XUSE = Listing(
     "iShares MSCI World ex-USA UCITS ETF (Acc)", "iShares",
     "IE000R4ZNTN3", "XUSE.L", "GBP", "LSE XUSE (GBP line)",
     "https://www.blackrock.com/uk/individual/products/340748/ishares-msci-world-ex-usa-ucits-etf",
     "UK equivalent of MSCI ACWI ex-US: developed markets only (no emerging markets; no ACWI ex-US "
     "UCITS fund was found). Accumulating, so its price is a total return. Listed April 2025. "
-    "Source-cited, not read first-hand. " + ACCOUNT_HOLD,
-    GB_VERIFIED_ON)
+    "Source-cited, not read first-hand." + T212_OWNER_CONFIRMED + " " + ACCOUNT_HOLD,
+    GB_VERIFIED_ON, brokers={"TRADING212": T212 % "XUSE"})
 VAGS = Listing(
     "Vanguard Global Aggregate Bond UCITS ETF GBP Hedged (Acc)", "Vanguard",
     "IE00BG47K971", "VAGS.L", "GBP", "LSE VAGS (GBP line)",
     "https://www.vanguard.co.uk/professional/product/etf/bond/9685/global-aggregate-bond-ucits-etf-hedged-accumulating",
     "UK equivalent of US aggregate bonds: global aggregate bonds hedged to pounds. Accumulating. "
-    "Source-cited, not read first-hand. " + ACCOUNT_HOLD,
-    GB_VERIFIED_ON)
+    "Source-cited, not read first-hand." + T212_OWNER_CONFIRMED + " " + ACCOUNT_HOLD,
+    GB_VERIFIED_ON, brokers={"TRADING212": T212 % "VAGS"})
 
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
