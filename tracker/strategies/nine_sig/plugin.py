@@ -35,7 +35,8 @@ def _review_export(instance, signal):
 
 
 def _offers_manual_reset(signal):
-    return (signal.strategy_version == VERSION and
+    from tracker.strategies.nine_sig.v3 import VERSION as V3
+    return (signal.strategy_version in (VERSION, V3) and
             "Your reserve is now empty. Review whether to reset to 60/40." in signal.message)
 
 
@@ -50,6 +51,30 @@ class _LazyModule:
         return getattr(importlib.import_module(self._name), attr)
 
 
+class _LazyStudy:
+    """A non-pound 9Sig study, built on first use."""
+
+    def __init__(self, **lines):
+        self._lines = lines
+        self._study = None
+
+    def __getattr__(self, attr):
+        if self._study is None:
+            from tracker.study import Lines, NineSigStudy
+            self._study = NineSigStudy(Lines(**self._lines))
+        return getattr(self._study, attr)
+
+
+# One Study per account currency: pounds LQQ3/ERNS (v2), dollars TQQQ/AGG and
+# euros 3QQQ/ERNX (v3, the same rules).
+STUDY = {
+    "GBP": _LazyModule("tracker.study"),
+    "USD": _LazyStudy(currency="USD", growth="TQQQ", safe="AGG", growth_name="TQQQ",
+                      safe_name="AGG", rules="v3"),
+    "EUR": _LazyStudy(currency="EUR", growth="3QQQ.DE", safe="ERNX.DE", growth_name="3QQQ",
+                      safe_name="ERNX", rules="v3"),
+}
+
 NINE_SIG = StrategyModule(
     key=KEY,
     review=_review,
@@ -61,7 +86,7 @@ NINE_SIG = StrategyModule(
     allocation_label="Reset",
     supports_reset=True,
     offers_manual_reset=_offers_manual_reset,
-    study=_LazyModule("tracker.study"),
+    study=STUDY,
     manual_reset=_manual_reset,
     review_detail=_review_detail,
     review_export=_review_export,

@@ -61,6 +61,10 @@ STUDY_SYMBOLS = {
     "EXUS.DE": (("EUR",), "EUR", Decimal("1")),
     "VAGF.DE": (("EUR",), "EUR", Decimal("1")),
     "XEON.DE": (("EUR",), "EUR", Decimal("1")),
+    # 9Sig for dollar (TQQQ, AGG and the TQQQ reference above) and euro accounts.
+    "TQQQ": (("USD",), "USD", Decimal("1")),
+    "3QQQ.DE": (("EUR",), "EUR", Decimal("1")),
+    "ERNX.DE": (("EUR",), "EUR", Decimal("1")),
 }
 FIRST_DAY = date(2000, 1, 1)
 EIGHT = Decimal("0.00000001")

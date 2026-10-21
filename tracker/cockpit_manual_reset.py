@@ -45,7 +45,8 @@ def choose_manual_reserve_reset(*, owner, strategy_id, signal_id):
     if existing:
         return existing
     _check_current(strategy, original)
-    if (original.strategy_version != NINE_SIG_RULE_VERSION or
+    from .strategies.nine_sig.v3 import VERSION as V3
+    if (original.strategy_version not in (NINE_SIG_RULE_VERSION, V3) or
             original.reset_reason or original.kind != "QUARTERLY" or
             RESERVE_EMPTY_NOTICE not in original.message):
         raise ValidationError("Only the current v2 exhausted-reserve review can offer a manual reset.")
@@ -66,10 +67,10 @@ def choose_manual_reserve_reset(*, owner, strategy_id, signal_id):
     equity = settlement_close(strategy.equity_symbol, original.as_of)
     safe = settlement_close(strategy.safe_symbol, original.as_of)
     if (equity is None or safe is None or
-            equity.currency != "GBP" or safe.currency != "GBP" or
+            equity.currency != strategy.account.currency or safe.currency != strategy.account.currency or
             equity.price <= ZERO or safe.price <= ZERO or
             abs((equity.as_of - safe.as_of).days) > 1):
-        raise ValidationError("Verified matching quarter-end GBP prices are required.")
+        raise ValidationError("Verified matching quarter-end prices in the account currency are required.")
 
     state = ledger_summary(strategy)
     positions = state["positions"]
@@ -123,7 +124,7 @@ def choose_manual_reserve_reset(*, owner, strategy_id, signal_id):
                 % (equity.as_of, safe.as_of),
         actions=actions,
         reset_reason="Owner-elected 60/40 reset after exhausted-reserve review",
-        strategy_version=NINE_SIG_RULE_VERSION,
+        strategy_version=original.strategy_version,
     )
     # A deliberate selection replaces the displayed proposal, never deletes
     # or mutates its mathematical result or recorded action list.

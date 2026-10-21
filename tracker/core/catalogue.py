@@ -267,21 +267,24 @@ EU_DBXF = _eu("Xtrackers II Eurozone Government Bond 15-30 UCITS ETF 1C", "Xtrac
               "https://www.onvista.de/etf/snapshot/LU0290357507")
 EU_SXRQ = _eu("iShares € Govt Bond 7-10yr UCITS ETF (Acc)", "iShares", "IE00B3VTN290", "SXRQ.DE",
               "https://live.deutsche-boerse.com/etf/ishares-eur-govt-bond-7-10yr-ucits-etf-eur-acc",
-              "Euro equivalent of intermediate US Treasuries: 7-10 year euro government bonds.")
+              "Euro equivalent of intermediate US Treasuries: 7-10 year euro government bonds.",
+              "https://www.finanzfluss.de/informer/etf/ie00b3vtn290/")
 EU_PPFB = _eu("iShares Physical Gold ETC", "iShares", "IE00B4ND3602", "PPFB.DE",
               "https://www.ishares.com/uk/individual/en/products/258441",
               "Physical gold, an ETC (secured debt security), on its Xetra EUR line.",
               TR_BROWSE + "?q=IE00B4ND3602")
 EU_SXRS = _eu("iShares Diversified Commodity Swap UCITS ETF", "iShares", "IE00BDFL4P12", "SXRS.DE",
               "https://www.comdirect.de/inf/etfs/IE00BDFL4P12",
-              "Broad commodities (Bloomberg Commodity index), swap-based.")
+              "Broad commodities (Bloomberg Commodity index), swap-based.",
+              "https://www.brokerexperte.de/etf/ie00bdfl4p12/")
 EU_ZPRV = _eu("SPDR MSCI USA Small Cap Value Weighted UCITS ETF (Acc)", "State Street", "IE00BSPLC413",
               "ZPRV.DE", "https://www.ssga.com/de/en_gb/intermediary/etfs/state-street-spdr-msci-usa-small-cap-value-weighted-ucits-etf-zprv-gy",
               "US small-cap value.",
               "https://www.finect.com/etfs/IE00BSPLC413-Spdr_msci_usa_small_cap_val_wtd_etf_usd")
 EU_DBXP = _eu("Xtrackers II Eurozone Government Bond 1-3 UCITS ETF 1C", "Xtrackers", "LU0290356871", "DBXP.DE",
               "https://live.deutsche-boerse.com/en/etf/xtrackers-ii-eurozone-government-bond-1-3-ucits-etf-1c",
-              "Euro equivalent of short-term US Treasuries: 1-3 year eurozone government bonds.")
+              "Euro equivalent of short-term US Treasuries: 1-3 year eurozone government bonds.",
+              "https://www.onvista.de/etf/Xtrackers-II-Eurozone-Government-Bond-1-3-UCITS-ETF-1C-EUR-Acc-ETF-LU0290356871")
 EU_EXUS = _eu("Xtrackers MSCI World ex USA UCITS ETF 1C", "Xtrackers", "IE0006WW1TQ4", "EXUS.DE",
               "https://finanzen.net/etf/xtrackers-msci-world-ex-usa-etf-1c-ie0006ww1tq4",
               "Euro-line equivalent of MSCI ACWI ex-US: developed markets only. Accumulating.",
@@ -290,6 +293,21 @@ EU_VAGF = _eu("Vanguard Global Aggregate Bond UCITS ETF EUR Hedged (Acc)", "Vang
               "https://live.deutsche-boerse.com/en/etf/vanguard-global-aggregate-bond-ucits-etf-eur-hedged-accumulating",
               "Euro equivalent of US aggregate bonds: global aggregate bonds hedged to euros. Accumulating.",
               TR_BROWSE + "?q=vanguard")
+
+US_TQQQ = _us("ProShares UltraPro QQQ", "ProShares", "US74347X8314", "TQQQ",
+              "https://www.proshares.com/our-etfs/leveraged-and-inverse/tqqq",
+              "3x daily Nasdaq-100, Kelly's own 9Sig growth fund. Fidelity requires a leveraged-ETF "
+              "agreement and the 'Most Aggressive' objective before buying; check its ETF service-fee list.")
+EU_3QQQ = _eu("WisdomTree NASDAQ 100 3x Daily Leveraged", "WisdomTree", "IE00BLRPRL42", "3QQQ.DE",
+              "https://www.wisdomtree.com/de/products/equities/wisdomtree-nasdaq-100-3x-daily-leveraged",
+              "3x daily Nasdaq-100 on its Xetra EUR line: an ETP (collateralised note), not the US TQQQ fund. "
+              "Trade Republic may ask knowledge and experience questions before buying.",
+              "https://www.finect.com/etfs/IE00BLRPRL42-Wisdomtree_nasdaq_100_3x_daily_leveraged")
+EU_ERNX = _eu("iShares € Ultrashort Bond UCITS ETF (Acc)", "iShares", "IE000RHYOR04", "ERNX.DE",
+              "https://live.deutsche-boerse.com/en/etf/ishares-eur-ultrashort-bond-ucits-etf-eur-acc",
+              "Euro ultrashort investment-grade bonds, the euro counterpart of the pound account's ERNS; "
+              "not the US AGG bond fund.",
+              "https://www.onvista.de/etf/iShares-EUR-Ultrashort-Bond-UCITS-ETF-Acc-ETF-IE000RHYOR04")
 
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
@@ -334,6 +352,10 @@ ROLE_LISTINGS = {
     (DUAL_MOMENTUM, "us", "DE"): (EU_SXR8,),
     (DUAL_MOMENTUM, "intl", "DE"): (EU_EXUS,),
     (DUAL_MOMENTUM, "bonds", "DE"): (EU_VAGF,),
+    (STRATEGY_9SIG, "growth", "US"): (US_TQQQ,),
+    (STRATEGY_9SIG, "safe", "US"): (US_AGG,),
+    (STRATEGY_9SIG, "growth", "DE"): (EU_3QQQ,),
+    (STRATEGY_9SIG, "safe", "DE"): (EU_ERNX,),
 }
 
 
@@ -507,8 +529,9 @@ def onboarding_manifest(strategy_key, platform, account_type):
     return manifest
 
 
-def released_version(strategy_key):
+def released_version(strategy_key, currency="GBP"):
+    """The rule version a new instance pins, for its account currency."""
     description = describe_strategy(strategy_key)
     if description is None:
         raise MappingNotAvailable("No released strategy rule version.")
-    return description.version
+    return description.version_for(currency)
