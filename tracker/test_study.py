@@ -88,7 +88,7 @@ class SeriesTests(TestCase):
 
     def test_study_never_writes_real_records(self):
         counts = (MarketObservation.objects.count(), LedgerEntry.objects.count())
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(7):
             data = study.load_data()
         study.run(data, "1y", 1000, 50)
         self.assertEqual(counts, (MarketObservation.objects.count(), LedgerEntry.objects.count()))

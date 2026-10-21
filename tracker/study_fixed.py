@@ -9,6 +9,9 @@ with that day's GBP/USD close.
 Before a fund existed, its role follows a named stand-in (e.g. SPY for an
 S&P 500 fund), scaled to join the real fund without a jump; a role with no
 stand-in is held as cash at 0%. Periods using a stand-in are flagged.
+A price is never carried forward more than a week: days without a fresh price
+for every fund are left out, so the study ends on the last day all its prices
+are fresh.
 """
 from bisect import bisect_left
 from dataclasses import dataclass, field
@@ -129,14 +132,14 @@ class FixedWeightStudy:
             if start is not None:
                 data.real_from[role] = grid[start]
                 for i in range(start, len(grid)):
-                    column[i] = _last(fund_days, fund, grid[i]) or column[i - 1]
+                    column[i] = _last(fund_days, fund, grid[i])  # None when over a week old
                 first_real = column[start]
                 if self.sources[role].proxy == CASH:
                     for i in range(start):
                         column[i] = first_real
                 elif proxy_days:
                     anchor = _last(proxy_days, proxy, grid[start])
-                    if anchor:
+                    if anchor and first_real:
                         scale = first_real / anchor
                         for i in range(start):
                             p = _last(proxy_days, proxy, grid[i])
@@ -150,12 +153,9 @@ class FixedWeightStudy:
         keep = [i for i in range(first, len(grid)) if all(columns[r][i] for r in columns)]
         data.days = [grid[i] for i in keep]
         data.prices = {r: [columns[r][i] for i in keep] for r in columns}
-        last_vti = None
         for d in data.days:
             data.spy.append(_last(spy_days, spy, d))
-            v = vti.get(d)
-            last_vti = v if v else last_vti
-            data.vti.append(last_vti)
+            data.vti.append(_last(vti_days, vti, d))
         return data
 
     def _strategy(self, data, s, amount, monthly):
@@ -242,4 +242,6 @@ class FixedWeightStudy:
             "All values are in %s with dividends reinvested.%s Trades fill at that day's close with "
             "no dealing costs or tax." % (money, fx),
             "Before a fund existed, its role follows a stand-in, flagged on the page.",
+            "A price is never carried forward more than a week. Days without a fresh price for every fund "
+            "are left out, so the study ends on the last day all its prices are fresh.",
         )

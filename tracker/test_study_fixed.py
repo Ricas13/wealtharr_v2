@@ -74,13 +74,13 @@ class FixedWeightStudyPageTests(TestCase):
 
     def test_empty_then_results_with_all_weather_wording(self):
         page = self.client.get(self.url)
-        self.assertContains(page, "same All Weather rules")
+        self.assertContains(page, "same All Seasons rules")
         self.assertContains(page, "Study data not downloaded yet")
         self.assertNotContains(page, "isn't available for this strategy")
         seed_all_weather(TODAY - timedelta(days=800), TODAY - timedelta(days=200))
         cache.clear()
         page = self.client.get(self.url + "?range=1y&amount=2000")
-        self.assertContains(page, "All Weather value now")
+        self.assertContains(page, "All Seasons value now")
         self.assertContains(page, "Includes simulated history")
         self.assertContains(page, "SPY (S&amp;P 500)")
         self.assertNotContains(page, "9Sig")

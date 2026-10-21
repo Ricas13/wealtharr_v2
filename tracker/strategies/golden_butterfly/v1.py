@@ -1,9 +1,10 @@
 """Golden Butterfly version 1: five equal weights, rebalanced once a year.
 
 Pure: no database, network or clock. The published mix (Tyler, Portfolio
-Charts): 20% total stock market, 20% small-cap value, 20% long-term
-government bonds, 20% short-term government bonds and 20% gold, put back to
-those weights each year. Not affiliated with Portfolio Charts.
+Charts): 20% US large-cap blend (earlier write-ups: total stock market), 20%
+small-cap value, 20% long-term government bonds, 20% short-term government
+bonds and 20% gold, put back to those weights each year. Not affiliated with
+Portfolio Charts.
 """
 from decimal import Decimal
 

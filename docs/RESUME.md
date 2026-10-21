@@ -1,3 +1,17 @@
+## Audit fixes: Study data, homepage fairness, founder fidelity (21 October 2026)
+
+Branch `feature/audit-study-fixes` from main (after PR #45). Owner asked to fix every defect from the independent strategy/Study audit, in priority order:
+1. **Pence fallback** (`study_data.py`): a missing adjusted close on a GBX line was divided by 100 twice. Each raw value is now converted once; Yahoo arrays of different lengths are refused; an isolated row under a quarter / over four times its neighbours is dropped, a lasting jump refuses the download (stored history kept).
+2. **9Sig Study resets**: still replayed (as the rules say) but now stated as an assumption (confirmed and filled at the quarter close; live waits for the owner, spike = warning only), counted per run (`assumed_resets`) and shown on the Study page and homepage note.
+3. **No unlimited forward fill** (`study.py`, `study_fixed.py`, so `study_momentum.py` too): a price is carried at most 7 days; days without a fresh price for every fund are left out, so a Study ends on its last fresh day. Benchmarks with a gap give no row rather than a flat line.
+4. **Homepage same period** (`v2_home.py`): another strategy is compared only if its Study starts and ends on exactly the same days and shares the plotted days; otherwise it's left out and named. Footnote states the dates, that "Per year" is money-weighted (XIRR) and the reset assumption.
+5. **Permanent Portfolio v2** (`permanent_portfolio/v2.py`): the v1 band rule checked once a year (31 Dec), as Browne wrote. New instances pin v2. `StrategyModule.by_version` + `StrategyDescription.earlier_versions`: instances pinned to v1 keep the monthly check, reviews and Study until an explicit upgrade (no upgrade UI exists; owner skipped it earlier).
+6. **All Seasons naming**: "All Weather" is shown as All Seasons (Robbins' retail version, not Bridgewater's leveraged fund); code key stays `all-weather`, rules unchanged. Golden Butterfly text says US large-cap (Portfolio Charts' current wording), behaviour unchanged.
+7. **9Sig 100%-up reference**: real TQQQ closes from TQQQ's first price (as live reviews), the rebuilt 3x line scaled to meet it before; flagged when a run starts before TQQQ data.
+Tests: `tracker/test_study_integrity.py`, updated Permanent Portfolio/All Seasons tests. Not done (improvements, not defects): T-bill/SONIA series for 0%-cash stand-ins, a financing estimate for rebuilt 3x history, real-data side-by-side verification (needs a copy of StudyPrice).
+
+---
+
 ## Homepage shows every strategy (21 October 2026)
 
 Branch `feature/homepage-all-strategies`. The signed-out comparison only used the 9Sig Study. `v2_home._other_rows` now adds each other strategy's pound Study on the same dates under generic names (no third-party brands on the public page): All-season mix, Five equal parts, Monthly momentum switch, Four equal parts banded. A strategy whose history isn't downloaded yet (or doesn't reach back) is left out, never guessed; stand-in history is footnoted.

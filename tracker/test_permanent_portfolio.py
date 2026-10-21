@@ -1,4 +1,4 @@
-"""Permanent Portfolio v1: 15-35% bands, the monthly check loop and its Study."""
+"""Permanent Portfolio: 15-35% bands, the yearly check (v2), the pinned monthly v1 and their Studies."""
 from datetime import date, timedelta
 from decimal import Decimal as D
 from unittest.mock import patch
@@ -12,8 +12,9 @@ from django.urls import reverse
 from django.utils import timezone
 
 from tracker.core import catalogue
-from tracker.core.calendar import month_end_before
-from tracker.strategies.permanent_portfolio.v1 import VERSION, WEIGHTS, Fund, Quote, evaluate
+from tracker.core.calendar import month_end_before, year_end_before
+from tracker.strategies.permanent_portfolio import v1
+from tracker.strategies.permanent_portfolio.v2 import VERSION, WEIGHTS, Fund, Quote, evaluate
 
 AS_OF = date(2026, 9, 30)
 SYMBOLS = {"stocks": "S.L", "long": "L.L", "cashfund": "C.L", "gold": "G.L"}
@@ -70,7 +71,30 @@ class BandRuleTests(SimpleTestCase):
                                  tickers)
 
 
-class MonthlyCheckEndToEndTests(TestCase):
+class VersionTests(SimpleTestCase):
+    def test_v2_is_the_v1_band_rule_with_its_own_version(self):
+        for prices in ({}, {"stocks": "170"}, {"gold": "25"}):
+            new = evaluate(funds=FUNDS, positions=even(), cash=D("0"), quotes=quotes(**prices), as_of=AS_OF)
+            old = v1.evaluate(funds=FUNDS, positions=even(), cash=D("0"), quotes=quotes(**prices), as_of=AS_OF)
+            self.assertEqual((new.status, new.reason_code, new.trades), (old.status, old.reason_code, old.trades))
+            self.assertEqual((new.strategy_version, old.strategy_version), (VERSION, v1.VERSION))
+
+    def test_new_instances_pin_v2_and_v1_instances_keep_the_monthly_check(self):
+        from types import SimpleNamespace
+        from tracker.strategies.registry import describe_strategy, module_for
+        description = describe_strategy("permanent-portfolio")
+        self.assertEqual(description.version_for("GBP"), VERSION)
+        self.assertTrue(description.accepts(v1.VERSION))
+        new = module_for(SimpleNamespace(strategy_key="permanent-portfolio", strategy_version=VERSION))
+        old = module_for(SimpleNamespace(strategy_key="permanent-portfolio", strategy_version=v1.VERSION))
+        self.assertEqual((new.cadence_word, old.cadence_word), ("yearly", "monthly"))
+        self.assertEqual(new.last_review_before(date(2026, 10, 21)), date(2025, 12, 31))
+        self.assertEqual(old.last_review_before(date(2026, 10, 21)), date(2026, 9, 30))
+        self.assertEqual(old.study["GBP"].review_word, "monthly")
+        self.assertIn("once a year", description.cadence)
+
+
+class YearlyCheckEndToEndTests(TestCase):
     def setUp(self):
         from tracker.models import NotificationPreference
         self.owner = get_user_model().objects.create_user("pp-owner", password="a-long-test-password-1")
@@ -79,10 +103,10 @@ class MonthlyCheckEndToEndTests(TestCase):
                                               discord_enabled=False, monthly_reminders=False)
         self.client.force_login(self.owner)
         self.today = timezone.localdate()
-        self.month_end = month_end_before(self.today)
+        self.month_end = year_end_before(self.today)  # v2 reviews each 31 December
         self.recent = self.today - timedelta(days=1)
         if self.recent <= self.month_end + timedelta(days=2):
-            self.skipTest("Needs a few days after the month end.")
+            self.skipTest("Needs a few days after the year end.")
 
     def observe(self, day, prices):
         from tracker.models import MarketObservation
@@ -135,15 +159,45 @@ class MonthlyCheckEndToEndTests(TestCase):
         study = self.client.get(reverse("v2_instance_page", args=[strategy.pk, "study"]))
         self.assertContains(study, "same Permanent Portfolio rules")
 
+    def test_an_instance_pinned_to_v1_keeps_its_monthly_check(self):
+        from tracker.models import StrategyInstance, StrategySignal
+        month_end = month_end_before(self.today)
+        if self.recent <= month_end + timedelta(days=2):
+            self.skipTest("Needs a few days after the month end.")
+        start = month_end - timedelta(days=40)
+        self.client.post(reverse("v2_add_strategy"), {
+            "strategy": "permanent-portfolio", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "mode": "fresh", "name": "PP", "start": start.isoformat(), "amount": "4000",
+            "deposited": "yes", "go_live": "yes"})
+        strategy = StrategyInstance.objects.get(owner=self.owner)
+        self.assertEqual(strategy.strategy_version, VERSION)
+        # A strategy set up before version 2 stays pinned to version 1.
+        StrategyInstance.objects.filter(pk=strategy.pk).update(strategy_version=v1.VERSION)
+        for symbol, qty, price in (("VUAG.L", "10", "100"), ("GLTL.L", "31.25", "32"),
+                                   ("ERNS.L", "10", "100"), ("SGLN.L", "16.6666", "60")):
+            self.client.post(reverse("v2_ledger_add", args=[strategy.pk]), {
+                "intent": "save", "kind": "BUY", "symbol": symbol, "quantity": qty, "unit_price": price,
+                "fee": "0", "occurred_on": start.isoformat()})
+        closes = {"VUAG.L": "100", "GLTL.L": "32", "ERNS.L": "100", "SGLN.L": "120"}
+        self.observe(month_end, closes)
+        self.observe(self.recent, closes)
+        with patch("tracker.market_data.sync_ticker", side_effect=self.latest), \
+                patch("tracker.management.commands.sync_market_and_signals.sync_ticker"):
+            call_command("sync_market_and_signals", verbosity=0)
+        signal = StrategySignal.objects.get(strategy=strategy)
+        self.assertEqual((signal.as_of, signal.strategy_version), (month_end, v1.VERSION))
+        page = self.client.get(reverse("v2_instance_page", args=[strategy.pk, "today"]))
+        self.assertEqual(page.status_code, 200)
+
 
 class PermanentStudyTests(TestCase):
-    def test_monthly_band_replay_in_dollars(self):
+    def test_yearly_band_replay_in_dollars(self):
         from tracker.strategies.registry import module_for_key
         from tracker.test_study import TODAY, seed
         cache.clear()
         start = TODAY - timedelta(days=800)
         seed("SPY", start, lambda d, i: 400.0)
-        seed("VTI", start, lambda d, i: 200 * (1.002 ** i))  # shares run away from the others
+        seed("VTI", start, lambda d, i: 200 * (1.01 ** i))  # shares run away from the others
         seed("TLT", start, lambda d, i: 90.0)
         seed("BIL", start, lambda d, i: 91.0)
         seed("GLD", start, lambda d, i: 250.0)
@@ -153,4 +207,5 @@ class PermanentStudyTests(TestCase):
         # Opening 4 buys plus at least one band rebalance.
         self.assertGreater(result["series"]["strategy"]["trades"], 4)
         self.assertIn("US dollars", " ".join(study.how_it_works(data)))
+        self.assertIn("yearly rule", " ".join(study.how_it_works(data)))
         self.assertIn("only when one is below 15% or above 35%", " ".join(study.how_it_works(data)))
