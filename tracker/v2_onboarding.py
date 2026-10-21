@@ -1,4 +1,4 @@
-"""Five-step, server-rendered owner onboarding for a fixed strategy.
+"""One-screen, server-rendered owner onboarding for a fixed strategy.
 
 Only released catalogue combinations can be created. An owner-reported
 opening holding is NOT a fabricated execution or price, and never enables
@@ -17,7 +17,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .core.catalogue import (
-    OFFERS, PLATFORMS, ACCOUNT_TYPES, STRATEGY_9SIG,
+    OFFERS, PLATFORMS, ACCOUNT_TYPES,
     CATALOGUE_VERSION, availability_reason, onboarding_manifest,
     released_version, rows_for, selection_available,
 )
@@ -27,23 +27,6 @@ from .models import (
     StrategyPreset,
 )
 from .services import validate_and_record
-
-
-SESSION_KEY = "wealtharr_v2_onboarding"
-ALERT_TYPES = (
-    ("quarterly", "Quarter-end action"),
-    ("urgent", "Urgent mid-period warning"),
-    ("unacted", "Reminder if I haven't acted"),
-    ("contribution", "Contribution reminder"),
-    ("data", "Data problem near review"),
-)
-CHANNELS = ("email", "discord")
-
-
-def _new_state(owner_id):
-    return {"owner_id": owner_id, "step": 1, "strategy": "", "platform": "TRADING212",
-            "type": "", "ack": False, "start": "", "name": "", "mode": "fresh",
-            "amount": "", "cash": "", "holdings": {}}
 
 
 def _decimal(value, label, *, precision=2, allow_zero=True):
@@ -144,13 +127,6 @@ def _validated_start(post, state):
     return result
 
 
-def _routes(post):
-    return {
-        kind: {channel: post.get(f"alert_{kind}_{channel}") == "on"
-               for channel in CHANNELS}
-        for kind, _ in ALERT_TYPES
-    }
-
 
 def _unique_account_name(owner, display, kind):
     label = (display + " · " + kind)[:75]
@@ -233,107 +209,74 @@ def _enroll(owner, state):
     return instance
 
 
+ROUTE_DEFAULTS = {
+    "quarterly": {"email": True, "discord": True}, "urgent": {"email": True, "discord": True},
+    "unacted": {"email": True, "discord": False}, "contribution": {"email": False, "discord": False},
+    "data": {"email": True, "discord": True},
+}
+
+
 @require_http_methods(["GET", "POST"])
 @login_required
 def wizard(request):
+    """Everything on one page: strategy, account, instruments, starting point, go live."""
     from .v2_views import _render
 
-    state = request.session.get(SESSION_KEY)
-    if (not isinstance(state, dict) or state.get("owner_id") != request.user.pk
-            or request.GET.get("restart") == "1"):
-        state = _new_state(request.user.pk)
-        request.session[SESSION_KEY] = state
+    offers = [o for o in OFFERS.values()]
+    default_key = next((o.key for o in offers if o.enabled), "")
+    post = request.POST if request.method == "POST" else {}
+    strategy = post.get("strategy", default_key)
+    platform = post.get("platform", "TRADING212")
+    types = [kind for kind, _ in ACCOUNT_TYPES if selection_available(strategy, platform, kind)]
+    account_type = post.get("account_type", "ISA" if "ISA" in types else (types[0] if types else ""))
+    state = {"owner_id": request.user.pk, "strategy": strategy, "platform": platform,
+             "type": account_type, "ack": post.get("ack") == "yes",
+             "mode": post.get("mode", "fresh"), "name": "", "start": "",
+             "amount": "", "cash": "", "holdings": {}, "routes": ROUTE_DEFAULTS}
     error = ""
     if request.method == "POST":
-        action = request.POST.get("direction", "next")
         try:
-            if action == "back":
-                state["step"] = max(1, state["step"] - 1)
-            elif request.POST.get("step") != str(state["step"]):
-                raise ValidationError("Form step changed. Review the current step.")
-            elif state["step"] == 1:
-                key = request.POST.get("strategy", "")
-                if key not in OFFERS or not OFFERS[key].enabled:
-                    raise ValidationError("This strategy is not available yet.")
-                state.update(strategy=key, type="", ack=False, name="", step=2)
-            elif state["step"] == 2:
-                platform = request.POST.get("platform", "")
-                account_type = request.POST.get("account_type", "")
-                if not selection_available(state["strategy"], platform, account_type):
-                    raise ValidationError(availability_reason(state["strategy"], platform, account_type))
-                state.update(platform=platform, type=account_type, ack=False, step=3)
-            elif state["step"] == 3:
-                if request.POST.get("ack") != "yes":
-                    raise ValidationError("Confirm you checked these instruments in your actual account.")
-                state.update(ack=True, step=4)
-            elif state["step"] == 4:
-                state.update(_draft_start(request.POST, state))
-                request.session[SESSION_KEY] = state
-                info = _validated_start(request.POST, state)
-                state.update(info)
-                state["step"] = 5
-            elif state["step"] == 5:
-                state["routes"] = _routes(request.POST)
-                instance = _enroll(request.user, state)
-                del request.session[SESSION_KEY]
-                # Step 3 already confirmed the instruments are buyable in the
-                # owner's own account, which is what going live attests.
-                if request.POST.get("go_live") == "yes":
-                    from .v2_go_live import go_live
-                    try:
-                        go_live(instance, request.user)
-                    except ValidationError as exc:
-                        messages.error(request, "Created, but not live yet: " + " ".join(exc.messages))
-                return redirect("v2_instance_page", instance_id=instance.pk, section="today")
-            request.session[SESSION_KEY] = state
+            if strategy not in OFFERS or not OFFERS[strategy].enabled:
+                raise ValidationError("This strategy is not available yet.")
+            if not selection_available(strategy, platform, account_type):
+                raise ValidationError(availability_reason(strategy, platform, account_type))
+            state.update(_draft_start(post, state))
+            state.update(_validated_start(post, state))
+            if not state["ack"]:
+                raise ValidationError("Tick the box to confirm you checked these instruments in your own account.")
+            instance = _enroll(request.user, state)
+            if post.get("go_live") == "yes":
+                from .v2_go_live import go_live
+                try:
+                    go_live(instance, request.user)
+                except ValidationError as exc:
+                    messages.error(request, "Created, but not live yet: " + " ".join(exc.messages))
+            messages.success(request, f"{instance.name} is set up.")
+            return redirect("v2_instance_page", instance_id=instance.pk, section="today")
         except (ValidationError, IntegrityError, ValueError, ArithmeticError) as exc:
-            error = exc.messages[0] if isinstance(exc, ValidationError) else "Cannot save these details safely. No partial account was created."
-    lines = rows_for(
-        state.get("strategy", ""), state.get("platform", ""), state.get("type", "")
-    )
+            error = exc.messages[0] if isinstance(exc, ValidationError) else "Cannot save these details safely. Nothing was created."
+    lines = rows_for(strategy, platform, account_type) if account_type else ()
     known_isa, verified_year = _isa_recorded(request.user, timezone.localdate())
-    duplicate = bool(state.get("type") and StrategyInstance.objects.filter(
-        owner=request.user, preset__slug=state.get("strategy"),
-        account__kind=state.get("type"), account__broker=state.get("platform"),
+    duplicate = bool(account_type and StrategyInstance.objects.filter(
+        owner=request.user, preset__slug=strategy,
+        account__kind=account_type, account__broker=platform,
     ).exists())
-    account_options = [
-        {"key": kind, "name": title,
-         "enabled": selection_available(state.get("strategy", ""),
-                                        state.get("platform", ""), kind),
-         "reason": availability_reason(state.get("strategy", ""),
-                                       state.get("platform", ""), kind)}
-        for kind, title in ACCOUNT_TYPES
-    ]
-    for option in account_options:
-        option["duplicate"] = StrategyInstance.objects.filter(
-            owner=request.user, preset__slug=state.get("strategy"),
-            account__kind=option["key"], account__broker=state.get("platform"),
-        ).exists()
     hold_rows = [
         {"line": line,
-         "shares": state.get("holdings", {}).get(line.role, {}).get("shares", ""),
-         "cost": state.get("holdings", {}).get(line.role, {}).get("average_cost_gbp", "")}
+         "shares": state["holdings"].get(line.role, {}).get("shares", ""),
+         "cost": state["holdings"].get(line.role, {}).get("average_cost_gbp", "")}
         for line in lines
-    ]
-    defaults = {
-        "quarterly": (True, True), "urgent": (True, True),
-        "unacted": (True, False), "contribution": (False, False),
-        "data": (True, True),
-    }
-    route_rows = [
-        {"key": kind, "label": label,
-         "email": state.get("routes", {}).get(kind, {}).get("email", defaults[kind][0]),
-         "discord": state.get("routes", {}).get(kind, {}).get("discord", defaults[kind][1])}
-        for kind, label in ALERT_TYPES
     ]
     return _render(
         request, page_key="add", page_title="Add strategy",
-        wizard=state, wizard_error=error, wizard_offers=OFFERS.values(),
-        wizard_platforms=PLATFORMS, wizard_types=ACCOUNT_TYPES,
-        wizard_lines=lines, wizard_duplicate=duplicate,
-        wizard_alerts=ALERT_TYPES, wizard_channels=CHANNELS,
+        wizard=state, wizard_error=error, wizard_offers=offers,
+        wizard_platforms=PLATFORMS,
+        wizard_account_options=[{"key": kind, "name": title, "enabled": kind in types}
+                                for kind, title in ACCOUNT_TYPES],
+        wizard_lines=lines, wizard_duplicate=duplicate, wizard_hold_rows=hold_rows,
         wizard_known_isa=known_isa, wizard_isa_limit=OVERALL_LIMIT_2026_GBP,
         wizard_tax_year_verified=verified_year,
-        wizard_account_options=account_options, wizard_hold_rows=hold_rows,
-        wizard_route_rows=route_rows,
+        wizard_today=timezone.localdate(),
+        wizard_amount=post.get("amount", ""), wizard_deposited=post.get("deposited") == "yes",
+        wizard_go_live=post.get("go_live") == "yes" or request.method == "GET",
     )

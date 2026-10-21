@@ -163,16 +163,9 @@ class OneScreenOwnerEnrolmentTests(TestCase):
 
     def enroll(self, *, mode="fresh", name="9Sig ISA", amount="18000.00",
                cash="0"):
-        self.client.get(self.url + "?restart=1")
-        self.client.post(self.url, {
-            "step": "1", "strategy": "nasdaq-quarterly-target",
-        })
-        self.client.post(self.url, {
-            "step": "2", "platform": "TRADING212", "account_type": "ISA",
-        })
-        self.client.post(self.url, {"step": "3", "ack": "yes"})
         step = {
-            "step": "4", "mode": mode, "name": name,
+            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "mode": mode, "name": name,
             "start": "2026-10-10",
         }
         if mode == "fresh":
@@ -180,8 +173,7 @@ class OneScreenOwnerEnrolmentTests(TestCase):
         else:
             step.update(cash=cash, shares_growth="0", cost_growth="0",
                         shares_safe="0", cost_safe="0")
-        self.assertContains(self.client.post(self.url, step), "step 5 of 5")
-        response = self.client.post(self.url, {"step": "5"})
+        response = self.client.post(self.url, step)
         strategy = StrategyInstance.objects.get(owner=self.owner, name=name)
         self.assertRedirects(response, reverse(
             "v2_instance_page", args=[strategy.pk, "today"]))

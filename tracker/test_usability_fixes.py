@@ -63,17 +63,14 @@ class UsabilityFixesTests(TestCase):
 
 
     # 3 + 4. opening position from the wizard, and input kept on error
+    BASE = {"strategy": KEY, "platform": "TRADING212", "account_type": "ISA", "ack": "yes"}
+
     def wizard_to_step4(self):
-        url = reverse("v2_add_strategy")
-        self.client.get(url)
-        for step, data in ((1, {"strategy": KEY}), (2, {"platform": "TRADING212", "account_type": "ISA"}),
-                           (3, {"ack": "yes"})):
-            self.client.post(url, dict(data, step=str(step), direction="next"))
-        return url
+        return reverse("v2_add_strategy")
 
     def test_wizard_keeps_typed_holdings_after_an_error(self):
         url = self.wizard_to_step4()
-        page = self.client.post(url, {"step": "4", "direction": "next", "name": "9Sig", "start": "",
+        page = self.client.post(url, {**self.BASE, "name": "9Sig", "start": "",
                                       "mode": "hold", "cash": "42.10", "shares_growth": "60",
                                       "cost_growth": "55", "shares_safe": "700", "cost_safe": "5.05"})
         self.assertContains(page, "Enter a valid start date")
@@ -83,10 +80,9 @@ class UsabilityFixesTests(TestCase):
 
     def test_typed_holdings_become_the_opening_position(self):
         url = self.wizard_to_step4()
-        self.client.post(url, {"step": "4", "direction": "next", "name": "9Sig", "start": "2026-03-02",
+        self.client.post(url, {**self.BASE, "name": "9Sig", "start": "2026-03-02",
                                "mode": "hold", "cash": "42.10", "shares_growth": "60",
                                "cost_growth": "55", "shares_safe": "700", "cost_safe": "5"})
-        self.client.post(url, {"step": "5", "direction": "next"})
         s = StrategyInstance.objects.get(owner=self.owner, name="9Sig")
         report = ledger_summary(s)
         self.assertEqual(report["positions"], {"LQQ3.L": D("60"), "ERNS.L": D("700")})
