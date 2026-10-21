@@ -34,7 +34,7 @@ Worked examples: `strategies/nine_sig/` (quarterly signal line) and
    broker and account type, the first listing with evidence for that broker is
    used; setup only offers the strategy when every role resolves. Quote units feed
    the price checks automatically. Keep the rules true to the original; only the
-   funds are local.
+   funds are local equivalents (say so in the caution).
 5. **Tests**: pure rule tests, plus an end-to-end test like the one in
    `test_strategy_plugins.py`.
 

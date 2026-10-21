@@ -48,9 +48,9 @@ _OFFERS = {
         "Quarterly decisions use the versioned 9Sig rules.", True,
     ),
     ALL_WEATHER: StrategyOffer(
-        ALL_WEATHER, "All Weather (UK)", "Moderate risk", "Yearly",
-        "Five funds at fixed weights: US shares, long and intermediate UK gilts, gold and "
-        "commodities, rebalanced once a year. Not affiliated with Bridgewater.", True,
+        ALL_WEATHER, "All Weather", "Moderate risk", "Yearly",
+        "Five funds at the published weights: stocks, long-term and intermediate government "
+        "bonds, gold and commodities, rebalanced once a year. Not affiliated with Bridgewater.", True,
     ),
 }
 OFFERS = MappingProxyType(_OFFERS)
@@ -143,11 +143,12 @@ VUAG = _aw("Vanguard S&P 500 UCITS ETF (USD) Accumulating", "Vanguard",
 GLTL = _aw("SPDR Bloomberg 15+ Year Gilt UCITS ETF (Dist)", "State Street",
            "IE00B6YX5L24", "GLTL.L", "GBP", "LSE GLTL (GBP line)",
            "https://www.ssga.com/uk/en_gb/intermediary/etfs/spdr-bloomberg-15-year-gilt-ucits-etf-dist-sybl-gy",
-           "Distributing; small fund.")
+           "UK equivalent of long-term US Treasuries. Distributing; small fund.")
 IGLT = _aw("iShares Core UK Gilts UCITS ETF (Dist)", "iShares",
            "IE00B1FZSB30", "IGLT.L", "GBP", "LSE IGLT (GBP line)",
            "https://www.ishares.com/uk/individual/en/products/251806",
-           "All-maturity gilts.")
+           "UK equivalent of intermediate US Treasuries. All-maturity gilts: no 5-15 year gilt fund "
+           "was found at the broker, so it overlaps the long role.")
 SGLN = _aw("iShares Physical Gold ETC", "iShares",
            "IE00B4ND3602", "SGLN.L", "GBX", "LSE SGLN (pence line)",
            "https://www.ishares.com/uk/individual/en/products/258441",
