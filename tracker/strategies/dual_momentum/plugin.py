@@ -8,9 +8,15 @@ from tracker.study_fixed import Source
 from tracker.study_momentum import MomentumStudy
 
 KEY = "dual-momentum"
-# Signal-only series for "cash" (absolute momentum): an accumulating sterling
-# overnight-rate fund, so its price is a total return. Never held.
-CASH_SYMBOL = "CSH2.L"
+# Signal-only series for "cash" (absolute momentum), per account currency. Never
+# held. Pounds: an accumulating SONIA fund (price = total return); dollars:
+# 1-3 month T-bills, as in the original; euros: an accumulating €STR fund.
+CASH_SYMBOLS = {"GBP": "CSH2.L", "USD": "BIL", "EUR": "XEON.DE"}
+CASH_SYMBOL = CASH_SYMBOLS["GBP"]
+
+
+def cash_symbol(instance):
+    return CASH_SYMBOLS.get(instance.account.currency, CASH_SYMBOL)
 
 
 def decide(instance, as_of, *, positions=None, cash=None):
@@ -28,13 +34,13 @@ def decide(instance, as_of, *, positions=None, cash=None):
 
     def quote(symbol, day):
         close = settlement_close(symbol, day)
-        if close and close.currency == "GBP":
+        if close and close.currency == instance.account.currency:
             return v1.Quote(symbol, Decimal(close.price), close.as_of)
         return None
 
     quotes = {s: q for s in funds.values() if (q := quote(s, as_of))}
     lookbacks = {}
-    for key, symbol in (("us", funds.get("us")), ("intl", funds.get("intl")), ("cash", CASH_SYMBOL)):
+    for key, symbol in (("us", funds.get("us")), ("intl", funds.get("intl")), ("cash", cash_symbol(instance))):
         begin, end = (quote(symbol, start), quote(symbol, as_of)) if symbol else (None, None)
         if begin and end:
             lookbacks[key] = v1.Lookback(begin, end)
@@ -52,7 +58,7 @@ def review(instance):
     from tracker.models import PriceMark, StrategySignal
     from tracker.strategies.instruments import role_symbols
 
-    if not instance.market_data_enabled or instance.account.currency != "GBP":
+    if not instance.market_data_enabled:
         return {"status": "disabled"}
     if instance.strategy_version and instance.strategy_version != v1.VERSION:
         return {"status": "cannot_compute", "reason": "Pinned rule version differs; owner review required"}
@@ -60,11 +66,11 @@ def review(instance):
     if not roles or not all(TICKER.fullmatch(s) for s in roles.values()):
         return {"status": "invalid symbol"}
     today = timezone.localdate()
-    for symbol in tuple(roles.values()) + (CASH_SYMBOL,):
+    for symbol in tuple(roles.values()) + (cash_symbol(instance),):
         close = sync_ticker(symbol)
-        if symbol == CASH_SYMBOL:
+        if symbol == cash_symbol(instance):
             continue
-        if close and close.currency == "GBP" and close.as_of >= today - timedelta(days=8):
+        if close and close.currency == instance.account.currency and close.as_of >= today - timedelta(days=8):
             previous = PriceMark.objects.filter(strategy=instance, symbol=symbol).first()
             if not previous or previous.as_of <= close.as_of:
                 PriceMark.objects.update_or_create(
@@ -111,7 +117,7 @@ DUAL_MOMENTUM = StrategyModule(
     review=review,
     next_review=month_end_on_or_after,
     last_review_before=month_end_before,
-    reference_symbols=(CASH_SYMBOL,),
+    reference_symbols=lambda instance: (cash_symbol(instance),),
     allocation_label="Chosen",
     cadence_word="monthly",
     current_weights=current_weights,

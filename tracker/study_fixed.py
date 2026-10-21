@@ -47,13 +47,19 @@ class FixedData:
         return len(self.days) > 1
 
 
-def _gbp_series(symbol, fx_days, fx, convert=True):
-    """{day: GBP adjusted close} for one StudyPrice symbol (or local returns if not ``convert``)."""
+def _gbp_series(symbol, fx_days, fx, convert=True, target="GBP"):
+    """{day: adjusted close in ``target``} for one StudyPrice symbol.
+
+    US-dollar rows are divided by that day's target/USD rate (``fx``) unless
+    ``convert`` is False (local returns); rows in any other currency are skipped.
+    """
     rows = StudyPrice.objects.filter(symbol=symbol).only("as_of", "adj_close", "currency")
     out = {}
     for r in rows:
         value = float(r.adj_close)
-        if r.currency == "USD" and convert:
+        if r.currency != target and r.currency != "USD":
+            continue
+        if r.currency == "USD" and target != "USD" and convert:
             i = bisect_left(fx_days, r.as_of + timedelta(days=1)) - 1
             if i < 0 or (r.as_of - fx_days[i]).days > 7:
                 continue
@@ -74,8 +80,9 @@ class FixedWeightStudy:
     TIMEFRAMES = TIMEFRAMES
     PRIMARY = "strategy"
 
-    def __init__(self, *, title, rules, sources, review_word="yearly"):
+    def __init__(self, *, title, rules, sources, review_word="yearly", currency="GBP"):
         self.TITLE = title
+        self.CURRENCY = currency
         self.rules = rules
         self.sources = sources  # {role: Source}
         self.SERIES = (("strategy", title), ("spy", "SPY (S&P 500)"), ("vti", "VTI (US total market)"))
@@ -85,25 +92,34 @@ class FixedWeightStudy:
     def NEEDS(self):  # noqa: N802 (same interface as the 9Sig study module)
         names = [s.fund.replace(".L", "") for s in self.sources.values()]
         names += [s.proxy for s in self.sources.values() if s.proxy != CASH]
-        return ", ".join(dict.fromkeys(names + ["SPY", "VTI", "GBP/USD"]))
+        fx = [] if self.CURRENCY == "USD" else ["%s/USD" % self.CURRENCY]
+        return ", ".join(dict.fromkeys(names + ["SPY", "VTI"] + fx))
 
     def load_data(self):
-        fx = {r.as_of: float(r.adj_close) for r in StudyPrice.objects.filter(symbol="GBPUSD=X")}
-        fx_days = sorted(fx)
+        target = self.CURRENCY
+        if target == "USD":
+            fx, fx_days = {}, []
+        else:
+            fx = {r.as_of: float(r.adj_close)
+                  for r in StudyPrice.objects.filter(symbol="%sUSD=X" % target)}
+            fx_days = sorted(fx)
         data = FixedData()
-        if not fx:
+        if target != "USD" and not fx:
             return data
-        spy, vti = _gbp_series("SPY", fx_days, fx), _gbp_series("VTI", fx_days, fx)
+
+        def series_of(symbol, convert=True):
+            return _gbp_series(symbol, fx_days, fx, convert=convert, target=target)
+
+        spy, vti = series_of("SPY"), series_of("VTI")
         if not spy:
             return data
         spy_days, vti_days = sorted(spy), sorted(vti)
         series = {}
         for role, source in self.sources.items():
-            fund = _gbp_series(source.fund, fx_days, fx)
-            proxy = {} if source.proxy == CASH else _gbp_series(
-                source.proxy, fx_days, fx, convert=source.proxy_in_gbp)
+            fund = series_of(source.fund)
+            proxy = {} if source.proxy == CASH else series_of(source.proxy, convert=source.proxy_in_gbp)
             series[role] = (fund, sorted(fund), proxy, sorted(proxy))
-        grid = [d for d in spy_days if fx_days and _last(fx_days, fx, d) is not None]
+        grid = [d for d in spy_days if target == "USD" or _last(fx_days, fx, d) is not None]
         columns = {}
         for role, (fund, fund_days, proxy, proxy_days) in series.items():
             column = [None] * len(grid)

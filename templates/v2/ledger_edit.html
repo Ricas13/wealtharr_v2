@@ -47,7 +47,7 @@
         <label class="w2-field">Private reference / note
           <input class="w2-input" name="note" maxlength="280" value="{{ edit_values.note }}" placeholder="Actual transaction reference"></label>
         {% if edit_operation == 'new' and selected_instance.account.kind == 'ISA' %}
-        <label class="w2-field">Other ISA subscriptions in this tax year (£, optional)
+        <label class="w2-field">Other ISA subscriptions in this tax year ({{ cur }}, optional)
           <input class="w2-input" type="number" min="0" step="0.01"
                  name="other_isa_subscriptions" placeholder="If known, enter amount">
           <small class="w2-muted">Used only for an advisory warning; not saved as a deposit.</small>
@@ -58,7 +58,7 @@
         <dl class="w2-review-grid">
           <div><dt>Original date</dt><dd>{{ edit_entry.occurred_on|date:"j M Y" }}</dd></div>
           <div><dt>Event</dt><dd>{{ edit_entry.kind }} {{ edit_entry.symbol }}</dd></div>
-          <div><dt>Cash movement</dt><dd>£{{ edit_entry.amount }}</dd></div>
+          <div><dt>Cash movement</dt><dd>{{ cur }}{{ edit_entry.amount }}</dd></div>
           <div><dt>Shares</dt><dd>{{ edit_entry.quantity }}</dd></div>
         </dl>
       {% endif %}
@@ -71,8 +71,8 @@
       <h3>Impact preview · no changes saved yet</h3>
       <p class="w2-muted">Every historical balance has been checked for negative cash and overselling. No market prices or investment returns are inferred.</p>
       <div class="w2-form-grid">
-        <div class="w2-panel"><p class="w2-label">Cash before</p><p class="w2-stat-value">£{{ edit_preview.before.cash }}</p><p class="w2-muted">Net funded: £{{ edit_preview.before.net_contributed }}</p></div>
-        <div class="w2-panel"><p class="w2-label">Cash after</p><p class="w2-stat-value">£{{ edit_preview.after.cash }}</p><p class="w2-muted">Net funded: £{{ edit_preview.after.net_contributed }}</p></div>
+        <div class="w2-panel"><p class="w2-label">Cash before</p><p class="w2-stat-value">{{ cur }}{{ edit_preview.before.cash }}</p><p class="w2-muted">Net funded: {{ cur }}{{ edit_preview.before.net_contributed }}</p></div>
+        <div class="w2-panel"><p class="w2-label">Cash after</p><p class="w2-stat-value">{{ cur }}{{ edit_preview.after.cash }}</p><p class="w2-muted">Net funded: {{ cur }}{{ edit_preview.after.net_contributed }}</p></div>
       </div>
       <p class="w2-note">Holdings before: {{ edit_preview.before.positions }}. Holdings after: {{ edit_preview.after.positions }}.</p>
       {% if edit_preview.impact.periods %}

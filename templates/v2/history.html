@@ -23,7 +23,7 @@
 
   <section class="w2-card">
     <div class="w2-ch"><h2 class="w2-ct">Monthly</h2><span class="w2-muted">Deposits shown separately</span></div>
-    <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Month</th><th class="w2-r">Start</th><th class="w2-r">Deposits</th><th class="w2-r">End</th><th class="w2-r">Gain £</th><th class="w2-r">Return</th></tr></thead><tbody>
+    <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Month</th><th class="w2-r">Start</th><th class="w2-r">Deposits</th><th class="w2-r">End</th><th class="w2-r">Gain {{ cur }}</th><th class="w2-r">Return</th></tr></thead><tbody>
       {% for m in perf_monthly %}<tr><td>{{ m.month|date:"M Y" }}{% if m.partial %}*{% endif %}</td><td class="w2-r">{{ m.start|floatformat:"2g" }}</td><td class="w2-r">{{ m.deposits|floatformat:"2g" }}</td><td class="w2-r">{{ m.end|floatformat:"2g" }}</td>
         <td class="w2-r {{ m.gain|tone }}">{{ m.gain|signed_num }}</td>
         <td class="w2-r {{ m.pct|tone }}">{% if m.pct is not None %}{{ m.pct|signed_pct }}{% else %}—{% endif %}</td></tr>
@@ -45,7 +45,7 @@
     {% endif %}
     <h2 class="w2-ct" style="margin:14px 0 8px">Money in by month</h2>
     {% if perf_money_in %}
-    <div class="w2-bars" role="img" aria-label="Net deposits by month">{% for m in perf_money_in %}<span style="height:{{ m.height }}%" title="{{ m.month|date:'M Y' }}: £{{ m.amount|floatformat:'2g' }}"></span>{% endfor %}</div>
+    <div class="w2-bars" role="img" aria-label="Net deposits by month">{% for m in perf_money_in %}<span style="height:{{ m.height }}%" title="{{ m.month|date:'M Y' }}: {{ cur }}{{ m.amount|floatformat:'2g' }}"></span>{% endfor %}</div>
     <div class="w2-axis" aria-hidden="true">{% for m in perf_money_in %}<span>{{ m.month|date:"M" }}</span>{% endfor %}</div>
     {% endif %}
   </section>
@@ -67,7 +67,7 @@
       <div class="w2-table-wrap w2-space-top"><table class="w2-table w2-history-table">
         <thead><tr><th>Date</th><th class="w2-r">GBP value</th><th class="w2-r">Net funded</th><th>Origin</th><th>Check</th></tr></thead>
         <tbody>{% for point in history.points reversed %}
-        <tr><td>{{ point.as_of|date:"j M Y" }}</td><td class="w2-r">£{{ point.value_gbp|floatformat:"2g" }}</td><td class="w2-r">£{{ point.net_contributed_gbp|floatformat:"2g" }}</td><td>{{ point.origin }}</td>
+        <tr><td>{{ point.as_of|date:"j M Y" }}</td><td class="w2-r">{{ cur }}{{ point.value_gbp|floatformat:"2g" }}</td><td class="w2-r">{{ cur }}{{ point.net_contributed_gbp|floatformat:"2g" }}</td><td>{{ point.origin }}</td>
           <td><span class="w2-chip {% if point.certified %}w2-ok{% endif %}">{% if point.certified %}{% if point.origin == 'Source-checked GBP portfolio close' %}Source-verified GBP{% else %}Ledger-verified cash{% endif %}{% else %}Not certified{% endif %}</span></td></tr>
         {% empty %}<tr><td colspan="5"><div class="w2-empty">No recorded values yet.</div></td></tr>{% endfor %}
         </tbody></table></div>

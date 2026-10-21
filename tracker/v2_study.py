@@ -28,7 +28,8 @@ def _number(raw, default, low, high):
 def _data(engine):
     """Cache the built series until the next download."""
     latest = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
-    key = "study-data:%s:%s" % (engine.TITLE.replace(" ", "-"), latest.isoformat() if latest else "none")
+    key = "study-data:%s:%s:%s" % (engine.TITLE.replace(" ", "-"), getattr(engine, "CURRENCY", "GBP"),
+                                   latest.isoformat() if latest else "none")
     data = cache.get(key)
     if data is None:
         data = engine.load_data()
@@ -72,9 +73,25 @@ def _chart(engine, result, scale):
         ticks = [10 ** (lo + span * k / 2) for k in (2, 1, 0)]
     else:
         ticks = [hi, hi / 2, 0]
-    return {"lines": out, "y_labels": ["£{:,.0f}".format(t) for t in ticks],
+    from .money import symbol_for
+    cur = symbol_for(getattr(engine, "CURRENCY", "GBP"))
+    return {"lines": out, "y_labels": [cur + "{:,.0f}".format(t) for t in ticks],
             "ticks": [first + (last - first) * k / 4 for k in range(5)],
             "first": first, "last": last}
+
+
+def study_for(plugin, currency):
+    """The plug-in's Study engine for an account currency, or None.
+
+    ``plugin.study`` is one engine or a {currency: engine} map; an engine
+    without a ``CURRENCY`` works in pounds.
+    """
+    study = plugin.study if plugin else None
+    if isinstance(study, dict):
+        return study.get(currency)
+    if study is not None and getattr(study, "CURRENCY", "GBP") != currency:
+        return None
+    return study
 
 
 @login_required
@@ -88,7 +105,7 @@ def study_page(request, instance_id):
     amount, bad_amount = _number(request.GET.get("amount", ""), "1000", 1, 10_000_000)
     monthly, bad_monthly = _number(request.GET.get("monthly", ""), "0", 0, 1_000_000)
     plugin = module_for(strategy)
-    study = plugin.study if plugin else None
+    study = study_for(plugin, strategy.account.currency)
     if study is None:
         return _render(request, page_key="instance", page_title="Study", instance=strategy,
                        section="study", study_supported=False, study_title="")

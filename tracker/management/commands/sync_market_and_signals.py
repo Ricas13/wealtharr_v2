@@ -26,7 +26,7 @@ def save_verified_strategy_snapshot(strategy):
         if (mark is None or mark.source != "yahoo" or
                 mark.as_of < timezone.localdate() - timedelta(days=8) or
                 not MarketObservation.objects.filter(symbol=symbol, as_of=mark.as_of,
-                    currency="GBP", price=mark.price).exists()):
+                    currency=strategy.account.currency, price=mark.price).exists()):
             return None
         dates.append(mark.as_of)
     if not dates:

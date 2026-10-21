@@ -17,12 +17,13 @@ def _number(value):
 
 @register.filter
 def signed_money(value, places=2):
-    """+£1,234.56 / −£1,234.56; "—" when unknown."""
+    """+£1,234.56 / −£1,234.56 (the page's currency symbol); "—" when unknown."""
+    from tracker.money import current_symbol
     number = _number(value)
     if number is None:
         return "—"
     sign = "+" if number > 0 else "−" if number < 0 else ""
-    return "%s£{:,.{p}f}".format(abs(number), p=int(places)) % sign
+    return "%s%s{:,.{p}f}".format(abs(number), p=int(places)) % (sign, current_symbol())
 
 
 @register.filter

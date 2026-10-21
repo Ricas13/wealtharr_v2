@@ -59,7 +59,7 @@
     </fieldset>
     <div id="w2-fresh-fields" {% if wizard.mode == 'hold' %}hidden{% endif %}>
       <div class="w2-form-grid">
-        <label class="w2-field">Money deposited (£)
+        <label class="w2-field">Money deposited ({{ cur }})
           <input class="w2-input" name="amount" inputmode="decimal" type="number" min="0.01" step="0.01" value="{{ wizard_amount }}" placeholder="1000.00"></label>
         <label class="w2-check" style="align-self:end"><input type="checkbox" name="deposited" value="yes" {% if wizard_deposited %}checked{% endif %}>
           <span>This money is already in the account, not a plan.</span></label>
@@ -67,22 +67,22 @@
     </div>
     <div id="w2-hold-fields" {% if wizard.mode != 'hold' %}hidden{% endif %}>
       <p class="w2-field-help">What you hold on the start date and that day's price per share. You can correct it later in the Ledger.</p>
-      <label class="w2-field">Cash in the account (£)
+      <label class="w2-field">Cash in the account ({{ cur }})
         <input class="w2-input" name="cash" inputmode="decimal" type="number" min="0" step="0.01" value="{{ wizard.cash }}" placeholder="0.00"></label>
       {% for holding in wizard_hold_rows %}
       <div class="w2-form-grid">
         <label class="w2-field">{{ holding.line.ticker }} shares
           <input class="w2-input" name="shares_{{ holding.line.role }}" type="number" min="0" step="0.00000001" value="{{ holding.shares }}"></label>
-        <label class="w2-field">{{ holding.line.ticker }} price per share (£)
+        <label class="w2-field">{{ holding.line.ticker }} price per share ({{ cur }})
           <input class="w2-input" name="cost_{{ holding.line.role }}" type="number" min="0" step="0.00000001" value="{{ holding.cost }}"></label>
       </div>
       {% endfor %}
     </div>
-    <label class="w2-field" style="max-width:320px">Monthly top-up you plan (£, optional)
+    <label class="w2-field" style="max-width:320px">Monthly top-up you plan ({{ cur }}, optional)
       <input class="w2-input" name="monthly" inputmode="decimal" type="number" min="0" step="0.01" value="{{ wizard_monthly }}" placeholder="e.g. 500">
       <small class="w2-muted">Used for a reminder if a month's deposit hasn't been recorded. Change it any time.</small></label>
     {% if wizard.type == 'ISA' and wizard_tax_year_verified %}<p class="w2-note">ISA allowance (advisory): £{{ wizard_known_isa|floatformat:"2g" }} of £{{ wizard_isa_limit|floatformat:0 }} recorded in Wealtharr this tax year, not counting other ISAs.</p>
-    {% elif wizard.type == 'GIA' %}<p class="w2-note">A GIA may incur dividend and capital-gains tax. This is tracking, not tax advice.</p>{% endif %}
+    {% elif wizard.type == 'GIA' or wizard.type == 'BROKERAGE' or wizard.type == 'DEPOT' %}<p class="w2-note">This account type may incur dividend and capital-gains tax. This is tracking, not tax advice.</p>{% endif %}
 
     <label class="w2-check w2-space-top"><input type="checkbox" name="go_live" value="yes" {% if wizard_go_live %}checked{% endif %}>
       <span><strong>Go live now</strong> · check prices hourly and tell me when to act. Alerts use your Alerts &amp; settings; change them per strategy later.</span></label>

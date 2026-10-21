@@ -68,7 +68,7 @@
       <div class="w2-pair">
         <label class="w2-field">Type<select class="w2-input" name="kind"><option value="DEPOSIT">Deposit</option><option value="WITHDRAW">Withdrawal</option><option value="INTEREST">Interest on cash</option><option value="DIVIDEND">Dividend</option><option value="FEE">Fee</option></select></label>
         <label class="w2-field">Date<input class="w2-input" type="date" name="occurred_on" value="{{ ledger_today|date:'Y-m-d' }}" max="{{ ledger_today|date:'Y-m-d' }}" required></label>
-        <label class="w2-field">Amount £<input class="w2-input" type="number" name="amount" step="0.01" min="0.01" required></label>
+        <label class="w2-field">Amount {{ cur }}<input class="w2-input" type="number" name="amount" step="0.01" min="0.01" required></label>
         <label class="w2-field">Note<input class="w2-input" name="note" maxlength="200" placeholder="Optional"></label>
       </div>
       <button type="submit" class="w2-button w2-button-primary w2-full">Save</button>
@@ -79,13 +79,13 @@
   {% if ledger_totals %}
   <section class="w2-card">
     <h2 class="w2-ct" style="margin-bottom:6px">Totals</h2>
-    <div class="w2-kv"><span>Deposits</span><span>£{{ ledger_totals.deposits|floatformat:"2g" }}</span></div>
-    <div class="w2-kv"><span>Withdrawals</span><span>£{{ ledger_totals.withdrawals|floatformat:"2g" }}</span></div>
-    <div class="w2-kv"><span>Interest &amp; dividends</span><span>£{{ ledger_totals.income|floatformat:"2g" }}</span></div>
-    <div class="w2-kv"><span>Fees</span><span>£{{ ledger_totals.fees|floatformat:"2g" }}</span></div>
-    <div class="w2-kv"><span>Bought / sold</span><span>£{{ ledger_totals.bought|floatformat:"2g" }} / £{{ ledger_totals.sold|floatformat:"2g" }}</span></div>
-    {% if ledger_summary %}<div class="w2-kv"><span>Ledger cash</span><strong>£{{ ledger_summary.cash|floatformat:"2g" }}</strong></div>
-    <div class="w2-kv"><span>Net contributions</span><span>£{{ ledger_summary.net_contributed|floatformat:"2g" }}</span></div>{% endif %}
+    <div class="w2-kv"><span>Deposits</span><span>{{ cur }}{{ ledger_totals.deposits|floatformat:"2g" }}</span></div>
+    <div class="w2-kv"><span>Withdrawals</span><span>{{ cur }}{{ ledger_totals.withdrawals|floatformat:"2g" }}</span></div>
+    <div class="w2-kv"><span>Interest &amp; dividends</span><span>{{ cur }}{{ ledger_totals.income|floatformat:"2g" }}</span></div>
+    <div class="w2-kv"><span>Fees</span><span>{{ cur }}{{ ledger_totals.fees|floatformat:"2g" }}</span></div>
+    <div class="w2-kv"><span>Bought / sold</span><span>{{ cur }}{{ ledger_totals.bought|floatformat:"2g" }} / {{ cur }}{{ ledger_totals.sold|floatformat:"2g" }}</span></div>
+    {% if ledger_summary %}<div class="w2-kv"><span>Ledger cash</span><strong>{{ cur }}{{ ledger_summary.cash|floatformat:"2g" }}</strong></div>
+    <div class="w2-kv"><span>Net contributions</span><span>{{ cur }}{{ ledger_summary.net_contributed|floatformat:"2g" }}</span></div>{% endif %}
   </section>
   {% endif %}
   <section class="w2-card">

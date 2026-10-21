@@ -10,8 +10,8 @@
 <form method="get" class="w2-card w2-space-top" aria-label="Study inputs">
   <div class="w2-row" style="justify-content:space-between;align-items:flex-end;gap:12px">
     <div class="w2-row" style="align-items:flex-end;gap:10px">
-      <label class="w2-field">Start with £<input class="w2-input" style="width:120px" name="amount" inputmode="decimal" value="{{ study_amount|floatformat:'0' }}"></label>
-      <label class="w2-field">Add each month £<input class="w2-input" style="width:120px" name="monthly" inputmode="decimal" value="{{ study_monthly|floatformat:'0' }}"></label>
+      <label class="w2-field">Start with {{ cur }}<input class="w2-input" style="width:120px" name="amount" inputmode="decimal" value="{{ study_amount|floatformat:'0' }}"></label>
+      <label class="w2-field">Add each month {{ cur }}<input class="w2-input" style="width:120px" name="monthly" inputmode="decimal" value="{{ study_monthly|floatformat:'0' }}"></label>
       <input type="hidden" name="scale" value="{{ study_scale }}">
       <button type="submit" name="range" value="{{ study_range }}" class="w2-button w2-button-primary">Update</button>
     </div>
@@ -27,8 +27,8 @@
 {% else %}
 {% with s=study_main %}
 <section class="w2-kpis w2-space-top" aria-label="{{ study_title }} result">
-  <div class="w2-kpi"><p class="w2-label">{{ study_title }} value now</p><p class="w2-stat-value">£{{ s.final|floatformat:"0g" }}</p></div>
-  <div class="w2-kpi"><p class="w2-label">Money put in</p><p class="w2-stat-value">£{{ s.put_in|floatformat:"0g" }}</p></div>
+  <div class="w2-kpi"><p class="w2-label">{{ study_title }} value now</p><p class="w2-stat-value">{{ cur }}{{ s.final|floatformat:"0g" }}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Money put in</p><p class="w2-stat-value">{{ cur }}{{ s.put_in|floatformat:"0g" }}</p></div>
   <div class="w2-kpi"><p class="w2-label">Gain</p><p class="w2-stat-value {{ s.gain|tone }}">{{ s.gain|signed_money:0 }} <small>{{ s.gain_pct|signed_pct }}</small></p></div>
   <div class="w2-kpi"><p class="w2-label">Annualised</p><p class="w2-stat-value {{ s.annual|tone }}">{% if s.annual is not None %}{{ s.annual|signed_pct }}{% else %}—{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">Worst fall</p><p class="w2-stat-value w2-neg">{{ s.drawdown|signed_pct }}</p></div>
@@ -39,7 +39,7 @@
 
 <div class="w2-grid2">
   <section class="w2-card w2-span2" aria-label="Study chart">
-    <div class="w2-ch"><h2 class="w2-ct">£{{ study_amount|floatformat:"0g" }}{% if study_monthly %} + £{{ study_monthly|floatformat:"0g" }} a month{% endif %} from {{ study_selected.start|date:"j M Y" }}</h2>
+    <div class="w2-ch"><h2 class="w2-ct">{{ cur }}{{ study_amount|floatformat:"0g" }}{% if study_monthly %} + {{ cur }}{{ study_monthly|floatformat:"0g" }} a month{% endif %} from {{ study_selected.start|date:"j M Y" }}</h2>
       <div class="w2-seg" role="group" aria-label="Scale">
         <a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ study_range }}&amp;scale=linear" {% if study_scale == 'linear' %}class="w2-on" aria-current="true"{% endif %}>Linear</a>
         <a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ study_range }}&amp;scale=log" {% if study_scale == 'log' %}class="w2-on" aria-current="true"{% endif %}>Log</a>
@@ -67,7 +67,7 @@
       <thead><tr><th>Approach</th><th class="w2-r">Value now</th><th class="w2-r">Put in</th><th class="w2-r">Gain</th><th class="w2-r">Gain %</th><th class="w2-r">Annualised</th><th class="w2-r">Worst fall</th><th class="w2-r">Trades</th></tr></thead>
       <tbody>{% for name, label, css, row in study_selected_rows %}
         <tr><td><span class="w2-dotsw {{ css }}"></span>{{ label }}{% if name == study_best %} <span class="w2-chip w2-ok">Best</span>{% endif %}</td>
-          {% if row %}<td class="w2-r">£{{ row.final|floatformat:"2g" }}</td><td class="w2-r">£{{ row.put_in|floatformat:"0g" }}</td>
+          {% if row %}<td class="w2-r">{{ cur }}{{ row.final|floatformat:"2g" }}</td><td class="w2-r">{{ cur }}{{ row.put_in|floatformat:"0g" }}</td>
           <td class="w2-r {{ row.gain|tone }}">{{ row.gain|signed_money }}</td><td class="w2-r {{ row.gain_pct|tone }}">{{ row.gain_pct|signed_pct }}</td>
           <td class="w2-r">{% if row.annual is not None %}{{ row.annual|signed_pct }}{% else %}—{% endif %}</td>
           <td class="w2-r w2-neg">{{ row.drawdown|signed_pct }}</td><td class="w2-r">{% if row.trades is not None %}{{ row.trades }}{% else %}—{% endif %}</td>
@@ -78,13 +78,13 @@
   </section>
 
   <section class="w2-card w2-span2">
-    <div class="w2-ch"><h2 class="w2-ct">Every timeframe · value now</h2><span class="w2-muted">£{{ study_amount|floatformat:"0g" }}{% if study_monthly %} + £{{ study_monthly|floatformat:"0g" }}/month{% endif %}</span></div>
+    <div class="w2-ch"><h2 class="w2-ct">Every timeframe · value now</h2><span class="w2-muted">{{ cur }}{{ study_amount|floatformat:"0g" }}{% if study_monthly %} + {{ cur }}{{ study_monthly|floatformat:"0g" }}/month{% endif %}</span></div>
     <div class="w2-table-wrap"><table class="w2-table">
       <thead><tr><th>Started</th><th>On</th>{% for name, label in study_series %}<th class="w2-r">{{ label }}</th>{% endfor %}</tr></thead>
       <tbody>{% for row in study_rows %}
         <tr><td><a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ row.key }}&amp;scale={{ study_scale }}">{% if row.key == 'ytd' %}Since 1 Jan{% else %}{{ row.label }} ago{% endif %}</a></td>
           {% if row.result %}<td class="w2-muted">{{ row.result.start|date:"j M Y" }}{% if row.result.simulated_notes %}*{% endif %}</td>
-            {% for name, cell in row.cells %}<td class="w2-r {% if name == row.best %}w2-best{% endif %}">{% if cell %}£{{ cell.final|floatformat:"0g" }} <small class="{{ cell.gain_pct|tone }}">{{ cell.gain_pct|signed_pct:0 }}</small>{% else %}<span class="w2-muted">—</span>{% endif %}</td>{% endfor %}
+            {% for name, cell in row.cells %}<td class="w2-r {% if name == row.best %}w2-best{% endif %}">{% if cell %}{{ cur }}{{ cell.final|floatformat:"0g" }} <small class="{{ cell.gain_pct|tone }}">{{ cell.gain_pct|signed_pct:0 }}</small>{% else %}<span class="w2-muted">—</span>{% endif %}</td>{% endfor %}
           {% else %}<td colspan="{{ study_series|length|add:1 }}" class="w2-muted">Not enough history</td>{% endif %}</tr>
       {% endfor %}</tbody>
     </table></div>

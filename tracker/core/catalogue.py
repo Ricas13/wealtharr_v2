@@ -26,11 +26,8 @@ CATALOGUE_VERSION = MAPPING_VERSION
 ALL_WEATHER = "all-weather"
 GOLDEN_BUTTERFLY = "golden-butterfly"
 DUAL_MOMENTUM = "dual-momentum"
-ACCOUNT_TYPES = (
-    ("ISA", "Stocks & Shares ISA"),
-    ("GIA", "General Investment Account"),
-    ("SIPP", "SIPP (pension)"),
-)
+from tracker.core.brokers import ACCOUNT_TYPE_NAMES  # noqa: E402
+ACCOUNT_TYPES = tuple(ACCOUNT_TYPE_NAMES.items())
 
 
 @dataclass(frozen=True)
@@ -83,7 +80,7 @@ class Listing:
     brokers: dict = field(default_factory=dict)  # broker key -> evidence URL
     wrappers: tuple = ("ISA", "GIA")  # account types the issuer says it suits
     country: str = "GB"
-    currency: str = "GBP"  # normalised account currency
+    currency: str = "GBP"  # the account currency this line is tracked in
 
 
 @dataclass(frozen=True)
@@ -273,7 +270,8 @@ def platforms():
 # Raw Yahoo quote units for reference series that no strategy holds.
 REFERENCE_QUOTE_UNITS = {"TQQQ": ("USD",), "SPY": ("USD",), "QQQ": ("USD",), "GBPUSD=X": ("USD",),
                          # Dual Momentum's sterling cash series (Amundi Smart Overnight Return, pence line).
-                         "CSH2.L": ("GBp", "GBX")}
+                         "CSH2.L": ("GBp", "GBX"), "BIL": ("USD",), "XEON.DE": ("EUR",),
+                         "EURUSD=X": ("USD",)}
 
 
 def expected_quote_units():
@@ -290,12 +288,19 @@ def expected_quote_units():
     return units
 
 
+def fx_symbol(quote_currency, account_currency):
+    """Yahoo pair converting a quote currency into the account currency."""
+    return "%s%s=X" % (account_currency, quote_currency)
+
+
 class MappingNotAvailable(ValueError):
     pass
 
 
-def rows_for(strategy_key, platform, account_type, *, country="GB",
+def rows_for(strategy_key, platform, account_type, *, country=None,
              version=CATALOGUE_VERSION):
+    if country is None:
+        country = BROKERS[platform].country if platform in BROKERS else "GB"
     if version != CATALOGUE_VERSION:
         raise MappingNotAvailable("Mapping version is not released.")
     rows = tuple(
@@ -330,15 +335,25 @@ def _manifest_from_lines(strategy_key, platform, account_type):
             "broker_ticker": line.ticker.split(".")[0], "yahoo_ticker": line.ticker,
             "trading_line": line.trading_line, "raw_quote_unit": line.raw_quote_unit,
             "normalised_currency": line.currency,
-            "raw_to_gbp_factor": {"GBX": "100", "GBP": "1"}.get(line.raw_quote_unit, "GBPUSD=X daily close"),
             "weight": str(line.weight),
             "broker_isa_confirmed": False, "owner_product_permission_confirmed": False,
             "issuer_url": line.issuer_url, "broker_evidence_url": line.broker_evidence_url,
         }
+        # Pinned snapshots of existing pound accounts must stay byte-identical.
+        if line.currency == "GBP":
+            roles[line.role]["raw_to_gbp_factor"] = {"GBX": "100", "GBP": "1"}.get(
+                line.raw_quote_unit, "GBPUSD=X daily close")
+        else:
+            roles[line.role]["raw_to_account_factor"] = (
+                "1" if line.raw_quote_unit == line.currency
+                else "%s daily close" % fx_symbol(line.raw_quote_unit, line.currency))
     manifest = {
         "strategy_key": strategy_key, "mapping_version": CATALOGUE_VERSION,
-        "country": "GB", "broker": platform, "account_type": account_type, "roles": roles,
+        "country": BROKERS[platform].country,
+        "broker": platform, "account_type": account_type, "roles": roles,
     }
+    if BROKERS[platform].currency != "GBP":
+        manifest["currency"] = BROKERS[platform].currency
     serial = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
     manifest["sha256"] = hashlib.sha256(serial.encode()).hexdigest()
     return manifest

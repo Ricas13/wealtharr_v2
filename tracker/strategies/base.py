@@ -18,8 +18,9 @@ class StrategyModule:
     next_review: Callable
     # The last completed review date before a day. (date) -> date
     last_review_before: Callable
-    # Market series the rules need besides the held funds (e.g. reference indexes).
-    reference_symbols: tuple = ()
+    # Market series the rules need besides the held funds (e.g. reference indexes):
+    # a tuple, or (instance) -> tuple when it depends on the account.
+    reference_symbols: tuple | Callable = ()
     # Optional extra dashboard cards: template path and (instance, report, next_end) -> context.
     dashboard_template: str = ""
     dashboard_context: Callable | None = None

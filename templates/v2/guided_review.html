@@ -36,8 +36,8 @@
         <tbody>{% for fill in action.fills %}
           <tr><td>{{ fill.ledger_entry.occurred_on|date:"j M Y" }}</td>
               <td>{{ fill.ledger_entry.quantity }}</td>
-              <td>£{{ fill.ledger_entry.unit_price }}</td>
-              <td>£{{ fill.ledger_entry.fee }}</td></tr>
+              <td>{{ cur }}{{ fill.ledger_entry.unit_price }}</td>
+              <td>{{ cur }}{{ fill.ledger_entry.fee }}</td></tr>
         {% endfor %}</tbody></table></div>
     {% endif %}
     {% if review_can_submit and not action.complete %}

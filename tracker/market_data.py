@@ -76,7 +76,7 @@ def fetch_chart(symbol, since):
     if symbol in expected_units and raw_currency not in expected_units[symbol]:
         raise ValueError("PRICE_HOLD:RAW_UNIT_MISMATCH")
     currency = "GBP" if raw_currency in ("GBp", "GBX", "GBP") else raw_currency
-    if currency not in ("GBP", "USD"):
+    if currency not in ("GBP", "USD", "EUR"):
         raise ValueError("Unsupported Yahoo quote currency")
     divisor = Decimal(100) if raw_currency in ("GBp", "GBX") else Decimal(1)
     closes = ((chart.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
@@ -107,9 +107,13 @@ EIGHT_DP = Decimal("0.00000001")
 
 
 def usd_holding_symbols():
-    """Catalogued fund lines quoted in USD (not reference series like SPY)."""
+    """Pound-account fund lines quoted in USD (not reference series like SPY).
+
+    Dollar accounts hold USD lines as they are; only pound accounts convert.
+    """
     from .core.catalogue import CATALOGUE
-    return {line.ticker for line in CATALOGUE.values() if line.raw_quote_unit == "USD"}
+    return {line.ticker for line in CATALOGUE.values()
+            if line.raw_quote_unit == "USD" and line.currency == "GBP"}
 
 
 def fx_rates(days):

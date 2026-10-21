@@ -61,8 +61,9 @@ def _ownership(strategy):
 def _blocked(strategy):
     if not _ownership(strategy):
         return "The account owner and strategy owner differ."
-    if strategy.account.currency != "GBP":
-        return "GBP history requires an actual GBP account and exact currency data."
+    from .core.brokers import CURRENCY_SYMBOLS
+    if strategy.account.currency not in CURRENCY_SYMBOLS:
+        return "History requires an account in a supported currency and exact currency data."
     return ""
 
 
@@ -79,7 +80,7 @@ def _cash_evidence(strategy, state, day, entries):
         return None
     # Ledger entry identities, dates and revision versions are audit provenance.
     return VerifiedValuation(
-        as_of=day, value_gbp=state["cash"], verified=True, currency="GBP",
+        as_of=day, value_gbp=state["cash"], verified=True, currency=strategy.account.currency,
         observation_ids=tuple(
             "owner-ledger:%s:%s:%s" % (strategy.pk, e.pk, e.version)
             for e in relevant
@@ -93,8 +94,7 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
     The original Yahoo raw unit and price must have been captured by sync_ticker
     on that exact trading day; legacy normalized-only rows remain unapproved.
     """
-    if strategy.account.country != "GB":
-        return None
+    currency = strategy.account.currency
     from .core.catalogue import expected_quote_units
     from .strategies.instruments import symbols
     units_by_symbol = expected_quote_units()
@@ -102,12 +102,14 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
     # Only catalogued GBP/GBX trading lines of this strategy count as evidence.
     expected = {
         s: units_by_symbol[s] + (Decimal("100") if "GBX" in units_by_symbol[s] else Decimal("1"),)
-        for s in funds if s in units_by_symbol and set(units_by_symbol[s]) <= {"GBp", "GBX", "GBP"}
+        for s in funds if s in units_by_symbol and set(units_by_symbol[s]) <= (
+            {"GBp", "GBX", "GBP"} if currency == "GBP" else {currency})
     }
     # USD-quoted lines: the raw close divided by that day's GBP/USD close.
     from .market_data import fx_rates, usd_holding_symbols, usd_to_gbp
     rate = fx_rates([day]).get(day)
-    expected.update({s: ("USD", None) for s in funds if s in usd_holding_symbols() and rate})
+    if currency == "GBP":
+        expected.update({s: ("USD", None) for s in funds if s in usd_holding_symbols() and rate})
     if not expected or len(expected) != len(funds) or not state["positions"]:
         return None
     value = state["cash"]
@@ -119,7 +121,7 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
                 symbol=symbol, last_error__startswith="PRICE_HOLD:").exists():
             return None
         obs = MarketObservation.objects.filter(
-            symbol=symbol, as_of=day, currency="GBP",
+            symbol=symbol, as_of=day, currency=currency,
             source="yahoo", raw_unit_verified=True,
         ).first()
         if obs is None or not isinstance(obs.raw_close, Decimal) or obs.raw_close <= ZERO:
@@ -144,7 +146,7 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
     )
     return VerifiedValuation(
         as_of=day, value_gbp=snapshot_value, verified=True,
-        currency="GBP", observation_ids=tuple(ids),
+        currency=currency, observation_ids=tuple(ids),
     )
 
 
@@ -389,17 +391,27 @@ def overview_page(request):
     included_funding_known = True
     excluded = []
     today = timezone.localdate()
+    # Combined figures add up one currency only (no guessed exchange rates): the
+    # first strategy's. Strategies in another currency are listed, not combined.
+    from .money import symbol_for
+    home = items[0].account.currency if items else "GBP"
+    other_currency = [i.name for i in items if i.account.currency != home]
     # A strategy counts when it has a certified value from the last 8 days
     # (latest closes, so weekends and holidays don't blank the total).
     fresh_after = today - timedelta(days=8)
     for instance in items:
         report = build_history(instance)
-        if report["actual_net_funding"] is None:
+        combined = instance.account.currency == home
+        if not combined:
+            pass
+        elif report["actual_net_funding"] is None:
             complete_funding = False
         else:
             contributed += report["actual_net_funding"]
         latest = report["latest_certified"]
-        if latest and latest.as_of >= fresh_after:
+        if not combined:
+            pass
+        elif latest and latest.as_of >= fresh_after:
             total += latest.value_gbp
             if report["actual_net_funding"] is None:
                 included_funding_known = False
@@ -413,8 +425,9 @@ def overview_page(request):
             "as_of": latest.as_of if latest else None,
             "contributed": report["actual_net_funding"],
             "last_recorded": report["last_point"],
+            "cur": symbol_for(instance.account.currency), "combined": combined,
         })
-    valued = len(items) - len(excluded)
+    valued = len(items) - len(excluded) - len(other_currency)
     aggregate = total if valued else None
     gained = total - included_funding if valued and included_funding_known else None
     isa_total = sum((row["contributed"] for row in rows
@@ -423,7 +436,8 @@ def overview_page(request):
     return _render(
         request, page_key="overview", page_title="Overview",
         **_overview_extras(request, items, rows, today),
-        overview_rows=rows, overview_total=aggregate,
+        overview_rows=rows, overview_total=aggregate, overview_other_currency=other_currency,
+        page_currency=home,
         overview_contributed=contributed if complete_funding and items else None,
         overview_gain=gained, overview_same_date=bool(items) and not excluded,
         overview_excluded=excluded,
@@ -444,14 +458,15 @@ def _open_action(strategy, summary, today):
         return {"kind": "golive", "title": "Setup not finished", "detail": "Confirm the instruments to start recording"}
     if not summary["positions"] and summary["cash"] > ZERO:
         return {"kind": "start", "title": "Buy your opening position",
-                "detail": "Split your cash at the target weights"}
+                "detail": "Buy what the strategy holds today"}
     signal = strategy.signals.filter(
         kind="QUARTERLY", as_of=last_review_before(strategy, today),
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-pk").first()
     if signal and proposed_actions(signal) and not RebalanceExecution.objects.filter(
             signal=signal).exists():
-        trades = " · ".join("%s ≈ £%s %s" % (
-            a["side"].title(), "{:,.0f}".format(Decimal(str(a.get("estimated_gbp") or 0))), a["symbol"])
+        from .money import symbol_for
+        trades = " · ".join("%s ≈ %s%s %s" % (
+            a["side"].title(), symbol_for(strategy.account.currency), "{:,.0f}".format(Decimal(str(a.get("estimated_gbp") or 0))), a["symbol"])
             for a in proposed_actions(signal))
         quarter = (signal.as_of.month - 1) // 3 + 1
         return {"kind": "review", "title": "Q%s rebalance" % quarter, "detail": trades,
@@ -465,7 +480,8 @@ def _overview_extras(request, items, rows, today):
     from .services import ledger_summary
     span = dash.pick_range(request)
     mode = dash.pick_mode(request)
-    live = [s for s in items if not s.tracking_only]
+    home = items[0].account.currency if items else "GBP"
+    live = [s for s in items if not s.tracking_only and s.account.currency == home]
     points = dash.combine_points(live)
     todos = []
     assets = {}
@@ -482,7 +498,8 @@ def _overview_extras(request, items, rows, today):
         row["action"] = _open_action(strategy, summary, today) if summary else None
         if row["action"]:
             todos.append({"strategy": strategy, **row["action"]})
-        if summary and summary["value"] is not None and not strategy.tracking_only:
+        if (summary and summary["value"] is not None and not strategy.tracking_only
+                and strategy.account.currency == home):
             for symbol, qty in summary["positions"].items():
                 mark = summary["marks"].get(symbol)
                 if mark and qty > ZERO:
@@ -496,10 +513,11 @@ def _overview_extras(request, items, rows, today):
         "css": {"Growth": "w2-c1", "Safe": "w2-c2", "Cash": "w2-c4"}.get(label, "w2-c3"),
         "width": float(value / asset_total * 100) if asset_total > ZERO else 0,
     } for label, value in assets.items()) if asset_total > ZERO else ()
-    valued = [r for r in rows if r["value"] is not None]
+    valued = [r for r in rows if r["value"] is not None and r["combined"]]
     total = sum((r["value"] for r in valued), ZERO)
     for r in rows:
-        r["share"] = float(r["value"] / total * 100) if r["value"] is not None and total > ZERO else 0
+        r["share"] = (float(r["value"] / total * 100)
+                      if r["value"] is not None and r["combined"] and total > ZERO else 0)
     next_end = _next_quarter(today)
     coming = []
     for todo in todos:
@@ -520,7 +538,7 @@ def _overview_extras(request, items, rows, today):
                        "todo": "Allowance resets"})
     coming.sort(key=lambda c: (c["date"] is not None, c["date"] or today))
     symbols = sorted({x for s in live for x in fund_symbols(s)})
-    prices = [MarketObservation.objects.filter(symbol=x, currency="GBP").order_by("-as_of").first()
+    prices = [MarketObservation.objects.filter(symbol=x, currency=home).order_by("-as_of").first()
               for x in symbols]
     last_sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()
     change, change_pct = dash.day_change(points)

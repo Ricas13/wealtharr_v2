@@ -51,7 +51,7 @@ def rebuild_value_history(strategy, changed_on):
         value = cash
         for symbol, qty in positions.items():
             close = MarketObservation.objects.filter(
-                symbol=symbol, as_of=row.as_of, currency="GBP").first() if qty > 0 else None
+                symbol=symbol, as_of=row.as_of, currency=strategy.account.currency).first() if qty > 0 else None
             if close is None:
                 value = None
                 break

@@ -25,8 +25,9 @@ def _year_before(day):
 class MomentumStudy(FixedWeightStudy):
     """Sources must include a "cash" role: the signal-only cash series."""
 
-    def __init__(self, *, title, rules, sources):
-        super().__init__(title=title, rules=rules, sources=sources, review_word="monthly")
+    def __init__(self, *, title, rules, sources, currency="GBP"):
+        super().__init__(title=title, rules=rules, sources=sources, review_word="monthly",
+                         currency=currency)
 
     def _strategy(self, data, s, amount, monthly):
         rules, days = self.rules, data.days
