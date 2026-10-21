@@ -22,14 +22,14 @@ from .models import StrategyGoLive, StrategyInstance
 
 
 def attestation_text(strategy):
+    from .strategies.instruments import role_symbols
     roles = (strategy.resolved_instruments or {}).get("roles", {})
-    growth = roles.get("growth", {}).get("isin", "")
-    safe = roles.get("safe", {}).get("isin", "")
+    funds = [f"{symbol}{f' ({isin})' if (isin := roles.get(role, {}).get('isin', '')) else ''}"
+             for role, symbol in role_symbols(strategy).items()]
+    listed = " and ".join(funds) if len(funds) < 3 else ", ".join(funds[:-1]) + " and " + funds[-1]
     return (
         f"I checked in my own {strategy.account.broker} {strategy.account.kind} account that "
-        f"{strategy.equity_symbol}{f' ({growth})' if growth else ''} and "
-        f"{strategy.safe_symbol}{f' ({safe})' if safe else ''} can be bought. "
-        "Wealtharr never trades for me."
+        f"{listed} can be bought. Wealtharr never trades for me."
     )
 
 

@@ -9,7 +9,6 @@ from decimal import Decimal
 from django.utils import timezone
 
 from .instrument_mapping import for_strategy
-from .market_signals import quarter_end_before
 from .models import MarketObservation, RebalanceExecution, YahooSync
 
 ZERO = Decimal("0")
@@ -28,19 +27,21 @@ def changed_since_review(strategy, notice):
 
 
 def _next_end(day):
-    from calendar import monthrange
-    from datetime import date
-    month = ((day.month - 1) // 3 + 1) * 3
-    return date(day.year, month, monthrange(day.year, month)[1])
+    from .core.calendar import quarter_end_on_or_after
+    return quarter_end_on_or_after(day)
 
 
 def _price_status(strategy, report):
+    from .strategies.instruments import symbols
+    from .strategies.registry import module_for
     today = timezone.localdate()
     if not strategy.market_data_enabled or strategy.account.currency != 'GBP':
-        return False, '9Sig monitoring must be enabled for a GBP account before trading.', []
+        return False, 'Price monitoring must be enabled for a GBP account before trading.', []
     if for_strategy(strategy) is None:
         return False, 'Your broker/account instruments are not mapped to an exact verified GBP trading line.', []
-    required_symbols = (strategy.equity_symbol, strategy.safe_symbol, 'TQQQ', 'SPY')
+    plugin = module_for(strategy)
+    funds = symbols(strategy)
+    required_symbols = funds + (plugin.reference_symbols if plugin else ())
     if YahooSync.objects.filter(symbol__in=required_symbols,
                                 last_error__startswith='PRICE_HOLD:').exists():
         return False, 'A required market price is on hold for verification. No trade instruction is available.', []
@@ -49,23 +50,22 @@ def _price_status(strategy, report):
     if report['cash'] < ZERO:
         return False, 'Cash is negative. Reconcile missing deposits, charges, or trades.', []
     held = [s for s, q in report['positions'].items() if q > ZERO]
-    if any(s not in (strategy.equity_symbol, strategy.safe_symbol) for s in held):
+    if any(s not in funds for s in held):
         return False, 'An unmodelled holding exists. Reconcile the broker portfolio first.', []
     if report['missing']:
         return False, 'A held instrument has no price. Fetch verified GBP closes.', []
     if not held:
         return False, 'Record your purchases in the Ledger.', []
-    # 9Sig also needs a verified safe-asset quote when that sleeve holds zero
-    # shares, because a BUY/SELL instruction may require its price.
-    required = list(dict.fromkeys([strategy.equity_symbol, strategy.safe_symbol]))
-    marks = [report['marks'].get(s) for s in required]
+    # Every fund needs a verified quote, even one held at zero shares,
+    # because a BUY instruction may require its price.
+    marks = [report['marks'].get(s) for s in funds]
     if any(m is None for m in marks):
-        return False, 'Both 9Sig instruments need verified GBP closes.', marks
+        return False, "Every one of the strategy's funds needs a verified GBP close.", marks
     if any(m.source != 'yahoo' or m.price <= ZERO or m.as_of > today or
            m.as_of < today - timedelta(days=8) for m in marks):
         return False, 'Prices are stale or not Yahoo-verified. Refresh market data.', marks
     if (max(m.as_of for m in marks) - min(m.as_of for m in marks)).days > 1:
-        return False, 'Equity and safe-asset prices have mismatched closing dates.', marks
+        return False, "The funds' prices have mismatched closing dates.", marks
     for m in marks:
         if not MarketObservation.objects.filter(symbol=m.symbol, as_of=m.as_of,
                                                 currency='GBP', price=m.price).exists():
@@ -78,7 +78,8 @@ def _price_status(strategy, report):
 def _last_action(strategy):
     # Only the most recently completed quarter can supply executable orders.
     # Old unacknowledged notices remain in History, not resurrected as trades.
-    quarter = quarter_end_before(timezone.localdate())
+    from .strategies.registry import last_review_before
+    quarter = last_review_before(strategy, timezone.localdate())
     manual = strategy.signals.filter(kind__in=('SPIKE_WATCH', 'THIRTY_DOWN'),
              as_of__gte=quarter, acknowledged_at__isnull=True).exclude(
              review_outcome__in=('FALSE_POSITIVE', 'NOT_APPLICABLE')).order_by('-as_of', '-pk').first()

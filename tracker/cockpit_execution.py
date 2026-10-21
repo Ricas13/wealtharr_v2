@@ -12,12 +12,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from .instrument_mapping import for_strategy
-from .market_signals import quarter_end_before
 from .models import (
     LedgerEntry, MarketObservation, RebalanceExecution, SignalFill,
     StrategyBaseline, StrategyInstance, StrategySignal,
 )
 from .services import ledger_summary, validate_and_record
+from .strategies.instruments import symbols
+from .strategies.registry import last_review_before, module_for
 
 D = Decimal
 ZERO = D("0")
@@ -91,7 +92,7 @@ def late_review_allowed(strategy, signal):
     It can still be finished against the fills already recorded (never new
     fills: trades after the quarter belong to the next review).
     """
-    if signal.kind != "QUARTERLY" or signal.as_of >= quarter_end_before(timezone.localdate()):
+    if signal.kind != "QUARTERLY" or signal.as_of >= last_review_before(strategy, timezone.localdate()):
         return False
     if not SignalFill.objects.filter(signal=signal, strategy=strategy).exists():
         return False
@@ -101,7 +102,7 @@ def late_review_allowed(strategy, signal):
 
 
 def _check_current(locked, signal, *, allow_late=False):
-    current = signal.as_of == quarter_end_before(timezone.localdate())
+    current = signal.as_of == last_review_before(locked, timezone.localdate())
     if (signal.strategy_id != locked.pk or signal.kind != "QUARTERLY" or
             not (current or (allow_late and late_review_allowed(locked, signal))) or
             signal.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")):
@@ -183,7 +184,7 @@ def record_single_fill(*, owner, strategy_id, signal_id, action_index,
         if quantity > rows[action_index]["remaining"]:
             raise ValidationError("This fill exceeds the remaining proposed units. Reconcile the larger trade separately.")
         action = actions[action_index]
-        if action["symbol"] not in (locked.equity_symbol, locked.safe_symbol):
+        if action["symbol"] not in symbols(locked):
             raise ValidationError("The proposed broker symbol is not the mapped holding.")
         entry = LedgerEntry(
             kind=action["side"], occurred_on=executed_on,
@@ -230,26 +231,25 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
         last_day = max(f.ledger_entry.occurred_on for f in fills)
         if any(m is None or m.as_of <= last_day for m in marks):
             raise ValidationError("Wait for a verified GBP close AFTER the latest real fill.")
-        if marks[0].as_of != marks[1].as_of:
-            raise ValidationError("Both held instruments need the same dated GBP close.")
+        if len({m.as_of for m in marks}) != 1:
+            raise ValidationError("Every held instrument needs the same dated GBP close.")
         if before["value"] is None or before["value"] <= ZERO or before["cash"] < ZERO:
             raise ValidationError("Portfolio valuation or cash is incomplete.")
-        if any(s not in (locked.equity_symbol, locked.safe_symbol)
-               for s in before["positions"]):
+        if any(s not in symbols(locked) for s in before["positions"]):
             raise ValidationError("Unmapped holdings cannot start a completed review.")
-        actual_equity = before["positions"].get(locked.equity_symbol, ZERO) * marks[0].price
-        actual_safe = before["positions"].get(locked.safe_symbol, ZERO) * marks[1].price
+        # Fully recorded quantities from an ordinary review are exact;
+        # unexpected additional entries since the review are rejected above.
         reset = bool(signal.reset_reason)
-        if reset:
-            target_equity = before["value"] * D("0.60")
-        else:
-            # Fully recorded quantities from the original signal are exact;
-            # unexpected additional entries since the signal are rejected.
-            target_equity = actual_equity
-        if abs(actual_equity - target_equity) / before["value"] > D("0.05"):
-            raise ValidationError("Actual post-fill equity is outside the reviewed reset tolerance.")
         baseline = None
         if reset:
+            # A reset (60/40 baseline) exists only for strategies that define one.
+            plugin = module_for(locked)
+            if not (plugin and plugin.supports_reset):
+                raise ValidationError("This strategy has no reset step.")
+            actual_equity = before["positions"].get(locked.equity_symbol, ZERO) * marks[0].price
+            actual_safe = before["positions"].get(locked.safe_symbol, ZERO) * marks[1].price
+            if abs(actual_equity - before["value"] * D("0.60")) / before["value"] > D("0.05"):
+                raise ValidationError("Actual post-fill equity is outside the reviewed reset tolerance.")
             if locked.baselines.filter(as_of__gt=signal.as_of).exists():
                 raise ValidationError("A later confirmed baseline already exists.")
             baseline = StrategyBaseline.objects.create(

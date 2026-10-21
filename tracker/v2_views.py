@@ -37,7 +37,8 @@ def _price_freshness(instance):
     from datetime import timedelta
     from django.utils import timezone
     from .models import MarketObservation, YahooSync
-    symbols = [x for x in (instance.equity_symbol, instance.safe_symbol) if x]
+    from .strategies.instruments import symbols as fund_symbols
+    symbols = list(fund_symbols(instance))
     latest = MarketObservation.objects.filter(
         symbol__in=symbols, currency="GBP").order_by("-as_of").first()
     sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()

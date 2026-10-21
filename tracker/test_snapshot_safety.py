@@ -38,7 +38,7 @@ class SnapshotSafetyTests(TestCase):
             price=self.mark.price, currency='GBP')
 
     def run_scheduler(self):
-        with patch("tracker.management.commands.sync_market_and_signals.review_strategy",
+        with patch("tracker.market_signals.review_strategy",
                    return_value={"status": "ok"}):
             call_command("sync_market_and_signals", verbosity=0)
 

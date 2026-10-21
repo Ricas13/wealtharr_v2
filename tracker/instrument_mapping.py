@@ -232,6 +232,9 @@ def for_strategy(strategy):
     # Old instances default False, so established legacy behaviour is unchanged.
     if getattr(strategy, "tracking_only", False):
         return None
+    key = getattr(strategy, "strategy_key", "") or strategy.preset.slug
+    if key != STRATEGY_9SIG:
+        return _catalogue_profile(strategy, key)
     try:
         profile = resolve_instruments(
             strategy.preset.slug, strategy.account.country,
@@ -263,6 +266,19 @@ def for_strategy(strategy):
         if snapshot != released:
             return None
     return profile
+
+
+def _catalogue_profile(strategy, key):
+    """Any non-9Sig strategy: its pinned snapshot must equal today's released one."""
+    from .core.catalogue import MappingNotAvailable, onboarding_manifest
+    snapshot = strategy.resolved_instruments or {}
+    if not snapshot or strategy.mapping_version != MAPPING_VERSION:
+        return None
+    try:
+        released = onboarding_manifest(key, strategy.account.broker, strategy.account.kind)
+    except MappingNotAvailable:
+        return None
+    return snapshot if snapshot == released else None
 
 
 def enrolment_manifest(strategy_slug=STRATEGY_9SIG, *, country="GB",

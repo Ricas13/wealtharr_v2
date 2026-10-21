@@ -95,7 +95,7 @@ class NineSigCalculations(SimpleTestCase):
         self.assertEqual(evaluate(starting=D("0")), [])
 
 class YahooParsing(SimpleTestCase):
-    @patch("tracker.market_signals.urlopen")
+    @patch("tracker.market_data.urlopen")
     def test_pence_prices_are_normalized_to_pounds(self, open_url):
         epoch = 1577923200  # 2 January 2020 UTC
         content = json.dumps({"chart": {"result": [{
@@ -111,7 +111,7 @@ class YahooParsing(SimpleTestCase):
         self.assertEqual(currency, "GBP")
         self.assertEqual(rows[0][1], D("12.34000000"))
 
-    @patch("tracker.market_signals.urlopen")
+    @patch("tracker.market_data.urlopen")
     def test_secondary_yahoo_chart_host_recovers_from_primary_outage(self, open_url):
         epoch = 1577923200
         content = json.dumps({"chart": {"result": [{
