@@ -39,7 +39,8 @@ class V2OnlyRoutingTests(TestCase):
         )
 
     def test_home_login_and_single_existing_instance(self):
-        self.assertRedirects(self.client.get("/"), "/login/", fetch_redirect_response=False)
+        # Signed out, "/" is the public homepage with a sign-in link.
+        self.assertContains(self.client.get("/"), 'href="/login/"')
         self.assertEqual(self.client.get("/login/").status_code, 200)
         one = self.add()
         response = self.client.post("/login/",{

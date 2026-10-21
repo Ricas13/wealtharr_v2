@@ -1,0 +1,170 @@
+{% load static %}<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Follow a fixed investing strategy without the spreadsheet. Wealtharr checks prices and tells you exactly what to do, and when.">
+<title>Wealtharr · Follow a proven strategy</title>
+<link rel="stylesheet" href="{% static 'css/home.css' %}">
+{% if turnstile_required %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
+</head>
+<body class="home">
+<a class="skip" href="#main">Skip to main content</a>
+<div class="wrap">
+  <nav class="nav" aria-label="Main">
+    <a class="brand" href="#top"><span class="logo">W</span>Wealtharr</a>
+    <div class="links"><a href="#compare">Strategies</a><a href="#invite">How it works</a></div>
+    <div class="row"><a class="btn g" href="{% url 'login' %}">Sign in</a><a class="btn" href="#invite">Request an invite</a></div>
+  </nav>
+</div>
+
+<main id="main">
+<div class="wrap">
+  <header class="hero" id="top">
+    <div>
+      <span class="eyebrow">● Private beta · UK Stocks &amp; Shares ISA</span>
+      <h1>Follow a proven strategy.<br><em>Skip the spreadsheet.</em></h1>
+      <p class="lead">Pick a fixed investing strategy, record what you hold, and Wealtharr checks prices every hour and tells you exactly what to do, and when. Nothing connects to your broker; your money never leaves your account.</p>
+      <div class="row"><a class="btn lg" href="#invite">Request an invite</a><a class="btn g lg" href="#compare">Compare strategies</a></div>
+      <p class="mut small">Free while in beta · No card · You place every trade yourself</p>
+    </div>
+
+    <div class="demo" data-demo aria-label="Example: a quarterly review in three taps">
+      <div class="phone" aria-live="polite">
+        <div class="notch" aria-hidden="true"></div>
+        <div data-stage="0">
+          <div class="lock"><div class="clock">07:05</div><div class="date">Wednesday 1 October</div></div>
+          <button type="button" class="notif" data-demo-next>
+            <span class="row between"><span class="row tight"><span class="logo sm">W</span><strong>Wealtharr</strong></span><span class="mut">now</span></span>
+            <strong class="nt">Q3 review: time to rebalance</strong>
+            <span class="mut">2 trades · takes about 2 minutes</span>
+          </button>
+          <p class="tap">Tap the notification</p>
+        </div>
+        <div data-stage="1" hidden>
+          <div class="screen"><span class="chip wait">To do</span><h2>Growth ran ahead</h2>
+            <p class="mut">It beat its 9% quarterly target. Bank the extra in the safe fund.</p></div>
+        </div>
+        <div data-stage="2" hidden>
+          <div class="screen"><div class="tick" aria-hidden="true">✓</div><h2>Back on target</h2>
+            <p class="mut">Nothing to do until 31 Dec. We'll nudge you.</p></div>
+        </div>
+        <div class="mix" data-mix hidden>
+          <div class="row between tiny"><span><span class="dot g1"></span>Growth <span data-mix-growth>68</span>%</span><span>Safe <span data-mix-safe>32</span>%<span class="dot s1 right"></span></span></div>
+          <div class="bar"><div class="fill" data-mix-fill style="width:68%"></div><div class="target"></div></div>
+          <p class="mut tiny center">line = this quarter's target</p>
+        </div>
+        <div class="trades" data-stage="1" hidden>
+          <div class="trade"><span class="neg">Sell</span><span>LQQ3.L · ≈ 7.2 sh</span><strong>£899</strong></div>
+          <div class="trade"><span class="pos">Buy</span><span>ERNS.L · ≈ 178 sh</span><strong>£895</strong></div>
+          <button type="button" class="btn full" data-demo-next>I did this</button>
+        </div>
+        <div class="trades" data-stage="2" hidden>
+          <div class="kv"><span class="mut">Value</span><strong>£11,842</strong></div>
+          <div class="kv"><span class="mut">Since start</span><strong class="pos">+12.8%</strong></div>
+          <button type="button" class="btn g full" data-demo-go="0">↺ Replay</button>
+        </div>
+      </div>
+      <div class="stepper" role="group" aria-label="Example step">
+        <button type="button" class="on" aria-pressed="true" data-demo-go="0"><span class="num">1</span>Nudge</button>
+        <button type="button" aria-pressed="false" data-demo-go="1"><span class="num">2</span>Trade</button>
+        <button type="button" aria-pressed="false" data-demo-go="2"><span class="num">3</span>Done</button>
+      </div>
+      <p class="mut tiny center">Example figures</p>
+    </div>
+  </header>
+</div>
+
+<section class="block" id="compare">
+  <div class="wrap">
+    <div class="row between end">
+      <div><h2>Compare the strategies</h2>
+        <p class="sub flush">Tick the ones you want to see. Move the sliders to try your own amounts.</p></div>
+      <div class="seg" role="group" aria-label="Timeframe">
+        {% for key, label in frames %}<button type="button" data-range="{{ key }}" aria-pressed="{% if key == compare.range %}true{% else %}false{% endif %}"{% if key == compare.range %} class="on"{% endif %}>{{ label }}</button>{% endfor %}
+      </div>
+    </div>
+
+    <div class="card gap-top" data-compare>
+      <div class="ctrl">
+        <label>Start with <strong>£<span data-amount-text>{{ compare.amount }}</span></strong><input type="range" min="500" max="20000" step="500" value="{{ compare.amount }}" data-amount aria-label="Starting amount in pounds"></label>
+        <label>Add each month <strong>£<span data-monthly-text>{{ compare.monthly }}</span></strong><input type="range" min="0" max="1000" step="25" value="{{ compare.monthly }}" data-monthly aria-label="Monthly top-up in pounds"></label>
+        <p class="ctrl-out">You'd have put in <strong>£<span data-putin>{% if compare.ready %}{{ compare.put_in|floatformat:"0g" }}{% else %}—{% endif %}</span></strong><span class="mut">over <span data-range-words>{{ compare.range_words }}</span></span></p>
+      </div>
+
+      <p class="mut" data-empty{% if compare.ready %} hidden{% endif %}>Price history for this comparison is still downloading. Check back soon.</p>
+      <div data-filled{% if not compare.ready %} hidden{% endif %}>
+        <div class="tw"><table>
+          <thead><tr><th scope="col">Show</th><th scope="col">Strategy</th><th scope="col" class="r">Value now</th><th scope="col" class="r">Gain</th><th scope="col" class="r">Per year</th><th scope="col" class="r">Worst fall</th><th scope="col">Effort</th></tr></thead>
+          <tbody data-rows>
+            {% for row in compare.rows %}<tr data-key="{{ row.key }}">
+              <td><input type="checkbox" checked aria-label="Show {{ row.label }}"></td>
+              <th scope="row"><span class="sw" style="background:{{ row.color }}"></span>{{ row.label }} <span class="mut">· {{ row.what }}</span></th>
+              <td class="r"><strong>£{{ row.final|floatformat:"0g" }}</strong></td>
+              <td class="r">{{ row.gain_pct|floatformat:1 }}%</td>
+              <td class="r">{% if row.annual is not None %}{{ row.annual|floatformat:1 }}%{% else %}—{% endif %}</td>
+              <td class="r neg">{{ row.drawdown|floatformat:1 }}%</td>
+              <td class="mut">{{ row.effort }}</td>
+            </tr>{% endfor %}
+          </tbody>
+        </table></div>
+
+        <div class="row between gap-top">
+          <div class="legend" data-legend></div>
+          <div class="seg" role="group" aria-label="Scale"><button type="button" class="on" aria-pressed="true" data-scale="lin">Linear</button><button type="button" aria-pressed="false" data-scale="log">Log</button></div>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 800 300" preserveAspectRatio="none" role="img" aria-label="Hypothetical value of the ticked strategies" data-chart>
+            <line x1="0" y1="75" x2="800" y2="75"></line><line x1="0" y1="150" x2="800" y2="150"></line><line x1="0" y1="225" x2="800" y2="225"></line>
+          </svg>
+          <div class="yl" aria-hidden="true"><span data-y="0"></span><span data-y="1"></span><span data-y="2"></span></div>
+        </div>
+        <div class="axis" aria-hidden="true" data-ticks>{% for t in compare.ticks %}<span>{{ t }}</span>{% endfor %}</div>
+      </div>
+      <p class="mut tiny gap-top"><strong>Hypothetical, not anyone's real results.</strong> Real daily prices from Yahoo, converted to pounds, replayed through each strategy's fixed rules with no dealing costs or tax.
+        <span data-simulated{% if not compare.simulated %} hidden{% endif %}>Before the 3× Nasdaq fund launched, its history is rebuilt from 3× QQQ's daily moves, which can look better than reality.</span>
+        Past performance doesn't guarantee future returns.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="invite">
+  <div class="wrap">
+    <div class="cta">
+      <div>
+        <h2>Set up once. Act only when it tells you.</h2>
+        <p class="sub">Two minutes to set up, then usually four nudges a year.</p>
+        <div class="steps3" role="group" aria-label="How it works" data-steps>
+          <button type="button" class="step on" aria-pressed="true" data-step="0"><span class="num">1</span><strong>Pick a strategy</strong></button>
+          <button type="button" class="step" aria-pressed="false" data-step="1"><span class="num">2</span><strong>Record what you hold</strong></button>
+          <button type="button" class="step" aria-pressed="false" data-step="2"><span class="num">3</span><strong>Follow the nudges</strong></button>
+        </div>
+        <p class="mut steptext" data-step-text="0">Each strategy is a fixed set of rules with the exact funds for your account locked in. 9Sig is available now.</p>
+        <p class="mut steptext" data-step-text="1" hidden>Starting from cash? Enter the deposit and you get the exact opening buys. Already invested? Type your shares once.</p>
+        <p class="mut steptext" data-step-text="2" hidden>Prices are checked hourly. When action is due you get an email or Discord message with the exact trades, then tap "I did this".</p>
+        <div class="row nevers"><span class="chip">No broker connection</span><span class="chip">No automatic trades</span><span class="chip">No rule tinkering</span><span class="chip">No made-up prices</span></div>
+      </div>
+      <form method="post" action="{% url 'request_invite' %}" class="invite">
+        {% csrf_token %}
+        <strong class="big">Invite-only private beta</strong>
+        <p class="mut small">Leave your email and you'll get a link when there's a place. It's only used for that.</p>
+        <div class="email">
+          <label for="invite-email" class="sr">Email</label>
+          <input id="invite-email" name="email" type="email" required autocomplete="email" placeholder="you@example.com">
+          <button class="btn lg" type="submit">Request an invite</button>
+        </div>
+        <div class="hp" aria-hidden="true"><label for="invite-website">Website</label><input id="invite-website" name="website" tabindex="-1" autocomplete="off"></div>
+        {% if turnstile_required %}<div class="cf-turnstile gap-top" data-sitekey="{{ turnstile_site_key }}"></div>{% endif %}
+        <p class="small {% if invite_state == 'thanks' %}pos{% elif invite_state == 'invalid' %}neg{% else %}mut{% endif %}" role="status">
+          {% if invite_state == 'thanks' %}Thanks, you're on the list.{% elif invite_state == 'invalid' %}That email address doesn't look right.{% else %}No spam. One email when your invite is ready.{% endif %}</p>
+      </form>
+    </div>
+    <footer class="foot"><span>© Wealtharr · Private tracker · Not financial advice</span><span>Already have access? <a href="{% url 'login' %}">Sign in</a></span></footer>
+  </div>
+</section>
+</main>
+{{ compare|json_script:"compare-data" }}
+<script src="{% static 'js/home.js' %}" defer></script>
+</body>
+</html>

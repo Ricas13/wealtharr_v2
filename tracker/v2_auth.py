@@ -52,10 +52,6 @@ def _turnstile_verified(request):
         return False
 
 
-def home(request):
-    return redirect(preferred_url(request.user)) if request.user.is_authenticated else redirect("login")
-
-
 def sign_in(request):
     if request.user.is_authenticated:
         return redirect(preferred_url(request.user))
