@@ -28,7 +28,7 @@ def seed_all_weather(start, fund_start, gold=lambda d, i: 50.0):
 class FixedWeightStudyEngineTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.study = module_for_key("all-weather").study
+        self.study = module_for_key("all-weather").study["GBP"]
 
     def test_every_released_strategy_has_a_study(self):
         from tracker.strategies.registry import _plugins

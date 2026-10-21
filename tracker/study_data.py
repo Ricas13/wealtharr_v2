@@ -43,6 +43,24 @@ STUDY_SYMBOLS = {
     "VEA": (("USD",), "USD", Decimal("1")),
     "AGG": (("USD",), "USD", Decimal("1")),
     "BIL": (("USD",), "USD", Decimal("1")),
+    # Dollar accounts (Fidelity): the original US funds.
+    "TLT": (("USD",), "USD", Decimal("1")),
+    "IEF": (("USD",), "USD", Decimal("1")),
+    "SHY": (("USD",), "USD", Decimal("1")),
+    "ACWX": (("USD",), "USD", Decimal("1")),
+    "EFA": (("USD",), "USD", Decimal("1")),
+    # Euro accounts (Trade Republic): Xetra EUR lines, and US dollars per euro.
+    "EURUSD=X": (("USD",), "USD", Decimal("1")),
+    "SXR8.DE": (("EUR",), "EUR", Decimal("1")),
+    "DBXF.DE": (("EUR",), "EUR", Decimal("1")),
+    "SXRQ.DE": (("EUR",), "EUR", Decimal("1")),
+    "PPFB.DE": (("EUR",), "EUR", Decimal("1")),
+    "SXRS.DE": (("EUR",), "EUR", Decimal("1")),
+    "ZPRV.DE": (("EUR",), "EUR", Decimal("1")),
+    "DBXP.DE": (("EUR",), "EUR", Decimal("1")),
+    "EXUS.DE": (("EUR",), "EUR", Decimal("1")),
+    "VAGF.DE": (("EUR",), "EUR", Decimal("1")),
+    "XEON.DE": (("EUR",), "EUR", Decimal("1")),
 }
 FIRST_DAY = date(2000, 1, 1)
 EIGHT = Decimal("0.00000001")

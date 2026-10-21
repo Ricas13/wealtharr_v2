@@ -206,6 +206,91 @@ VAGS = Listing(
     "Source-cited, not read first-hand." + T212_OWNER_CONFIRMED + " " + ACCOUNT_HOLD,
     GB_VERIFIED_ON, brokers={"TRADING212": T212 % "VAGS"})
 
+# United States, Fidelity. The original US funds; prices in dollars, no
+# conversion. Fidelity lists US ETFs commission-free; its quote page per ticker
+# is the broker evidence (pattern confirmed for some tickers, not read first-hand).
+US_VERIFIED_ON = date(2026, 10, 21)
+FIDELITY = "https://digital.fidelity.com/prgw/digital/research/quote/dashboard/summary?symbol=%s"
+US_WRAPPERS = ("BROKERAGE", "TRAD_IRA", "ROTH_IRA")
+
+
+def _us(name, issuer, isin, ticker, issuer_url, note):
+    return Listing(name, issuer, isin, ticker, "USD", "%s (USD)" % ticker, issuer_url,
+                   note + " Source-cited, not read first-hand. " + ACCOUNT_HOLD, US_VERIFIED_ON,
+                   brokers={"FIDELITY": FIDELITY % ticker}, wrappers=US_WRAPPERS,
+                   country="US", currency="USD")
+
+
+US_VTI = _us("Vanguard Total Stock Market ETF", "Vanguard", "US9229087690", "VTI",
+             "https://investor.vanguard.com/investment-products/etfs/profile/vti", "US total stock market.")
+US_TLT = _us("iShares 20+ Year Treasury Bond ETF", "iShares", "US4642874329", "TLT",
+             "https://www.ishares.com/us/products/239454/", "Long-term US Treasuries.")
+US_IEF = _us("iShares 7-10 Year Treasury Bond ETF", "iShares", "US4642874402", "IEF",
+             "https://www.ishares.com/us/products/239456/", "Intermediate US Treasuries.")
+US_GLD = _us("SPDR Gold Shares", "State Street", "US78463V1070", "GLD",
+             "https://www.ssga.com/us/en/individual/etfs/spdr-gold-shares-gld", "Physical gold (a grantor trust).")
+US_DBC = _us("Invesco DB Commodity Index Tracking Fund", "Invesco", "US46138B1035", "DBC",
+             "https://www.invesco.com/us/financial-products/etfs/product-detail?productId=DBC",
+             "Broad commodities. A commodity pool: it issues a Schedule K-1 for taxes.")
+US_VBR = _us("Vanguard Small-Cap Value ETF", "Vanguard", "US9229086114", "VBR",
+             "https://investor.vanguard.com/investment-products/etfs/profile/VBR", "US small-cap value.")
+US_SHY = _us("iShares 1-3 Year Treasury Bond ETF", "iShares", "US4642874576", "SHY",
+             "https://www.ishares.com/us/products/239452/", "Short-term US Treasuries.")
+US_SPY = _us("SPDR S&P 500 ETF Trust", "State Street", "US78462F1030", "SPY",
+             "https://www.ssga.com/us/en/individual/etfs/spdr-sp-500-etf-trust-spy", "The S&P 500, as in the original.")
+US_ACWX = _us("iShares MSCI ACWI ex U.S. ETF", "iShares", "US4642882405", "ACWX",
+              "https://www.ishares.com/us/products/239594/", "MSCI ACWI ex-US, as in the original.")
+US_AGG = _us("iShares Core US Aggregate Bond ETF", "iShares", "US4642872265", "AGG",
+             "https://www.ishares.com/us/products/239458/", "The US Aggregate bond index, as in the original.")
+
+# Eurozone (Germany), Trade Republic. EUR lines on Xetra; local equivalents (euro
+# government bonds for US Treasuries). Broker evidence is a Trade Republic page or a
+# third-party listing naming the ISIN; lines without any are not offered there yet.
+EU_VERIFIED_ON = date(2026, 10, 21)
+TR_BROWSE = "https://app.traderepublic.com/browse/fund"
+EU_WRAPPERS = ("DEPOT",)
+
+
+def _eu(name, issuer, isin, ticker, issuer_url, note, evidence=""):
+    return Listing(name, issuer, isin, ticker, "EUR", "Xetra %s (EUR line)" % ticker.split(".")[0],
+                   issuer_url, note + " Source-cited, not read first-hand. " + ACCOUNT_HOLD,
+                   EU_VERIFIED_ON, brokers={"TRADE_REPUBLIC": evidence} if evidence else {},
+                   wrappers=EU_WRAPPERS, country="DE", currency="EUR")
+
+
+EU_SXR8 = _eu("iShares Core S&P 500 UCITS ETF (Acc)", "iShares", "IE00B5BMR087", "SXR8.DE",
+              "https://www.ishares.com/de/privatanleger/de/produkte/253743/", "US shares (S&P 500).",
+              TR_BROWSE + "?q=IE00B5BMR087")
+EU_DBXF = _eu("Xtrackers II Eurozone Government Bond 15-30 UCITS ETF 1C", "Xtrackers", "LU0290357507",
+              "DBXF.DE", "https://live.deutsche-boerse.com/en/etf/xtrackers-ii-eurozone-government-bond-15-30-ucits-etf-1c",
+              "Euro equivalent of long-term US Treasuries: 15-30 year eurozone government bonds. Small fund.",
+              "https://www.onvista.de/etf/snapshot/LU0290357507")
+EU_SXRQ = _eu("iShares € Govt Bond 7-10yr UCITS ETF (Acc)", "iShares", "IE00B3VTN290", "SXRQ.DE",
+              "https://live.deutsche-boerse.com/etf/ishares-eur-govt-bond-7-10yr-ucits-etf-eur-acc",
+              "Euro equivalent of intermediate US Treasuries: 7-10 year euro government bonds.")
+EU_PPFB = _eu("iShares Physical Gold ETC", "iShares", "IE00B4ND3602", "PPFB.DE",
+              "https://www.ishares.com/uk/individual/en/products/258441",
+              "Physical gold, an ETC (secured debt security), on its Xetra EUR line.",
+              TR_BROWSE + "?q=IE00B4ND3602")
+EU_SXRS = _eu("iShares Diversified Commodity Swap UCITS ETF", "iShares", "IE00BDFL4P12", "SXRS.DE",
+              "https://www.comdirect.de/inf/etfs/IE00BDFL4P12",
+              "Broad commodities (Bloomberg Commodity index), swap-based.")
+EU_ZPRV = _eu("SPDR MSCI USA Small Cap Value Weighted UCITS ETF (Acc)", "State Street", "IE00BSPLC413",
+              "ZPRV.DE", "https://www.ssga.com/de/en_gb/intermediary/etfs/state-street-spdr-msci-usa-small-cap-value-weighted-ucits-etf-zprv-gy",
+              "US small-cap value.",
+              "https://www.finect.com/etfs/IE00BSPLC413-Spdr_msci_usa_small_cap_val_wtd_etf_usd")
+EU_DBXP = _eu("Xtrackers II Eurozone Government Bond 1-3 UCITS ETF 1C", "Xtrackers", "LU0290356871", "DBXP.DE",
+              "https://live.deutsche-boerse.com/en/etf/xtrackers-ii-eurozone-government-bond-1-3-ucits-etf-1c",
+              "Euro equivalent of short-term US Treasuries: 1-3 year eurozone government bonds.")
+EU_EXUS = _eu("Xtrackers MSCI World ex USA UCITS ETF 1C", "Xtrackers", "IE0006WW1TQ4", "EXUS.DE",
+              "https://finanzen.net/etf/xtrackers-msci-world-ex-usa-etf-1c-ie0006ww1tq4",
+              "Euro-line equivalent of MSCI ACWI ex-US: developed markets only. Accumulating.",
+              TR_BROWSE + "?q=IE0006WW1TQ4")
+EU_VAGF = _eu("Vanguard Global Aggregate Bond UCITS ETF EUR Hedged (Acc)", "Vanguard", "IE00BG47KH54", "VAGF.DE",
+              "https://live.deutsche-boerse.com/en/etf/vanguard-global-aggregate-bond-ucits-etf-eur-hedged-accumulating",
+              "Euro equivalent of US aggregate bonds: global aggregate bonds hedged to euros. Accumulating.",
+              TR_BROWSE + "?q=vanguard")
+
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
     (STRATEGY_9SIG, "growth", "GB"): (_from_instrument(EQUITY_UK),),
@@ -223,6 +308,32 @@ ROLE_LISTINGS = {
     (DUAL_MOMENTUM, "us", "GB"): (VUAG,),
     (DUAL_MOMENTUM, "intl", "GB"): (XUSE,),
     (DUAL_MOMENTUM, "bonds", "GB"): (VAGS,),
+    (ALL_WEATHER, "stocks", "US"): (US_VTI,),
+    (ALL_WEATHER, "long", "US"): (US_TLT,),
+    (ALL_WEATHER, "inter", "US"): (US_IEF,),
+    (ALL_WEATHER, "gold", "US"): (US_GLD,),
+    (ALL_WEATHER, "comm", "US"): (US_DBC,),
+    (GOLDEN_BUTTERFLY, "stocks", "US"): (US_VTI,),
+    (GOLDEN_BUTTERFLY, "scv", "US"): (US_VBR,),
+    (GOLDEN_BUTTERFLY, "long", "US"): (US_TLT,),
+    (GOLDEN_BUTTERFLY, "short", "US"): (US_SHY,),
+    (GOLDEN_BUTTERFLY, "gold", "US"): (US_GLD,),
+    (DUAL_MOMENTUM, "us", "US"): (US_SPY,),
+    (DUAL_MOMENTUM, "intl", "US"): (US_ACWX,),
+    (DUAL_MOMENTUM, "bonds", "US"): (US_AGG,),
+    (ALL_WEATHER, "stocks", "DE"): (EU_SXR8,),
+    (ALL_WEATHER, "long", "DE"): (EU_DBXF,),
+    (ALL_WEATHER, "inter", "DE"): (EU_SXRQ,),
+    (ALL_WEATHER, "gold", "DE"): (EU_PPFB,),
+    (ALL_WEATHER, "comm", "DE"): (EU_SXRS,),
+    (GOLDEN_BUTTERFLY, "stocks", "DE"): (EU_SXR8,),
+    (GOLDEN_BUTTERFLY, "scv", "DE"): (EU_ZPRV,),
+    (GOLDEN_BUTTERFLY, "long", "DE"): (EU_DBXF,),
+    (GOLDEN_BUTTERFLY, "short", "DE"): (EU_DBXP,),
+    (GOLDEN_BUTTERFLY, "gold", "DE"): (EU_PPFB,),
+    (DUAL_MOMENTUM, "us", "DE"): (EU_SXR8,),
+    (DUAL_MOMENTUM, "intl", "DE"): (EU_EXUS,),
+    (DUAL_MOMENTUM, "bonds", "DE"): (EU_VAGF,),
 }
 
 

@@ -49,6 +49,15 @@ at setup) and gives its plug-in `current_weights` for the opening buy and alloca
 6. **Tests**: pure rule tests, plus an end-to-end test like the one in
    `test_strategy_plugins.py`.
 
+## Currencies
+
+A broker has a country and a currency; every account at it is tracked in that
+currency (prices, ledger, history, alerts, the symbol on its pages). Listings are
+per country (`ROLE_LISTINGS[(strategy, role, "US")]`), with `wrappers` set to that
+broker's account types. A plug-in's `study` may be a `{currency: engine}` map, one
+engine per account currency with that country's funds. The Overview adds up one
+currency only and lists the others.
+
 ## Adding a broker
 
 Add a `Broker` to `tracker/core/brokers.py` (name, country, account types). It is

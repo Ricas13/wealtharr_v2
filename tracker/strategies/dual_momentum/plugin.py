@@ -104,13 +104,27 @@ def current_weights(instance):
             for role, symbol in role_symbols(instance).items()}
 
 
-STUDY = MomentumStudy(title="Dual Momentum", rules=v1, sources={
-    "us": Source("VUAG.L", "US shares (VUAG)", "SPY", "SPY"),
-    "intl": Source("XUSE.L", "world ex-US shares (XUSE)", "VEA", "VEA"),
-    "bonds": Source("VAGS.L", "hedged global bonds (VAGS)", "AGG", "AGG in US dollars", proxy_in_gbp=False),
-    "cash": Source(CASH_SYMBOL, "sterling cash (CSH2)", "BIL", "US T-bills (BIL) in US dollars",
-                   proxy_in_gbp=False),
-})
+STUDY = {
+    "GBP": MomentumStudy(title="Dual Momentum", rules=v1, sources={
+        "us": Source("VUAG.L", "US shares (VUAG)", "SPY", "SPY"),
+        "intl": Source("XUSE.L", "world ex-US shares (XUSE)", "VEA", "VEA"),
+        "bonds": Source("VAGS.L", "hedged global bonds (VAGS)", "AGG", "AGG in US dollars", proxy_in_gbp=False),
+        "cash": Source("CSH2.L", "sterling cash (CSH2)", "BIL", "US T-bills (BIL) in US dollars",
+                       proxy_in_gbp=False),
+    }),
+    "USD": MomentumStudy(title="Dual Momentum", currency="USD", rules=v1, sources={
+        "us": Source("SPY", "US shares (SPY)"),
+        "intl": Source("ACWX", "world ex-US shares (ACWX)", "EFA", "EFA (developed markets ex-US)"),
+        "bonds": Source("AGG", "US aggregate bonds (AGG)"),
+        "cash": Source("BIL", "T-bills (BIL)"),
+    }),
+    "EUR": MomentumStudy(title="Dual Momentum", currency="EUR", rules=v1, sources={
+        "us": Source("SXR8.DE", "US shares (SXR8)", "SPY", "SPY"),
+        "intl": Source("EXUS.DE", "world ex-US shares (EXUS)", "EFA", "EFA"),
+        "bonds": Source("VAGF.DE", "hedged global bonds (VAGF)", "AGG", "AGG in US dollars", proxy_in_gbp=False),
+        "cash": Source("XEON.DE", "euro cash (XEON)"),
+    }),
+}
 
 DUAL_MOMENTUM = StrategyModule(
     key=KEY,
