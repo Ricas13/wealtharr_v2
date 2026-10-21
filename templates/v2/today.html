@@ -92,8 +92,8 @@
     <section class="w2-card w2-card-action w2-state-{{ today_status }}" aria-label="What to do next">
       <div class="w2-ch">
         <h2 class="w2-ct w2-big">{{ today_headline }}</h2>
-        <span class="w2-chip {% if today_status == 'trade' or today_status == 'record' or today_status == 'start' %}w2-wait{% elif today_status == 'idle' %}w2-ok{% endif %}">
-          {% if selected_instance.tracking_only %}Not live{% elif today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Part recorded{% elif today_status == 'trade' or today_status == 'start' %}Action needed{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}</span>
+        <span class="w2-chip {% if today_status == 'trade' or today_status == 'record' or today_status == 'start' or today_status == 'setup' or today_status == 'empty' %}w2-wait{% elif today_status == 'idle' %}w2-ok{% endif %}">
+          {% if selected_instance.tracking_only %}Not live{% elif today_status == 'setup' %}Setup needed{% elif today_status == 'empty' %}Action needed{% elif today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Part recorded{% elif today_status == 'trade' or today_status == 'start' %}Action needed{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}</span>
       </div>
       {% if selected_instance.onboarding_mode == 'hold' %}<p><span class="w2-chip" title="Your starting position was entered by you. Correct it in the Ledger if needed.">Based on holdings you entered</span></p>{% endif %}
       {% if today_status == 'trade' or today_status == 'record' %}
@@ -111,11 +111,17 @@
           {% for line in today_opening %}<tr><td><strong>Buy £{{ line.amount|floatformat:"2g" }} of {{ line.symbol }}</strong></td><td class="w2-r w2-muted">{{ line.pct|floatformat:0 }}%{% if line.shares %} · ≈ {{ line.shares }} shares at £{{ line.price|floatformat:"2g" }}{% endif %}</td></tr>{% endfor %}
         </tbody></table></div>
         <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">Record what I bought</a>
+      {% elif today_status == 'setup' %}
+        <p class="w2-muted">{{ today_explanation }}</p>
+        <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Finish setup</a>
+      {% elif today_status == 'empty' %}
+        <p class="w2-muted">{{ today_explanation }}</p>
+        <a class="w2-button w2-button-primary w2-space-top" href="#w2-add-money">Add money</a>
       {% elif today_status == 'blocked' %}
         <p class="w2-muted">{{ today_explanation }}</p>
         <div class="w2-row w2-space-top">
-          {% if selected_instance.tracking_only %}<a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Go live</a>{% endif %}
-          <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}">Check strategy setup</a>
+          {% if selected_instance.tracking_only %}<a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Go live</a>
+          {% else %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Open the ledger</a>{% endif %}
         </div>
       {% else %}
         <p class="w2-muted">{{ today_explanation }}</p>

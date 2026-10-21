@@ -75,19 +75,11 @@ class Phase2WizardTests(TestCase):
         self.url = reverse("v2_add_strategy")
         self.day = timezone.localdate() - timedelta(days=2)
 
-    def submit(self, step, **values):
-        return self.client.post(self.url, {"step": str(step), **values})
-
-    def to_start(self, account_type="ISA"):
-        self.client.get(self.url + "?restart=1")
-        self.assertContains(
-            self.submit(1, strategy=STRATEGY_9SIG), "step 2 of 5"
-        )
-        self.assertContains(
-            self.submit(2, platform="TRADING212", account_type=account_type),
-            "step 3 of 5",
-        )
-        self.assertContains(self.submit(3, ack="yes"), "step 4 of 5")
+    def create(self, account_type="ISA", **values):
+        """The one-screen setup form, posted once."""
+        return self.client.post(self.url, {
+            "strategy": STRATEGY_9SIG, "platform": "TRADING212",
+            "account_type": account_type, "ack": "yes", **values})
 
     def test_anonymous_cannot_see_or_write_wizard_or_catalogue(self):
         self.client.logout()
@@ -96,38 +88,33 @@ class Phase2WizardTests(TestCase):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 302)
                 self.assertIn("/login/", response["Location"])
-        response = self.client.post(self.url, {"step": 1, "strategy": STRATEGY_9SIG})
+        response = self.create(mode="fresh", name="x", start=self.day.isoformat(),
+                               amount="10", deposited="yes")
         self.assertEqual(response.status_code, 302)
         self.assertEqual(StrategyInstance.objects.count(), 0)
 
     def test_wizard_shows_exact_mapped_identifiers(self):
         # The catalogue page is gone; setup shows the exact lines it will pin.
-        self.client.get(self.url + "?restart=1")
-        self.submit(1, strategy=STRATEGY_9SIG)
-        response = self.submit(2, platform="TRADING212", account_type="ISA")
+        response = self.client.get(self.url)
         self.assertContains(response, "IE00BLRPRL42")
         self.assertContains(response, "IE00BCRY6441")
         self.assertNotContains(response, "Global equity role")
 
     def test_unsupported_strategy_account_and_skipped_steps_refuse(self):
-        self.client.get(self.url + "?restart=1")
-        error = self.submit(1, strategy=ALL_WEATHER)
+        fields = dict(mode="fresh", name="x", start=self.day.isoformat(),
+                      amount="10", deposited="yes")
+        error = self.client.post(self.url, {"strategy": ALL_WEATHER, "platform": "TRADING212",
+                                            "account_type": "ISA", "ack": "yes", **fields})
         self.assertContains(error, "not available yet")
-        self.assertContains(error, "step 1 of 5")
-        self.submit(1, strategy=STRATEGY_9SIG)
-        refused = self.submit(2, platform="TRADING212", account_type="SIPP")
+        refused = self.create(account_type="SIPP", **fields)
         self.assertContains(refused, "No reviewed instruments")
-        refused = self.submit(5, alert_urgent_email="on")
-        self.assertContains(refused, "Form step changed")
         self.assertEqual(StrategyInstance.objects.count(), 0)
 
     def test_verified_cash_deposit_creates_exactly_one_owner_ledger_record(self):
-        self.to_start()
-        self.assertContains(self.submit(
-            4, mode="fresh", name="My second 9Sig", start=self.day.isoformat(),
+        done = self.create(
+            mode="fresh", name="My second 9Sig", start=self.day.isoformat(),
             amount="1000.00", deposited="yes",
-        ), "step 5 of 5")
-        done = self.submit(5, alert_quarterly_email="on", alert_urgent_discord="on")
+        )
         instance = StrategyInstance.objects.get(owner=self.owner)
         self.assertRedirects(
             done, reverse("v2_instance_page", args=[instance.pk, "today"]),
@@ -145,8 +132,9 @@ class Phase2WizardTests(TestCase):
         from tracker.instrument_mapping import for_strategy
         self.assertIsNone(for_strategy(instance))
         self.assertTrue(instance.owner_checked_on)
-        self.assertEqual(instance.alert_routes["quarterly"]["email"], True)
-        self.assertEqual(instance.alert_routes["quarterly"]["discord"], False)
+        # Default routes; changed per strategy later on Strategy & alerts.
+        self.assertEqual(instance.alert_routes["quarterly"], {"email": True, "discord": True})
+        self.assertEqual(instance.alert_routes["contribution"], {"email": False, "discord": False})
         self.assertEqual(instance.ledger.count(), 1)
         entry = instance.ledger.get()
         self.assertEqual(entry.kind, LedgerEntry.DEPOSIT)
@@ -160,13 +148,11 @@ class Phase2WizardTests(TestCase):
         self.assertNotContains(response, "£14,820")
 
     def test_existing_shares_become_a_labelled_opening_position(self):
-        self.to_start(account_type="GIA")
-        self.assertContains(self.submit(
-            4, mode="hold", name="Existing 9Sig", start=self.day.isoformat(),
+        self.create(
+            account_type="GIA", mode="hold", name="Existing 9Sig", start=self.day.isoformat(),
             cash="175.20", shares_growth="2.125", cost_growth="55.50",
             shares_safe="8", cost_safe="101.20",
-        ), "step 5 of 5")
-        self.submit(5)
+        )
         instance = StrategyInstance.objects.get(owner=self.owner)
         self.assertEqual(instance.account.kind, "GIA")
         self.assertEqual(instance.onboarding_mode, "hold")
@@ -185,19 +171,16 @@ class Phase2WizardTests(TestCase):
         self.assertNotContains(page, "SECRET_OTHER")
 
     def test_requires_ack_and_actual_deposit_confirmation(self):
-        self.client.get(self.url + "?restart=1")
-        self.submit(1, strategy=STRATEGY_9SIG)
-        self.submit(2, platform="TRADING212", account_type="ISA")
-        self.assertContains(self.submit(3), "Confirm you checked")
-        self.submit(3, ack="yes")
-        error = self.submit(4, mode="fresh", name="No fake deposits",
+        no_ack = self.create(ack="", mode="fresh", name="No ack", start=self.day.isoformat(),
+                             amount="500", deposited="yes")
+        self.assertContains(no_ack, "confirm you checked")
+        error = self.create(mode="fresh", name="No fake deposits",
                             start=self.day.isoformat(), amount="500")
         self.assertContains(error, "actually deposited")
         self.assertEqual(Account.objects.filter(owner=self.owner).count(), 0)
         self.assertEqual(LedgerEntry.objects.count(), 0)
 
     def test_reject_negative_future_and_invalid_opening_without_partial_write(self):
-        self.to_start()
         cases = [
             {"mode": "fresh", "name": "Invalid", "start": self.day.isoformat(), "amount": "-1", "deposited": "yes"},
             {"mode": "fresh", "name": "Invalid", "start": self.day.isoformat(), "amount": "1.001", "deposited": "yes"},
@@ -207,17 +190,15 @@ class Phase2WizardTests(TestCase):
         ]
         for entry in cases:
             with self.subTest(entry=entry):
-                response = self.submit(4, **entry)
+                response = self.create(**entry)
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, 'role="alert"')
                 self.assertEqual(StrategyInstance.objects.count(), 0)
                 self.assertEqual(Account.objects.count(), 0)
 
     def test_identity_immutable_and_repeat_strategy_allowed(self):
-        self.to_start()
-        self.submit(4, mode="fresh", name="Same 9Sig", start=self.day.isoformat(),
+        self.create(mode="fresh", name="Same 9Sig", start=self.day.isoformat(),
                     amount="200", deposited="yes")
-        self.submit(5)
         first = StrategyInstance.objects.get(owner=self.owner)
         first.account.kind = "GIA"
         with self.assertRaises(ValidationError):
@@ -231,29 +212,24 @@ class Phase2WizardTests(TestCase):
         with self.assertRaises(ValidationError):
             first.save()
         first.refresh_from_db()
-        self.to_start()
-        self.submit(4, mode="fresh", name="Same 9Sig", start=self.day.isoformat(),
+        self.create(mode="fresh", name="Same 9Sig", start=self.day.isoformat(),
                     amount="100", deposited="yes")
-        self.submit(5)
         strategies = list(StrategyInstance.objects.filter(owner=self.owner))
         self.assertEqual(len(strategies), 2)
         self.assertNotEqual(strategies[0].account_id, strategies[1].account_id)
         self.assertNotEqual(strategies[0].account.name, strategies[1].account.name)
 
-    def test_owner_switch_discards_unfinished_private_wizard(self):
-        self.to_start()
+    def test_failed_setup_keeps_nothing_for_another_owner(self):
+        self.create(mode="fresh", name="Private name", start="", amount="10", deposited="yes")
         self.client.force_login(self.other)
         response = self.client.get(self.url)
-        self.assertContains(response, "step 1 of 5")
-        self.assertNotContains(response, "step 4 of 5")
+        self.assertNotContains(response, "Private name")
         self.assertEqual(StrategyInstance.objects.count(), 0)
 
     def test_snapshot_cannot_be_mutated_after_recording(self):
         # Older instances may still carry an opening snapshot; it stays immutable.
-        self.to_start(account_type="GIA")
-        self.submit(4, mode="fresh", name="Hold", start=self.day.isoformat(),
+        self.create(account_type="GIA", mode="fresh", name="Hold", start=self.day.isoformat(),
                     amount="250", deposited="yes")
-        self.submit(5)
         opening = InstanceOpeningSnapshot.objects.create(
             strategy=StrategyInstance.objects.get(owner=self.owner),
             reported_on=self.day, cash_gbp=D("250"), positions={})

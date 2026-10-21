@@ -34,23 +34,16 @@ class OwnerEnrollmentTests(TestCase):
         self.today = timezone.localdate()
         self.url = reverse("v2_add_strategy")
 
-    def to_start(self):
-        self.client.get(self.url + "?restart=1")
-        self.assertEqual(self.client.post(self.url, {
-            "step": "1", "strategy": "nasdaq-quarterly-target",
-        }).status_code, 200)
-        self.assertEqual(self.client.post(self.url, {
-            "step": "2", "platform": "TRADING212", "account_type": "ISA",
-        }).status_code, 200)
-        self.assertEqual(self.client.post(self.url, {
-            "step": "3", "ack": "yes",
-        }).status_code, 200)
+    BASE = {"strategy": "nasdaq-quarterly-target", "platform": "TRADING212",
+            "account_type": "ISA", "ack": "yes"}
+
+    def create(self, data):
+        return self.client.post(self.url, dict(self.BASE, **data))
 
     def finish(self, *, mode="fresh", date_at=None, amount="1000",
                name="Owner 9Sig ISA", **holdings):
-        self.to_start()
         data = {
-            "step": "4", "mode": mode, "name": name,
+            "mode": mode, "name": name,
             "start": (date_at or self.today-timedelta(days=4)).isoformat(),
         }
         if mode == "fresh":
@@ -59,18 +52,13 @@ class OwnerEnrollmentTests(TestCase):
             data.update(cash="0", shares_growth="0", cost_growth="0",
                         shares_safe="0", cost_safe="0")
             data.update(holdings)
-        preview = self.client.post(self.url, data)
-        self.assertContains(preview, "step 5 of 5")
-        done = self.client.post(self.url, {"step": "5", "alert_quarterly_email": "on"})
+        done = self.create(data)
         instance = StrategyInstance.objects.get(owner=self.owner, name=name)
         self.assertRedirects(
             done, reverse("v2_instance_page", args=[instance.pk, "today"]))
         return instance
 
     def test_one_screen_fixed_isa_scope_and_named_issuer_evidence(self):
-        self.client.get(self.url + "?restart=1")
-        self.client.post(self.url, {"step": "1", "strategy": "nasdaq-quarterly-target"})
-        self.client.post(self.url, {"step": "2", "platform": "TRADING212", "account_type": "ISA"})
         page = self.client.get(self.url)
         self.assertContains(page, "IE00BLRPRL42")
         self.assertContains(page, "IE00BCRY6441")
@@ -116,9 +104,8 @@ class OwnerEnrollmentTests(TestCase):
         self.assertFalse(InstanceOpeningSnapshot.objects.filter(strategy=s).exists())
 
     def test_existing_holdings_reject_double_counted_opening_cash(self):
-        self.to_start()
-        response = self.client.post(self.url, {
-            "step": "4", "mode": "hold", "name": "No fictitious cost",
+        response = self.create({
+            "mode": "hold", "name": "No fictitious cost",
             "start": self.today.isoformat(), "cash": "500",
             "shares_growth": "0", "cost_growth": "100",
         })
@@ -127,31 +114,28 @@ class OwnerEnrollmentTests(TestCase):
         self.assertFalse(Account.objects.filter(owner=self.owner).exists())
 
     def test_fresh_requires_actual_date_for_recorded_cash(self):
-        self.to_start()
-        response = self.client.post(self.url, {
-            "step": "4", "mode": "fresh", "name": "Missing date",
+        response = self.create({
+            "mode": "fresh", "name": "Missing date",
             "start": "", "amount": "1000", "deposited": "yes",
         })
         self.assertContains(response, "valid start date")
         self.assertFalse(StrategyInstance.objects.filter(owner=self.owner).exists())
 
     def test_cannot_backfill_future_cash_and_gia_request_is_not_offered(self):
-        self.to_start()
         future = self.today + timedelta(days=1)
-        invalid = self.client.post(self.url, {
-            "step": "4", "mode": "fresh", "name": "Future not real",
+        invalid = self.create({
+            "mode": "fresh", "name": "Future not real",
             "start": future.isoformat(), "amount": "50", "deposited": "yes",
         })
         self.assertContains(invalid, "future")
         self.assertFalse(Account.objects.filter(owner=self.owner).exists())
         # Forged old account_kind is ignored after explicit ISA wizard selection.
-        valid = self.client.post(self.url, {
-            "step": "4", "mode": "fresh", "name": "Real account",
+        valid = self.create({
+            "mode": "fresh", "name": "Real account",
             "start": self.today.isoformat(), "amount": "50",
             "deposited": "yes", "account_kind": "GIA",
         })
-        self.assertContains(valid, "step 5 of 5")
-        self.client.post(self.url, {"step": "5"})
+        self.assertEqual(valid.status_code, 302)
         self.assertEqual(StrategyInstance.objects.get(owner=self.owner).account.kind, "ISA")
 
     def test_optional_notifications_and_monthly_zero_remain_planning(self):
@@ -159,7 +143,7 @@ class OwnerEnrollmentTests(TestCase):
         self.assertEqual(s.monthly_target, D("0"))
         self.assertEqual(s.ledger.get().note, OPENING_NOTE)
         self.assertTrue(s.alert_routes["quarterly"]["email"])
-        self.assertFalse(s.alert_routes["quarterly"]["discord"])
+        self.assertFalse(s.alert_routes["contribution"]["email"])
 
     def test_owner_can_record_actual_contribution_after_enrolling(self):
         s = self.finish(date_at=self.today-timedelta(days=5), amount="100")

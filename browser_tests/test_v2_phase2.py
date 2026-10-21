@@ -11,14 +11,13 @@ from tempfile import TemporaryDirectory
 
 from django.conf import settings
 from django.test import override_settings
-from django.utils import timezone
 
 from browser_tests.harness import BrowserHarness
 
 
 @override_settings(TURNSTILE_REQUIRED=False)
 class V2OnboardingBrowserTests(BrowserHarness):
-    def test_catalogue_and_all_five_onboarding_steps_at_desktop_and_mobile(self):
+    def test_one_screen_setup_at_desktop_and_mobile(self):
         output = Path(settings.BASE_DIR) / "docs/design/screenshots"
         keep = os.environ.get("WEALTHARR_CAPTURE_V2_BASELINES") == "1"
         with TemporaryDirectory() as tmp:
@@ -42,55 +41,26 @@ class V2OnboardingBrowserTests(BrowserHarness):
 
 
                     self.visit("v2_add_strategy")
-                    self.page.get_by_text("step 1 of 5").wait_for()
-                    screenshot("strategy")
-                    self.assertTrue(
-                        self.page.locator(
-                            'input[name="strategy"][value="all-weather"]'
-                        ).is_disabled()
-                    )
-                    self.page.locator(
-                        'input[name="strategy"][value="nasdaq-quarterly-target"]'
-                    ).check()
-                    self.page.get_by_role("button", name="Continue").click()
-                    self.page.get_by_text("step 2 of 5").wait_for()
-                    self.assertTrue(
-                        self.page.locator('input[name="account_type"][value="SIPP"]')
-                        .is_disabled()
-                    )
-                    self.page.locator(
-                        'input[name="account_type"][value="ISA"]'
-                    ).check()
-                    self.page.get_by_role("button", name="Continue").click()
-                    self.page.get_by_text("step 3 of 5").wait_for()
-                    screenshot("instruments")
+                    self.page.get_by_role("heading", name="Add a strategy").wait_for()
+                    screenshot("setup")
+                    # Everything is on one page: strategy, account, funds, start, go live.
+                    self.assertTrue(self.page.locator(
+                        'select[name="strategy"] option[value="all-weather"]').evaluate("(el) => el.disabled"))
+                    self.assertTrue(self.page.locator(
+                        'input[name="account_type"][value="SIPP"]').is_disabled())
+                    self.assertTrue(self.page.locator(
+                        'input[name="account_type"][value="ISA"]').is_checked())
+                    self.assertTrue(self.page.get_by_text("IE00BLRPRL42").first.is_visible())
                     self.page.locator('input[name="ack"]').check()
-                    self.page.get_by_role("button", name="Continue").click()
-                    self.page.get_by_text("step 4 of 5").wait_for()
                     self.page.locator('input[name="mode"][value="hold"]').check()
                     self.assertFalse(
-                        self.page.locator("#w2-hold-fields").evaluate(
-                            "(el) => el.hidden"
-                        )
-                    )
+                        self.page.locator("#w2-hold-fields").evaluate("(el) => el.hidden"))
                     self.page.locator('input[name="mode"][value="fresh"]').check()
                     self.assertTrue(
-                        self.page.locator("#w2-hold-fields").evaluate(
-                            "(el) => el.hidden"
-                        )
-                    )
-                    self.page.locator('input[name="name"]').fill(
-                        "Browser 9Sig " + str(width)
-                    )
-                    self.page.locator('input[name="start"]').fill(
-                        timezone.localdate().isoformat()
-                    )
+                        self.page.locator("#w2-hold-fields").evaluate("(el) => el.hidden"))
+                    self.page.locator('input[name="name"]').fill("Browser 9Sig " + str(width))
                     self.page.locator('input[name="amount"]').fill("1000.00")
                     self.page.locator('input[name="deposited"]').check()
-                    screenshot("starting-point")
-                    self.page.get_by_role("button", name="Continue").click()
-                    self.page.get_by_text("step 5 of 5").wait_for()
-                    screenshot("alerts")
                     self.page.get_by_role("button", name="Create strategy").click()
                     self.page.get_by_role("link", name="Dashboard").wait_for()
                     # "Go live now" is ticked by default, so a cash start asks for the opening buys.

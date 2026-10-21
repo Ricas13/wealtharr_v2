@@ -50,21 +50,14 @@ class LegacyEnrollmentRoutingTests(TestCase):
         self.client.force_login(self.owner)
         day = timezone.localdate() - timedelta(days=4)
         url = self.modern_url
-        self.client.get(url + "?restart=1")
-        self.client.post(url, {"step": "1", "strategy": "nasdaq-quarterly-target"})
-        self.client.post(url, {
-            "step": "2", "platform": "TRADING212", "account_type": "ISA",
-        })
-        self.client.post(url, {"step": "3", "ack": "yes"})
-        preview = self.client.post(url, {
-            "step": "4", "mode": "fresh", "name": "My 9Sig ISA",
+        response = self.client.post(url, {
+            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "mode": "fresh", "name": "My 9Sig ISA",
             "start": day.isoformat(), "amount": "1000",
             "deposited": "yes",
             # Forged user-modifiable identity and rules never override released code.
             "account_kind": "GIA", "equity_symbol": "TQQQ", "safe_symbol": "AGG",
         })
-        self.assertContains(preview, "step 5 of 5")
-        response = self.client.post(url, {"step": "5"})
         portfolio = StrategyInstance.objects.get(owner=self.owner)
         self.assertRedirects(response, reverse(
             "v2_instance_page", args=[portfolio.pk, "today"]))

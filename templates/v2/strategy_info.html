@@ -27,14 +27,15 @@
     {% if not strategy_alerts.email and not strategy_alerts.discord %}<p class="w2-note">No destination is switched on, so nothing will be sent. Set one in <a href="{% url 'v2_settings' %}">Alerts &amp; settings</a>.</p>{% endif %}
   </section>
 
-  {% if strategy_tracking_only %}
+  {% if needs_setup %}
   <section class="w2-card w2-card-action w2-go-live" id="go-live">
-    <h2 class="w2-ct w2-big" style="margin-bottom:6px">Go live</h2>
-    <p class="w2-muted">This strategy is tracking-only: no live prices and no instructions. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm.</p>
+    <h2 class="w2-ct w2-big" style="margin-bottom:6px">{% if strategy_tracking_only %}Go live{% else %}Finish setup{% endif %}</h2>
+    {% if strategy_tracking_only %}<p class="w2-muted">This strategy is tracking-only: no live prices and no instructions. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm.</p>
+    {% else %}<p class="w2-muted">This strategy went live before its start date and instruments were pinned, so the ledger can't record anything yet. Check the two instruments below in your {{ selected_instance.account.broker_label }} {{ selected_instance.account.kind }}, then confirm. The start date becomes your first ledger entry's date, or today.</p>{% endif %}
     <form method="post" action="{% url 'v2_go_live' instance_id=selected_instance.pk %}" class="w2-space-top">
       {% csrf_token %}
       <label class="w2-check"><input type="checkbox" name="confirm" value="yes" required> <span>{{ strategy_attestation }}</span></label>
-      <button type="submit" class="w2-button w2-button-primary w2-space-top">Go live</button>
+      <button type="submit" class="w2-button w2-button-primary w2-space-top">{% if strategy_tracking_only %}Go live{% else %}Finish setup{% endif %}</button>
     </form>
   </section>
   {% else %}

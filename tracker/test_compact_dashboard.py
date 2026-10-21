@@ -122,14 +122,10 @@ class CompactPagesTests(TestCase):
 
     def test_wizard_can_go_live_at_creation(self):
         url = reverse("v2_add_strategy")
-        self.client.get(url + "?restart=1")
-        self.client.post(url, {"step": "1", "strategy": KEY})
-        self.client.post(url, {"step": "2", "platform": "TRADING212", "account_type": "ISA"})
-        self.client.post(url, {"step": "3", "ack": "yes"})
-        self.client.post(url, {"step": "4", "mode": "fresh", "name": "Live at once",
+        self.client.post(url, {"strategy": KEY, "platform": "TRADING212", "account_type": "ISA",
+                               "ack": "yes", "mode": "fresh", "name": "Live at once",
                                "start": timezone.localdate().isoformat(), "amount": "500",
-                               "deposited": "yes"})
-        self.client.post(url, {"step": "5", "go_live": "yes"})
+                               "deposited": "yes", "go_live": "yes"})
         created = StrategyInstance.objects.get(owner=self.owner, name="Live at once")
         self.assertFalse(created.tracking_only)
 

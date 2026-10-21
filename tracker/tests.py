@@ -95,16 +95,12 @@ class SiteTests(TestCase):
     def test_create_account_strategy_deposit_and_snapshot(self):
         self.client.force_login(self.user)
         url = reverse("v2_add_strategy")
-        self.client.get(url + "?restart=1")
-        self.client.post(url, {"step": "1", "strategy": "nasdaq-quarterly-target"})
-        self.client.post(url, {"step": "2", "platform": "TRADING212", "account_type": "ISA"})
-        self.client.post(url, {"step": "3", "ack": "yes"})
-        self.client.post(url, {
-            "step": "4", "mode": "fresh", "name": "9Sig",
+        response = self.client.post(url, {
+            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "mode": "fresh", "name": "9Sig",
             "start": timezone.localdate().isoformat(),
             "amount": "1000", "deposited": "yes",
         })
-        response = self.client.post(url, {"step": "5"})
         s = StrategyInstance.objects.get(name="9Sig")
         self.assertEqual(response.status_code, 302)
         self.assertEqual(s.account.kind, "ISA")

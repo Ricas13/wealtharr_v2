@@ -75,7 +75,7 @@
       {% for todo in ov_todos %}
         <div class="w2-todo"><span><strong>{{ todo.strategy.name }}</strong> · {{ todo.title }}<br><span class="w2-muted">{{ todo.detail }}</span></span>
           {% if todo.kind == 'review' %}<a class="w2-button w2-button-primary" href="{% url 'v2_guided_review' instance_id=todo.strategy.pk signal_id=todo.signal.pk %}">Open</a>
-          {% elif todo.kind == 'golive' %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=todo.strategy.pk section='strategy' %}#go-live">Go live</a>
+          {% elif todo.kind == 'golive' %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=todo.strategy.pk section='strategy' %}#go-live">{% if todo.strategy.tracking_only %}Go live{% else %}Finish setup{% endif %}</a>
           {% else %}<a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=todo.strategy.pk section='today' %}">Open</a>{% endif %}</div>
       {% empty %}<p class="w2-muted">Nothing to do right now. See each strategy's Dashboard for detail.</p>{% endfor %}
     </section>

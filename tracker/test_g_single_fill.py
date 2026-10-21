@@ -19,7 +19,9 @@ from tracker.models import (
 from tracker.services import ledger_summary, validate_and_record
 
 
-class ConfirmedSingleFillTests(TestCase):
+class ReviewFixture(TestCase):
+    """A current quarterly review with holdings and a verified post-fill close."""
+
     def setUp(self):
         self.owner = get_user_model().objects.create_user(
             "manual_fill_owner", password="long-test-password")
@@ -84,6 +86,8 @@ class ConfirmedSingleFillTests(TestCase):
             "actual_confirmation": "yes",
         }
 
+
+class ConfirmedSingleFillTests(ReviewFixture):
     def test_two_partial_sells_then_buy_finalize_actual_reset(self):
         first = self.fill(0, "0.4", "100")
         self.assertEqual(self.client.post(self.url, first).status_code, 302)
@@ -204,3 +208,43 @@ class ConfirmedSingleFillTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(SignalFill.objects.filter(signal=self.signal).count(), 1)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.signal).exists())
+
+
+class AutoFinishTests(ReviewFixture):
+    """The hourly job finishes an ordinary review once every fill is in and a
+    verified close after the last fill exists. Resets still need the owner."""
+
+    def ordinary(self):
+        StrategySignal.objects.filter(pk=self.signal.pk).update(reset_reason="")
+        self.signal.refresh_from_db()
+
+    def test_finishes_only_when_all_fills_and_a_later_close_exist(self):
+        from tracker.review_autofinish import auto_finish_reviews
+        self.ordinary()
+        self.assertEqual(auto_finish_reviews(), 0)  # nothing recorded yet
+        self.client.post(self.url, self.fill(0, "1", "100"))
+        self.assertEqual(auto_finish_reviews(), 0)  # still partial
+        self.client.post(self.url, self.fill(1, "2", "50"))
+        self.assertEqual(auto_finish_reviews(), 1)
+        record = RebalanceExecution.objects.get(signal=self.signal)
+        self.assertIsNone(record.baseline_id)  # ordinary reviews never reset
+        self.signal.refresh_from_db()
+        self.assertEqual(self.signal.review_outcome, "CONFIRMED")
+        self.assertEqual(auto_finish_reviews(), 0)  # idempotent
+
+    def test_waits_for_a_close_after_the_last_fill(self):
+        from tracker.review_autofinish import auto_finish_reviews
+        self.ordinary()
+        self.client.post(self.url, self.fill(0, "1", "100"))
+        self.client.post(self.url, self.fill(1, "2", "50"))
+        PriceMark.objects.filter(strategy=self.strategy).update(as_of=self.trade_day)
+        MarketObservation.objects.filter(as_of=self.quote_day).update(as_of=self.trade_day)
+        self.assertEqual(auto_finish_reviews(), 0)
+        self.assertFalse(RebalanceExecution.objects.filter(signal=self.signal).exists())
+
+    def test_reset_reviews_are_left_for_the_owner(self):
+        from tracker.review_autofinish import auto_finish_reviews
+        self.client.post(self.url, self.fill(0, "1", "100"))
+        self.client.post(self.url, self.fill(1, "2", "50"))
+        self.assertEqual(auto_finish_reviews(), 0)
+        self.assertFalse(StrategyBaseline.objects.filter(reset_signal=self.signal).exists())

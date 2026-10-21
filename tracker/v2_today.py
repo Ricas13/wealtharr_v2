@@ -31,6 +31,7 @@ from .models import (
 )
 from .services import ledger_summary
 from .v2_views import _render
+from .v2_go_live import setup_missing
 
 
 ZERO = Decimal("0")
@@ -159,10 +160,10 @@ def today_page(request, instance_id):
         status = "record"
         headline = "Finish recording actual fills"
         explanation = (
-            "A real transaction has already been recorded against this "
-            "quarter. Continue the actual-fill record or finalize only after "
-            "the required post-fill verified GBP closing prices are available. "
-            "These are not fresh instructions to trade."
+            "A real trade is already recorded for this quarter. Record the rest; "
+            "the review then finishes by itself after the next closing prices"
+            + (" (a reset review needs you to press Finish)." if notice.reset_reason else ".")
+            + " These are not fresh instructions to trade."
         )
     elif notice and notice.kind in ("THIRTY_DOWN", "SPIKE_WATCH"):
         status = "review"
@@ -176,6 +177,18 @@ def today_page(request, instance_id):
             "Split your cash at the target weights, place the buys in "
             f"{strategy.account.broker_label}, "
             "then record what you actually bought.")
+    elif not strategy.tracking_only and setup_missing(strategy):
+        status = "setup"
+        headline = "Finish setting up"
+        explanation = ("This strategy is missing its start date or pinned instruments, "
+                       "so nothing can be recorded yet. It takes one confirmation.")
+    elif (not strategy.tracking_only and not notice and not report["positions"]
+          and report["cash"] <= ZERO):
+        status = "empty"
+        headline = "Add your first deposit"
+        explanation = ("Record the money you've put into your "
+                       f"{strategy.account.kind} with Add money. You'll then see "
+                       "exactly what to buy.")
     elif not ready:
         status = "blocked"
         headline = ("Not live yet" if strategy.tracking_only
@@ -364,8 +377,8 @@ def guided_review(request, instance_id, signal_id):
                     request,
                     "Actual fill already recorded; no duplicate was added."
                     if outcome == "duplicate" else
-                    "Actual fill recorded. The review remains partial until "
-                    "a separate verified finalization."
+                    "Actual fill recorded. Once every trade is recorded, the review "
+                    "finishes automatically after the next closing prices."
                 )
                 return redirect(
                     "v2_guided_review", instance_id=strategy.pk, signal_id=notice.pk,
