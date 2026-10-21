@@ -12,6 +12,9 @@ from tracker.strategies.dual_momentum.v1 import VERSION as DUAL_MOMENTUM_VERSION
 from tracker.strategies.golden_butterfly.v1 import (
     VERSION as GOLDEN_BUTTERFLY_VERSION, WEIGHTS as GOLDEN_BUTTERFLY_WEIGHTS,
 )
+from tracker.strategies.permanent_portfolio.v1 import (
+    VERSION as PERMANENT_VERSION, WEIGHTS as PERMANENT_WEIGHTS,
+)
 from tracker.strategies.nine_sig.v2 import VERSION as NINE_SIG_VERSION
 from tracker.strategies.nine_sig.v3 import VERSION as NINE_SIG_V3_VERSION
 
@@ -151,6 +154,32 @@ _RELEASED = {
         release_label="dual-momentum@1",
         version_history=("dual-momentum@1 (dual_momentum.v1.0.0): monthly Global Equities Momentum.",),
     ),
+    "permanent-portfolio": StrategyDescription(
+        key="permanent-portfolio",
+        version=PERMANENT_VERSION,
+        title="Permanent Portfolio",
+        summary=("Harry Browne's Permanent Portfolio as published: 25% each in stocks, long-term "
+                 "government bonds, cash and gold, left alone until one part drifts too far. "
+                 "All transactions are made by you."),
+        cadence="A band check after each calendar month end; trades only when a part is outside 15-35%.",
+        rules=(
+            "Target weights, as published: 25% stocks, 25% long-term government bonds, 25% cash (Treasury bills), 25% gold.",
+            "After each month end, each part's share is measured at verified closes, counting uninvested cash in the total.",
+            "If every part is between 15% and 35%, nothing happens.",
+            "If any part is below 15% or above 35%, all four are put back to 25%: sells first, then buys, never borrowing.",
+            "The original uses US shares, 30-year Treasuries and T-bills. In a UK account the bonds are long gilts and cash is a sterling ultrashort bond fund; in a euro account, long euro government bonds and an overnight-rate fund. Each fund is shown with its evidence at setup.",
+            "New money waits as cash until the next rebalance, or you can split it at 25% yourself. Orders under 1 (pound, dollar or euro) are skipped as too small to place.",
+            "Only owner-confirmed actual fills are recorded. No trade is ever placed for you.",
+        ),
+        role_targets=PERMANENT_WEIGHTS,
+        target_explanation="25% each, restored only when a part leaves its 15-35% band.",
+        caution=("Not affiliated with Harry Browne's estate or publishers. The rules are the published ones; "
+                 "the funds are local equivalents (an S&P 500 fund for the US market, and outside the US "
+                 "a bond-based cash fund for T-bills), so results differ from the original. Your own "
+                 "account's access to each fund is unverified."),
+        release_label="permanent-portfolio@1",
+        version_history=("permanent-portfolio@1 (permanent_portfolio.v1.0.0): 25% each, 15-35% bands.",),
+    ),
 }
 STRATEGIES = MappingProxyType(_RELEASED)
 
@@ -167,7 +196,8 @@ def _plugins():
     from tracker.strategies.dual_momentum.plugin import DUAL_MOMENTUM
     from tracker.strategies.golden_butterfly.plugin import GOLDEN_BUTTERFLY
     from tracker.strategies.nine_sig.plugin import NINE_SIG
-    return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY, DUAL_MOMENTUM)}
+    from tracker.strategies.permanent_portfolio.plugin import PERMANENT_PORTFOLIO
+    return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY, DUAL_MOMENTUM, PERMANENT_PORTFOLIO)}
 
 
 _MODULES = {}
