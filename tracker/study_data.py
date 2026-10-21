@@ -24,6 +24,18 @@ STUDY_SYMBOLS = {
     "GBPUSD=X": (("USD",), "USD", Decimal("1")),
     "LQQ3.L": (("GBp", "GBX"), "GBP", Decimal("100")),
     "ERNS.L": (("GBP",), "GBP", Decimal("1")),
+    # Fixed-weight strategies (All Weather, Golden Butterfly): their funds and
+    # the stand-ins used before each fund existed.
+    "VUAG.L": (("GBP",), "GBP", Decimal("1")),
+    "GLTL.L": (("GBP",), "GBP", Decimal("1")),
+    "IGLT.L": (("GBP",), "GBP", Decimal("1")),
+    "IGLS.L": (("GBP",), "GBP", Decimal("1")),
+    "SGLN.L": (("GBp", "GBX"), "GBP", Decimal("100")),
+    "CMOP.L": (("GBp", "GBX"), "GBP", Decimal("100")),
+    "USSC.L": (("USD",), "USD", Decimal("1")),
+    "GLD": (("USD",), "USD", Decimal("1")),
+    "DBC": (("USD",), "USD", Decimal("1")),
+    "VBR": (("USD",), "USD", Decimal("1")),
 }
 FIRST_DAY = date(2000, 1, 1)
 EIGHT = Decimal("0.00000001")

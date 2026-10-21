@@ -100,6 +100,29 @@ def fetch_chart(symbol, since):
     return FetchedChart(currency, series, raw_currency, raw_closes)
 
 
+# Yahoo's daily GBP/USD close (US dollars per pound) converts USD-quoted
+# holdings to pounds for the same day. No rate that day, no GBP price.
+FX_SYMBOL = "GBPUSD=X"
+EIGHT_DP = Decimal("0.00000001")
+
+
+def usd_holding_symbols():
+    """Catalogued fund lines quoted in USD (not reference series like SPY)."""
+    from .core.catalogue import CATALOGUE
+    return {line.ticker for line in CATALOGUE.values() if line.raw_quote_unit == "USD"}
+
+
+def fx_rates(days):
+    """{day: USD per GBP} from verified daily closes, for the days asked."""
+    return dict(MarketObservation.objects.filter(
+        symbol=FX_SYMBOL, as_of__in=list(days), currency="USD", price__gt=ZERO,
+    ).values_list("as_of", "price"))
+
+
+def usd_to_gbp(amount, rate):
+    return (amount / rate).quantize(EIGHT_DP)
+
+
 def sync_ticker(symbol, *, force=False):
     """One fetch per 12 hours per symbol, with durable prices and bounded errors."""
     if not TICKER.fullmatch(symbol):
@@ -116,6 +139,17 @@ def sync_ticker(symbol, *, force=False):
     try:
         fetched = fetch_chart(symbol, since)
         currency, series = fetched
+        usd_closes = {}
+        if symbol in usd_holding_symbols():
+            if currency != "USD":
+                raise ValueError("PRICE_HOLD:RAW_UNIT_MISMATCH")
+            sync_ticker(FX_SYMBOL, force=force)
+            rates = fx_rates(day for day, _ in series)
+            usd_closes = dict(series)
+            series = [(day, usd_to_gbp(price, rates[day])) for day, price in series if day in rates]
+            if not series:
+                raise ValueError("FX_UNAVAILABLE")
+            currency = "GBP"
         # Screen the new batch before *any* upsert. A suspicious daily jump
         # (including an unhandled split/restrike or 100x pence error) stays
         # on hold; no later signal may use the older mark as though fresh.
@@ -153,7 +187,8 @@ def sync_ticker(symbol, *, force=False):
             justified = bool(
                 accepted_raw and isinstance(raw, Decimal) and raw.is_finite()
                 and raw > ZERO and
-                (raw / factor).quantize(Decimal("0.00000001")) == price
+                (raw == usd_closes.get(day) if usd_closes else
+                 (raw / factor).quantize(Decimal("0.00000001")) == price)
             )
             observations.append(MarketObservation(
                 symbol=symbol, as_of=day, price=price, currency=currency,
@@ -171,7 +206,7 @@ def sync_ticker(symbol, *, force=False):
     except Exception as exc:
         # Network errors are surfaced as a status, never replaced with invented data.
         detail = str(exc)
-        state.last_error = (detail[:80] if detail.startswith("PRICE_HOLD:")
+        state.last_error = (detail[:80] if detail.startswith(("PRICE_HOLD:", "FX_UNAVAILABLE"))
                             else type(exc).__name__[:80])
         state.save(update_fields=["last_error"])
         LOG.warning("Yahoo quote unavailable for %s (%s)", symbol, type(exc).__name__)

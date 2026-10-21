@@ -104,6 +104,10 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
         s: units_by_symbol[s] + (Decimal("100") if "GBX" in units_by_symbol[s] else Decimal("1"),)
         for s in funds if s in units_by_symbol and set(units_by_symbol[s]) <= {"GBp", "GBX", "GBP"}
     }
+    # USD-quoted lines: the raw close divided by that day's GBP/USD close.
+    from .market_data import fx_rates, usd_holding_symbols, usd_to_gbp
+    rate = fx_rates([day]).get(day)
+    expected.update({s: ("USD", None) for s in funds if s in usd_holding_symbols() and rate})
     if not expected or len(expected) != len(funds) or not state["positions"]:
         return None
     value = state["cash"]
@@ -123,9 +127,10 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
         allowed = expected[symbol]
         units = allowed[:-1]
         factor = allowed[-1]
+        converted = (usd_to_gbp(obs.raw_close, rate) if factor is None
+                     else (obs.raw_close / factor).quantize(Decimal("0.00000001")))
         if (obs.raw_quote_unit not in units or
-                not obs.price.is_finite() or obs.price <= ZERO or
-                (obs.raw_close / factor).quantize(Decimal("0.00000001")) != obs.price):
+                not obs.price.is_finite() or obs.price <= ZERO or converted != obs.price):
             return None
         value += qty * obs.price
         ids.append("yahoo-raw:%s:%s:%s:%s" % (

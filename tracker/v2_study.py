@@ -11,7 +11,7 @@ from .strategies.registry import module_for
 from .models import StrategyInstance, StudyPrice
 from .v2_views import _render
 
-CSS = {"nine_sig": "w2-c1", "hold": "w2-c2", "spy": "w2-c3", "vti": "w2-c5"}
+CSS = {"nine_sig": "w2-c1", "strategy": "w2-c1", "hold": "w2-c2", "spy": "w2-c3", "vti": "w2-c5"}
 MAX_POINTS = 600
 
 
@@ -28,7 +28,7 @@ def _number(raw, default, low, high):
 def _data(engine):
     """Cache the built series until the next download."""
     latest = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
-    key = "study-data:%s" % (latest.isoformat() if latest else "none")
+    key = "study-data:%s:%s" % (engine.TITLE.replace(" ", "-"), latest.isoformat() if latest else "none")
     data = cache.get(key)
     if data is None:
         data = engine.load_data()
@@ -48,7 +48,7 @@ def _chart(engine, result, scale):
         s = result["series"].get(name)
         if s:
             lines.append((label, CSS[name], [s["values"][i] for i in index]))
-    base = result["series"]["nine_sig"]
+    base = result["series"][engine.PRIMARY]
     lines.append(("Money put in", "w2-c4", [base["contributed"][i] for i in index]))
     values = [v for _, _, vs in lines for v in vs if v and v > 0]
     if not values:
@@ -91,7 +91,7 @@ def study_page(request, instance_id):
     study = plugin.study if plugin else None
     if study is None:
         return _render(request, page_key="instance", page_title="Study", instance=strategy,
-                       section="study", study_supported=False)
+                       section="study", study_supported=False, study_title="")
     key = request.GET.get("range", "10y")
     if key not in dict((k, l) for k, l, _ in study.TIMEFRAMES):
         key = "10y"
@@ -124,9 +124,9 @@ def study_page(request, instance_id):
         study_selected_rows=[(n, label, CSS[n], selected["series"].get(n))
                              for n, label in study.SERIES] if selected else (),
         study_chart=_chart(study, selected, scale) if selected else None,
-        study_growth_real_from=data.growth_real_from,
-        study_safe_real_from=data.safe_real_from,
+        study_title=study.TITLE, study_needs=study.NEEDS,
+        study_main=selected["series"][study.PRIMARY] if selected else None,
+        study_how=study.how_it_works(data),
         study_first_day=data.days[0] if data.ready else None,
         study_last_day=data.days[-1] if data.ready else None,
-        study_charge=study.GROWTH_CHARGE * 100,
     )

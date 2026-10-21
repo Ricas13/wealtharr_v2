@@ -29,6 +29,9 @@ GROWTH_CHARGE = 0.0075
 SERIES = (("nine_sig", "9Sig"), ("hold", "Buy & hold (100% growth)"),
           ("spy", "SPY (S&P 500)"), ("vti", "VTI (US total market)"))
 D = Decimal
+TITLE = "9Sig"
+PRIMARY = "nine_sig"
+NEEDS = "QQQ, SPY, VTI, GBP/USD, LQQ3 and ERNS"
 
 
 @dataclass
@@ -284,4 +287,33 @@ def run(data, key, amount, monthly):
         "simulated_safe": bool(data.safe_real_from and start < data.safe_real_from)
         or data.safe_real_from is None,
         "dates": data.days[s:],
+        "simulated_notes": _simulated_notes(data, start),
     }
+
+
+def _simulated_notes(data, start):
+    notes = []
+    if data.growth_real_from is None or start < data.growth_real_from:
+        notes.append("Before %s, the growth fund is rebuilt from 3x QQQ's daily return less %.2f%% a year." % (
+            _day(data.growth_real_from, "LQQ3 data"), GROWTH_CHARGE * 100))
+    if data.safe_real_from is None or start < data.safe_real_from:
+        notes.append("Before %s, the safe sleeve is cash at 0%%." % _day(data.safe_real_from, "ERNS data"))
+    return notes
+
+
+def _day(day, default):
+    return "%d %s" % (day.day, day.strftime("%b %Y")) if day else default
+
+
+def how_it_works(data):
+    return (
+        "9Sig starts 60% growth (LQQ3) / 40% safe (ERNS) and runs the live quarterly rule at each "
+        "quarter end: the 9% signal line, half of new money, the large-buy throttle, 30 Down (from SPY), "
+        "the 100%-up reset and 60/40 resets.",
+        "Monthly top-ups arrive on the first trading day of each month. In 9Sig they wait as cash for "
+        "the next quarterly review; in the others they're invested that day.",
+        "All values are in pounds. SPY, VTI and QQQ are converted with daily GBP/USD rates and include "
+        "reinvested dividends. Trades fill at that day's close with no dealing costs or tax.",
+        "Rebuilt history is an estimate: real leveraged funds also pay borrowing and swap costs, so early "
+        "periods may look better than reality. Buy & hold puts everything, and every top-up, into the growth fund.",
+    )
