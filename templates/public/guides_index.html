@@ -1,0 +1,20 @@
+{% extends "public/base.html" %}
+{% block title %}Guides to Leveraged ETFs, ISAs and Rebalancing | Wealtharr{% endblock %}
+{% block description %}Plain-English guides for UK investors: leveraged Nasdaq ETFs in an ISA, volatility decay, quarterly signal rebalancing, GBX vs GBP prices and tracking.{% endblock %}
+{% block og_title %}Wealtharr guides{% endblock %}
+{% block og_description %}Plain-English guides to leveraged ETFs, ISAs and rules-based rebalancing for UK investors.{% endblock %}
+{% block jsonld %},
+{"@type":"CollectionPage","name":"Wealtharr guides","url":"{{ site_url }}{{ request.path }}","inLanguage":"en-GB","hasPart":[{% for g in guides %}{"@type":"Article","headline":"{{ g.h1|escapejs }}","url":"{{ site_url }}{% url 'guide' g.slug %}"}{% if not forloop.last %},{% endif %}{% endfor %}]},
+{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"{{ site_url }}/"},{"@type":"ListItem","position":2,"name":"Guides","item":"{{ site_url }}{{ request.path }}"}]}{% endblock %}
+{% block content %}
+<div class="wrap">
+  <section class="article">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> › <span aria-current="page">Guides</span></nav>
+    <h1>Guides for rules-based ISA investors</h1>
+    <p class="lead">Short, plain-English explainers on leveraged ETFs, ISAs and rebalancing on a schedule. Written for UK investors; educational, not advice.</p>
+  </section>
+  <div class="cards">{% for g in guides %}
+    <a class="card link" href="{% url 'guide' g.slug %}"><strong>{{ g.h1 }}</strong><span class="mut">{{ g.description }}</span><span class="mut tiny">{{ g.minutes }} min read · updated {{ g.updated|date:"j M Y" }}</span></a>
+  {% endfor %}</div>
+</div>
+{% endblock %}
