@@ -64,7 +64,7 @@ def yearly_review(instance, *, key, rules):
     return {"status": "ok"}
 
 
-def yearly_rebalance_plugin(key, rules):
+def yearly_rebalance_plugin(key, rules, *, study=None):
     return StrategyModule(
         key=key,
         review=lambda instance: yearly_review(instance, key=key, rules=rules),
@@ -72,4 +72,5 @@ def yearly_rebalance_plugin(key, rules):
         last_review_before=year_end_before,
         allocation_label="Target",
         cadence_word="yearly",
+        study=study,
     )

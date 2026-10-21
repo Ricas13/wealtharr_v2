@@ -39,7 +39,12 @@ and a two-line `plugin.py` using `strategies/yearly_plugin.py`.
    stored in pounds at that day's Yahoo `GBPUSD=X` close; a day without a rate has
    no price. Keep the rules true to the original; only the
    funds are local equivalents (say so in the caution).
-5. **Tests**: pure rule tests, plus an end-to-end test like the one in
+5. **Study** (required for every strategy): the plug-in's `study`. A fixed-weight
+   strategy passes a `tracker/study_fixed.py::FixedWeightStudy` with one `Source`
+   per role (the fund, and a stand-in for before it existed, flagged on the page),
+   and adds the symbols to `study_data.STUDY_SYMBOLS`. A test fails if a released
+   strategy has no Study.
+6. **Tests**: pure rule tests, plus an end-to-end test like the one in
    `test_strategy_plugins.py`.
 
 ## Adding a broker
