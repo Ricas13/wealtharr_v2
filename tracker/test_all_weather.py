@@ -125,6 +125,10 @@ class AllWeatherEndToEndTests(TestCase):
         from tracker.strategies.instruments import symbols
         start = self.year_end - timedelta(days=180)
         self.assertContains(self.client.get(reverse("v2_add_strategy")), "All Weather (UK)")
+        chosen = self.client.get(reverse("v2_add_strategy") + "?strategy=all-weather")
+        for isin in ("IE00BFMXXD54", "IE00B6YX5L24", "IE00B1FZSB30", "IE00B4ND3602", "IE00BD6FTQ80"):
+            self.assertContains(chosen, isin)
+        self.assertNotContains(chosen, "IE00BLRPRL42")
         self.client.post(reverse("v2_add_strategy"), {
             "strategy": "all-weather", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
             "mode": "fresh", "name": "AW", "start": start.isoformat(), "amount": "10000",
