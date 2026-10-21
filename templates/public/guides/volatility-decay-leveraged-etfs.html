@@ -1,0 +1,28 @@
+<h2>The two-day example</h2>
+<p>Take an index at 100. On day one it rises 10%; on day two it falls 10%. A 3x daily product starts at 100 too.</p>
+<div class="tw"><table>
+  <thead><tr><th scope="col">Day</th><th scope="col">Index move</th><th scope="col" class="r">Index</th><th scope="col">3x move</th><th scope="col" class="r">3x product</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Start</th><td>—</td><td class="r">100.00</td><td>—</td><td class="r">100.00</td></tr>
+    <tr><th scope="row">1</th><td>+10%</td><td class="r">110.00</td><td>+30%</td><td class="r">130.00</td></tr>
+    <tr><th scope="row">2</th><td>−10%</td><td class="r">99.00</td><td>−30%</td><td class="r">91.00</td></tr>
+  </tbody>
+</table></div>
+<p>The index ends 1% down. "Three times the index" would suggest about 3% down, but the product ends <strong>9% down</strong>. That extra gap is <strong>volatility decay</strong>, sometimes called beta slippage.</p>
+
+<h2>Why it happens</h2>
+<p>A loss needs a bigger gain to recover: after a 30% fall you need about a 43% rise to get back to where you were. A daily-reset product applies its leverage to each day's move separately, so up-and-down swings compound against it. The bigger the daily swings, the bigger the drag.</p>
+
+<h2>It can also work for you</h2>
+<p>In a steady trend the same compounding helps. If an index rises 1% every day for five days, a 3x daily product gains about 15.9%, slightly more than three times the index's 5.1%. Decay hurts in choppy, sideways markets; daily compounding helps in smooth trends.</p>
+
+<h2>What it means in practice</h2>
+<ul>
+  <li><strong>Long holding periods are unpredictable.</strong> Over a year, the product can return far more or far less than three times the index.</li>
+  <li><strong>Sideways markets are expensive.</strong> An index that goes nowhere for a year can still leave a 3x product down noticeably.</li>
+  <li><strong>Costs add up.</strong> On top of decay there are ongoing charges and the cost of the leverage itself.</li>
+</ul>
+
+<h2>How rules-based investors manage it</h2>
+<p>A common approach is to hold the leveraged fund as only one part of a portfolio, next to a steady "safe" fund, and rebalance on a fixed schedule. After strong runs, profits are moved to the safe side. After falls, the safe side buys more growth. That turns volatility into a source of rebalancing trades rather than just a drag. <a href="/guides/quarterly-signal-rebalancing/">Quarterly signal rebalancing</a> is one version of this.</p>
+<p>For the ISA side of things, see <a href="/guides/3x-nasdaq-etf-stocks-and-shares-isa/">holding a 3x Nasdaq ETF in a Stocks &amp; Shares ISA</a>.</p>
