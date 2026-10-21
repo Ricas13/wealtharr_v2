@@ -318,12 +318,13 @@ def holdings_detail(strategy, report, roles):
     return tuple(rows)
 
 
-def allocation(report, lines, roles):
-    """Current split against the strategy's reset weights."""
+def allocation(report, lines, roles, targets=None):
+    """Current split against the strategy's weights (or ``targets``: {symbol: 0..1})."""
     if report["value"] is None or report["value"] <= ZERO:
         return None
     total = report["value"]
-    weights = {line.ticker: line.weight_pct for line in lines}
+    weights = ({s: w * HUNDRED for s, w in targets.items()} if targets is not None
+               else {line.ticker: line.weight_pct for line in lines})
     rows = []
     # Funds in the strategy's own order (roles is ordered), then anything else.
     order = {symbol: i for i, symbol in enumerate(roles)}

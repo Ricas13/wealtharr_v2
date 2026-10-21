@@ -36,6 +36,13 @@ STUDY_SYMBOLS = {
     "GLD": (("USD",), "USD", Decimal("1")),
     "DBC": (("USD",), "USD", Decimal("1")),
     "VBR": (("USD",), "USD", Decimal("1")),
+    # Dual Momentum: funds, the sterling cash series, and stand-ins.
+    "XUSE.L": (("GBP",), "GBP", Decimal("1")),
+    "VAGS.L": (("GBP",), "GBP", Decimal("1")),
+    "CSH2.L": (("GBp", "GBX"), "GBP", Decimal("100")),
+    "VEA": (("USD",), "USD", Decimal("1")),
+    "AGG": (("USD",), "USD", Decimal("1")),
+    "BIL": (("USD",), "USD", Decimal("1")),
 }
 FIRST_DAY = date(2000, 1, 1)
 EIGHT = Decimal("0.00000001")

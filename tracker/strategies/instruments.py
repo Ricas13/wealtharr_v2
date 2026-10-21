@@ -8,6 +8,7 @@ ROLE_LABELS = {
     "stocks": "Equities", "long": "Long bonds", "inter": "Intermediate bonds",
     "gold": "Gold", "comm": "Commodities", "bonds": "Bonds", "cash": "Cash",
     "scv": "Small-cap value", "short": "Short bonds",
+    "us": "US shares", "intl": "World ex-US shares",
 }
 
 

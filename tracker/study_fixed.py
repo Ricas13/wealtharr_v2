@@ -29,6 +29,9 @@ class Source:
     fund_label: str
     proxy: str = CASH          # stand-in symbol before the fund existed, or CASH
     proxy_label: str = "cash at 0%"
+    # False for a GBP-hedged fund: its stand-in's US-dollar returns are used as
+    # they are, since hedging removes most of the currency effect.
+    proxy_in_gbp: bool = True
 
 
 @dataclass
@@ -44,13 +47,13 @@ class FixedData:
         return len(self.days) > 1
 
 
-def _gbp_series(symbol, fx_days, fx):
-    """{day: GBP adjusted close} for one StudyPrice symbol."""
+def _gbp_series(symbol, fx_days, fx, convert=True):
+    """{day: GBP adjusted close} for one StudyPrice symbol (or local returns if not ``convert``)."""
     rows = StudyPrice.objects.filter(symbol=symbol).only("as_of", "adj_close", "currency")
     out = {}
     for r in rows:
         value = float(r.adj_close)
-        if r.currency == "USD":
+        if r.currency == "USD" and convert:
             i = bisect_left(fx_days, r.as_of + timedelta(days=1)) - 1
             if i < 0 or (r.as_of - fx_days[i]).days > 7:
                 continue
@@ -97,7 +100,8 @@ class FixedWeightStudy:
         series = {}
         for role, source in self.sources.items():
             fund = _gbp_series(source.fund, fx_days, fx)
-            proxy = {} if source.proxy == CASH else _gbp_series(source.proxy, fx_days, fx)
+            proxy = {} if source.proxy == CASH else _gbp_series(
+                source.proxy, fx_days, fx, convert=source.proxy_in_gbp)
             series[role] = (fund, sorted(fund), proxy, sorted(proxy))
         grid = [d for d in spy_days if fx_days and _last(fx_days, fx, d) is not None]
         columns = {}

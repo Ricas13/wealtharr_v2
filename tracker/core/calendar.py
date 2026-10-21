@@ -27,3 +27,21 @@ def year_end_before(day):
 
 def year_end_on_or_after(day):
     return date(day.year, 12, 31)
+
+
+def month_end_before(day):
+    """Last completed calendar month end before ``day``."""
+    first = date(day.year, day.month, 1)
+    previous = date(first.year - 1, 12, 1) if first.month == 1 else date(first.year, first.month - 1, 1)
+    return date(previous.year, previous.month, monthrange(previous.year, previous.month)[1])
+
+
+def month_end_on_or_after(day):
+    return date(day.year, day.month, monthrange(day.year, day.month)[1])
+
+
+def months_before(day, months):
+    """The month end ``months`` calendar months before month end ``day``."""
+    index = day.year * 12 + day.month - 1 - months
+    year, month = divmod(index, 12)
+    return date(year, month + 1, monthrange(year, month + 1)[1])
