@@ -48,6 +48,24 @@ class HomepageTests(TestCase):
         self.assertNotContains(page, "9Sig")
         self.assertContains(page, 'id="compare-data"')
 
+    def test_other_strategies_join_the_comparison_under_generic_names(self):
+        from tracker.test_study_fixed import seed_all_weather
+        start = TODAY - timedelta(days=800)
+        seed("QQQ", start, lambda d, i: 100 * (1.001 ** i))
+        seed_all_weather(start, start)  # SPY, VTI, GBP/USD and the pound All Weather funds
+        data = self.client.get("/compare.json?amount=1000&monthly=0&range=1y").json()
+        keys = [r["key"] for r in data["rows"]]
+        self.assertIn("all-weather", keys)
+        # Strategies whose price history isn't downloaded are left out, not guessed.
+        self.assertNotIn("golden-butterfly", keys)
+        row = next(r for r in data["rows"] if r["key"] == "all-weather")
+        self.assertEqual(row["label"], "All-season mix")
+        self.assertEqual(len(row["points"]), len(data["put_in_points"]))
+        page = self.client.get("/?range=1y")
+        self.assertContains(page, "All-season mix")
+        for brand in ("All Weather", "Bridgewater", "Golden Butterfly", "Dual Momentum", "Permanent Portfolio"):
+            self.assertNotContains(page, brand)
+
     def test_comparison_inputs_are_snapped_to_the_sliders(self):
         data = self.client.get("/compare.json?amount=999999&monthly=-5&range=bogus").json()
         self.assertEqual((data["amount"], data["monthly"], data["range"]), (20000, 0, "10y"))

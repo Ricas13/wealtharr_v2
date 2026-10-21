@@ -1,3 +1,9 @@
+## Homepage shows every strategy (21 October 2026)
+
+Branch `feature/homepage-all-strategies`. The signed-out comparison only used the 9Sig Study. `v2_home._other_rows` now adds each other strategy's pound Study on the same dates under generic names (no third-party brands on the public page): All-season mix, Five equal parts, Monthly momentum switch, Four equal parts banded. A strategy whose history isn't downloaded yet (or doesn't reach back) is left out, never guessed; stand-in history is footnoted.
+
+---
+
 ## Permanent Portfolio, the last strategy (21 October 2026)
 
 Branch `feature/permanent-portfolio` from main (after PR #42). Owner: "add just one more strategy and stop there"; chose Permanent Portfolio. Published rules (Harry Browne, Fail-Safe Investing): 25% each stocks, long-term government bonds, cash (T-bills), gold; rebalance all to 25% only when a part is below 15% or above 35% (uninvested cash counts in the total). Checked after each month end (`yearly_plugin` now takes `cadence="monthly"`). Funds, all already in the catalogue except BIL and XEON as holdings: Trading 212 VUAG/GLTL/ERNS/SGLN; Fidelity VTI/TLT/BIL/GLD; Trade Republic SXR8/DBXF/XEON/PPFB. Study per currency (monthly band replay). Also fixed: fixed-weight and momentum Study "How it works" said "pounds" for dollar/euro studies.

@@ -113,6 +113,7 @@
       </div>
       <p class="mut tiny gap-top"><strong>Hypothetical, not anyone's real results.</strong> Real daily prices from Yahoo, converted to pounds, replayed through each strategy's fixed rules with no dealing costs or tax.
         <span data-simulated{% if not compare.simulated %} hidden{% endif %}>Before the 3× Nasdaq fund launched, its history is rebuilt from 3× QQQ's daily moves, which can look better than reality.</span>
+        <span data-simulated-other{% if not compare.simulated_other %} hidden{% endif %}>Before some other funds launched, their history follows a similar older fund or index.</span>
         Past performance doesn't guarantee future returns.</p>
       <p class="mut tiny">New to this? <a href="{% url 'guide' '3x-nasdaq-etf-stocks-and-shares-isa' %}">3x Nasdaq ETFs in an ISA</a> · <a href="{% url 'guide' 'volatility-decay-leveraged-etfs' %}">Volatility decay explained</a> · <a href="{% url 'guide' 'quarterly-signal-rebalancing' %}">How quarterly signal rebalancing works</a></p>
     </div>

@@ -147,6 +147,8 @@
     text("[data-range-words]", state.range_words);
     text("[data-putin]", state.ready ? money(state.put_in) : "—");
     box.querySelector("[data-simulated]").hidden = !state.simulated;
+    var other = box.querySelector("[data-simulated-other]");
+    if (other) other.hidden = !state.simulated_other;
     if (!state.ready) return;
     var ticks = box.querySelector("[data-ticks]");
     ticks.textContent = "";

@@ -28,6 +28,17 @@ LINES = {
     "spy": ("S&P 500 (SPY)", "benchmark", "Never", "#9aa3ad"),
     "vti": ("US total market (VTI)", "benchmark", "Never", "#b58cf0"),
 }
+# The other released strategies, by plug-in key. Generic names only: the
+# public homepage doesn't use third-party strategy brands (CLAUDE.md).
+OTHER_LINES = {
+    "all-weather": ("All-season mix", "30% shares, 55% bonds, 15% gold & commodities", "1× a year", "#4fc3a1"),
+    "golden-butterfly": ("Five equal parts", "shares, small-cap value, long & short bonds, gold",
+                         "1× a year", "#e06c9f"),
+    "dual-momentum": ("Monthly momentum switch", "US shares, world shares or bonds", "Up to 12× a year",
+                      "#e5c07b"),
+    "permanent-portfolio": ("Four equal parts, banded", "shares, long bonds, cash, gold; 15–35% bands",
+                            "Rarely", "#56b6c2"),
+}
 POINTS = 160
 DAILY_INVITE_ALERTS = 10
 
@@ -83,6 +94,7 @@ def compare(amount, monthly, frame):
                 "drawdown": round(s["drawdown"], 2),
                 "points": [round(s["values"][i], 2) for i in index],
             })
+        simulated_other = _other_rows(rows, days, index, frame, amount, monthly)
         base = result["series"]["nine_sig"]
         first, last = days[0], days[-1]
         out.update({
@@ -92,9 +104,46 @@ def compare(amount, monthly, frame):
             "start": first.isoformat(), "end": last.isoformat(),
             "ticks": [(first + (last - first) * k / 4).strftime("%b %Y") for k in range(5)],
             "simulated": bool(result["simulated_growth"] or result["simulated_safe"]),
+            "simulated_other": simulated_other,
         })
     cache.set(key, out, 3600)
     return out
+
+
+def _other_rows(rows, days, index, frame, amount, monthly):
+    """Add each other strategy's pound Study to the comparison, on the same dates.
+
+    Returns whether any of them used stand-in history before a fund existed.
+    A strategy whose history doesn't reach back this far is left out.
+    """
+    from bisect import bisect_right
+    from .strategies.registry import module_for_key
+    simulated = False
+    for key, (label, what, effort, color) in OTHER_LINES.items():
+        plugin = module_for_key(key)
+        study = plugin.study.get("GBP") if plugin and isinstance(plugin.study, dict) else None
+        if study is None:
+            continue
+        data = _data(study)
+        result = study.run(data, frame, amount, monthly) if data.ready else None
+        s = result["series"].get("strategy") if result else None
+        if not s or result["start"] > days[0] + timedelta(days=7):
+            continue
+        simulated = simulated or bool(result["simulated_notes"])
+        own_days = result["dates"]
+
+        def value_on(day):
+            i = bisect_right(own_days, day) - 1
+            return s["values"][max(i, 0)]
+        rows.append({
+            "key": key, "label": label, "what": what, "effort": effort, "color": color,
+            "final": round(s["final"], 2), "put_in": round(s["put_in"], 2),
+            "gain_pct": round(s["gain_pct"], 2) if s["gain_pct"] is not None else None,
+            "annual": round(s["annual"], 2) if s["annual"] is not None else None,
+            "drawdown": round(s["drawdown"], 2),
+            "points": [round(value_on(days[i]), 2) for i in index],
+        })
+    return simulated
 
 
 def landing(request):
