@@ -25,6 +25,7 @@ from tracker.strategies.registry import describe_strategy
 CATALOGUE_VERSION = MAPPING_VERSION
 ALL_WEATHER = "all-weather"
 GOLDEN_BUTTERFLY = "golden-butterfly"
+DUAL_MOMENTUM = "dual-momentum"
 ACCOUNT_TYPES = (
     ("ISA", "Stocks & Shares ISA"),
     ("GIA", "General Investment Account"),
@@ -57,6 +58,11 @@ _OFFERS = {
         GOLDEN_BUTTERFLY, "Golden Butterfly", "Moderate risk", "Yearly",
         "Five equal parts: stocks, small-cap value, long-term and short-term government bonds, "
         "and gold, rebalanced once a year. Not affiliated with Portfolio Charts.", True,
+    ),
+    DUAL_MOMENTUM: StrategyOffer(
+        DUAL_MOMENTUM, "Dual Momentum", "High risk", "Monthly",
+        "100% in one fund, chosen each month: US shares, world ex-US shares, or bonds when shares "
+        "aren't beating cash. Not affiliated with Gary Antonacci.", True,
     ),
 }
 OFFERS = MappingProxyType(_OFFERS)
@@ -110,6 +116,7 @@ class CatalogueLine:
             "inter": "Intermediate bonds", "gold": "Gold",
             "comm": "Commodities",
             "scv": "Small-cap value", "short": "Short bonds",
+    "us": "US shares", "intl": "World ex-US shares", "bonds": "Bonds",
         }.get(self.role, self.role)
 
     @property
@@ -183,6 +190,24 @@ IGLS = Listing(
     "not read first-hand. " + ACCOUNT_HOLD,
     GB_VERIFIED_ON, brokers={"TRADING212": T212 % "IGLS"})
 
+# Dual Momentum. No broker evidence yet: Trading 212 pages for these lines were
+# not found, so the strategy isn't offered there until the owner confirms them.
+XUSE = Listing(
+    "iShares MSCI World ex-USA UCITS ETF (Acc)", "iShares",
+    "IE000R4ZNTN3", "XUSE.L", "GBP", "LSE XUSE (GBP line)",
+    "https://www.blackrock.com/uk/individual/products/340748/ishares-msci-world-ex-usa-ucits-etf",
+    "UK equivalent of MSCI ACWI ex-US: developed markets only (no emerging markets; no ACWI ex-US "
+    "UCITS fund was found). Accumulating, so its price is a total return. Listed April 2025. "
+    "Source-cited, not read first-hand. " + ACCOUNT_HOLD,
+    GB_VERIFIED_ON)
+VAGS = Listing(
+    "Vanguard Global Aggregate Bond UCITS ETF GBP Hedged (Acc)", "Vanguard",
+    "IE00BG47K971", "VAGS.L", "GBP", "LSE VAGS (GBP line)",
+    "https://www.vanguard.co.uk/professional/product/etf/bond/9685/global-aggregate-bond-ucits-etf-hedged-accumulating",
+    "UK equivalent of US aggregate bonds: global aggregate bonds hedged to pounds. Accumulating. "
+    "Source-cited, not read first-hand. " + ACCOUNT_HOLD,
+    GB_VERIFIED_ON)
+
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
     (STRATEGY_9SIG, "growth", "GB"): (_from_instrument(EQUITY_UK),),
@@ -197,6 +222,9 @@ ROLE_LISTINGS = {
     (GOLDEN_BUTTERFLY, "long", "GB"): (GLTL,),
     (GOLDEN_BUTTERFLY, "short", "GB"): (IGLS,),
     (GOLDEN_BUTTERFLY, "gold", "GB"): (SGLN,),
+    (DUAL_MOMENTUM, "us", "GB"): (VUAG,),
+    (DUAL_MOMENTUM, "intl", "GB"): (XUSE,),
+    (DUAL_MOMENTUM, "bonds", "GB"): (VAGS,),
 }
 
 
@@ -242,7 +270,9 @@ def platforms():
 
 
 # Raw Yahoo quote units for reference series that no strategy holds.
-REFERENCE_QUOTE_UNITS = {"TQQQ": ("USD",), "SPY": ("USD",), "QQQ": ("USD",), "GBPUSD=X": ("USD",)}
+REFERENCE_QUOTE_UNITS = {"TQQQ": ("USD",), "SPY": ("USD",), "QQQ": ("USD",), "GBPUSD=X": ("USD",),
+                         # Dual Momentum's sterling cash series (Amundi Smart Overnight Return, pence line).
+                         "CSH2.L": ("GBp", "GBX")}
 
 
 def expected_quote_units():

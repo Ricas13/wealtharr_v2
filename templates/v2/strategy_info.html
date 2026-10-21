@@ -69,7 +69,7 @@
     <div class="w2-table-wrap"><table class="w2-table">
       <thead><tr><th>Role</th><th>{{ weight_label }}</th><th>Ticker</th><th>Name</th><th>ISIN</th><th>Units</th><th>Status</th><th>Sources</th></tr></thead>
       <tbody>{% for line in strategy_catalogue_rows %}
-        <tr><td>{{ line.role_label }}</td><td>{{ line.weight_pct|floatformat:"-1" }}%</td><td>{{ line.ticker }}</td><td>{{ line.name }}</td><td>{{ line.isin }}</td><td>{{ line.raw_quote_unit }}</td>
+        <tr><td>{{ line.role_label }}</td><td>{% if line.weight %}{{ line.weight_pct|floatformat:"-1" }}%{% else %}By signal{% endif %}</td><td>{{ line.ticker }}</td><td>{{ line.name }}</td><td>{{ line.isin }}</td><td>{{ line.raw_quote_unit }}</td>
           <td>{% if line.status == 'account_check_pending' %}<span class="w2-chip w2-wait">Account check pending</span>{% elif line.status == 'draft' %}<span class="w2-chip">Draft</span>{% else %}<span class="w2-chip w2-ok">Reviewed</span>{% endif %}</td>
           <td>{% if line.issuer_url %}<a href="{{ line.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer ↗</a>{% endif %}{% if line.broker_evidence_url %} <a href="{{ line.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">{{ line.broker_name }} ↗</a>{% endif %}{% if not line.issuer_url and not line.broker_evidence_url %}—{% endif %}</td></tr>
       {% empty %}<tr><td colspan="8"><div class="w2-empty">No released, account-specific instrument mapping. Do not infer replacements.</div></td></tr>{% endfor %}

@@ -8,6 +8,7 @@ from decimal import Decimal
 from types import MappingProxyType
 
 from tracker.strategies.all_weather.v1 import VERSION as ALL_WEATHER_VERSION, WEIGHTS as ALL_WEATHER_WEIGHTS
+from tracker.strategies.dual_momentum.v1 import VERSION as DUAL_MOMENTUM_VERSION
 from tracker.strategies.golden_butterfly.v1 import (
     VERSION as GOLDEN_BUTTERFLY_VERSION, WEIGHTS as GOLDEN_BUTTERFLY_WEIGHTS,
 )
@@ -111,6 +112,32 @@ _RELEASED = {
         release_label="golden-butterfly@1",
         version_history=("golden-butterfly@1 (golden_butterfly.v1.0.0): yearly rebalance to five equal weights.",),
     ),
+    "dual-momentum": StrategyDescription(
+        key="dual-momentum",
+        version=DUAL_MOMENTUM_VERSION,
+        title="Dual Momentum",
+        summary=("Global Equities Momentum as published: each month, hold 100% of whichever is "
+                 "strongest of US shares and world shares outside the US, or bonds when shares "
+                 "aren't beating cash. All transactions are made by you."),
+        cadence="One review after each calendar month end.",
+        rules=(
+            "At each month end, compare 12-month total returns from verified month-end closes.",
+            "Absolute momentum: if US shares returned more than cash, stay in shares; otherwise hold bonds.",
+            "Relative momentum: in shares, hold US shares or world ex-US shares, whichever returned more.",
+            "Everything goes into the chosen fund: sell any other fund, then buy it with the proceeds and your cash.",
+            "The original compares US-dollar returns with US Treasury bills and holds US aggregate bonds; in a UK account the returns are in pounds, cash is a sterling overnight-rate fund and the bond fund is the local equivalent. Each fund is shown with its evidence at setup.",
+            "New money is invested in the chosen fund at the next monthly review. Orders under £1 are skipped as too small to place.",
+            "Only owner-confirmed actual fills are recorded. No trade is ever placed for you.",
+        ),
+        role_targets=(("us", Decimal("0")), ("intl", Decimal("0")), ("bonds", Decimal("0"))),
+        target_explanation="No fixed weights: 100% sits in the one fund the monthly rules choose.",
+        caution=("Not affiliated with Gary Antonacci. The rules are the published ones; the funds and the "
+                 "cash series are local equivalents, so switches can differ from the US original. "
+                 "Momentum switches can lag sharp turns and trigger capital gains outside an ISA. "
+                 "Your own account's access to each fund is unverified."),
+        release_label="dual-momentum@1",
+        version_history=("dual-momentum@1 (dual_momentum.v1.0.0): monthly Global Equities Momentum.",),
+    ),
 }
 STRATEGIES = MappingProxyType(_RELEASED)
 
@@ -124,9 +151,10 @@ def describe_strategy(key: str) -> StrategyDescription | None:
 # behaviour here and never imports a strategy's rules directly.
 def _plugins():
     from tracker.strategies.all_weather.plugin import ALL_WEATHER
+    from tracker.strategies.dual_momentum.plugin import DUAL_MOMENTUM
     from tracker.strategies.golden_butterfly.plugin import GOLDEN_BUTTERFLY
     from tracker.strategies.nine_sig.plugin import NINE_SIG
-    return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY)}
+    return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY, DUAL_MOMENTUM)}
 
 
 _MODULES = {}

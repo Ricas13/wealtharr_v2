@@ -69,20 +69,34 @@ def _readiness(strategy, report):
 
 
 def _opening_buys(strategy, cash):
-    """Target-weight split of uninvested cash for a strategy that holds nothing yet."""
+    """Target-weight split of uninvested cash for a strategy that holds nothing yet.
+
+    Strategies without fixed weights supply today's split through their plug-in;
+    when it can't be computed there is no opening card rather than a guess.
+    """
     from .core.catalogue import rows_for
     from .models import MarketObservation
+    from .strategies.registry import module_for
     lines = rows_for(strategy.strategy_key or strategy.preset.slug,
                      strategy.account.broker, strategy.account.kind)
+    plugin = module_for(strategy)
+    weights = {line.ticker: line.weight for line in lines}
+    if plugin and plugin.current_weights:
+        weights = plugin.current_weights(strategy)
+        if weights is None:
+            return ()
     fresh_after = timezone.localdate() - timedelta(days=8)
     rows = []
     for line in lines:
-        amount = (cash * line.weight).quantize(Decimal("0.01"))
+        weight = weights.get(line.ticker, Decimal("0"))
+        if not weight:
+            continue
+        amount = (cash * weight).quantize(Decimal("0.01"))
         quote = MarketObservation.objects.filter(
             symbol=line.ticker, currency="GBP", as_of__gte=fresh_after,
         ).order_by("-as_of").first()
         rows.append({
-            "symbol": line.ticker, "role": line.role_label, "pct": line.weight_pct,
+            "symbol": line.ticker, "role": line.role_label, "pct": weight * 100,
             "amount": amount, "price": quote.price if quote else None,
             "shares": (amount / quote.price).quantize(Decimal("0.01")) if quote else None,
         })
@@ -172,7 +186,7 @@ def today_page(request, instance_id):
         status = "start"
         headline = "Buy your opening position"
         explanation = (
-            "Split your cash at the target weights, place the buys in "
+            "Buy what the strategy holds today with your cash, place the buys in "
             f"{strategy.account.broker_label}, "
             "then record what you actually bought.")
     elif not strategy.tracking_only and setup_missing(strategy):
@@ -263,7 +277,10 @@ def _dashboard(request, strategy, report, ready, roles, next_end):
             if ready and report["value"] is not None and report["net_contributed"] > ZERO
             else None),
         "dash_xirr": dash.xirr_pct(strategy, points) if ready else None,
-        "dash_allocation": dash.allocation(report, lines, roles) if ready else None,
+        "dash_allocation": dash.allocation(
+            report, lines, roles,
+            targets=plugin.current_weights(strategy) if plugin and plugin.current_weights and ready else None,
+        ) if ready else None,
         "dash_allocation_label": plugin.allocation_label if plugin else "Target",
         "dash_plugin_template": plugin.dashboard_template if plugin else "",
         **(plugin.dashboard_context(strategy, report, next_end)
