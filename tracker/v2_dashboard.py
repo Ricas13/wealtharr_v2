@@ -297,9 +297,9 @@ def holdings_detail(strategy, report, roles):
             cost[entry.symbol] -= cost[entry.symbol] * entry.quantity / shares[entry.symbol]
             shares[entry.symbol] -= entry.quantity
     rows = []
-    order = {"Growth": 0, "Safe": 1}
+    order = {symbol: i for i, symbol in enumerate(roles)}
     for symbol, quantity in sorted(report["positions"].items(),
-                                   key=lambda item: (order.get(roles.get(item[0]), 9), item[0])):
+                                   key=lambda item: (order.get(item[0], 99), item[0])):
         if quantity <= ZERO:
             continue
         mark = report["marks"].get(symbol)
@@ -325,9 +325,10 @@ def allocation(report, lines, roles):
     total = report["value"]
     weights = {line.ticker: line.weight_pct for line in lines}
     rows = []
-    order = {label: i for i, label in enumerate(("Growth", "Safe"))}
+    # Funds in the strategy's own order (roles is ordered), then anything else.
+    order = {symbol: i for i, symbol in enumerate(roles)}
     for symbol, quantity in sorted(report["positions"].items(),
-                                   key=lambda item: (order.get(roles.get(item[0]), 9), item[0])):
+                                   key=lambda item: (order.get(item[0], 99), item[0])):
         mark = report["marks"].get(symbol)
         if quantity <= ZERO or mark is None:
             continue
@@ -338,8 +339,9 @@ def allocation(report, lines, roles):
     rows.append({"label": "Cash", "symbol": "", "value": report["cash"],
                  "pct": (report["cash"] / total * HUNDRED).quantize(Decimal("0.1")),
                  "target": None})
+    palette = ("w2-c1", "w2-c2", "w2-c3", "w2-c5", "w2-c6", "w2-c7")  # w2-c4 is cash grey
     for i, row in enumerate(rows):
-        row["css"] = "w2-c%d" % (i + 1) if row["symbol"] else "w2-c4"
+        row["css"] = palette[i % len(palette)] if row["symbol"] else "w2-c4"
         row["width"] = max(min(float(row["pct"]), 100.0), 0.0)
     return tuple(rows)
 

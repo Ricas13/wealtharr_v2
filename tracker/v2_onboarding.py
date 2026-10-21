@@ -233,7 +233,8 @@ def wizard(request):
     offers = [o for o in OFFERS.values()]
     default_key = next((o.key for o in offers if o.enabled), "")
     post = request.POST if request.method == "POST" else {}
-    strategy = post.get("strategy", default_key)
+    chosen = request.GET.get("strategy", "")
+    strategy = post.get("strategy", chosen if chosen in OFFERS and OFFERS[chosen].enabled else default_key)
     platform = post.get("platform", "TRADING212")
     types = [kind for kind, _ in ACCOUNT_TYPES if selection_available(strategy, platform, kind)]
     account_type = post.get("account_type", "ISA" if "ISA" in types else (types[0] if types else ""))

@@ -121,6 +121,7 @@ def _snapshot_rows(strategy):
 @require_GET
 def today_page(request, instance_id):
     strategy = _owned(request, instance_id)
+    plugin = module_for(strategy)
     report = ledger_summary(strategy)
     ready, reason, marks = _readiness(strategy, report)
     notice = _last_action(strategy)
@@ -193,7 +194,7 @@ def today_page(request, instance_id):
         explanation = reason
     elif ready and notice and notice.kind == "QUARTERLY" and progress and not executed:
         status = "trade"
-        headline = "Review the verified quarterly proposal"
+        headline = "Review the verified %s proposal" % (plugin.cadence_word if plugin else "quarterly")
         explanation = (
             "Check the dated proposal against your broker and decide yourself. "
             "Nothing is executed by Wealtharr. Record only fills you actually made."
@@ -201,7 +202,8 @@ def today_page(request, instance_id):
     else:
         status = "idle"
         headline = "Nothing to do right now"
-        explanation = "No currently outstanding verified quarterly instruction."
+        explanation = "No currently outstanding verified %s instruction." % (
+            plugin.cadence_word if plugin else "quarterly")
     next_end = next_review(strategy, timezone.localdate())
     price_date = min((m.as_of for m in marks if m is not None), default=None) if ready else None
     display_value = account_value(

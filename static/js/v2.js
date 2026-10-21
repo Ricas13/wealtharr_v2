@@ -70,6 +70,12 @@
     } catch (_) { /* UI continues without persistence. */ }
   });
   updateCollapse();
+  // Setup: changing the strategy reloads the page with that strategy's funds.
+  Array.prototype.forEach.call(document.querySelectorAll("[data-w2-reload-with]"), function (select) {
+    select.addEventListener("change", function () {
+      window.location.assign(window.location.pathname + "?" + select.name + "=" + encodeURIComponent(select.value));
+    });
+  });
   var modeInputs = document.querySelectorAll("input[name=mode]");
   function updateMode() {
     var checked = document.querySelector("input[name=mode]:checked");

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from types import MappingProxyType
 
+from tracker.strategies.all_weather.v1 import VERSION as ALL_WEATHER_VERSION, WEIGHTS as ALL_WEATHER_WEIGHTS
 from tracker.strategies.nine_sig.v2 import VERSION as NINE_SIG_VERSION
 
 
@@ -55,6 +56,29 @@ _RELEASED = {
             "nine-sig@1 (nine_sig.v1.0.0): frozen original with shortage reset/HOLD.",
         ),
     ),
+    "all-weather": StrategyDescription(
+        key="all-weather",
+        version=ALL_WEATHER_VERSION,
+        title="All Weather (UK)",
+        summary=("Five funds at fixed weights, rebalanced once a year: US shares, long and "
+                 "intermediate UK gilts, gold and broad commodities. All transactions are made by you."),
+        cadence="One review after each calendar year end.",
+        rules=(
+            "Target weights: 30% US shares, 40% long-dated UK gilts, 15% intermediate UK gilts, 7.5% gold, 7.5% broad commodities.",
+            "After each 31 December, holdings are valued at verified year-end GBP closes.",
+            "Funds above their weight are sold back to it; the proceeds and any cash buy the funds below their weight.",
+            "Buys never exceed the cash available; trades under £25 are skipped.",
+            "New money waits as cash until the next yearly review, or you can split it at the weights yourself.",
+            "Only owner-confirmed actual fills are recorded. No trade is ever placed for you.",
+        ),
+        role_targets=ALL_WEATHER_WEIGHTS,
+        target_explanation="These weights are restored at every yearly review.",
+        caution=("A UK adaptation inspired by the All Weather idea; not affiliated with Bridgewater "
+                 "Associates. Gilts replace US Treasuries, so it behaves differently from the original. "
+                 "Personal Trading 212 ISA access to each fund is unverified."),
+        release_label="all-weather@1",
+        version_history=("all-weather@1 (all_weather.v1.0.0): yearly rebalance to fixed weights.",),
+    ),
 }
 STRATEGIES = MappingProxyType(_RELEASED)
 
@@ -67,8 +91,9 @@ def describe_strategy(key: str) -> StrategyDescription | None:
 # Plug-ins, keyed like the descriptions. Generic code finds a strategy's
 # behaviour here and never imports a strategy's rules directly.
 def _plugins():
+    from tracker.strategies.all_weather.plugin import ALL_WEATHER
     from tracker.strategies.nine_sig.plugin import NINE_SIG
-    return {NINE_SIG.key: NINE_SIG}
+    return {NINE_SIG.key: NINE_SIG, ALL_WEATHER.key: ALL_WEATHER}
 
 
 _MODULES = {}

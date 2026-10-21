@@ -27,7 +27,7 @@
       {% if dash_allocation %}
         <div class="w2-bar" role="img" aria-label="{% for row in dash_allocation %}{{ row.label }} {{ row.pct }}%{% if not forloop.last %}, {% endif %}{% endfor %}">{% for row in dash_allocation %}<span class="{{ row.css }}" style="width:{{ row.width|floatformat:1 }}%"></span>{% endfor %}</div>
         <table class="w2-table w2-space-top"><thead><tr><th>Holding</th><th class="w2-r">Now</th><th class="w2-r">{{ dash_allocation_label }}</th><th class="w2-r">£</th></tr></thead><tbody>
-          {% for row in dash_allocation %}<tr><td><span class="w2-dotsw {{ row.css }}"></span>{{ row.label }}{% if row.symbol %} · {{ row.symbol }}{% endif %}</td><td class="w2-r">{{ row.pct }}%</td><td class="w2-r w2-muted">{% if row.target is not None %}{{ row.target|floatformat:0 }}%{% else %}—{% endif %}</td><td class="w2-r">{{ row.value|floatformat:"2g" }}</td></tr>{% endfor %}
+          {% for row in dash_allocation %}<tr><td><span class="w2-dotsw {{ row.css }}"></span>{{ row.label }}{% if row.symbol %} · {{ row.symbol }}{% endif %}</td><td class="w2-r">{{ row.pct }}%</td><td class="w2-r w2-muted">{% if row.target is not None %}{{ row.target|floatformat:"-1" }}%{% else %}—{% endif %}</td><td class="w2-r">{{ row.value|floatformat:"2g" }}</td></tr>{% endfor %}
         </tbody></table>
       {% else %}<div class="w2-empty">Needs live prices and holdings.</div>{% endif %}
     </section>

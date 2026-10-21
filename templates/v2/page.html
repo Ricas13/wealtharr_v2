@@ -5,7 +5,7 @@
 <header class="w2-strategy-head">
   <div class="w2-row">
     <h1>{{ selected_instance.name }}</h1>
-    <span class="w2-muted">{% if selected_instance.account.kind == 'ISA' %}Stocks &amp; Shares ISA{% else %}{{ selected_instance.account.kind }}{% endif %} · {{ selected_instance.account.broker_label|default:"Platform not set" }}{% if selected_instance.equity_symbol %} · {{ selected_instance.equity_symbol }}{% if selected_instance.safe_symbol %} / {{ selected_instance.safe_symbol }}{% endif %}{% endif %}</span>
+    <span class="w2-muted">{% if selected_instance.account.kind == 'ISA' %}Stocks &amp; Shares ISA{% else %}{{ selected_instance.account.kind }}{% endif %} · {{ selected_instance.account.broker_label|default:"Platform not set" }}{% if fund_symbols %} · {{ fund_symbols|join:" / " }}{% endif %}</span>
   </div>
   <div class="w2-row">
     {% if selected_instance.tracking_only %}<span class="w2-chip">Not live</span>{% else %}<span class="w2-chip w2-ok">● Live</span>{% endif %}
@@ -17,7 +17,7 @@
 </header>
 <nav class="w2-tabs" aria-label="{{ selected_instance.name }} pages">
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='today' %}" {% if section == 'today' %}class="w2-on" aria-current="page"{% endif %}>Dashboard</a>
-  <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}" {% if section == 'review' %}class="w2-on" aria-current="page"{% endif %}>Quarterly review</a>
+  <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}" {% if section == 'review' %}class="w2-on" aria-current="page"{% endif %}>{{ review_word|default:"quarterly"|capfirst }} review</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}" {% if section == 'ledger' %}class="w2-on" aria-current="page"{% endif %}>Ledger</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='history' %}" {% if section == 'history' %}class="w2-on" aria-current="page"{% endif %}>Performance</a>
   <a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='study' %}" {% if section == 'study' %}class="w2-on" aria-current="page"{% endif %}>Study</a>

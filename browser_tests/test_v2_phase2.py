@@ -44,13 +44,23 @@ class V2OnboardingBrowserTests(BrowserHarness):
                     self.page.get_by_role("heading", name="Add a strategy").wait_for()
                     screenshot("setup")
                     # Everything is on one page: strategy, account, funds, start, go live.
-                    self.assertTrue(self.page.locator(
+                    # Both released strategies are offered; 9Sig is preselected.
+                    self.assertFalse(self.page.locator(
                         'select[name="strategy"] option[value="all-weather"]').evaluate("(el) => el.disabled"))
+                    self.assertEqual(self.page.locator('select[name="strategy"]').input_value(),
+                                     "nasdaq-quarterly-target")
                     self.assertTrue(self.page.locator(
                         'input[name="account_type"][value="SIPP"]').is_disabled())
                     self.assertTrue(self.page.locator(
                         'input[name="account_type"][value="ISA"]').is_checked())
                     self.assertTrue(self.page.get_by_text("IE00BLRPRL42").first.is_visible())
+                    # Picking All Weather shows its five funds instead.
+                    with self.page.expect_navigation():
+                        self.page.locator('select[name="strategy"]').select_option("all-weather")
+                    self.assertTrue(self.page.get_by_text("IE00BFMXXD54").first.is_visible())
+                    self.assertEqual(self.page.locator('select[name="strategy"]').input_value(), "all-weather")
+                    with self.page.expect_navigation():
+                        self.page.locator('select[name="strategy"]').select_option("nasdaq-quarterly-target")
                     self.page.locator('input[name="ack"]').check()
                     self.page.locator('input[name="mode"][value="hold"]').check()
                     self.assertFalse(

@@ -6,6 +6,10 @@ found with `tracker.strategies.registry.module_for(instance)`. A test
 (`tracker/test_strategy_plugins.py`) fails if a generic module imports a strategy's
 rules directly, and runs a test-only three-fund strategy through the whole loop.
 
+Worked examples: `strategies/nine_sig/` (quarterly signal line) and
+`strategies/all_weather/` (five fixed weights, yearly rebalance: `v1.py` rules,
+`plugin.py` wiring, funds in `core/catalogue.py`).
+
 ## What a new strategy needs
 
 1. **Rules description**: add a `StrategyDescription` to `_RELEASED` in

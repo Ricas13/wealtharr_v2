@@ -54,8 +54,15 @@ def _render(request, *, page_key, page_title, instance=None, section=None, **ext
     if instance is not None and "head_prices" not in extra:
         extra["head_prices"] = _price_freshness(instance)
     if instance is not None:
+        from .strategies.instruments import symbols as fund_symbols
+        from .strategies.registry import module_for
         from .v2_go_live import setup_missing
+        plugin = module_for(instance)
         extra.setdefault("needs_setup", instance.tracking_only or setup_missing(instance))
+        extra.setdefault("review_word", plugin.cadence_word if plugin else "quarterly")
+        extra.setdefault("weight_label", "Weight at reset"
+                         if plugin and plugin.allocation_label == "Reset" else "Target weight")
+        extra.setdefault("fund_symbols", fund_symbols(instance))
     return render(
         request, "v2/page.html",
         {

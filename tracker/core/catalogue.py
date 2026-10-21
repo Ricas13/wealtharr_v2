@@ -2,7 +2,8 @@
 
 The account check is a deliberate hold. Issuer ISA eligibility and a public
 Trading 212 Invest listing do not prove this owner's ISA buying permission.
-Unreviewed All Weather roles contain NO asserted ticker or ISIN.
+All Weather lines are source-cited (issuer, Trading 212 and platform pages,
+21 Oct 2026) but were not read first-hand, so they carry the same hold.
 """
 from dataclasses import dataclass
 from datetime import date
@@ -48,9 +49,9 @@ _OFFERS = {
         "Quarterly decisions use the versioned 9Sig rules.", True,
     ),
     ALL_WEATHER: StrategyOffer(
-        ALL_WEATHER, "All Weather", "Moderate risk", "Annual",
-        "Five diversifying asset roles; instruments and rules are not released.",
-        False,
+        ALL_WEATHER, "All Weather (UK)", "Moderate risk", "Yearly",
+        "Five funds at fixed weights: US shares, long and intermediate UK gilts, gold and "
+        "commodities, rebalanced once a year. Not affiliated with Bridgewater.", True,
     ),
 }
 OFFERS = MappingProxyType(_OFFERS)
@@ -119,21 +120,43 @@ def _reviewed_line(role, item, account_type):
     )
 
 
-_PLACEHOLDER_ROLES = (
-    ("stocks", "Global equity role", ".30"),
-    ("long", "Long-term bond role", ".40"),
-    ("inter", "Intermediate bond role", ".15"),
-    ("gold", "Gold role", ".075"),
-    ("comm", "Broad commodity role", ".075"),
+AW_VERIFIED_ON = date(2026, 10, 21)
+AW_NOTE = ("Source-cited from issuer, Trading 212 and platform pages; not read first-hand. "
+           "Your account access and the live price quote unit are NOT confirmed. "
+           "A different unit from Yahoo holds the price rather than guessing.")
+T212 = "https://www.trading212.com/trading-instruments/invest/%s.GB"
+# role, weight, name, issuer, ISIN, Yahoo ticker, raw unit, line, issuer page, note
+_ALL_WEATHER_FUNDS = (
+    ("stocks", ".30", "Vanguard S&P 500 UCITS ETF (USD) Accumulating", "Vanguard",
+     "IE00BFMXXD54", "VUAG.L", "GBP", "LSE VUAG (GBP line)",
+     "https://www.vanguard.co.uk/uk-fund-directory/product/etf/equity/9694/sp-500-ucits-etf-usd-accumulating",
+     "US shares in USD, unhedged, on a GBP line."),
+    ("long", ".40", "SPDR Bloomberg 15+ Year Gilt UCITS ETF (Dist)", "State Street",
+     "IE00B6YX5L24", "GLTL.L", "GBP", "LSE GLTL (GBP line)",
+     "https://www.ssga.com/uk/en_gb/intermediary/etfs/spdr-bloomberg-15-year-gilt-ucits-etf-dist-sybl-gy",
+     "The only 15+ year gilt ETF found on Trading 212. Distributing; small fund."),
+    ("inter", ".15", "iShares Core UK Gilts UCITS ETF (Dist)", "iShares",
+     "IE00B1FZSB30", "IGLT.L", "GBP", "LSE IGLT (GBP line)",
+     "https://www.ishares.com/uk/individual/en/products/251806",
+     "All-maturity gilts: no 5-15 year gilt ETF is on Trading 212, so this overlaps the long role."),
+    ("gold", ".075", "iShares Physical Gold ETC", "iShares",
+     "IE00B4ND3602", "SGLN.L", "GBX", "LSE SGLN (pence line)",
+     "https://www.ishares.com/uk/individual/en/products/258441",
+     "An ETC (secured debt security), not a UCITS fund; physically backed; unhedged."),
+    ("comm", ".075", "Invesco Bloomberg Commodity UCITS ETF (Acc)", "Invesco",
+     "IE00BD6FTQ80", "CMOP.L", "GBX", "LSE CMOP (pence line)",
+     "https://www.invesco.com/content/dam/invesco/uk/en/product-documents/etf/share-class/factsheet/IE00BD6FTQ80_factsheet_en-uk.pdf",
+     "Swap-based (synthetic); index includes precious metals, so it partly overlaps gold."),
 )
 
 
-def _draft_line(role, label, weight, account_type):
+def _all_weather_line(fund, account_type):
+    role, weight, name, issuer, isin, ticker, unit, line, issuer_url, note = fund
     return CatalogueLine(
-        ALL_WEATHER, role, "GB", "TRADING212", account_type,
-        CATALOGUE_VERSION, label + " — instrument not researched",
-        "", "", "", "", "", Decimal(weight), "draft",
-        note="Draft role placeholder only. No reviewed security or tradable line.",
+        ALL_WEATHER, role, "GB", "TRADING212", account_type, CATALOGUE_VERSION,
+        name, ticker, isin, unit, "GBP", line, Decimal(weight), "account_check_pending",
+        issuer_url=issuer_url, broker_evidence_url=T212 % ticker.split(".")[0],
+        verified_on=AW_VERIFIED_ON, note=note + " " + AW_NOTE, issuer=issuer,
     )
 
 
@@ -145,8 +168,8 @@ for account_type in ("ISA", "GIA"):
             (row.strategy_key, row.role, row.country, row.platform,
              row.account_type, row.mapping_version)
         ] = row
-    for role, label, weight in _PLACEHOLDER_ROLES:
-        row = _draft_line(role, label, weight, account_type)
+    for fund in _ALL_WEATHER_FUNDS:
+        row = _all_weather_line(fund, account_type)
         _CATALOGUE[
             (row.strategy_key, row.role, row.country, row.platform,
              row.account_type, row.mapping_version)

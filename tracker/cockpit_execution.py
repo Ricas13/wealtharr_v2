@@ -173,7 +173,8 @@ def record_single_fill(*, owner, strategy_id, signal_id, action_index,
             return "duplicate", prior
         _check_current(locked, signal)
         actions = proposed_actions(signal)
-        if not 0 <= action_index < len(actions) or not 1 <= len(actions) <= 4:
+        # At most one trade per fund (9Sig's reviews have up to four).
+        if not 0 <= action_index < len(actions) or not 1 <= len(actions) <= max(4, len(symbols(locked))):
             raise ValidationError("Select an action from the current review.")
         if executed_on <= signal.as_of:
             raise ValidationError("Your actual fill must be after the review date.")

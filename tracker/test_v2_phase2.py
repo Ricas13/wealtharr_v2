@@ -41,17 +41,23 @@ class Phase2CatalogueTests(TestCase):
                 self.assertFalse(manifest["roles"]["growth"]["yahoo_price_unit_confirmed"])
                 self.assertEqual(len(manifest["sha256"]), 64)
 
-    def test_all_weather_stays_unreleased_and_draft_without_invented_identifiers(self):
-        self.assertFalse(OFFERS[ALL_WEATHER].enabled)
+    def test_all_weather_pins_five_exact_lines_with_the_account_hold(self):
+        self.assertTrue(OFFERS[ALL_WEATHER].enabled)
+        expected = {"stocks": ("VUAG.L", "IE00BFMXXD54", "GBP"), "long": ("GLTL.L", "IE00B6YX5L24", "GBP"),
+                    "inter": ("IGLT.L", "IE00B1FZSB30", "GBP"), "gold": ("SGLN.L", "IE00B4ND3602", "GBX"),
+                    "comm": ("CMOP.L", "IE00BD6FTQ80", "GBX")}
         for account_type in ("ISA", "GIA"):
             rows = rows_for(ALL_WEATHER, "TRADING212", account_type)
-            self.assertEqual(len(rows), 5)
+            self.assertEqual({r.role: (r.ticker, r.isin, r.raw_quote_unit) for r in rows}, expected)
             self.assertEqual(sum((row.weight for row in rows), D("0")), D("1"))
-            self.assertTrue(all(row.status == "draft" for row in rows))
-            self.assertTrue(all(not row.isin and not row.ticker for row in rows))
-            self.assertFalse(selection_available(ALL_WEATHER, "TRADING212", account_type))
-            with self.assertRaises(MappingNotAvailable):
-                onboarding_manifest(ALL_WEATHER, "TRADING212", account_type)
+            # Source-cited but not first-hand: same hold as 9Sig, never "verified".
+            self.assertTrue(all(row.status == "account_check_pending" for row in rows))
+            self.assertTrue(all(row.issuer_url and row.broker_evidence_url for row in rows))
+            self.assertTrue(selection_available(ALL_WEATHER, "TRADING212", account_type))
+            manifest = onboarding_manifest(ALL_WEATHER, "TRADING212", account_type)
+            self.assertEqual(manifest["roles"]["gold"]["raw_to_gbp_factor"], "100")
+            self.assertFalse(manifest["roles"]["gold"]["broker_isa_confirmed"])
+        self.assertFalse(selection_available(ALL_WEATHER, "TRADING212", "SIPP"))
 
     def test_no_sipp_other_platform_or_version_guess(self):
         self.assertFalse(rows_for(STRATEGY_9SIG, "TRADING212", "SIPP"))
@@ -103,7 +109,7 @@ class Phase2WizardTests(TestCase):
     def test_unsupported_strategy_account_and_skipped_steps_refuse(self):
         fields = dict(mode="fresh", name="x", start=self.day.isoformat(),
                       amount="10", deposited="yes")
-        error = self.client.post(self.url, {"strategy": ALL_WEATHER, "platform": "TRADING212",
+        error = self.client.post(self.url, {"strategy": "no-such-strategy", "platform": "TRADING212",
                                             "account_type": "ISA", "ack": "yes", **fields})
         self.assertContains(error, "not available yet")
         refused = self.create(account_type="SIPP", **fields)
