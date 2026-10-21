@@ -25,9 +25,11 @@ from .v2_ledger_core import effective_entries, replay
 
 ZERO = Decimal("0")
 REQUIRED_HISTORY = 9
+# The v2 rules (pounds) and v3 (the same rules for dollar/euro accounts).
+RULE_VERSIONS = (VERSION, "nine_sig.v3.0.0")
 LABELS = {
-    "growth": "LQQ3 growth (GBP)",
-    "safe": "ERNS defensive (GBP)",
+    "growth": "Growth fund",
+    "safe": "Defensive fund",
     "TQQQ": "TQQQ reference (USD)",
     "SPY": "SPY 30 Down reference (USD)",
 }
@@ -43,8 +45,8 @@ def _quality_rows(strategy, as_of):
     """Persisted observation audit, not claim that raw units were verified."""
     rows = []
     for key, symbol, currency in (
-        ("growth", strategy.equity_symbol, "GBP"),
-        ("safe", strategy.safe_symbol, "GBP"),
+        ("growth", strategy.equity_symbol, strategy.account.currency),
+        ("safe", strategy.safe_symbol, strategy.account.currency),
         ("TQQQ", "TQQQ", "USD"),
         ("SPY", "SPY", "USD"),
     ):
@@ -60,7 +62,8 @@ def _quality_rows(strategy, as_of):
             observation.price > ZERO and not held
         )
         rows.append({
-            "role": LABELS[key], "symbol": symbol,
+            "role": ("%s (%s)" % (LABELS[key], currency) if key in ("growth", "safe") else LABELS[key]),
+            "symbol": symbol,
             "observation": observation, "expected_currency": currency,
             "held": held, "date_ok": valid,
             "status": (
@@ -102,13 +105,21 @@ def _spy_reference(as_of):
 
 def _trace(strategy, as_of):
     """Reconstruct dated arithmetic only; never reissue proposal quantities."""
-    if strategy.strategy_version != VERSION or strategy.mapping_version != MAPPING_VERSION:
+    if strategy.strategy_version not in RULE_VERSIONS or strategy.mapping_version != MAPPING_VERSION:
         return None, "Pinned strategy or mapping version does not match the released version."
     if strategy.preset.slug != "nasdaq-quarterly-target":
         return None, "No released 9Sig calculation for this strategy."
-    if (strategy.account.currency != "GBP" or
-            strategy.equity_symbol != "LQQ3.L" or strategy.safe_symbol != "ERNS.L"):
-        return None, "Unmapped or non-GBP strategy holdings."
+    from .instrument_mapping import for_strategy
+    from .strategies.instruments import role_symbols
+    pinned = role_symbols(strategy)
+    if strategy.strategy_version == VERSION:
+        expected = strategy.account.currency == "GBP" and (
+            strategy.equity_symbol, strategy.safe_symbol) == ("LQQ3.L", "ERNS.L")
+    else:
+        expected = (pinned.get("growth"), pinned.get("safe")) == (
+            strategy.equity_symbol, strategy.safe_symbol) and for_strategy(strategy) is not None
+    if not expected:
+        return None, "Unmapped strategy holdings or account currency."
     prior_resets = strategy.signals.filter(
         as_of__lt=as_of, reset_reason__gt=""
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"))
@@ -137,13 +148,13 @@ def _trace(strategy, as_of):
                 strategy=strategy, signal=baseline.reset_signal,
                 baseline=baseline).exists():
             return None, "Reset baseline lacks a linked owner-confirmed execution."
-        if (baseline.strategy_version != VERSION or
+        if (baseline.strategy_version not in RULE_VERSIONS or
                 baseline.mapping_version != MAPPING_VERSION or
                 not baseline.quote_evidence):
             return None, "Reset basis is missing pinned versions or original price evidence."
         anchor = baseline.as_of
         starting = baseline.equity_value
-        label = "Owner-confirmed reset (recorded GBP equity basis)"
+        label = "Owner-confirmed reset (recorded %s equity basis)" % strategy.account.currency
     else:
         first = next((e for e in events if e.kind == "BUY" and
                       e.symbol == strategy.equity_symbol), None)

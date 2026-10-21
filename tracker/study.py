@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from .models import StudyPrice
 from .strategies.nine_sig.v2 import _floor_qty, advice_for_holdings, quarter_number
+from .strategies.nine_sig.v3 import advice_for_holdings as v3_advice
 
 TIMEFRAMES = (("1w", "1 week", 7), ("1m", "1 month", 30), ("ytd", "YTD", None),
               ("1y", "1 year", 365), ("5y", "5 years", 1826), ("10y", "10 years", 3652),
@@ -45,10 +46,25 @@ class StudyData:
     spy_usd: list = field(default_factory=list)    # (date, USD close), for 30 Down
     growth_real_from: date | None = None
     safe_real_from: date | None = None
+    lines: "Lines | None" = None  # which funds and currency this data is for
 
     @property
     def ready(self):
         return len(self.days) > 1
+
+
+@dataclass(frozen=True)
+class Lines:
+    """One account currency's 9Sig funds for the study."""
+    currency: str = "GBP"
+    growth: str = "LQQ3.L"
+    safe: str = "ERNS.L"
+    growth_name: str = "LQQ3"
+    safe_name: str = "ERNS"
+    rules: str = "v2"  # the pinned rule version for accounts in this currency
+
+
+GBP_LINES = Lines()
 
 
 def _series(symbol):
@@ -56,11 +72,14 @@ def _series(symbol):
             for r in StudyPrice.objects.filter(symbol=symbol).only("as_of", "close", "adj_close")}
 
 
-def load_data():
-    """Build the daily GBP series on US trading days that have a GBP/USD rate."""
+def load_data(lines=GBP_LINES):
+    """Build the daily series in the account currency on US trading days that have a rate."""
     qqq, spy, vti = _series("QQQ"), _series("SPY"), _series("VTI")
-    fx, lqq3, erns = _series("GBPUSD=X"), _series("LQQ3.L"), _series("ERNS.L")
-    data = StudyData()
+    lqq3, erns = _series(lines.growth), _series(lines.safe)
+    # US dollars per unit of account currency (1 for a dollar account).
+    fx = ({day: (1.0, 1.0) for day in qqq} if lines.currency == "USD"
+          else _series("%sUSD=X" % lines.currency))
+    data = StudyData(lines=lines)
     if not qqq or not fx or not spy:
         return data
     fx_days = sorted(fx)
@@ -182,9 +201,11 @@ def _nine_sig(data, s, amount, monthly):
             qend = _quarter_end(day)
             review_q = quarter_number(qend)
             k = bisect_left(days, day + timedelta(days=1))
-            alerts = advice_for_holdings(
-                start_date=start_day, as_of=qend, currency="GBP",
-                equity_symbol="LQQ3.L", safe_symbol="ERNS.L",
+            lines = data.lines or GBP_LINES
+            rules = v3_advice if lines.rules == "v3" else advice_for_holdings
+            alerts = rules(
+                start_date=start_day, as_of=qend, currency=lines.currency,
+                equity_symbol=lines.growth, safe_symbol=lines.safe,
                 equity_qty=equity, equity_price=g, safe_qty=reserve, safe_price=sf,
                 cash=cash, starting_equity_cost=start_cost,
                 reference=data.reference[max(0, k - 200):k],
@@ -200,7 +221,7 @@ def _nine_sig(data, s, amount, monthly):
                     qty = D(action["quantity"])
                     if action["side"] == "HOLD":
                         skipped += 1
-                    elif action["symbol"] == "LQQ3.L":
+                    elif action["symbol"] == lines.growth:
                         qty = min(qty, equity) if action["side"] == "SELL" else qty
                         equity += qty if action["side"] == "BUY" else -qty
                         cash += (-qty if action["side"] == "BUY" else qty) * g
@@ -292,12 +313,14 @@ def run(data, key, amount, monthly):
 
 
 def _simulated_notes(data, start):
+    lines = data.lines or GBP_LINES
     notes = []
     if data.growth_real_from is None or start < data.growth_real_from:
         notes.append("Before %s, the growth fund is rebuilt from 3x QQQ's daily return less %.2f%% a year." % (
-            _day(data.growth_real_from, "LQQ3 data"), GROWTH_CHARGE * 100))
+            _day(data.growth_real_from, lines.growth_name + " data"), GROWTH_CHARGE * 100))
     if data.safe_real_from is None or start < data.safe_real_from:
-        notes.append("Before %s, the safe sleeve is cash at 0%%." % _day(data.safe_real_from, "ERNS data"))
+        notes.append("Before %s, the safe sleeve is cash at 0%%." % _day(
+            data.safe_real_from, lines.safe_name + " data"))
     return notes
 
 
@@ -306,14 +329,43 @@ def _day(day, default):
 
 
 def how_it_works(data):
+    lines = data.lines or GBP_LINES
+    money = {"GBP": "pounds", "USD": "US dollars", "EUR": "euros"}[lines.currency]
     return (
-        "9Sig starts 60% growth (LQQ3) / 40% safe (ERNS) and runs the live quarterly rule at each "
+        ("9Sig starts 60%% growth (%s) / 40%% safe (%s) and runs the live quarterly rule at each " % (
+            lines.growth_name, lines.safe_name)) +
         "quarter end: the 9% signal line, half of new money, the large-buy throttle, 30 Down (from SPY), "
         "the 100%-up reset and 60/40 resets.",
         "Monthly top-ups arrive on the first trading day of each month. In 9Sig they wait as cash for "
         "the next quarterly review; in the others they're invested that day.",
-        "All values are in pounds. SPY, VTI and QQQ are converted with daily GBP/USD rates and include "
-        "reinvested dividends. Trades fill at that day's close with no dealing costs or tax.",
+        ("All values are in %s. SPY, VTI and QQQ include reinvested dividends%s. Trades fill at that "
+         "day's close with no dealing costs or tax." % (
+             money, "" if lines.currency == "USD" else
+             " and are converted with daily %s/USD rates" % lines.currency)),
         "Rebuilt history is an estimate: real leveraged funds also pay borrowing and swap costs, so early "
         "periods may look better than reality. Buy & hold puts everything, and every top-up, into the growth fund.",
     )
+
+
+class NineSigStudy:
+    """The 9Sig study for a non-pound account currency (pounds use this module)."""
+    TIMEFRAMES = TIMEFRAMES
+    SERIES = SERIES
+    PRIMARY = PRIMARY
+    TITLE = TITLE
+    GROWTH_CHARGE = GROWTH_CHARGE
+
+    def __init__(self, lines):
+        self.lines = lines
+        self.CURRENCY = lines.currency
+        self.NEEDS = "QQQ, SPY, VTI, %s%s and %s" % (
+            "" if lines.currency == "USD" else "%s/USD, " % lines.currency, lines.growth_name, lines.safe_name)
+
+    def load_data(self):
+        return load_data(self.lines)
+
+    def run(self, data, key, amount, monthly):
+        return run(data, key, amount, monthly)
+
+    def how_it_works(self, data):
+        return how_it_works(data)

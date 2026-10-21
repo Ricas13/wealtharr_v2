@@ -72,7 +72,7 @@ def go_live(strategy, user, started_on=None):
             raise ValidationError("This strategy's account doesn't match a supported mapping.")
         try:
             manifest = onboarding_manifest(key, strategy.account.broker, strategy.account.kind)
-            version = released_version(key)
+            version = released_version(key, strategy.account.currency)
         except MappingNotAvailable as exc:
             raise ValidationError(f"Can't go live: {exc}")
         # Never repin a strategy already pinned to different rules or lines.

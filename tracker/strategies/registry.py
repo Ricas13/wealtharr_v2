@@ -13,6 +13,7 @@ from tracker.strategies.golden_butterfly.v1 import (
     VERSION as GOLDEN_BUTTERFLY_VERSION, WEIGHTS as GOLDEN_BUTTERFLY_WEIGHTS,
 )
 from tracker.strategies.nine_sig.v2 import VERSION as NINE_SIG_VERSION
+from tracker.strategies.nine_sig.v3 import VERSION as NINE_SIG_V3_VERSION
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,16 @@ class StrategyDescription:
     caution: str
     release_label: str = ""
     version_history: tuple[str, ...] = ()
+    # Rule version for new instances per account currency, where it differs
+    # from ``version`` (the pound-account version): ((currency, version), ...).
+    versions_by_currency: tuple[tuple[str, str], ...] = ()
+
+    def version_for(self, currency="GBP"):
+        return dict(self.versions_by_currency).get(currency, self.version)
+
+    def accepts(self, version):
+        """A released rule version an instance may be pinned to."""
+        return version == self.version or version in dict(self.versions_by_currency).values()
 
 
 _RELEASED = {
@@ -54,7 +65,9 @@ _RELEASED = {
         caution=("LQQ3 is not TQQQ, and ERNS is not AGG. Real-quarter workbook "
                  "parity and personal Trading 212 ISA permissions remain unverified."),
         release_label="nine-sig@2",
+        versions_by_currency=(("USD", NINE_SIG_V3_VERSION), ("EUR", NINE_SIG_V3_VERSION)),
         version_history=(
+            "nine-sig@3 (nine_sig.v3.0.0): the v2 rules unchanged, for dollar and euro accounts.",
             "nine-sig@2 (nine_sig.v2.0.0): all-in shortage, SPY 30 Down kept, "
             "TQQQ drawdown information only, no sell-half.",
             "nine-sig@1 (nine_sig.v1.0.0): frozen original with shortage reset/HOLD.",

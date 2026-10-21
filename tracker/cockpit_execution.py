@@ -117,7 +117,7 @@ def _check_current(locked, signal, *, allow_late=False):
         from .strategies.registry import describe_strategy
         from .instrument_mapping import MAPPING_VERSION
         described = describe_strategy(locked.preset.slug)
-        if (not described or locked.strategy_version != described.version or
+        if (not described or not described.accepts(locked.strategy_version) or
                 locked.mapping_version != MAPPING_VERSION):
             raise ValidationError("Pinned strategy or instrument version differs from installed rules.")
 

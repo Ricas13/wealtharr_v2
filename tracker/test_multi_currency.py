@@ -27,8 +27,8 @@ class CatalogueByCurrencyTests(TestCase):
         manifest = catalogue.onboarding_manifest("golden-butterfly", "FIDELITY", "BROKERAGE")
         self.assertEqual((manifest["country"], manifest["currency"]), ("US", "USD"))
         self.assertEqual(manifest["roles"]["scv"]["raw_to_account_factor"], "1")
-        # No evidence that Trade Republic carries every All Weather line yet: not offered.
-        self.assertFalse(catalogue.selection_available("all-weather", "TRADE_REPUBLIC", "DEPOT"))
+        for key in ("all-weather", "golden-butterfly", "dual-momentum"):
+            self.assertTrue(catalogue.selection_available(key, "TRADE_REPUBLIC", "DEPOT"), key)
         # A pound manifest keeps its original shape (no currency key).
         self.assertNotIn("currency", catalogue.onboarding_manifest("all-weather", "TRADING212", "ISA"))
         # Accounts types belong to their broker.

@@ -179,7 +179,7 @@ def _enroll(owner, state):
             owner=owner, account=account, preset=preset, name=name,
             strategy_key=strategy, platform_code=platform,
             account_type_code=account_type, started_on=start,
-            strategy_version=released_version(strategy),
+            strategy_version=released_version(strategy, broker.currency),
             mapping_version=CATALOGUE_VERSION, resolved_instruments=manifest,
             # Legacy two-column fields; every role lives in resolved_instruments.
             equity_symbol=lines[0].ticker,

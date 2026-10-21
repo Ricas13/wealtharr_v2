@@ -62,7 +62,7 @@ def _readiness(strategy, report):
         from .strategies.registry import describe_strategy
         from .instrument_mapping import MAPPING_VERSION
         desc = describe_strategy(strategy.preset.slug)
-        if (desc is None or strategy.strategy_version != desc.version
+        if (desc is None or not desc.accepts(strategy.strategy_version)
                 or strategy.mapping_version != MAPPING_VERSION):
             return False, "The pinned strategy or mapping version has changed.", marks
     return True, "", marks

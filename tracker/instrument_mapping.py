@@ -233,7 +233,8 @@ def for_strategy(strategy):
     if getattr(strategy, "tracking_only", False):
         return None
     key = getattr(strategy, "strategy_key", "") or strategy.preset.slug
-    if key != STRATEGY_9SIG:
+    # 9Sig outside pound accounts pins a catalogue manifest like any strategy.
+    if key != STRATEGY_9SIG or strategy.account.broker != "TRADING212":
         return _catalogue_profile(strategy, key)
     try:
         profile = resolve_instruments(

@@ -49,7 +49,8 @@ def count_skipped_equity_sells(quarterly_signals):
     )
 
 
-def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest):
+def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest,
+                             version=NINE_SIG_RULE_VERSION):
     """Possible mid-quarter 100%-up rule, using verified daily US closes.
 
     Exact Kelly spike reference is last executed quarterly rebalance price,
@@ -110,13 +111,25 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest)
         defaults={"kind": "SPIKE_WATCH",
                   "title": "9Sig 100%-up spike: manual reset review",
                   "message": message, "as_of": crossed.as_of, "actions": [],
-                  "strategy_version": NINE_SIG_RULE_VERSION})
+                  "strategy_version": version})
     if created:
         route_notice(strategy.owner, "urgent",
                      "signal:%s:%s" % (strategy.pk, key),
                      "Wealtharr — " + signal.title,
                      strategy.name + "\n" + message + "\nNo orders placed.",
                      sender=dispatch, strategy=strategy)
+
+
+def _rules_for(strategy):
+    """The pinned rule module: v2 for pound accounts, v3 for dollar/euro ones."""
+    from .strategies.nine_sig import v2, v3
+    version = strategy.strategy_version or NINE_SIG_RULE_VERSION
+    rules = {v2.VERSION: v2, v3.VERSION: v3}.get(version)
+    if rules is v2 and strategy.account.currency != "GBP":
+        return None
+    if rules is v3 and strategy.account.currency not in v3.CURRENCIES:
+        return None
+    return rules
 
 
 def review_strategy(strategy):
@@ -126,13 +139,13 @@ def review_strategy(strategy):
     if strategy.preset.slug != "nasdaq-quarterly-target":
         return {"status": "unsupported"}
     # Never run v2 against an old pinned v1 owner portfolio implicitly.
-    if strategy.strategy_version and strategy.strategy_version != NINE_SIG_RULE_VERSION:
+    rules = _rules_for(strategy)
+    if rules is None:
         return {"status": "cannot_compute", "reason": "Pinned 9Sig rule version differs; owner review required"}
+    currency = strategy.account.currency
     if (not TICKER.fullmatch(strategy.equity_symbol) or
             not TICKER.fullmatch(strategy.safe_symbol)):
         return {"status": "invalid symbol"}
-    if strategy.account.currency != "GBP":
-        return {"status": "unsupported account currency"}
     # The live adapter must enforce the exact pinned UK trading lines just
     # as the pure evaluator, cockpit and single-fill path already do.
     from .instrument_mapping import for_strategy
@@ -156,7 +169,7 @@ def review_strategy(strategy):
     # quarter's signal. A failed Yahoo lookup cannot invent a new valuation.
     for symbol in (strategy.equity_symbol, strategy.safe_symbol):
         close = data.get(symbol)
-        if close and close.currency == "GBP" and close.as_of >= now - timedelta(days=8):
+        if close and close.currency == currency and close.as_of >= now - timedelta(days=8):
             previous = PriceMark.objects.filter(strategy=strategy, symbol=symbol).first()
             if not previous or previous.as_of <= close.as_of:
                 PriceMark.objects.update_or_create(
@@ -185,11 +198,11 @@ def review_strategy(strategy):
         return {"status": "manual reset must be confirmed as a new strategy baseline"}
     _alert_intraperiod_spike(
         strategy, now=now, first_buy=first_buy, baseline=baseline,
-        tqqq_latest=data.get("TQQQ"))
+        tqqq_latest=data.get("TQQQ"), version=rules.VERSION)
     closing = {symbol: settlement_close(symbol, quarter_end) for symbol in tickers}
     if (any(x is None for x in closing.values()) or
-            closing[strategy.equity_symbol].currency != "GBP" or
-            closing[strategy.safe_symbol].currency != "GBP" or
+            closing[strategy.equity_symbol].currency != currency or
+            closing[strategy.safe_symbol].currency != currency or
             closing["TQQQ"].currency != "USD" or closing["SPY"].currency != "USD"):
         return {"status": "incomplete or currency-mismatched quarter-end prices"}
     # Replay only actual fills dated by the quarterly settlement.
@@ -232,7 +245,7 @@ def review_strategy(strategy):
     # Separate from USD TQQQ: use only persisted normalized GBP observations
     # of the owner's actual growth trading line for information-only drawdown.
     growth_history = list(MarketObservation.objects.filter(
-        symbol=strategy.equity_symbol, currency="GBP", as_of__lte=quarter_end,
+        symbol=strategy.equity_symbol, currency=currency, as_of__lte=quarter_end,
     ).order_by("as_of").values_list("as_of", "price"))
     # The 30 Down clock starts with a detected 30 Down notice, not
     # with a period of no sales. Previous unrelated HOLDs do not count.
@@ -279,9 +292,9 @@ def review_strategy(strategy):
         ZERO)
     if initial_equity_cost <= ZERO:
         return {"status": "missing initial equity investment"}
-    alerts = advice_for_holdings(
+    alerts = rules.advice_for_holdings(
         start_date=start_date, as_of=quarter_end,
-        currency=strategy.account.currency,
+        currency=currency,
         equity_symbol=strategy.equity_symbol,
         safe_symbol=strategy.safe_symbol,
         equity_qty=stock_qty, equity_price=closing[strategy.equity_symbol].price,
@@ -333,13 +346,14 @@ def review_strategy(strategy):
             defaults={"kind": alert["kind"], "title": alert["title"],
                       "message": alert["message"], "actions": alert["actions"],
                       "reset_reason": alert.get("reset_reason", ""),
-                      "strategy_version": NINE_SIG_RULE_VERSION,
+                      "strategy_version": rules.VERSION,
                       "as_of": quarter_end})
         if new:
             created += 1
+            from .money import symbol_for
             details = "\n".join(
-                "%s %s shares %s (estimated £%s)" %
-                (a["side"], a["quantity"], a["symbol"], a["estimated_gbp"])
+                "%s %s shares %s (estimated %s%s)" %
+                (a["side"], a["quantity"], a["symbol"], symbol_for(currency), a["estimated_gbp"])
                 for a in alert["actions"])
             # No-action quarterly reviews remain in history without
             # triggering rebalance alerts or cluttering the Overview.
