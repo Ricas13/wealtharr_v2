@@ -1,0 +1,34 @@
+{% extends "public/base.html" %}
+{% block title %}Privacy | Wealtharr{% endblock %}
+{% block description %}What Wealtharr's public site collects (only an email if you ask for an invite), why, how long it's kept and how to have it deleted.{% endblock %}
+{% block og_title %}Wealtharr privacy notice{% endblock %}
+{% block og_description %}The public site collects only an email address, and only if you ask for an invite.{% endblock %}
+{% block content %}
+<div class="wrap">
+  <section class="article">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> › <span aria-current="page">Privacy</span></nav>
+    <h1>Privacy</h1>
+    <p class="lead">The public site collects one thing, and only if you choose to: your email address when you ask for an invite.</p>
+
+    <h2>What we collect and why</h2>
+    <ul>
+      <li><strong>Your email address</strong>, if you submit the invite form. It's used for one thing: to send you an invite link when there's a place. It's never sold, shared for marketing or added to a newsletter.</li>
+      <li><strong>A spam check.</strong> The invite form uses Cloudflare Turnstile to tell people from bots. Cloudflare processes technical details such as your IP address to do that, under its own privacy policy.</li>
+      <li><strong>A security cookie.</strong> The form sets a small cookie that protects it from forged submissions. It's strictly necessary, holds nothing about you, and there are no advertising or analytics cookies.</li>
+    </ul>
+
+    <h2>How long it's kept</h2>
+    <p>Your email is kept only while it's needed to send your invite, and is deleted whenever you ask.</p>
+
+    <h2>Your rights</h2>
+    <p>You can ask what we hold about you, ask for it to be corrected, or ask for it to be deleted at any time.
+      {% if contact_email %}Write to <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% else %}Reply to any email you've had from Wealtharr.{% endif %}
+      If you're unhappy with how your data is handled, you can complain to the UK Information Commissioner's Office (ico.org.uk).</p>
+
+    <h2>The private app</h2>
+    <p>Signed-in accounts are created by hand for invited people. What you record there (deposits, trades and alert settings) is visible only to your own account, is used only to run your strategy and alerts, and never leaves Wealtharr except as the alerts you set up yourself. Wealtharr never connects to a broker.</p>
+
+    <p class="mut tiny">Last updated 21 October 2026.</p>
+  </section>
+</div>
+{% endblock %}

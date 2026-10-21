@@ -133,3 +133,23 @@ class InviteTests(TestCase):
         from django.test import Client
         client = Client(enforce_csrf_checks=True)
         self.assertEqual(client.post("/invite/", {"email": "friend@example.com"}).status_code, 403)
+
+
+class FooterAndPrivacyTests(TestCase):
+    def test_footer_on_public_pages_and_privacy_notice(self):
+        for path in ("/", "/guides/"):
+            page = self.client.get(path)
+            for text in ("Works with", "Fidelity", "Trade Republic", "The small print",
+                         "not affiliated", "No broker connection", 'href="/privacy/"'):
+                self.assertContains(page, text, msg_prefix=path)
+        home = self.client.get("/")
+        self.assertNotContains(home, "Leveraged ISA rebalancing")
+        self.assertNotContains(home, "A quarterly growth-target plan for a UK ISA is available now")
+        privacy = self.client.get("/privacy/")
+        self.assertEqual(privacy.status_code, 200)
+        self.assertContains(privacy, "your email address when you ask for an invite")
+        self.assertContains(privacy, "Reply to any email")
+        self.assertNotIn("noindex", privacy.get("X-Robots-Tag", ""))
+        self.assertContains(self.client.get("/sitemap.xml"), "/privacy/")
+        with override_settings(CONTACT_EMAIL="owner@example.invalid"):
+            self.assertContains(self.client.get("/privacy/"), "mailto:owner@example.invalid")

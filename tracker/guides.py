@@ -104,3 +104,10 @@ def guide(request, slug):
         "guide": item, "related": others[:3],
         "body_template": "public/guides/%s.html" % slug,
     })
+
+
+@require_GET
+def privacy(request):
+    """Plain privacy notice for the public site (the invite form collects an email)."""
+    from django.conf import settings
+    return render(request, "public/privacy.html", {"contact_email": settings.CONTACT_EMAIL})
