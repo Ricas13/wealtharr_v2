@@ -1,8 +1,9 @@
 """All Weather (UK) v1: pure yearly-rebalance rules."""
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal as D
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 
 from tracker.strategies.all_weather.v1 import Fund, Quote, WEIGHTS, evaluate
 
@@ -85,3 +86,91 @@ class AllWeatherRulesTests(SimpleTestCase):
                           quotes=quotes(stocks="1000"), as_of=YEAR_END)
         sell = next(t for t in result.trades if t.side == "SELL")
         self.assertLessEqual(sell.quantity, positions["S.L"])
+
+
+class AllWeatherEndToEndTests(TestCase):
+    """Setup, go live, opening buys, a yearly review, the alert, fills and finish."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from tracker.models import NotificationPreference
+        self.owner = get_user_model().objects.create_user("aw-owner", password="a-long-test-password-1")
+        NotificationPreference.objects.create(owner=self.owner, email_enabled=True,
+                                              destination_email="o@example.invalid",
+                                              discord_enabled=False, monthly_reminders=False)
+        self.client.force_login(self.owner)
+        self.today = timezone.localdate()
+        self.year_end = date(self.today.year - 1, 12, 31)
+        self.recent = self.today - timedelta(days=1)
+        if self.recent <= self.year_end + timedelta(days=2):
+            self.skipTest("Needs a few days after the year end for fills and a later close.")
+
+    def observe(self, day, prices):
+        from tracker.models import MarketObservation
+        for symbol, price in prices.items():
+            MarketObservation.objects.update_or_create(
+                symbol=symbol, as_of=day, defaults={"price": D(price), "currency": "GBP"})
+
+    def latest(self, symbol, **kwargs):
+        from tracker.models import MarketObservation
+        return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
+
+    def test_full_year_loop(self):
+        from unittest.mock import patch
+        from uuid import uuid4
+        from django.core.management import call_command
+        from django.urls import reverse
+        from tracker.models import RebalanceExecution, StrategyInstance, StrategySignal
+        from tracker.review_autofinish import auto_finish_reviews
+        from tracker.strategies.instruments import symbols
+        start = self.year_end - timedelta(days=180)
+        self.assertContains(self.client.get(reverse("v2_add_strategy")), "All Weather (UK)")
+        self.client.post(reverse("v2_add_strategy"), {
+            "strategy": "all-weather", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "mode": "fresh", "name": "AW", "start": start.isoformat(), "amount": "10000",
+            "deposited": "yes", "go_live": "yes"})
+        strategy = StrategyInstance.objects.get(owner=self.owner)
+        self.assertFalse(strategy.tracking_only)
+        self.assertEqual(symbols(strategy), ("VUAG.L", "GLTL.L", "IGLT.L", "SGLN.L", "CMOP.L"))
+        page = self.client.get(reverse("v2_instance_page", args=[strategy.pk, "strategy"]))
+        self.assertContains(page, "not affiliated with Bridgewater")
+        # Opening buys at the weights (prices in pounds).
+        buy = {"VUAG.L": ("30", "100"), "GLTL.L": ("125", "32"), "IGLT.L": ("150", "10"),
+               "SGLN.L": ("12.5", "60"), "CMOP.L": ("30", "25")}
+        add = reverse("v2_ledger_add", args=[strategy.pk])
+        for symbol, (qty, price) in buy.items():
+            self.client.post(add, {"intent": "save", "kind": "BUY", "symbol": symbol, "quantity": qty,
+                                   "unit_price": price, "fee": "0", "occurred_on": start.isoformat()})
+        self.assertEqual(strategy.ledger.filter(kind="BUY").count(), 5)
+        # US shares rallied by year end.
+        closes = {"VUAG.L": "150", "GLTL.L": "32", "IGLT.L": "10", "SGLN.L": "60", "CMOP.L": "25"}
+        self.observe(self.year_end, closes)
+        self.observe(self.recent, closes)
+        with patch("tracker.market_data.sync_ticker", side_effect=self.latest), \
+                patch("tracker.management.commands.sync_market_and_signals.sync_ticker"):
+            call_command("sync_market_and_signals", verbosity=0)
+        signal = StrategySignal.objects.get(strategy=strategy)
+        self.assertEqual(signal.as_of, self.year_end)
+        sides = {a["symbol"]: a["side"] for a in signal.actions}
+        self.assertEqual(sides["VUAG.L"], "SELL")
+        self.assertEqual(sides["GLTL.L"], "BUY")
+        self.assertContains(self.client.get(reverse("v2_instance_page", args=[strategy.pk, "today"])), "I did this")
+        from tracker.cockpit_notifications import send_due_cockpit_notices
+        with patch("tracker.services._send_message"):
+            self.assertEqual(send_due_cockpit_notices(today=self.today), 1)
+        review = reverse("v2_guided_review", args=[strategy.pk, signal.pk])
+        for index, action in enumerate(signal.actions):
+            response = self.client.post(review, {
+                "intent": "record_one", "action_index": str(index),
+                "executed_on": (self.year_end + timedelta(days=2)).isoformat(),
+                "quantity": action["quantity"], "unit_price": closes[action["symbol"]], "fee": "0",
+                "idempotency_key": str(uuid4()), "actual_confirmation": "yes"})
+            self.assertEqual(response.status_code, 302,
+                             response.context and response.context.get("review_error"))
+        self.assertEqual(auto_finish_reviews(), 1)
+        self.assertTrue(RebalanceExecution.objects.filter(signal=signal).exists())
+        # One review per year: running again adds nothing.
+        with patch("tracker.market_data.sync_ticker", side_effect=self.latest), \
+                patch("tracker.management.commands.sync_market_and_signals.sync_ticker"):
+            call_command("sync_market_and_signals", verbosity=0)
+        self.assertEqual(StrategySignal.objects.filter(strategy=strategy).count(), 1)

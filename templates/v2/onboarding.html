@@ -30,7 +30,7 @@
     <div class="w2-table-wrap"><table class="w2-table">
       <thead><tr><th>Role</th><th>Target</th><th>Fund</th><th>Ticker</th><th>Evidence</th></tr></thead>
       <tbody>{% for line in wizard_lines %}
-        <tr><td>{{ line.role_label }}</td><td>{{ line.weight_pct|floatformat:0 }}%</td>
+        <tr><td>{{ line.role_label }}</td><td>{{ line.weight_pct|floatformat:"-1" }}%</td>
           <td class="w2-wrap">{{ line.name }} <small class="w2-muted">{{ line.isin }}</small></td>
           <td>{{ line.ticker }}</td>
           <td><a href="{{ line.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer ↗</a> <a href="{{ line.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">Trading 212 ↗</a></td></tr>

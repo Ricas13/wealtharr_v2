@@ -23,6 +23,8 @@ class StrategyModule:
     # Optional extra dashboard cards: template path and (instance, report, next_end) -> context.
     dashboard_template: str = ""
     dashboard_context: Callable | None = None
+    # How often reviews happen, as a word for headings: "quarterly", "yearly".
+    cadence_word: str = "quarterly"
     # Label for the allocation card's comparison column.
     allocation_label: str = "Target"
     # Whether reviews can carry a reset that sets a new baseline (owner must finish those).

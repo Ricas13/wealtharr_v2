@@ -13,7 +13,8 @@ class FillForm(forms.Form):
 
 class SingleSignalFillForm(forms.Form):
     """One historical execution; selection is only from server-pinned advice."""
-    action_index = forms.IntegerField(min_value=0, max_value=3,
+    # The server checks the index against the review; this is just a sane bound.
+    action_index = forms.IntegerField(min_value=0, max_value=19,
                                       widget=forms.HiddenInput())
     executed_on = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date", "class": "field"}))

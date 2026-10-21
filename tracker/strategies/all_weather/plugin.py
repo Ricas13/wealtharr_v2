@@ -69,4 +69,5 @@ ALL_WEATHER = StrategyModule(
     next_review=year_end_on_or_after,
     last_review_before=year_end_before,
     allocation_label="Target",
+    cadence_word="yearly",
 )
