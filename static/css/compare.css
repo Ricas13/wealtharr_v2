@@ -1,0 +1,35 @@
+/* Hypothetical strategy comparison inside the app (Add strategy). Scoped to .cmp
+   so it never touches other v2 pages; the homepage has the same rules in home.css. */
+.cmp-summary{cursor:pointer;list-style-position:inside}
+.cmp .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cmp .row.between{justify-content:space-between}
+.cmp .mut{color:var(--w2-subtle)}.cmp .pos{color:var(--w2-positive)}.cmp .neg{color:var(--w2-negative)}
+.cmp .tiny{font-size:11px}.cmp .flush{margin:0}.cmp .gap-top{margin-top:14px}
+.cmp .seg{display:inline-flex;border:1px solid var(--w2-stroke);border-radius:7px;overflow:hidden}
+.cmp .seg button{background:none;border:0;color:var(--w2-muted);font:inherit;font-size:12px;padding:5px 11px;cursor:pointer}
+.cmp .seg button.on{background:#1f2631;color:#fff}
+.cmp table{width:100%;border-collapse:collapse;font-size:12.5px}
+.cmp thead th{font-weight:500;color:var(--w2-subtle);text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:7px 8px;border-bottom:1px solid var(--w2-stroke-soft);white-space:nowrap}
+.cmp tbody th{font-weight:600;text-align:left}
+.cmp tbody td,.cmp tbody th{padding:8px;border-bottom:1px solid var(--w2-stroke-soft);white-space:nowrap}
+.cmp tbody tr{cursor:pointer}
+.cmp tbody tr:hover>*{background:#141921}
+.cmp tr.off>*{opacity:.45}
+.cmp .r{text-align:right!important}
+.cmp .tw{overflow-x:auto}
+.cmp .sw{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px}
+.cmp .ctrl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:14px}
+.cmp .ctrl label,.cmp .ctrl-out{display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--w2-muted);margin:0}
+.cmp .ctrl strong{color:#fff;font-size:15px}
+.cmp input[type=range]{accent-color:var(--w2-primary);width:100%}
+.cmp input[type=checkbox]{accent-color:var(--w2-primary);width:15px;height:15px;margin:0;vertical-align:middle;cursor:pointer}
+.cmp .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--w2-muted)}
+.cmp .chart{position:relative;margin-top:8px}
+.cmp .chart svg{width:100%;height:300px;display:block}
+.cmp .chart line{stroke:#1c222a;vector-effect:non-scaling-stroke}
+.cmp .chart polyline{fill:none;stroke-width:2;vector-effect:non-scaling-stroke}
+.cmp .chart polyline.putin{stroke:#6b7480;stroke-width:1.5;stroke-dasharray:3 3}
+.cmp .yl{position:absolute;top:0;right:0;bottom:0;display:flex;flex-direction:column;justify-content:space-between;font-size:10.5px;color:#7d8692;text-align:right;pointer-events:none}
+.cmp .axis{display:flex;justify-content:space-between;color:#7d8692;font-size:10.5px;margin-top:4px}
+.cmp [data-compare].loading [data-filled]{opacity:.6;transition:opacity .2s}
+@media (max-width:900px){.cmp .ctrl{grid-template-columns:1fr}.cmp .chart svg{height:220px}}

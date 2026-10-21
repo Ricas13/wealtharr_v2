@@ -1,0 +1,44 @@
+{# The hypothetical comparison card body; the page wraps it in an element with data-compare and loads js/compare.js. #}
+      <div class="ctrl">
+        <label>Start with <strong>£<span data-amount-text>{{ compare.amount }}</span></strong><input type="range" min="500" max="20000" step="500" value="{{ compare.amount }}" data-amount aria-label="Starting amount in pounds"></label>
+        <label>Add each month <strong>£<span data-monthly-text>{{ compare.monthly }}</span></strong><input type="range" min="0" max="1000" step="25" value="{{ compare.monthly }}" data-monthly aria-label="Monthly top-up in pounds"></label>
+        <p class="ctrl-out">You'd have put in <strong>£<span data-putin>{% if compare.ready %}{{ compare.put_in|floatformat:"0g" }}{% else %}—{% endif %}</span></strong><span class="mut">over <span data-range-words>{{ compare.range_words }}</span></span></p>
+      </div>
+
+      <p class="mut" data-empty{% if compare.ready %} hidden{% endif %}>Price history for this comparison is still downloading. Check back soon.</p>
+      <div data-filled{% if not compare.ready %} hidden{% endif %}>
+        <div class="tw"><table>
+          <thead><tr><th scope="col">Show</th><th scope="col">Strategy</th><th scope="col" class="r">Value now</th><th scope="col" class="r">Gain</th><th scope="col" class="r"><abbr title="Money-weighted yearly return (XIRR): counts when each top-up went in">Per year*</abbr></th><th scope="col" class="r">Worst fall</th><th scope="col">Effort</th></tr></thead>
+          <tbody data-rows>
+            {% for row in compare.rows %}<tr data-key="{{ row.key }}">
+              <td><input type="checkbox" checked aria-label="Show {{ row.label }}"></td>
+              <th scope="row"><span class="sw" style="background:{{ row.color }}"></span>{{ row.label }} <span class="mut">· {{ row.what }}</span></th>
+              <td class="r"><strong>£{{ row.final|floatformat:"0g" }}</strong></td>
+              <td class="r">{{ row.gain_pct|floatformat:1 }}%</td>
+              <td class="r">{% if row.annual is not None %}{{ row.annual|floatformat:1 }}%{% else %}—{% endif %}</td>
+              <td class="r neg">{{ row.drawdown|floatformat:1 }}%</td>
+              <td class="mut">{{ row.effort }}</td>
+            </tr>{% endfor %}
+          </tbody>
+        </table></div>
+
+        <div class="row between gap-top">
+          <div class="legend" data-legend></div>
+          <div class="seg" role="group" aria-label="Scale"><button type="button" class="on" aria-pressed="true" data-scale="lin">Linear</button><button type="button" aria-pressed="false" data-scale="log">Log</button></div>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 800 300" preserveAspectRatio="none" role="img" aria-label="Hypothetical value of the ticked strategies" data-chart>
+            <line x1="0" y1="75" x2="800" y2="75"></line><line x1="0" y1="150" x2="800" y2="150"></line><line x1="0" y1="225" x2="800" y2="225"></line>
+          </svg>
+          <div class="yl" aria-hidden="true"><span data-y="0"></span><span data-y="1"></span><span data-y="2"></span></div>
+        </div>
+        <div class="axis" aria-hidden="true" data-ticks>{% for t in compare.ticks %}<span>{{ t }}</span>{% endfor %}</div>
+      </div>
+      <p class="mut tiny gap-top"><strong>Hypothetical, not anyone's real results.</strong> Real daily prices from Yahoo, converted to pounds, replayed through each strategy's fixed rules with no dealing costs or tax.
+        Every row covers the same dates<span data-period-wrap{% if not compare.ready %} hidden{% endif %}> (<span data-period>{{ compare.period }}</span>)</span>, the same money and the same top-up days.
+        *Per year is money-weighted (XIRR), so it counts when each top-up went in; worst fall ignores top-ups.
+        The {{ signal_name|default:"quarterly signal" }}'s 60/40 resets are assumed confirmed and filled at the quarter close.
+        <span data-left-out{% if not compare.left_out %} hidden{% endif %}>Left out because their price history doesn't cover these dates: <span data-left-out-names>{{ compare.left_out|join:", " }}</span>.</span>
+        <span data-simulated{% if not compare.simulated %} hidden{% endif %}>Before the 3× Nasdaq fund launched, its history is rebuilt from 3× QQQ's daily moves, which can look better than reality.</span>
+        <span data-simulated-other{% if not compare.simulated_other %} hidden{% endif %}>Before some other funds launched, their history follows a similar older fund or index.</span>
+        Past performance doesn't guarantee future returns.</p>

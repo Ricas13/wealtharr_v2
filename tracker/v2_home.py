@@ -7,6 +7,7 @@ from datetime import timedelta
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
@@ -39,6 +40,9 @@ OTHER_LINES = {
     "permanent-portfolio": ("Four equal parts, banded", "shares, long bonds, cash, gold; 15–35% bands",
                             "Rarely", "#56b6c2"),
 }
+# Signed-in pages (Add strategy) may use the strategies' own names; the public
+# homepage keeps the generic ones above.
+REAL_NAMES = {"nine_sig": "9Sig", "hold": "Buy & hold 3× Nasdaq (LQQ3)"}
 POINTS = 160
 DAILY_INVITE_ALERTS = 10
 
@@ -59,10 +63,22 @@ def _inputs(params):
             frame if frame in FRAME_WORDS else "10y")
 
 
-def compare(amount, monthly, frame):
+def _label(key, generic, real_names):
+    """A row's label: generic on the public homepage, the strategy's own name when signed in."""
+    if not real_names:
+        return generic
+    if key in REAL_NAMES:
+        return REAL_NAMES[key]
+    from .strategies.registry import describe_strategy
+    description = describe_strategy(key)
+    return description.title if description else generic
+
+
+def compare(amount, monthly, frame, real_names=False):
     """Chart-ready hypothetical comparison, cached until the next download."""
     latest = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
-    key = "home-compare:%s:%s:%s:%s" % (latest.isoformat() if latest else "none", amount, monthly, frame)
+    key = "home-compare:%s:%s:%s:%s:%s" % (latest.isoformat() if latest else "none", amount, monthly, frame,
+                                         "real" if real_names else "generic")
     out = cache.get(key)
     if out is not None:
         return out
@@ -86,6 +102,7 @@ def compare(amount, monthly, frame):
             if not s:
                 continue
             label, what, effort, color = LINES[name]
+            label = _label(name, label, real_names)
             rows.append({
                 "key": name, "label": label, "what": what, "effort": effort, "color": color,
                 "final": round(s["final"], 2), "put_in": round(s["put_in"], 2),
@@ -94,7 +111,7 @@ def compare(amount, monthly, frame):
                 "drawdown": round(s["drawdown"], 2),
                 "points": [round(s["values"][i], 2) for i in index],
             })
-        simulated_other, left_out = _other_rows(rows, days, index, frame, amount, monthly)
+        simulated_other, left_out = _other_rows(rows, days, index, frame, amount, monthly, real_names)
         base = result["series"]["nine_sig"]
         first, last = days[0], days[-1]
         out.update({
@@ -116,7 +133,7 @@ def _day(day):
     return "%d %s" % (day.day, day.strftime("%b %Y"))
 
 
-def _other_rows(rows, days, index, frame, amount, monthly):
+def _other_rows(rows, days, index, frame, amount, monthly, real_names=False):
     """Add each other strategy's pound Study to the comparison, on the same dates.
 
     Returns (whether any of them used stand-in history before a fund existed,
@@ -127,6 +144,7 @@ def _other_rows(rows, days, index, frame, amount, monthly):
     from .strategies.registry import module_for_key
     simulated, left_out = False, []
     for key, (label, what, effort, color) in OTHER_LINES.items():
+        label = _label(key, label, real_names)
         plugin = module_for_key(key)
         study = plugin.study.get("GBP") if plugin and isinstance(plugin.study, dict) else None
         if study is None:
@@ -169,6 +187,13 @@ def landing(request):
 @require_GET
 def compare_json(request):
     return JsonResponse(compare(*_inputs(request.GET)))
+
+
+@login_required
+@require_GET
+def compare_named_json(request):
+    """The same comparison with the strategies' own names, for signed-in pages."""
+    return JsonResponse(compare(*_inputs(request.GET), real_names=True))
 
 
 class InviteForm(forms.Form):

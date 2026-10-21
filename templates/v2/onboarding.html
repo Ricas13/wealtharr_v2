@@ -1,3 +1,17 @@
+<details class="w2-panel w2-space-top cmp" open>
+  <summary class="cmp-summary"><span><strong>How each strategy did in the past</strong> <span class="w2-muted">· hypothetical, from the same history as each Study tab</span></span></summary>
+  <div class="row between gap-top">
+    <p class="mut flush">Tick the ones you want to see and try your own amounts. Figures are in pounds.</p>
+    <div class="seg" role="group" aria-label="Timeframe">
+      {% for key, label in compare_frames %}<button type="button" data-range="{{ key }}" aria-pressed="{% if key == compare.range %}true{% else %}false{% endif %}"{% if key == compare.range %} class="on"{% endif %}>{{ label }}</button>{% endfor %}
+    </div>
+  </div>
+  <div class="gap-top" data-compare data-compare-url="{% url 'v2_compare_json' %}">
+    {% include 'partials/compare_card.html' with signal_name='9Sig strategy' %}
+  </div>
+  {{ compare|json_script:"compare-data" }}
+</details>
+
 <section class="w2-panel w2-space-top w2-wizard" aria-labelledby="w2-wizard-title">
   <div class="w2-section-heading">
     <div><h2 id="w2-wizard-title">Add a strategy</h2>
