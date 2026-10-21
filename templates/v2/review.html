@@ -125,11 +125,11 @@
       {% if review_can_finalize %}
       <form method="post">{% csrf_token %}<input type="hidden" name="intent" value="finalize">
         <button class="w2-button w2-button-primary w2-full" type="submit">Verify and complete review</button></form>
-      <p class="w2-note">Needs a closing price after your last fill (usually the next weekday).</p>
+      <p class="w2-note">{% if review_signal.reset_reason %}Needs a closing price after your last fill, then your click.{% else %}Finishes by itself after the next closing prices; this button just does it sooner.{% endif %}</p>
       {% elif review_completed %}<p class="w2-muted">Done.</p>
       {% else %}
       <button class="w2-button w2-full" type="button" disabled>Verify and complete review</button>
-      <p class="w2-note">Unlocks when every line is recorded. Part fills are saved and you can come back.</p>
+      <p class="w2-note">Record every trade you made. Part fills are saved and you can come back.</p>
       {% endif %}
     </section>
     {% if review_is_current and not review_completed and not review_actual_fills %}

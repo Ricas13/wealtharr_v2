@@ -64,10 +64,10 @@
   {% if review_can_finalize %}
   <form method="post" class="w2-wizard-actions">
     {% csrf_token %}<input type="hidden" name="intent" value="finalize">
-    <p class="w2-muted">Finalization still requires GBP market observations strictly after the last actual fill. Reset evidence is immutable.</p>
+    <p class="w2-muted">{% if review_signal.reset_reason %}A reset review needs you to finish it once a closing price after your last fill is in.{% else %}Nothing more to do: this finishes by itself after the next closing prices. You can also finish it now if they're already in.{% endif %}</p>
     <button class="w2-button w2-button-primary" type="submit">Verify and complete review</button>
   </form>
   {% elif review_actual_fills and not review_completed %}
-  <p class="w2-notice">Partial fills are saved and the review can be resumed. Complete each actual proposed quantity before finalization; no simulated trades will be added.</p>
+  <p class="w2-notice">Partial fills are saved and the review can be resumed. Record each trade you actually made; once all are in, the review finishes by itself after the next closing prices.</p>
   {% endif %}
 </section>

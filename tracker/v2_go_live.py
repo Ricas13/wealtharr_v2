@@ -36,7 +36,8 @@ def setup_missing(strategy):
     """Live but never fully pinned: a linked legacy strategy that went live
     before go-live filled in the start date. The ledger can't record until
     the owner finishes setup."""
-    return not (strategy.strategy_key and strategy.started_on and strategy.resolved_instruments)
+    pinned = bool(strategy.strategy_key or strategy.strategy_version)
+    return pinned and not (strategy.strategy_key and strategy.started_on and strategy.resolved_instruments)
 
 
 def go_live(strategy, user):

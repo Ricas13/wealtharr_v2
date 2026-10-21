@@ -380,6 +380,9 @@ def edit_entry(request, instance_id, operation, entry_id=None):
     if entry_id is not None and old is None:
         raise Http404("Entry not found")
     if not _editable(strategy):
+        from .v2_go_live import setup_missing
+        if not setup_missing(strategy):
+            raise Http404("Legacy ledger edits are unavailable")
         messages.error(request, "Finish this strategy's setup first, then you can record entries.")
         return redirect(reverse("v2_instance_page", args=[strategy.pk, "strategy"]) + "#go-live")
     default = snapshot(old) if old else {

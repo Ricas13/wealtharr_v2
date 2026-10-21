@@ -6,6 +6,7 @@ from tracker.models import MarketObservation, StrategyInstance, StrategyValueSna
 from tracker.market_signals import review_strategy, sync_ticker
 from tracker.services import ledger_summary
 from tracker.instrument_mapping import for_strategy
+from tracker.review_autofinish import auto_finish_reviews
 
 
 def save_verified_strategy_snapshot(strategy):
@@ -72,4 +73,10 @@ class Command(BaseCommand):
                     sync_ticker(symbol)
                 except Exception:
                     pass
-        self.stdout.write("Yahoo monitoring: %d verified, %d awaiting usable data" % (ok, fail))
+        # With fresh closes in, finish any review whose fills are all recorded.
+        try:
+            finished = auto_finish_reviews()
+        except Exception:
+            finished = 0
+        self.stdout.write("Yahoo monitoring: %d verified, %d awaiting usable data, %d reviews finished"
+                          % (ok, fail, finished))
