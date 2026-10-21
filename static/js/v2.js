@@ -70,10 +70,14 @@
     } catch (_) { /* UI continues without persistence. */ }
   });
   updateCollapse();
-  // Setup: changing the strategy reloads the page with that strategy's funds.
-  Array.prototype.forEach.call(document.querySelectorAll("[data-w2-reload-with]"), function (select) {
+  // Setup: changing the strategy or broker reloads the page with its funds.
+  var reloaders = document.querySelectorAll("[data-w2-reload-with]");
+  Array.prototype.forEach.call(reloaders, function (select) {
     select.addEventListener("change", function () {
-      window.location.assign(window.location.pathname + "?" + select.name + "=" + encodeURIComponent(select.value));
+      var query = Array.prototype.map.call(reloaders, function (each) {
+        return each.name + "=" + encodeURIComponent(each.value);
+      }).join("&");
+      window.location.assign(window.location.pathname + "?" + query);
     });
   });
   var modeInputs = document.querySelectorAll("input[name=mode]");

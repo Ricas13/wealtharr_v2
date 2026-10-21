@@ -25,8 +25,8 @@ class Account(models.Model):
     @property
     def broker_label(self):
         """Human platform name, e.g. "Trading 212" for TRADING212."""
-        from .core.catalogue import PLATFORMS
-        return next((label for code, label, _ in PLATFORMS if code == self.broker), self.broker)
+        from .core.brokers import broker_name
+        return broker_name(self.broker)
 
     def save(self, *args, **kwargs):
         if self.pk:

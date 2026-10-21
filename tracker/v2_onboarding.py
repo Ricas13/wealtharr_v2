@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .core.catalogue import (
-    OFFERS, PLATFORMS, ACCOUNT_TYPES,
+    OFFERS, ACCOUNT_TYPES, platforms,
     CATALOGUE_VERSION, availability_reason, onboarding_manifest,
     released_version, rows_for, selection_available,
 )
@@ -235,7 +235,9 @@ def wizard(request):
     post = request.POST if request.method == "POST" else {}
     chosen = request.GET.get("strategy", "")
     strategy = post.get("strategy", chosen if chosen in OFFERS and OFFERS[chosen].enabled else default_key)
-    platform = post.get("platform", "TRADING212")
+    from .core.brokers import BROKERS
+    chosen_platform = request.GET.get("platform", "")
+    platform = post.get("platform", chosen_platform if chosen_platform in BROKERS else "TRADING212")
     types = [kind for kind, _ in ACCOUNT_TYPES if selection_available(strategy, platform, kind)]
     account_type = post.get("account_type", "ISA" if "ISA" in types else (types[0] if types else ""))
     state = {"owner_id": request.user.pk, "strategy": strategy, "platform": platform,
@@ -280,7 +282,7 @@ def wizard(request):
     return _render(
         request, page_key="add", page_title="Add strategy",
         wizard=state, wizard_error=error, wizard_offers=offers,
-        wizard_platforms=PLATFORMS,
+        wizard_platforms=platforms(),
         wizard_account_options=[{"key": kind, "name": title, "enabled": kind in types}
                                 for kind, title in ACCOUNT_TYPES],
         wizard_lines=lines, wizard_duplicate=duplicate, wizard_hold_rows=hold_rows,

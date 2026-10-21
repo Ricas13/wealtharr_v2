@@ -125,9 +125,10 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
                     "Wealtharr — planned monthly £%s contribution" % (
                         strategy.monthly_target),
                     "Your plan this month: £%s. Actual recorded: £%s. "
-                    "Amount still planned: £%s. After depositing in "
-                    "Trading 212, record it in Wealtharr. This is a "
+                    "Amount still planned: £%s. After depositing with "
+                    "%s, record it in Wealtharr. This is a "
                     "reminder, not an automatic transfer." % (
                         strategy.monthly_target, contributed,
-                        strategy.monthly_target - contributed))
+                        strategy.monthly_target - contributed,
+                        strategy.account.broker_label))
     return count

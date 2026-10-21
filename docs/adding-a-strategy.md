@@ -27,13 +27,23 @@ Worked examples: `strategies/nine_sig/` (quarterly signal line) and
    - Optional: `reference_symbols` (index series the rules need), extra
      `dashboard_template` and `dashboard_context`, `supports_reset`,
      `review_detail` and `review_export` ("How this was calculated"), `study`.
-4. **Funds** (CLAUDE.md boundary 2): one reviewed `CatalogueLine` per role in
-   `tracker/core/catalogue.py`, with exact ticker, ISIN, raw quote unit (GBX or
-   GBP) and evidence links, plus a `StrategyOffer`. Setup only offers the strategy
-   when every role has a reviewed line. Quote units feed the price checks
-   automatically.
+4. **Funds** (CLAUDE.md boundary 2), in `tracker/core/catalogue.py`: one `Listing`
+   per exact trading line (ticker, ISIN, raw quote unit GBX or GBP, issuer link)
+   with a `brokers` map of broker key → evidence URL, then list each role's
+   listings in preference order in `ROLE_LISTINGS`, plus a `StrategyOffer`. For a
+   broker and account type, the first listing with evidence for that broker is
+   used; setup only offers the strategy when every role resolves. Quote units feed
+   the price checks automatically. Keep the rules true to the original; only the
+   funds are local.
 5. **Tests**: pure rule tests, plus an end-to-end test like the one in
    `test_strategy_plugins.py`.
+
+## Adding a broker
+
+Add a `Broker` to `tracker/core/brokers.py` (name, country, account types). It is
+listed in setup straight away but offers nothing until listings cite evidence that
+it carries them: add its key and evidence URL to each listing's `brokers`. Never
+assume a broker carries a fund because another one does.
 
 ## What you get for free
 

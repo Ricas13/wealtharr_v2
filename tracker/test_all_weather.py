@@ -61,7 +61,7 @@ class AllWeatherRulesTests(SimpleTestCase):
 
     def test_small_drifts_are_ignored(self):
         positions = on_target()
-        positions["S.L"] += D("0.1")  # £10 over
+        positions["S.L"] += D("0.005")  # 50p over: too small to place
         result = evaluate(funds=FUNDS, positions=positions, cash=D("0"), quotes=quotes(), as_of=YEAR_END)
         self.assertEqual(result.trades, ())
 

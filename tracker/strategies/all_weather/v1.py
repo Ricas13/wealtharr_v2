@@ -1,11 +1,12 @@
-"""All Weather, UK version 1: five fixed weights, rebalanced once a year.
+"""All Weather version 1: five fixed weights, rebalanced once a year.
 
 Pure: no database, network or clock. The caller supplies holdings, cash and
 verified GBP closes for the review date; this returns the trades that put
 every fund back to its weight, or a reason it can't.
 
-Not affiliated with Bridgewater Associates. A UK adaptation: US shares,
-long and intermediate UK gilts, gold and broad commodities.
+Not affiliated with Bridgewater Associates. The published retail version:
+30% US stocks, 40% long-term US Treasuries, 15% intermediate US Treasuries,
+7.5% gold and 7.5% broad commodities, put back to those weights each year.
 """
 from dataclasses import dataclass
 from datetime import date
@@ -15,8 +16,8 @@ VERSION = "all_weather.v1.0.0"
 ZERO = Decimal("0")
 CENTS = Decimal("0.01")
 SHARES = Decimal("0.0001")
-# Trades smaller than this are left alone: not worth a dealing slip.
-MIN_TRADE_GBP = Decimal("25")
+# Not a rule: orders under £1 can't be placed at most brokers.
+MIN_TRADE_GBP = Decimal("1")
 WEIGHTS = (("stocks", Decimal("0.30")), ("long", Decimal("0.40")), ("inter", Decimal("0.15")),
            ("gold", Decimal("0.075")), ("comm", Decimal("0.075")))
 

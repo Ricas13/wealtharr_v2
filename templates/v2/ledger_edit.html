@@ -1,7 +1,7 @@
 <section class="w2-panel w2-space-top w2-wizard">
   <div class="w2-section-heading">
     <div><h2>{% if edit_operation == 'new' %}Record a real transaction{% elif edit_operation == 'edit' %}Propose a correction{% elif edit_operation == 'delete' %}Preview soft deletion{% else %}Restore a deleted transaction{% endif %}</h2>
-      <p class="w2-muted">Changes preserve the original source entry and are audited. Nothing is sent to Trading 212.</p></div>
+      <p class="w2-muted">Changes preserve the original source entry and are audited. Nothing is sent to your broker.</p></div>
     <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Back to ledger</a>
   </div>
   {% if edit_error %}<p class="w2-form-error" role="alert">{{ edit_error }}</p>{% endif %}

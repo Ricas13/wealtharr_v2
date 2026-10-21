@@ -14,7 +14,7 @@
           {% for offer in wizard_offers %}<option value="{{ offer.key }}" {% if wizard.strategy == offer.key %}selected{% endif %} {% if not offer.enabled %}disabled{% endif %}>{{ offer.title }}{% if offer.enabled %} · {{ offer.cadence }} reviews{% else %} · coming later{% endif %}</option>{% endfor %}
         </select></label>
       <label class="w2-field">Platform
-        <select name="platform" class="w2-input">
+        <select name="platform" class="w2-input" data-w2-reload-with>
           {% for key, label, available in wizard_platforms %}<option value="{{ key }}" {% if wizard.platform == key %}selected{% endif %} {% if not available %}disabled{% endif %}>{{ label }}{% if not available %} · not mapped yet{% endif %}</option>{% endfor %}
         </select></label>
     </div>
@@ -27,18 +27,19 @@
     {% if wizard_duplicate %}<p class="w2-note">You already run this strategy in a {{ wizard.type }}. This one gets its own account and ledger.</p>{% endif %}
 
     <h3>2 · The funds you'll buy (fixed)</h3>
-    <noscript><p class="w2-note">Changed the strategy? <a href="{% url 'v2_add_strategy' %}?strategy=all-weather">Show All Weather's funds</a> · <a href="{% url 'v2_add_strategy' %}">Show 9Sig's funds</a></p></noscript>
+    <noscript><p class="w2-note">Changed the strategy or broker? Show the funds for:{% for offer in wizard_offers %}{% if offer.enabled %} <a href="{% url 'v2_add_strategy' %}?strategy={{ offer.key }}&amp;platform={{ wizard.platform }}">{{ offer.title }}</a>{% endif %}{% endfor %}</p></noscript>
+    {% if not wizard_lines %}<p class="w2-note" role="status">No reviewed funds for this strategy at this broker yet. Pick another broker or strategy.</p>{% endif %}
     <div class="w2-table-wrap"><table class="w2-table">
       <thead><tr><th>Role</th><th>Target</th><th>Fund</th><th>Ticker</th><th>Evidence</th></tr></thead>
       <tbody>{% for line in wizard_lines %}
         <tr><td>{{ line.role_label }}</td><td>{{ line.weight_pct|floatformat:"-1" }}%</td>
           <td class="w2-wrap">{{ line.name }} <small class="w2-muted">{{ line.isin }}</small></td>
           <td>{{ line.ticker }}</td>
-          <td><a href="{{ line.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer ↗</a> <a href="{{ line.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">Trading 212 ↗</a></td></tr>
+          <td><a href="{{ line.issuer_url }}" target="_blank" rel="noopener noreferrer">Issuer ↗</a> <a href="{{ line.broker_evidence_url }}" target="_blank" rel="noopener noreferrer">{{ line.broker_name }} ↗</a></td></tr>
       {% endfor %}</tbody>
     </table></div>
     <label class="w2-check w2-space-top"><input type="checkbox" name="ack" value="yes" {% if wizard.ack %}checked{% endif %} required>
-      <span>I checked I can buy these exact funds in my own Trading 212 account.</span></label>
+      <span>I checked I can buy these exact funds in my own {{ wizard_lines.0.broker_name|default:"broker" }} account.</span></label>
 
     <h3>3 · Your starting point</h3>
     <div class="w2-form-grid">
