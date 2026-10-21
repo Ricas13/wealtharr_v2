@@ -4,19 +4,17 @@ Notification secrets remain in existing staff-only IntegrationForm; this
 view never renders them, never accesses a broker and never certifies backups.
 """
 from uuid import uuid4
-from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
-from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import NotificationForm
 from .models import (
-    NotificationDelivery, NotificationPreference, NotificationSchedulerRun,
+    NotificationDelivery, NotificationPreference,
     OwnerTOTP, StrategyInstance, SystemIntegration,
 )
 from .notification_routing import CATEGORIES, CHANNELS
@@ -128,15 +126,6 @@ def settings_page(request):
         .order_by("-created_at", "-pk")
         .values("channel", "category", "status", "created_at", "attempts")[:10]
     )
-    latest_run = (
-        NotificationSchedulerRun.objects.order_by("-started_at", "-pk").first()
-        if request.user.is_staff else None
-    )
-    scheduler_recent = bool(
-        latest_run and latest_run.status == "SUCCEEDED" and
-        latest_run.finished_at and
-        latest_run.finished_at >= timezone.now() - timedelta(hours=3)
-    )
     return _render(
         request, page_key="settings", page_title="Settings",
         notification_form=form, settings_error=error,
@@ -147,7 +136,6 @@ def settings_page(request):
         ),
         discord_configured=bool(config and config.discord_url_ciphertext),
         has_authenticator=OwnerTOTP.objects.filter(owner=request.user).exists(),
-        scheduler_run=latest_run, scheduler_recent=scheduler_recent,
     )
 
 
@@ -158,8 +146,8 @@ def test_channel(request, channel):
         raise Http404("Unknown notification channel")
     pref, _ = NotificationPreference.objects.get_or_create(owner=request.user)
     if not getattr(pref, channel + "_enabled"):
-        messages.error(request, "Enable the destination before sending a test.")
-        return redirect("v2_settings")
+        messages.error(request, "Turn on that destination in Alerts & settings before sending a test.")
+        return redirect("control")
     # Real attempt, with a unique idempotency key. Success only means a
     # transport acknowledgment; it does not certify future delivery.
     outcome = dispatch(
@@ -172,4 +160,4 @@ def test_channel(request, channel):
         messages.success(request, channel.title() + " test accepted by the transport.")
     else:
         messages.error(request, channel.title() + " test was not confirmed; check the integration and receipts.")
-    return redirect("v2_settings")
+    return redirect("control")

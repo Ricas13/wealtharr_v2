@@ -90,21 +90,27 @@ def change_password(request):
 
 @staff_member_required
 def control(request):
+    """Owner admin page, inside the normal app shell (staff only)."""
     from .forms import IntegrationForm
-    from .models import SystemIntegration
+    from .models import InviteRequest, NotificationSchedulerRun, SystemIntegration, YahooSync
+    from .v2_views import _render
     cfg = SystemIntegration.current()
     form = IntegrationForm(request.POST or None, instance=cfg)
     if request.method == "POST" and form.is_valid():
         form.save()
-        messages.success(request, "Integration preferences saved.")
-        return redirect("v2_admin_control")
-    return render(request, "v2/control.html", {
-        "form": form, "cfg": cfg,
-        "smtp_password_set": bool(cfg.smtp_password_ciphertext),
-        "discord_set": bool(cfg.discord_url_ciphertext),
-        "turnstile_set": bool(settings.TURNSTILE_SITE_KEY and settings.TURNSTILE_SECRET_KEY),
-        "turnstile_required": settings.TURNSTILE_REQUIRED,
-    })
+        messages.success(request, "Mail and Discord settings saved.")
+        return redirect("control")
+    return _render(
+        request, page_key="admin", page_title="Admin",
+        form=form,
+        smtp_password_set=bool(cfg.smtp_password_ciphertext),
+        discord_set=bool(cfg.discord_url_ciphertext),
+        turnstile_set=bool(settings.TURNSTILE_SITE_KEY and settings.TURNSTILE_SECRET_KEY),
+        turnstile_required=settings.TURNSTILE_REQUIRED,
+        scheduler_run=NotificationSchedulerRun.objects.order_by("-started_at", "-pk").first(),
+        invite_count=InviteRequest.objects.count(),
+        price_problems=YahooSync.objects.exclude(last_error="").order_by("symbol"),
+    )
 
 
 @require_GET

@@ -54,6 +54,24 @@
         {% include 'partials/icon.html' with name='settings' %}<span class="w2-nav-label">Alerts &amp; settings</span>
       </a>
     </nav>
+    {% if request.user.is_staff %}
+    <nav class="w2-sidebar-admin" aria-label="Admin">
+      <p class="w2-nav-caption">Admin</p>
+      <a class="w2-nav-link {% if page_key == 'admin' %}w2-active{% endif %}"
+         href="{% url 'control' %}" {% if page_key == 'admin' %}aria-current="page"{% endif %} title="Mail, Discord and status">
+        {% include 'partials/icon.html' with name='shield' %}<span class="w2-nav-label">Mail, Discord &amp; status</span>
+      </a>
+      <a class="w2-nav-link" href="{% url 'admin:tracker_inviterequest_changelist' %}" title="Invite requests">
+        {% include 'partials/icon.html' with name='bell' %}<span class="w2-nav-label">Invite requests</span>
+      </a>
+      <a class="w2-nav-link" href="{% url 'admin:auth_user_changelist' %}" title="Users">
+        {% include 'partials/icon.html' with name='wallet' %}<span class="w2-nav-label">Users</span>
+      </a>
+      <a class="w2-nav-link" href="{% url 'admin:index' %}" title="Django admin">
+        {% include 'partials/icon.html' with name='settings' %}<span class="w2-nav-label">Django admin</span>
+      </a>
+    </nav>
+    {% endif %}
     <div class="w2-sidebar-footer">
       <button type="button" id="v2-collapse" class="w2-nav-link" aria-pressed="false"
               aria-label="Collapse sidebar" title="Collapse sidebar">

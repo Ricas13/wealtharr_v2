@@ -211,7 +211,7 @@ class SettingsAndRoutingTests(TestCase):
         self.assertNotContains(resp, "Alert sender")
         self.owner.is_staff = True
         self.owner.save(update_fields=["is_staff"])
-        resp = self.client.get(self.url)
+        resp = self.client.get(reverse("control"))
         self.assertContains(resp, "DIAGNOSTIC_STAFF_ONLY")
         self.assertContains(resp, "· failed")
 

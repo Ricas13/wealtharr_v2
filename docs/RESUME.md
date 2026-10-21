@@ -1,3 +1,9 @@
+## Admin links in the sidebar (21 October 2026)
+
+Branch `feature/admin-sidebar` from main (after PR #46). Owner wants their own account to be the admin but keep the normal user menu, with admin options at the lower left of the sidebar. Staff accounts now see an **Admin** group just above Collapse / Sign out: Mail, Discord & status (`/control/`, now rendered inside the normal app shell), Invite requests, Users and Django admin (Django's own pages). Non-staff accounts see none of it, and `/control/` still requires staff. The admin page holds the SMTP/Discord form, the email/Discord test buttons, the alert sender status, Turnstile state, the invite count and any price check with an error (e.g. `PRICE_HOLD:LARGE_MOVE`). These staff diagnostics moved off the personal Alerts & settings page. Fixed: saving `/control/` redirected to an unknown URL name (500 after saving). Tests: `tracker/test_admin_page.py`, `browser_tests/test_admin_sidebar.py`.
+
+---
+
 ## Audit fixes: Study data, homepage fairness, founder fidelity (21 October 2026)
 
 Branch `feature/audit-study-fixes` from main (after PR #45). Owner asked to fix every defect from the independent strategy/Study audit, in priority order:
