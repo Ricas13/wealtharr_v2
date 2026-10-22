@@ -233,6 +233,7 @@ PY
     cp "$src/secrets/"* secrets/
     chmod 600 .env .env.production
     chmod 444 secrets/postgres_password secrets/django_secret_key
+    if [[ -s secrets/data_encryption_key ]]; then chmod 444 secrets/data_encryption_key; fi
     preflight
     compose up -d --wait db
     compose exec -T db pg_restore -U wealtharr -d wealtharr \
