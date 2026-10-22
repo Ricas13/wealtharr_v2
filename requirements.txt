@@ -1,5 +1,5 @@
-Django>=5.2,<5.3
-gunicorn>=23,<24
-psycopg[binary]>=3.2,<3.4
-cryptography>=45,<47
-whitenoise>=6.9,<7
+Django==5.2.18
+gunicorn==23.0.0
+psycopg[binary]==3.3.6
+cryptography==46.0.7
+whitenoise==6.12.0

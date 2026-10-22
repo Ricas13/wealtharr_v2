@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from tracker.models import RateLimitBucket
 
 
 class SignInTests(TestCase):
@@ -31,7 +32,7 @@ class SignInTests(TestCase):
         paused = self.client.post(reverse("login"), {"username": "owner-x", "password": "a-long-test-password-1"})
         self.assertContains(paused, "Too many failed sign-ins")
         self.assertFalse(paused.wsgi_request.user.is_authenticated)
-        cache.clear()
+        RateLimitBucket.objects.all().delete()
         ok = self.client.post(reverse("login"), {"username": "owner-x", "password": "a-long-test-password-1"})
         self.assertEqual(ok.status_code, 302)
 

@@ -619,3 +619,10 @@ class InviteRequest(models.Model):
 
     def __str__(self):
         return self.email
+
+
+class RateLimitBucket(models.Model):
+    """Cross-worker throttle shared through PostgreSQL, not per-process cache."""
+    key = models.CharField(max_length=180, unique=True)
+    count = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(db_index=True)

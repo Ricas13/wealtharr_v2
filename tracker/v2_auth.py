@@ -1,5 +1,6 @@
 """Minimal owner authentication retained after retiring the legacy interface."""
 import json
+from hashlib import sha256
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -52,17 +53,18 @@ def _turnstile_verified(request):
         return False
 
 
-# Failed sign-ins per username before a 15-minute pause (per web process).
+# Failed sign-ins per username before a 15-minute pause (shared PostgreSQL row).
 LOGIN_FAILURE_LIMIT = 10
 LOGIN_PAUSE_SECONDS = 15 * 60
 
 
 def _failure_key(request):
-    return "login-failures:" + (request.POST.get("username") or "").strip().lower()[:150]
+    username = (request.POST.get("username") or "").strip().lower()[:150]
+    return "login-failures:" + sha256(username.encode("utf-8")).hexdigest()
 
 
 def sign_in(request):
-    from django.core.cache import cache
+    from .rate_limits import attempts, increment, clear
     if request.user.is_authenticated:
         return redirect(preferred_url(request.user))
     form = AuthenticationForm(request=request, data=request.POST or None)
@@ -72,18 +74,18 @@ def sign_in(request):
         # An unbound form: a bound one would run the password check when rendered.
         retry = {"username": (request.POST.get("username") or "")[:150]}
         # Checks run before the password, so a failed check never reveals whether it was right.
-        if cache.get(key, 0) >= LOGIN_FAILURE_LIMIT:
+        if attempts(key) >= LOGIN_FAILURE_LIMIT:
             form = AuthenticationForm(request=request, initial=retry)
             error = "Too many failed sign-ins. Try again in 15 minutes."
         elif not _turnstile_verified(request):
             form = AuthenticationForm(request=request, initial=retry)
             error = "Security verification failed. Please try again."
         elif form.is_valid():
-            cache.delete(key)
+            clear(key)
             login(request, form.get_user())
             return redirect(preferred_url(request.user))
         else:
-            cache.set(key, cache.get(key, 0) + 1, LOGIN_PAUSE_SECONDS)
+            increment(key, LOGIN_PAUSE_SECONDS)
     return render(request, "v2/login.html", {
         "form": form, "login_error": error, "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
         "turnstile_required": settings.TURNSTILE_REQUIRED,
