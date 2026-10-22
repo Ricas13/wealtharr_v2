@@ -193,9 +193,13 @@ def _fresh_days_only(data):
 
 def start_index(data, key, today=None):
     today = today or timezone.localdate()
+    if not data.ready:
+        return None
+    if key == "max":
+        return 0  # Comparison MAX: all usable Study dates, without changing Study tab presets.
     days = dict((k, n) for k, _, n in TIMEFRAMES)[key]
     target = date(today.year, 1, 1) if key == "ytd" else today - timedelta(days=days)
-    if not data.ready or data.days[0] > target + timedelta(days=7):
+    if data.days[0] > target + timedelta(days=7):
         return None
     i = bisect_left(data.days, target)
     return i if i < len(data.days) - 1 else None

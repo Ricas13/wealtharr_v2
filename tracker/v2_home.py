@@ -2,7 +2,7 @@
 from the Study history, and an invite request. Nothing here signs anyone up;
 the owner reads invite requests and creates any account by hand."""
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django import forms
 from django.conf import settings
@@ -22,8 +22,9 @@ from .strategies.registry import COLOURS
 
 log = logging.getLogger(__name__)
 
-FRAMES = (("ytd", "YTD"), ("1y", "1Y"), ("5y", "5Y"), ("10y", "10Y"), ("20y", "20Y"))
-FRAME_WORDS = {"ytd": "this year", "1y": "1 year", "5y": "5 years", "10y": "10 years", "20y": "20 years"}
+FRAMES = (("ytd", "YTD"), ("1y", "1Y"), ("5y", "5Y"), ("10y", "10Y"), ("max", "MAX"))
+FRAME_WORDS = {"ytd": "this year", "1y": "1 year", "5y": "5 years", "10y": "10 years",
+               "max": "all available history"}
 LINES = {
     "nine_sig": ("Quarterly signal", "60/40, 9% growth target", "4× a year", COLOURS["nasdaq-quarterly-target"]),
     "hold": ("Buy & hold 3× Nasdaq", "100% growth fund", "Never", "#f0a050"),
@@ -46,7 +47,7 @@ OTHER_LINES = {
 # Signed-in pages (Add strategy) may use the strategies' own names; the public
 # homepage keeps the generic ones above.
 REAL_NAMES = {"nine_sig": "9Sig", "hold": "Buy & hold 3× Nasdaq (LQQ3)"}
-POINTS = 5500  # Preserve daily observations for timeline zoom; SVG rendering downsamples.
+POINTS = 10000  # Keep real daily observations for precise selected-period comparisons.
 DAILY_INVITE_ALERTS = 10
 
 
@@ -154,6 +155,7 @@ def compare(amount, monthly, frame, real_names=False, public=False):
             "left_out": left_out,
             "ticks": [(first + (last - first) * k / 4).strftime("%b %Y") for k in range(5)],
             "point_dates": [_day(days[i]) for i in index],
+            "point_dates_iso": [days[i].isoformat() for i in index],
             "simulated": bool(result["simulated_growth"] or result["simulated_safe"]),
             "simulated_other": simulated_other,
         })
@@ -208,6 +210,100 @@ def _other_rows(rows, days, index, frame, amount, monthly, real_names=False, mon
     return simulated, left_out
 
 
+
+def selected_period_metrics(comparison, start_index, end_index):
+    """Recompute a table for a selected chart window, without rerunning Studies.
+
+    Opening capital is the *portfolio value at the first selected close*, not
+    the contributions made since the strategy's inception. Contributions after
+    that close are external cash flows; the same flow dates are used for each
+    strategy. Money-weighted annual return uses Study's existing XIRR convention.
+    Drawdown uses Study's contribution-neutral chain, restarted at the chosen
+    opening close. Displaying the table does not restart a strategy or alter
+    its historical holdings.
+    """
+    from .study import _xirr
+
+    if not comparison.get("ready"):
+        raise ValueError("Comparison history unavailable")
+    dates = comparison.get("point_dates_iso", ())
+    invested = comparison.get("put_in_points", ())
+    n = len(dates)
+    if (not (2 <= n <= POINTS + 1) or len(invested) != n
+            or type(start_index) is not int or type(end_index) is not int
+            or not (0 <= start_index < end_index - 1 < n)):
+        raise ValueError("Invalid selected dates")
+    days = [date.fromisoformat(raw) for raw in dates[start_index:end_index + 1]]
+    if any(days[i] <= days[i - 1] for i in range(1, len(days))):
+        raise ValueError("Selected dates are not chronological")
+    flows = [(days[i - start_index], invested[i] - invested[i - 1])
+             for i in range(start_index + 1, end_index + 1)
+             if invested[i] != invested[i - 1]]
+    if any(not (flow > 0) for _, flow in flows):
+        raise ValueError("Invalid comparison contribution history")
+    additional = sum((amount for _, amount in flows), 0.0)
+    span = (days[-1] - days[0]).days
+    rows = {}
+    for row in comparison["rows"]:
+        values = row["points"]
+        if len(values) != n:
+            raise ValueError("Comparison series dates differ")
+        opening = values[start_index]
+        closing = values[end_index]
+        if opening <= 0 or closing < 0:
+            raise ValueError("Undefined opening or closing value")
+        capital = opening + additional
+        gain = closing - capital
+        # Same flow-neutral NAV/drawdown algorithm as study._summary.
+        peak, level, worst = 1.0, 1.0, 0.0
+        for i in range(start_index + 1, end_index + 1):
+            prior = values[i - 1]
+            movement = invested[i] - invested[i - 1]
+            if prior <= 0 or values[i] <= 0:
+                raise ValueError("Undefined daily flow-adjusted value")
+            level *= (values[i] - movement) / prior
+            peak = max(peak, level)
+            worst = min(worst, level / peak - 1)
+        annual = _xirr([(days[0], opening)] + flows, days[-1], closing) if span >= 360 else None
+        rows[row["key"]] = {
+            "final": round(closing, 2),
+            "gain_pct": round(gain / capital * 100, 2) if capital > 0 else None,
+            "annual": round(annual, 2) if annual is not None else None,
+            "drawdown": round(worst * 100, 2),
+        }
+    return {
+        "rows": rows,
+        "period": "%s – %s" % (_day(days[0]), _day(days[-1])),
+        "put_in": round(comparison["rows"][0]["points"][start_index] + additional, 2),
+        "reference_label": comparison["rows"][0]["label"],
+        "start_index": start_index, "end_index": end_index,
+        "description": "reference strategy's opening value plus top-ups during selection",
+    }
+
+
+def _comparison_response(request, *, public, real_names):
+    """Return either the complete chart data or lightweight selected metrics."""
+    from django.http import HttpResponseBadRequest
+
+    try:
+        comparison = compare(*_inputs(request.GET), public=public, real_names=real_names)
+    except Busy:
+        return JsonResponse({"error": "Busy. Try again in a minute."}, status=429)
+
+    first = request.GET.get("window_start")
+    last = request.GET.get("window_end")
+    if first is None and last is None:
+        return JsonResponse(comparison)
+    if (first is None or last is None or not first.isascii() or not last.isascii()
+            or not first.isdecimal() or not last.isdecimal()
+            or len(first) > 5 or len(last) > 5):
+        return HttpResponseBadRequest("Invalid comparison window")
+    try:
+        data = selected_period_metrics(comparison, int(first), int(last))
+    except (ValueError, IndexError, KeyError, TypeError, ArithmeticError):
+        return HttpResponseBadRequest("Comparison dates unavailable")
+    return JsonResponse(data)
+
 def landing(request):
     if request.user.is_authenticated:
         return redirect(preferred_url(request.user))
@@ -226,17 +322,14 @@ def landing(request):
 
 @require_GET
 def compare_json(request):
-    try:
-        return JsonResponse(compare(*_inputs(request.GET), public=True))
-    except Busy:
-        return JsonResponse({"error": "Busy. Try again in a minute."}, status=429)
+    return _comparison_response(request, public=True, real_names=False)
 
 
 @login_required
 @require_GET
 def compare_named_json(request):
     """The same comparison with the strategies' own names, for signed-in pages."""
-    return JsonResponse(compare(*_inputs(request.GET), real_names=True))
+    return _comparison_response(request, public=False, real_names=True)
 
 
 class InviteForm(forms.Form):

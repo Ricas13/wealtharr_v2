@@ -47,6 +47,7 @@ class HomepageTests(TestCase):
         self.assertGreater(len(spy["points"]), 170)
         self.assertLessEqual(len(spy["points"]), 5501)
         self.assertEqual(len(spy["points"]), len(data["point_dates"]))
+        self.assertEqual(len(spy["points"]), len(data["point_dates_iso"]))
         self.assertEqual(len(spy["points"]), len(data["put_in_points"]))
         page = self.client.get("/?range=1y")
         self.assertContains(page, "Quarterly signal")

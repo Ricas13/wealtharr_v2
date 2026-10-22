@@ -27,10 +27,14 @@
   var endHandle = box.querySelector('[data-zoom-handle="end"]');
   var windowHandle = box.querySelector("[data-zoom-window]");
   var resetZoom = box.querySelector("[data-zoom-reset]");
-  var view = null;  // selected index range; never changes the study or table figures
+  var view = null;  // selected index range shared by chart and selected-period table
   var drag = null;
   var miniState = null, miniSignature = ""; // only replot the overview when its data changes
   var resetAfterLoad = false;
+  var selectedMetrics = null;
+  var metricRequest = 0;
+  var metricTimer = null;
+  var tablePending = false;
   var NS = "http://www.w3.org/2000/svg";
   var money = function (v) { return Math.round(v).toLocaleString("en-GB"); };
   var pct = function (v) { return v === null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "%"; };
@@ -45,7 +49,15 @@
   }
 
   function sortedRows() {
-    var rows = (state.rows || []).slice();
+    var rows = (state.rows || []).map(function (row) {
+      var metrics = selectedMetrics && selectedMetrics.rows && selectedMetrics.rows[row.key];
+      if (metrics) return Object.assign({}, row, metrics);
+      // Never show inception figures as though they were selected-window returns.
+      if (tablePending || (view && !isFullView())) {
+        return Object.assign({}, row, { final: null, gain_pct: null, annual: null, drawdown: null });
+      }
+      return row;
+    });
     if (!sortKey) return rows;
     return rows.sort(function (a, b) {
       var x = a[sortKey], y = b[sortKey];
@@ -88,7 +100,7 @@
       name.appendChild(cell("span", "mut", "· " + row.what));
       tr.appendChild(name);
       var value = cell("td", "r");
-      value.appendChild(cell("strong", "", "£" + money(row.final)));
+      value.appendChild(cell("strong", "", row.final === null ? "—" : "£" + money(row.final)));
       tr.appendChild(value);
       tr.appendChild(cell("td", "r " + (row.gain_pct >= 0 ? "pos" : "neg"), pct(row.gain_pct)));
       tr.appendChild(cell("td", "r", pct(row.annual)));
@@ -103,6 +115,62 @@
   function gap() { return Math.min(2, lastIndex()); } // a minimum of three visible observations
   function clamp(value, low, high) { return Math.min(high, Math.max(low, value)); }
   function dateAt(i) { return (state.point_dates || [])[i] || ""; }
+  function isFullView() { return view && view.start === 0 && view.end === lastIndex(); }
+
+  function renderSummary() {
+    var selected = view && !isFullView();
+    var status = box.querySelector("[data-table-status]");
+    text("[data-period]", selected ? dateAt(view.start) + " – " + dateAt(view.end) : state.period);
+    text("[data-putin-title]", selected
+      ? (selectedMetrics ? selectedMetrics.reference_label + " opening value + top-ups"
+        : "Reference strategy opening value + top-ups")
+      : "You'd have put in");
+    text("[data-range-words]", selected ? "selected dates" : state.range_words);
+    text("[data-putin]", selected
+      ? (selectedMetrics ? money(selectedMetrics.put_in) : "—")
+      : money(state.put_in));
+    status.textContent = selected
+      ? (tablePending ? "Calculating selected-period returns…" :
+        selectedMetrics ? "Showing results for the selected dates." :
+        "Selected-period figures unavailable; try adjusting or resetting the range.")
+      : "Showing results for the full selected timeframe.";
+    box.querySelector("[data-rows]").setAttribute("aria-busy", tablePending ? "true" : "false");
+  }
+
+  function updatePeriodTable() {
+    clearTimeout(metricTimer);
+    var ticket = ++metricRequest;
+    selectedMetrics = null;
+    if (!state.ready || !view || isFullView()) {
+      tablePending = false;
+      if (state.ready) { renderSummary(); renderTable(); }
+      return;
+    }
+    tablePending = true;
+    renderSummary();
+    renderTable();
+    metricTimer = setTimeout(function () {
+      var url = (box.dataset.compareUrl || "/compare.json") + "?amount=" +
+        encodeURIComponent(state.amount) + "&monthly=" + encodeURIComponent(state.monthly) +
+        "&range=" + encodeURIComponent(state.range) +
+        "&window_start=" + view.start + "&window_end=" + view.end;
+      fetch(url, { headers: { Accept: "application/json" } })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (data) {
+          if (ticket !== metricRequest || !state.ready) return;
+          if (data.start_index !== view.start || data.end_index !== view.end) return;
+          selectedMetrics = data;
+          tablePending = false;
+          renderSummary();
+          renderTable();
+        }).catch(function () {
+          if (ticket !== metricRequest) return;
+          tablePending = false;
+          renderSummary();
+          renderTable();
+        });
+    }, 140);
+  }
 
   function normaliseView() {
     var last = lastIndex();
@@ -245,13 +313,16 @@
     view = { start: start, end: end };
     hideTip();
     renderChart();
+    updatePeriodTable();
   }
 
   function render() {
     box.querySelector("[data-empty]").hidden = state.ready;
     box.querySelector("[data-filled]").hidden = !state.ready;
-    text("[data-range-words]", state.range_words);
-    text("[data-putin]", state.ready ? money(state.put_in) : "—");
+    if (!state.ready) {
+      text("[data-range-words]", state.range_words);
+      text("[data-putin]", "—");
+    }
     box.querySelector("[data-simulated]").hidden = !state.simulated;
     var other = box.querySelector("[data-simulated-other]");
     if (other) other.hidden = !state.simulated_other;
@@ -265,8 +336,8 @@
     if (!state.ready) return;
     text("[data-period]", state.period);
     normaliseView();
-    renderTable();
     renderChart();
+    updatePeriodTable();
   }
 
   // Hover (or tap) readout: each shown strategy's value that day and its
@@ -411,6 +482,8 @@
 
   function load() {
     var ticket = ++latest;
+    ++metricRequest;
+    clearTimeout(metricTimer);
     box.classList.add("loading");
     var url = (box.dataset.compareUrl || "/compare.json") + "?amount=" + encodeURIComponent(amount.value) +
       "&monthly=" + encodeURIComponent(monthly.value) + "&range=" + range;
@@ -419,6 +492,8 @@
       .then(function (data) {
         if (ticket === latest) {
           state = data;
+          selectedMetrics = null;
+          tablePending = false;
           if (resetAfterLoad) view = null;
           resetAfterLoad = false;
           hideTip();

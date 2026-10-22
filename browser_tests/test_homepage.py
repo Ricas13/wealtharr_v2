@@ -44,10 +44,13 @@ class HomepageBrowserTests(BrowserHarness):
                 page.locator('[data-zoom-handle="end"]').focus()
                 page.keyboard.press("Shift+ArrowLeft")
                 self.assertFalse(page.locator("[data-zoom-reset]").is_disabled())
-                # The whole-period performance table does not rebase after zoom.
-                rows_before = page.locator("[data-rows]").inner_text()
+                # The table now shows results for the selected dates, then
+                # restores full-period figures on reset.
+                page.wait_for_function("document.querySelector('[data-table-status]').textContent.includes('Showing results for the selected dates')")
+                selected_rows = page.locator("[data-rows]").inner_text()
                 page.locator("[data-zoom-reset]").click()
-                self.assertEqual(page.locator("[data-rows]").inner_text(), rows_before)
+                self.assertNotEqual(page.locator("[data-rows]").inner_text(), selected_rows)
+                self.assertIn("full selected timeframe", page.locator("[data-table-status]").inner_text())
                 page.get_by_label("Show S&P 500 (SPY)").click()
                 self.assertEqual(page.locator("tr.off").count(), 1)
                 self.assertEqual(page.locator(".chart polyline").count(), 4)
