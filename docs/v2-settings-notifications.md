@@ -31,7 +31,7 @@ instrument identities, ledger replay, confirmed fills, broker access or automate
   password and owner TOTP setup links. All POST mutations require authenticated
   owner access and Django CSRF. Sending a live email/Discord test is a
   **staff-only POST**. Existing staff-only IntegrationForm remains the only
-  method for configuring encrypted SMTP and webhook credentials.
+  method for configuring encrypted SMTP and Discord bot credentials.
 - The normal owner cannot view other owners' portfolios, messages, receipts,
   credentials, or staff diagnostics. Staff see only a **bounded, redacted**
   scheduler heartbeat from the already persisted notification run log.

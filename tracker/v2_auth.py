@@ -92,7 +92,9 @@ def change_password(request):
 def control(request):
     """Owner admin page, inside the normal app shell (staff only)."""
     from .forms import IntegrationForm
-    from .models import InviteRequest, NotificationSchedulerRun, SystemIntegration, YahooSync
+    from .discord_dm import bot_invite_url, configured as discord_ready, redirect_uri
+    from .models import (InviteRequest, NotificationPreference, NotificationSchedulerRun,
+                         SystemIntegration, YahooSync)
     from .v2_views import _render
     cfg = SystemIntegration.current()
     form = IntegrationForm(request.POST or None, instance=cfg)
@@ -104,7 +106,10 @@ def control(request):
         request, page_key="admin", page_title="Admin",
         form=form,
         smtp_password_set=bool(cfg.smtp_password_ciphertext),
-        discord_set=bool(cfg.discord_url_ciphertext),
+        discord_set=discord_ready(cfg),
+        discord_redirect=redirect_uri(request),
+        discord_bot_invite=bot_invite_url(cfg),
+        discord_connected=NotificationPreference.objects.exclude(discord_user_id="").count(),
         turnstile_set=bool(settings.TURNSTILE_SITE_KEY and settings.TURNSTILE_SECRET_KEY),
         turnstile_required=settings.TURNSTILE_REQUIRED,
         scheduler_run=NotificationSchedulerRun.objects.order_by("-started_at", "-pk").first(),

@@ -11,11 +11,24 @@
       </div>
       <label class="w2-field" for="{{ notification_form.destination_email.id_for_label }}">Send emails to {{ notification_form.destination_email }}</label>
       <div class="w2-setting-row w2-space-top">
-        <label class="w2-check">{{ notification_form.discord_enabled }} <span><strong>Discord</strong> <span class="w2-muted">{% if discord_configured %}· webhook stored{% else %}· webhook not set up yet{% endif %}</span></span></label>
+        {% if preference.discord_user_id %}
+          <label class="w2-check">{{ notification_form.discord_enabled }} <span><strong>Discord DMs</strong> <span class="w2-muted">· connected as {{ preference.discord_username|default:"your account" }}</span></span></label>
+        {% else %}
+          <span><strong>Discord DMs</strong> <span class="w2-muted">· {% if discord_configured %}not connected{% else %}not set up by the site owner yet{% endif %}</span></span>
+        {% endif %}
       </div>
       <div class="w2-row w2-space-top"><button type="submit" class="w2-button w2-button-primary">Save</button>
         <span class="w2-muted">Choose which alerts go where on each strategy's Strategy &amp; alerts tab.</span></div>
     </form>
+    <div class="w2-row w2-space-top" data-discord>
+      {% if preference.discord_user_id %}
+        <form method="post" action="{% url 'discord_disconnect' %}">{% csrf_token %}<button type="submit" class="w2-button">Disconnect Discord</button></form>
+        <span class="w2-muted">The Wealtharr bot DMs you privately. You can mute its server; DMs still arrive.</span>
+      {% elif discord_configured %}
+        <a class="w2-button" href="{% url 'discord_connect' %}">Connect Discord</a>
+        <span class="w2-muted">Discord asks you to allow the Wealtharr bot to add you to its private server, so it can DM you.</span>
+      {% endif %}
+    </div>
   </section>
 
   <section class="w2-card" aria-labelledby="w2-strategy-notification-title">

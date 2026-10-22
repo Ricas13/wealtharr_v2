@@ -119,12 +119,13 @@ class NotificationTests(TestCase):
     def setUp(self):
         self.owner=get_user_model().objects.create_user("alertowner","owner@example.com","a-very-long-test-password")
         self.prefs=NotificationPreference.objects.create(
-            owner=self.owner,destination_email="owner@example.com",email_enabled=True,discord_enabled=True)
+            owner=self.owner,destination_email="owner@example.com",email_enabled=True,discord_enabled=True,
+            discord_user_id="111222333")
         self.config=SystemIntegration.current()
         self.config.smtp_host="smtp.example.test"
         self.config.smtp_sender="alerts@example.test"
         self.config.smtp_password_ciphertext=encrypt_secret("smtp-secret-not-for-logs")
-        self.config.discord_url_ciphertext=encrypt_secret("https://discord.com/api/webhooks/123456/test-secret")
+        self.config.discord_bot_token_ciphertext=encrypt_secret("bot-token-test-secret")
         self.config.save()
     def test_encryption_roundtrip(self):
         self.assertNotIn("smtp-secret-not-for-logs", self.config.smtp_password_ciphertext)
@@ -160,16 +161,20 @@ class NotificationTests(TestCase):
         self.assertEqual(delivery.attempts, 2)
         self.assertEqual(delivery.status, "SENT")
 
-    def test_discord_delivery_payload_does_not_leak_webhook(self):
-        class Response:
-            status=204
-            def __enter__(self): return self
-            def __exit__(self,*args): pass
-        with patch("tracker.services.urlopen",return_value=Response()) as send:
+    def test_discord_delivery_is_a_dm_and_the_payload_does_not_leak_the_token(self):
+        import io, json as _json
+        replies = [_json.dumps({"id": "999"}).encode(), b"{}"]
+        class Response(io.BytesIO):
+            status=200
+        with patch("tracker.discord_dm.urlopen",side_effect=lambda *a, **k: Response(replies.pop(0))) as send:
             self.assertEqual(dispatch(self.owner,"event-2","Test","Hello",channels=("discord",))["discord"],"sent")
-            data=send.call_args.args[0].data.decode()
-            self.assertIn("Hello",data)
-            self.assertNotIn("test-secret",data)
+        opened, posted = [call.args[0] for call in send.call_args_list]
+        self.assertTrue(opened.full_url.endswith("/users/@me/channels"))
+        self.assertEqual(_json.loads(opened.data)["recipient_id"], "111222333")
+        self.assertTrue(posted.full_url.endswith("/channels/999/messages"))
+        data=posted.data.decode()
+        self.assertIn("Hello",data)
+        self.assertNotIn("bot-token-test-secret",data)
 
 class TemplateAndSecurityTests(TestCase):
     def setUp(self):

@@ -1,3 +1,9 @@
+## Discord alerts as private DMs (22 October 2026)
+
+Branch `feature/discord-dm` from main (after PR #49). Owner wants each person to connect their Discord and get private DMs from a bot instead of a channel webhook. Owner choices: people are auto-added to the owner's private server on connect (Discord only lets a bot DM someone who shares a server), and DMs **replace** the webhook. Admin page: Discord application ID, client secret, bot token and server ID (secrets encrypted), the exact redirect URL to register, a link to add the bot (Create Instant Invite permission) and a connected count. Alerts & settings: **Connect Discord** (Discord consent screen, scopes `identify guilds.join`, session `state` check) → token exchange → `/users/@me` → bot `PUT /guilds/{id}/members/{user}` → stores only the Discord user id, name and time, and turns Discord on; **Disconnect** clears them. Sending: `discord_dm.send_dm` opens the DM channel and posts (no mentions). Migration 0027 adds the fields, drops `discord_url_ciphertext` and turns every old Discord switch off (nobody is connected yet). Tests: `tracker/test_discord_dm.py`, updated delivery tests. Not verified against the real Discord API from here (no network); the owner's first connect is the live check.
+
+---
+
 ## Add strategy layout (21 October 2026)
 
 Branch `feature/add-strategy-layout` from main (after PR #48). Owner asked for the decisions first and the backtest last, with the narrow decisions side by side. The page now shows three cards in a row (1 · Strategy and account, 2 · The funds you'll buy, 3 · Your starting point; two columns under 1200px, stacked under 760px), then one action bar (Go live now + Create strategy), then "How each strategy did in the past". Funds are compact cards instead of a wide table. Form fields, names and behaviour are unchanged.

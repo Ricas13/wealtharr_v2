@@ -67,7 +67,7 @@ class SettingsAndRoutingTests(TestCase):
         cfg.smtp_host = "smtp.private.test"
         cfg.smtp_sender = "from@example.test"
         cfg.smtp_password_ciphertext = "SECRET_SMTP_CIPHERTEXT"
-        cfg.discord_url_ciphertext = "SECRET_DISCORD_CIPHERTEXT"
+        cfg.discord_bot_token_ciphertext = "SECRET_DISCORD_CIPHERTEXT"
         cfg.save()
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, 200)

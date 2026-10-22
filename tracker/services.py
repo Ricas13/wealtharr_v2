@@ -1,12 +1,9 @@
 """Exact ledger maths in Decimal; no guessed market prices or fake returns."""
 import base64
 import hashlib
-import json
 import re
 from collections import defaultdict
 from decimal import Decimal
-from urllib.request import Request, urlopen
-from urllib.error import URLError
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.core.mail import EmailMessage, get_connection
@@ -139,23 +136,11 @@ def _send_message(channel, owner, cfg, prefs, subject, message):
         EmailMessage(subject, message, cfg.smtp_sender,
                      [prefs.destination_email], connection=connection).send(fail_silently=False)
     elif channel == "discord":
-        from urllib.parse import urlsplit
-        url = decrypt_secret(cfg.discord_url_ciphertext)
-        parsed = urlsplit(url)
-        if (parsed.scheme != "https" or
-                parsed.hostname not in ("discord.com", "discordapp.com") or
-                not re.fullmatch(r"/api/webhooks/[0-9]+/[A-Za-z0-9_-]+", parsed.path)):
-            raise ValueError("Discord webhook not configured")
-        payload = json.dumps({
-            "content": (subject + "\n" + message)[:1900],
-            "allowed_mentions": {"parse": []}
-        }).encode("utf-8")
-        request = Request(url, data=payload,
-                          headers={"Content-Type": "application/json",
-                                   "User-Agent": "Wealtharr/2"}, method="POST")
-        with urlopen(request, timeout=10) as response:
-            if response.status not in (200, 204):
-                raise ValueError("Discord rejected notification")
+        # A private DM from the site's bot to the owner's connected account.
+        from .discord_dm import send_dm
+        if not prefs.discord_user_id:
+            raise ValueError("Discord not connected")
+        send_dm(cfg, prefs.discord_user_id, subject + "\n" + message)
     else:
         raise ValueError("Unsupported notification channel")
 

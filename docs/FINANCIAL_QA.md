@@ -20,7 +20,7 @@
 
 **Security / notifications**
 1. Test unauthenticated and second-owner access to every endpoint; only staff may change global transport secrets.
-2. Verify private webhook URL/SMTP password never appears in templates, logs or exception messages.
+2. Verify the Discord client secret/bot token and SMTP password never appear in templates, logs or exception messages.
 3. Test alert idempotency on repeated scheduler runs and simulate lost network acknowledgements (at-least-once delivery).
 4. Suppress old immediate quarterly dispatch before enabling the new digest scheduler; continue urgent SPIKE_WATCH and THIRTY_DOWN notices.
 5. **No broker API connection at all**, including read-only keys; Trading 212 history is provided only by owner-imported CSV or manual transaction confirmation. Test that no broker API credentials, client or trading endpoints have been introduced.

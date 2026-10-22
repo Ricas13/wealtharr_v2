@@ -2,8 +2,19 @@
 <div class="w2-grid2">
   <section class="w2-card" aria-labelledby="w2-admin-mail-title" id="mail">
     <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-mail-title">Mail server and Discord</h2>
-      <span class="w2-muted">SMTP {% if smtp_password_set %}set up{% else %}not set up{% endif %} · Discord {% if discord_set %}set up{% else %}not set up{% endif %}</span></div>
-    <p class="w2-note">Passwords and the webhook are stored encrypted and never shown again; leave them blank to keep the saved ones.</p>
+      <span class="w2-muted">SMTP {% if smtp_password_set %}set up{% else %}not set up{% endif %} · Discord DMs {% if discord_set %}set up{% else %}not set up{% endif %}</span></div>
+    <p class="w2-note">Passwords, the client secret and the bot token are stored encrypted and never shown again; leave them blank to keep the saved ones.</p>
+    <details class="w2-note" id="discord-setup">
+      <summary><strong>Set up Discord DMs</strong> (once)</summary>
+      <ol class="w2-setup-steps">
+        <li>In the <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer">Discord Developer Portal ↗</a>, create an application. Copy its <em>Application ID</em> and, under OAuth2, its <em>Client secret</em>.</li>
+        <li>Under OAuth2 → Redirects, add exactly: <code>{{ discord_redirect }}</code></li>
+        <li>Under Bot, reset and copy the <em>bot token</em>. It needs no privileged intents.</li>
+        <li>Make a private Discord server for Wealtharr. With Developer Mode on, right-click it and copy its <em>Server ID</em>.</li>
+        <li>Fill in the four fields below and save, then {% if discord_bot_invite %}<a href="{{ discord_bot_invite }}" target="_blank" rel="noopener noreferrer">add the bot to that server ↗</a>{% else %}add the bot to that server (the link appears once the Application ID is saved){% endif %}.</li>
+      </ol>
+      <p>Each person then clicks <strong>Connect Discord</strong> in Alerts &amp; settings. {{ discord_connected }} connected so far.</p>
+    </details>
     <form method="post" action="{% url 'control' %}" class="w2-admin-form">
       {% csrf_token %}
       {% for field in form %}
@@ -19,7 +30,7 @@
 
   <section class="w2-card" aria-labelledby="w2-admin-test-title">
     <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-test-title">Test and status</h2></div>
-    <p class="w2-note">A test goes to your own alert destinations from Alerts &amp; settings.</p>
+    <p class="w2-note">A test goes to your own alert destinations from Alerts &amp; settings (for Discord, your connected account).</p>
     <div class="w2-row w2-space-top">
       <form method="post" action="{% url 'v2_notification_test' channel='email' %}">{% csrf_token %}<button type="submit" class="w2-button">Send email test</button></form>
       <form method="post" action="{% url 'v2_notification_test' channel='discord' %}">{% csrf_token %}<button type="submit" class="w2-button">Send Discord test</button></form>

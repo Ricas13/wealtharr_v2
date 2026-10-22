@@ -11,7 +11,7 @@ Open **Settings → Notifications**. Enable email and/or Discord as a destinatio
 - **Review follow-ups:** at most one per week for an outstanding current-quarter review after the configured delay; after actual partial fills this is a bookkeeping reminder only
 - **Contribution reminders:** a calendar-month target, based only on genuine recorded deposits; no direct debit, scheduled broker payment or fictitious deposit
 
-The master destination switches and category matrix **both** have to permit a message; monthly reminders have one additional opt-in master toggle. Newly created owner preferences have email and Discord **off** by default. Email requires a destination email address plus working SMTP transport. Discord requires a secret webhook configured by a staff administrator. Only staff can view/change transport secrets or send test deliveries. Normal owners may view only their own delivery receipts and statuses. The scheduler health table is staff-only.
+The master destination switches and category matrix **both** have to permit a message; monthly reminders have one additional opt-in master toggle. Newly created owner preferences have email and Discord **off** by default. Email requires a destination email address plus working SMTP transport. Discord sends private DMs: a staff administrator sets up the Discord bot once on the Admin page (application ID, client secret, bot token, server ID), then each person clicks **Connect Discord** in Alerts & settings, which adds them to that private server so the bot can DM them. Only their Discord user id and name are stored. Only staff can view/change transport secrets or send test deliveries. Normal owners may view only their own delivery receipts and statuses. The scheduler health table is staff-only.
 
 Push/mobile notifications are *not implemented*: neither a push provider nor a device token is configured.
 
@@ -22,7 +22,7 @@ Push/mobile notifications are *not implemented*: neither a push provider nor a d
 - A failed send has a maximum of three attempts, with a persisted 5, 15 minute exponential delay. A stuck `SENDING` record may be retried only after 15 minutes.
 - Every retry checks the latest destination switch and recorded alert category; disabling either permanently marks the pending receipt `CANCELLED`, rather than replaying it if the owner later opts in again. Older event keys use explicit prefix-based category inference; untyped historical receipts still obey destination masters.
 - This is **at-least-once** network delivery. If a remote endpoint accepted a message but its acknowledgment disappeared, a retry can duplicate an advisory alert. No claim of global exactly-once transport delivery.
-- `NotificationDelivery.status` tracks `SENDING`, `PENDING`, `FAILED`, `SENT`, and owner-muted `CANCELLED`. `attempts` and `next_retry_at` enable honest diagnostics; the status view never reveals stored message bodies or webhook credentials.
+- `NotificationDelivery.status` tracks `SENDING`, `PENDING`, `FAILED`, `SENT`, and owner-muted `CANCELLED`. `attempts` and `next_retry_at` enable honest diagnostics; the status view never reveals stored message bodies or Discord credentials.
 
 ## Scheduler and troubleshooting
 
@@ -40,7 +40,7 @@ docker compose exec web python manage.py retry_notifications
 
 `tracker/notification_scheduler.py` records a `NotificationSchedulerRun` for each canonical scheduler iteration, including start/end, success/failure, new deliveries, attempted retries, successful retries and a **generic, redacted** failure code. An unfinished run older than an hour is flagged as interrupted; an otherwise last successful heartbeat older than three hours is flagged as overdue. These are operational observations, not evidence of quote freshness or recommendation correctness.
 
-When a recipient reports a missing message, check category/channel settings, destination email, SMTP or Discord webhook configuration, recent owner delivery receipts, retry exhaustion and admin scheduler heartbeat. Test the configured channel manually; no test or scheduler should contain a broker account key. Never show SMTP passwords or webhook URLs in user-facing statuses.
+When a recipient reports a missing message, check category/channel settings, destination email, SMTP or Discord bot configuration and whether the person's Discord is connected, recent owner delivery receipts, retry exhaustion and admin scheduler heartbeat. Test the configured channel manually; no test or scheduler should contain a broker account key. Never show SMTP passwords, the Discord client secret or the bot token in user-facing statuses.
 
 ## Boundaries and validation
 
