@@ -24,7 +24,7 @@ from .models import (
     SignalFill, StrategyInstance, StrategySignal,
 )
 from .services import ledger_summary, validate_and_record
-from .strategies.instruments import symbols as fund_symbols
+from .strategies.instruments import symbol_labels, symbols as fund_symbols
 from .v2_review_refresh import rebuild_value_history, retire_stale_reviews
 from .v2_ledger_core import (
     ZERO, EffectiveEntry, effective_entries, evidence_impact, find_entry,
@@ -39,13 +39,14 @@ from .core.isa_allowance import estimate_allowance, tax_year_bounds
 KIND_GROUPS = (
     ("all", "All"), ("DEPOSIT", "Deposits"), ("WITHDRAW", "Withdrawals"),
     ("BUY", "Buys"), ("SELL", "Sells"), ("DIVIDEND", "Dividends"), ("INTEREST", "Interest"), ("FEE", "Fees"),
+    ("SPLIT", "Splits"),
 )
 TABS = {"entries", "rebalances", "history"}
 # The All / Money / Trades tabs above the entries table.
 FILTER_GROUPS = {
-    "all": ("All", {"DEPOSIT", "WITHDRAW", "DIVIDEND", "INTEREST", "FEE", "BUY", "SELL"}),
+    "all": ("All", {"DEPOSIT", "WITHDRAW", "DIVIDEND", "INTEREST", "FEE", "BUY", "SELL", "SPLIT"}),
     "money": ("Money", {"DEPOSIT", "WITHDRAW", "DIVIDEND", "INTEREST", "FEE"}),
-    "trades": ("Trades", {"BUY", "SELL"}),
+    "trades": ("Trades", {"BUY", "SELL", "SPLIT"}),
 }
 OPERATIONS = {"new", "edit", "delete", "restore"}
 
@@ -197,6 +198,8 @@ def _cash_move(entry):
         return entry.amount
     if entry.kind in ("WITHDRAW", "FEE"):
         return -entry.amount
+    if entry.kind == "SPLIT":
+        return D("0")
     gross = (entry.quantity * entry.unit_price).quantize(D("0.01"))
     return -(gross + entry.fee) if entry.kind == "BUY" else gross - entry.fee
 
@@ -249,6 +252,17 @@ def _input_payload(post, strategy):
         "symbol": "", "quantity": "0", "unit_price": "0", "amount": "0",
         "fee": "0", "note": note,
     }
+    if kind == "SPLIT":
+        symbol = post.get("symbol", "").strip()
+        if not symbol or symbol not in fund_symbols(strategy):
+            raise ValidationError("Choose the fund that split.")
+        payload["symbol"] = symbol
+        ratio = _decimal(post.get("ratio", "") or post.get("quantity", ""), "split ratio",
+                         precision=8, allow_zero=False)
+        if ratio == 1:
+            raise ValidationError("A split ratio of 1 changes nothing.")
+        payload["quantity"] = str(ratio)
+        return payload
     if kind in ("BUY", "SELL"):
         symbol = post.get("symbol", "").strip()
         if not symbol or symbol not in fund_symbols(strategy):
@@ -485,6 +499,7 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                     "delete": "Delete ledger entry", "restore": "Restore ledger entry"}[operation],
         instance=strategy, section="ledger",
         ledger_edit=True, edit_operation=operation, edit_entry=old,
+        edit_symbols=tuple(symbol_labels(strategy).items()),
         edit_values=view["form_values"], edit_preview=view["preview"],
         edit_isa_warning=view["isa_warning"], edit_error=error,
     )

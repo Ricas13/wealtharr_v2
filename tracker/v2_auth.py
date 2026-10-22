@@ -108,6 +108,12 @@ def change_password(request):
     return render(request, "v2/password.html", {"form": form})
 
 
+def _isa_limit_status():
+    from django.utils import timezone
+    from .core.isa_allowance import limit_check_status
+    return limit_check_status(timezone.localdate())
+
+
 @staff_member_required
 def control(request):
     """Owner admin page, inside the normal app shell (staff only)."""
@@ -142,6 +148,7 @@ def control(request):
         turnstile_required=settings.TURNSTILE_REQUIRED,
         scheduler_run=NotificationSchedulerRun.objects.order_by("-started_at", "-pk").first(),
         invite_count=InviteRequest.objects.count(),
+        isa_limit=_isa_limit_status(),
         price_problems=YahooSync.objects.exclude(last_error="").order_by("symbol"),
         price_revisions=PriceRevision.objects.filter(accepted_at__isnull=True),
     )

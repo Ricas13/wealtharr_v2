@@ -176,7 +176,7 @@ def _external_after_signal(locked, signal, fills):
     """
     linked = {fill.ledger_entry_id for fill in fills}
     actual = set(locked.ledger.filter(occurred_on__gt=signal.as_of,
-                                      kind__in=("BUY", "SELL", "WITHDRAW"))
+                                      kind__in=("BUY", "SELL", "WITHDRAW", "SPLIT"))
                  .values_list("pk", flat=True))
     return actual != linked
 

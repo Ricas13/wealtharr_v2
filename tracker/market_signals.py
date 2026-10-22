@@ -244,6 +244,9 @@ def review_strategy(strategy):
         elif entry.kind == LedgerEntry.SELL:
             cash += (entry.quantity * entry.unit_price).quantize(CENTS) - entry.fee
             positions[entry.symbol] = qty - entry.quantity
+        elif entry.kind == LedgerEntry.SPLIT:
+            from .services import split_quantity
+            positions[entry.symbol] = split_quantity(qty, entry.quantity)
     stock_qty = positions.get(strategy.equity_symbol, ZERO)
     safe_qty = positions.get(strategy.safe_symbol, ZERO)
     if stock_qty <= ZERO or safe_qty < ZERO or cash < ZERO:

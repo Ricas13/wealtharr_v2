@@ -19,6 +19,20 @@ def cash_symbol(instance):
     return CASH_SYMBOLS.get(instance.account.currency, CASH_SYMBOL)
 
 
+def _with_income(end, begin, currency):
+    """The window's end price plus cash paid per share inside the window.
+
+    The published rule compares 12-month total returns. Distributing funds
+    (BIL, SPY, ACWX) pay income out instead of growing the price, so it is
+    added back (not reinvested: a small difference over 12 months).
+    """
+    from tracker.models import DividendEvent
+    paid = sum(DividendEvent.objects.filter(
+        symbol=end.symbol, currency=currency, ex_date__gt=begin.as_of, ex_date__lte=end.as_of,
+    ).values_list("amount", flat=True), Decimal("0"))
+    return v1.Quote(end.symbol, end.price_gbp + paid, end.as_of) if paid else end
+
+
 def decide(instance, as_of, *, positions=None, cash=None):
     """Run the pure rules at month end ``as_of`` from verified closes. Read-only."""
     from tracker.market_data import period_close, settlement_close
@@ -44,7 +58,7 @@ def decide(instance, as_of, *, positions=None, cash=None):
     for key, symbol in (("us", funds.get("us")), ("intl", funds.get("intl")), ("cash", cash_symbol(instance))):
         begin, end = (quote(symbol, start), quote(symbol, as_of)) if symbol else (None, None)
         if begin and end:
-            lookbacks[key] = v1.Lookback(begin, end)
+            lookbacks[key] = v1.Lookback(begin, _with_income(end, begin, instance.account.currency))
     return v1.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes,
                        lookbacks=lookbacks, as_of=as_of, window_start=start)
 

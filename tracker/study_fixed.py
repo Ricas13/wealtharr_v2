@@ -20,7 +20,7 @@ from decimal import Decimal
 
 from .core.calendar import month_end_on_or_after, quarter_end_on_or_after
 from .models import StudyPrice
-from .study import TIMEFRAMES, _buy_and_hold, _new_month, _summary, start_index  # noqa: F401
+from .study import TIMEFRAMES, _buy_and_hold, _new_month, _summary, fill_orders, start_index  # noqa: F401
 
 D = Decimal
 CASH = "CASH"
@@ -190,7 +190,7 @@ class FixedWeightStudy:
             data.vti.append(_last(vti_days, vti, d))
         return data
 
-    def _strategy(self, data, s, amount, monthly):
+    def _strategy(self, data, s, amount, monthly, fill="close"):
         rules, days = self.rules, data.days
         weights = dict(rules.WEIGHTS)
         roles = [r for r, _ in rules.WEIGHTS]
@@ -202,9 +202,13 @@ class FixedWeightStudy:
         positions = {r: D("0") for r in roles}
         cash = D(str(amount))
         trades = 0
+        pending = []
 
-        def apply(result):
-            nonlocal cash, trades
+        def apply(result, now=False):
+            nonlocal cash, trades, pending
+            if fill == "next" and not now:
+                pending = [(t.role, t.side, t.quantity) for t in result.trades]
+                return
             for t in result.trades:
                 if t.side == "BUY":
                     positions[t.role] += t.quantity
@@ -216,9 +220,13 @@ class FixedWeightStudy:
             cash = max(cash, D("0"))
 
         # Opening buys at the weights, as setup suggests.
-        apply(rules.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes(s), as_of=days[s]))
+        apply(rules.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes(s), as_of=days[s]),
+              now=True)
         flows, values = [(days[s], amount)], []
         for i in range(s, len(days)):
+            if pending:
+                cash, filled = fill_orders(pending, positions, cash, {r: q.price_gbp for r, q in quotes(i).items()})
+                trades, pending = trades + filled, []
             if i > s and _new_month(days, i) and monthly:
                 cash += D(str(monthly))
                 flows.append((days[i], monthly))
@@ -237,12 +245,12 @@ class FixedWeightStudy:
             values.append(float(cash + sum(positions[r] * D(str(round(data.prices[r][i], 6))) for r in roles)))
         return {"values": values, "flows": flows, "trades": trades}
 
-    def run(self, data, key, amount, monthly):
+    def run(self, data, key, amount, monthly, fill="close"):
         s = start_index(data, key)
         if s is None:
             return None
         raw = {
-            "strategy": self._strategy(data, s, amount, monthly),
+            "strategy": self._strategy(data, s, amount, monthly, fill),
             "spy": _buy_and_hold(data.spy, data.days, s, amount, monthly),
             "vti": _buy_and_hold(data.vti, data.days, s, amount, monthly),
         }

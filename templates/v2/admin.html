@@ -51,6 +51,8 @@
       <span class="w2-muted">{% if scheduler_run %}Last ran {{ scheduler_run.started_at|date:"j M H:i" }} · {{ scheduler_run.status|lower }}{% if scheduler_run.error_code %} · {{ scheduler_run.error_code }}{% endif %}{% else %}Hasn't run yet{% endif %}</span></div>
     <div class="w2-setting-row"><span>Signed-out bot check (Turnstile)</span>
       <span class="w2-muted">{% if turnstile_set %}set up{% if turnstile_required %} · required{% endif %}{% else %}not set up{% endif %}</span></div>
+    <div class="w2-setting-row"><span>ISA allowance limit</span>
+      <span class="{% if not isa_limit.current or isa_limit.days_left < 60 %}w2-chip w2-wait{% else %}w2-muted{% endif %}">{% if isa_limit.current %}checked for {{ isa_limit.checked_year }}{% if isa_limit.days_left < 60 %} · check the new year's limit before {{ isa_limit.expires|date:"j M Y" }}{% endif %}{% else %}not checked for this tax year: ISA cards are hidden until it's updated{% endif %}</span></div>
     <div class="w2-setting-row"><span>Invite requests</span>
       <a href="{% url 'admin:tracker_inviterequest_changelist' %}">{{ invite_count }} waiting to be read</a></div>
   </section>

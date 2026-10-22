@@ -24,17 +24,20 @@
               <option value="DIVIDEND" {% if edit_values.kind == 'DIVIDEND' %}selected{% endif %}>Dividend</option>
               <option value="INTEREST" {% if edit_values.kind == 'INTEREST' %}selected{% endif %}>Interest on cash</option>
               <option value="FEE" {% if edit_values.kind == 'FEE' %}selected{% endif %}>Fee</option>
+              <option value="SPLIT" {% if edit_values.kind == 'SPLIT' %}selected{% endif %}>Share split or consolidation</option>
             </select>
           </label>
         </div>
         <div class="w2-form-grid">
-          <label class="w2-field" data-v2-trade-field>Instrument / exact trading line
+          <label class="w2-field" data-v2-fund-field>Instrument / exact trading line
             <select name="symbol" class="w2-input">
               <option value="">Choose instrument</option>
-              <option value="{{ selected_instance.equity_symbol }}" {% if edit_values.symbol == selected_instance.equity_symbol %}selected{% endif %}>{{ selected_instance.equity_symbol }} · Growth</option>
-              <option value="{{ selected_instance.safe_symbol }}" {% if edit_values.symbol == selected_instance.safe_symbol %}selected{% endif %}>{{ selected_instance.safe_symbol }} · Safe</option>
+              {% for symbol, label in edit_symbols %}<option value="{{ symbol }}" {% if edit_values.symbol == symbol %}selected{% endif %}>{{ symbol }} · {{ label }}</option>{% endfor %}
             </select>
           </label>
+          <label class="w2-field" data-v2-split-field hidden>New shares for each old share
+            <input class="w2-input" name="ratio" type="number" min="0.00000001" step="0.00000001" value="{% if edit_values.kind == 'SPLIT' %}{{ edit_values.quantity }}{% endif %}" placeholder="2 for a 2-for-1 split, 0.1 for 1-for-10">
+            <small class="w2-muted">Your share count is multiplied by this; no cash moves and your total cost stays the same. If the broker paid cash for a fraction left over, record that as a Sell.</small></label>
           <label class="w2-field" data-v2-cash-field>Actual GBP amount
             <input class="w2-input" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="{{ edit_values.amount }}" placeholder="500.00"></label>
           <label class="w2-field" data-v2-trade-field>Actual shares

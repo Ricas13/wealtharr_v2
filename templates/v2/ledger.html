@@ -41,9 +41,9 @@
     <tbody>{% for row in ledger_rows %}{% with entry=row.entry %}
     <tr {% if entry.deleted %}class="w2-deleted-row"{% endif %}>
       <td>{{ entry.occurred_on|date:"j M Y" }}</td>
-      <td>{% if entry.kind == 'INTEREST' %}Interest{% elif entry.kind == 'WITHDRAW' %}Withdrawal{% else %}{{ entry.kind|title }}{% endif %}{% if entry.deleted %} <span class="w2-chip">Deleted</span>{% endif %}</td>
+      <td>{% if entry.kind == 'INTEREST' %}Interest{% elif entry.kind == 'WITHDRAW' %}Withdrawal{% elif entry.kind == 'SPLIT' %}Split ×{{ entry.quantity|floatformat:-4 }}{% else %}{{ entry.kind|title }}{% endif %}{% if entry.deleted %} <span class="w2-chip">Deleted</span>{% endif %}</td>
       <td>{{ entry.symbol|default:"—" }}</td>
-      <td class="w2-r">{% if entry.quantity %}{{ entry.quantity|floatformat:-4 }}{% else %}<span class="w2-muted">—</span>{% endif %}</td>
+      <td class="w2-r">{% if entry.quantity and entry.kind != 'SPLIT' %}{{ entry.quantity|floatformat:-4 }}{% else %}<span class="w2-muted">—</span>{% endif %}</td>
       <td class="w2-r">{% if entry.unit_price %}{{ entry.unit_price|floatformat:-4 }}{% else %}<span class="w2-muted">—</span>{% endif %}</td>
       <td class="w2-r">{% if entry.kind == 'BUY' or entry.kind == 'SELL' %}{{ entry.fee|floatformat:2 }}{% else %}<span class="w2-muted">—</span>{% endif %}</td>
       <td class="w2-r {% if row.move > 0 %}w2-pos{% elif row.move < 0 %}w2-neg{% endif %}">{% if entry.deleted %}<span class="w2-muted">—</span>{% else %}{% if row.move > 0 %}+{% endif %}{{ row.move|floatformat:"2g" }}{% endif %}</td>

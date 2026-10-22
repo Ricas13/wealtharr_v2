@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from .core.calendar import months_before
-from .study import _new_month
+from .study import _new_month, fill_orders
 from .study_fixed import FixedWeightStudy
 
 D = Decimal
@@ -29,7 +29,7 @@ class MomentumStudy(FixedWeightStudy):
         super().__init__(title=title, rules=rules, sources=sources, review_word="monthly",
                          currency=currency)
 
-    def _strategy(self, data, s, amount, monthly):
+    def _strategy(self, data, s, amount, monthly, fill="close"):
         rules, days = self.rules, data.days
         roles = rules.ROLES
         funds = {r: r for r in roles}
@@ -44,9 +44,10 @@ class MomentumStudy(FixedWeightStudy):
         positions = {r: D("0") for r in roles}
         cash = D(str(amount))
         trades = 0
+        pending = []
 
-        def review(i, as_of, window_start):
-            nonlocal cash, trades
+        def review(i, as_of, window_start, now=False):
+            nonlocal cash, trades, pending
             j = at_or_before(window_start)
             if j is None:
                 return
@@ -56,6 +57,9 @@ class MomentumStudy(FixedWeightStudy):
             quotes = {r: rules.Quote(r, price(r, i), days[i]) for r in roles}
             result = rules.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes,
                                     lookbacks=lookbacks, as_of=as_of, window_start=window_start)
+            if fill == "next" and not now:
+                pending = [(t.role, t.side, t.quantity) for t in result.trades]
+                return
             for t in result.trades:
                 if t.side == "BUY":
                     positions[t.role] += t.quantity
@@ -66,9 +70,12 @@ class MomentumStudy(FixedWeightStudy):
                 trades += 1
             cash = max(cash, D("0"))
 
-        review(s, days[s], _year_before(days[s]))
+        review(s, days[s], _year_before(days[s]), now=True)
         flows, values = [(days[s], amount)], []
         for i in range(s, len(days)):
+            if pending:
+                cash, filled = fill_orders(pending, positions, cash, {r: price(r, i) for r in roles})
+                trades, pending = trades + filled, []
             if i > s and _new_month(days, i) and monthly:
                 cash += D(str(monthly))
                 flows.append((days[i], monthly))

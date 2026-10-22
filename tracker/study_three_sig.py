@@ -11,7 +11,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from .models import StudyPrice
-from .study import _floor_qty, _new_month, _quarter_end
+from .study import _floor_qty, _new_month, _quarter_end, fill_orders
 from .study_fixed import FixedWeightStudy
 
 D = Decimal
@@ -28,7 +28,7 @@ class ThreeSigStudy(FixedWeightStudy):
                         StudyPrice.objects.filter(symbol="SPY").order_by("as_of").only("as_of", "close")]
         return data
 
-    def _strategy(self, data, s, amount, monthly):
+    def _strategy(self, data, s, amount, monthly, fill="close"):
         rules, days = self.rules, data.days
         growth_role, safe_role = list(self.sources)
         growth, safe = data.prices[growth_role], data.prices[safe_role]
@@ -44,9 +44,16 @@ class ThreeSigStudy(FixedWeightStudy):
         start_day, start_cost = days[s], equity * g0
         contributions, down_q, skipped, trades, resets = [], None, 0, 0, 0
         flows, values = [(days[s], amount)], []
+        pending, pending_reset = [], None
         for i in range(s, len(days)):
             day = days[i]
             g, sf = px(growth, i), px(safe, i)
+            if pending:
+                held = {growth_role: equity, safe_role: reserve}
+                cash, filled = fill_orders(pending, held, cash, {growth_role: g, safe_role: sf})
+                equity, reserve, trades, pending = held[growth_role], held[safe_role], trades + filled, []
+                if pending_reset:
+                    start_day, start_cost, pending_reset = pending_reset, equity * g, None
             if i > s and _new_month(days, i) and monthly:
                 cash += D(monthly)
                 contributions.append((day, D(monthly)))
@@ -69,7 +76,15 @@ class ThreeSigStudy(FixedWeightStudy):
                 if any(a["kind"] == "THIRTY_DOWN" for a in alerts):
                     down_q, skipped = review_q, 0
                 plan = next((a for a in alerts if a["kind"] == "QUARTERLY"), None)
-                if plan:
+                if plan and fill == "next":
+                    skipped += sum(a["side"] == "HOLD" for a in plan["actions"])
+                    pending = [(a["symbol"], a["side"], D(a["quantity"])) for a in plan["actions"]
+                               if a["side"] in ("BUY", "SELL")]
+                    if plan.get("reset_reason"):
+                        pending_reset = qend
+                        contributions, down_q, skipped = [], None, 0
+                        resets += 1
+                elif plan:
                     for action in plan["actions"]:
                         qty = D(action["quantity"])
                         if action["side"] == "HOLD":

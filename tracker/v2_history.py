@@ -468,8 +468,13 @@ def _open_action(strategy, summary, today):
         trades = " · ".join("%s ≈ %s%s %s" % (
             a["side"].title(), symbol_for(strategy.account.currency), "{:,.0f}".format(Decimal(str(a.get("estimated_gbp") or 0))), a["symbol"])
             for a in proposed_actions(signal))
-        quarter = (signal.as_of.month - 1) // 3 + 1
-        return {"kind": "review", "title": "Q%s rebalance" % quarter, "detail": trades,
+        from .strategies.registry import module_for
+        plugin = module_for(strategy)
+        word = plugin.cadence_word if plugin else "quarterly"
+        title = ("%d rebalance" % signal.as_of.year if word == "yearly" else
+                 "%s rebalance" % signal.as_of.strftime("%B") if word == "monthly" else
+                 "Q%d rebalance" % ((signal.as_of.month - 1) // 3 + 1))
+        return {"kind": "review", "title": title, "detail": trades,
                 "signal": signal}
     return None
 

@@ -142,6 +142,15 @@ def replay(entries, *, strict=True):
                 cash += row.amount
             elif row.kind == "FEE":
                 cash -= row.amount
+        elif row.kind == "SPLIT":
+            if (not row.symbol or row.quantity <= ZERO or row.quantity == 1 or row.unit_price != ZERO
+                    or row.amount != ZERO or row.fee != ZERO):
+                raise ValidationError("A split needs one fund and a ratio other than 1, with no cash or price.")
+            previous = holdings.get(row.symbol, ZERO)
+            if previous <= ZERO:
+                raise ValidationError("A split needs shares of that fund held on its date.")
+            from .services import split_quantity
+            holdings[row.symbol] = split_quantity(previous, row.quantity)
         elif row.kind in TRADE_KINDS:
             if (not row.symbol or row.quantity <= ZERO or row.unit_price <= ZERO or
                     row.amount != ZERO):
