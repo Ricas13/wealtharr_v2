@@ -2,7 +2,7 @@
       <div class="ctrl">
         <label>Start with <span class="money-in"><span aria-hidden="true">£</span><input type="number" inputmode="numeric" min="{{ compare.limits.amount_min }}" max="{{ compare.limits.amount_max }}" step="1" value="{{ compare.amount }}" data-amount aria-label="Starting amount in pounds"></span></label>
         <label>Add each month <span class="money-in"><span aria-hidden="true">£</span><input type="number" inputmode="numeric" min="0" max="{{ compare.limits.monthly_max }}" step="1" value="{{ compare.monthly }}" data-monthly aria-label="Monthly top-up in pounds"></span></label>
-        <p class="ctrl-out">You'd have put in <strong>£<span data-putin>{% if compare.ready %}{{ compare.put_in|floatformat:"0g" }}{% else %}—{% endif %}</span></strong><span class="mut">over <span data-range-words>{{ compare.range_words }}</span></span></p>
+        <p class="ctrl-out"><span data-putin-title>You'd have put in</span> <strong>£<span data-putin>{% if compare.ready %}{{ compare.put_in|floatformat:"0g" }}{% else %}—{% endif %}</span></strong><span class="mut">over <span data-range-words>{{ compare.range_words }}</span></span></p>
       </div>
 
       <p class="mut" data-empty{% if compare.ready %} hidden{% endif %}>Price history for this comparison is still downloading. Check back soon.</p>
@@ -10,9 +10,9 @@
         <div class="tw"><table>
           <thead><tr><th scope="col">Show</th>
             <th scope="col" aria-sort="none"><button type="button" class="sort" data-sort="label">Strategy</button></th>
-            <th scope="col" class="r" aria-sort="none"><button type="button" class="sort" data-sort="final">Value now</button></th>
+            <th scope="col" class="r" aria-sort="none"><button type="button" class="sort" data-sort="final">Value at end</button></th>
             <th scope="col" class="r" aria-sort="none"><button type="button" class="sort" data-sort="gain_pct">Gain</button></th>
-            <th scope="col" class="r" aria-sort="none"><button type="button" class="sort" data-sort="annual" title="Money-weighted yearly return (XIRR): counts when each top-up went in">Per year*</button></th>
+            <th scope="col" class="r" aria-sort="none"><button type="button" class="sort" data-sort="annual" title="Money-weighted yearly return (XIRR), using the selected opening value and top-ups. Hidden for periods shorter than 360 days.">Per year*</button></th>
             <th scope="col" class="r" aria-sort="none"><button type="button" class="sort" data-sort="drawdown" title="Biggest fall from a high, ignoring top-ups">Worst fall</button></th>
             <th scope="col">Effort</th></tr></thead>
           <tbody data-rows>
@@ -28,6 +28,7 @@
           </tbody>
         </table></div>
 
+        <p class="mut tiny" data-table-status role="status" aria-live="polite">Showing results for the full selected timeframe.</p>
         <div class="row between gap-top">
           <div class="legend" data-legend></div>
           <div class="row tight"><span class="mut tiny" data-scale-hint>Linear: equal heights are equal pounds.</span>
@@ -63,8 +64,9 @@
         <p class="mut tiny">Hover over (or tap) the chart to see each strategy's value on that day and its gain against the money put in by then.</p>
       </div>
       <p class="mut tiny gap-top"><strong>Hypothetical, not anyone's real results.</strong> Real daily prices from Yahoo, converted to pounds, replayed through each strategy's fixed rules with no dealing costs or tax.
+        The table and chart use the selected dates; starting capital for a zoomed period is its opening portfolio value, plus top-ups made afterwards. Gain is measured against that capital.
         Every row covers the same dates<span data-period-wrap{% if not compare.ready %} hidden{% endif %}> (<span data-period>{{ compare.period }}</span>)</span>, the same money and the same top-up days.
-        *Per year is money-weighted (XIRR), so it counts when each top-up went in; worst fall ignores top-ups.
+        *Per year is money-weighted (XIRR) where the selected period has at least 360 days of data; worst fall removes the effect of top-ups.
         The {{ signal_name|default:"quarterly signal" }}'s 60/40 resets are assumed confirmed and filled at the quarter close.
         <span data-left-out{% if not compare.left_out %} hidden{% endif %}>Left out because their price history doesn't cover these dates: <span data-left-out-names>{{ compare.left_out|join:", " }}</span>.</span>
         <span data-simulated{% if not compare.simulated %} hidden{% endif %}>Before the 3× Nasdaq fund launched, its history is rebuilt from 3× QQQ's daily moves, which can look better than reality.</span>
