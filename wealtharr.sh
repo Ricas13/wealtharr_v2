@@ -50,7 +50,7 @@ case "${1:-help}" in
     fi
     [[ ! -e secrets/postgres_password && ! -e secrets/django_secret_key ]] ||
       die "Secret files exist. Refusing to rotate either key."
-    read -r -p "Private hostname (e.g. wealtharr.vpn4u.cc): " HOST
+    read -r -p "Private hostname (e.g. app.example.com): " HOST
     read -r -p "Traefik in Docker? [Y/n]: " DOCKER_PROXY
     if [[ -z "$DOCKER_PROXY" || "$DOCKER_PROXY" =~ ^[Yy]$ ]]; then
       read -r -p "Existing Traefik Docker network: " NET
