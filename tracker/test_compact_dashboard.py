@@ -153,7 +153,7 @@ class CompactPagesTests(TestCase):
         page = self.client.get(self.url("history"))
         self.assertContains(page, "Monthly")
         self.assertNotContains(page, "+20.00")
-        self.assertEqual(dash.certified_points(self.s), [])
+        self.assertEqual([p[1] for p in dash.certified_points(self.s)], [D("1000.00")])
         self.assertEqual(len(dash.recorded_points(self.s)), 2)
 
     def test_index_lines_use_stored_usd_closes_only(self):
