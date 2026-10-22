@@ -17,6 +17,7 @@ docker_proxy() {
 compose() {
   local args=(-p "$PROJECT" -f compose.yml)
   if docker_proxy; then args+=(-f compose.traefik.yml); fi
+  if [[ -s secrets/data_encryption_key ]]; then args+=(-f compose.data-key.yml); fi
   docker compose "${args[@]}" "$@"
 }
 preflight() {
@@ -48,7 +49,7 @@ case "${1:-help}" in
     if docker volume inspect "${PROJECT}_wealtharr_db" >/dev/null 2>&1; then
       die "Existing database volume. Refusing to generate a new key."
     fi
-    [[ ! -e secrets/postgres_password && ! -e secrets/django_secret_key ]] ||
+    [[ ! -e secrets/postgres_password && ! -e secrets/django_secret_key && ! -e secrets/data_encryption_key ]] ||
       die "Secret files exist. Refusing to rotate either key."
     read -r -p "Private hostname (e.g. app.example.com): " HOST
     read -r -p "Traefik in Docker? [Y/n]: " DOCKER_PROXY
@@ -101,7 +102,7 @@ PY
     python3 - <<'PY'
 import secrets
 from pathlib import Path
-for name in ("postgres_password", "django_secret_key"):
+for name in ("postgres_password", "django_secret_key", "data_encryption_key"):
     p = Path("secrets") / name
     with p.open("x") as out:
         out.write(secrets.token_urlsafe(64))
@@ -112,6 +113,21 @@ PY
     echo "Now run: bash wealtharr.sh start"
     ;;
   start) start ;;
+  enable-data-key)
+    require_files .env.production secrets/django_secret_key
+    [[ ! -e secrets/data_encryption_key ]] || die "Dedicated encryption key already exists."
+    python3 - <<'PY'
+import secrets
+from pathlib import Path
+p = Path("secrets/data_encryption_key")
+with p.open("x") as out:
+    out.write(secrets.token_urlsafe(64))
+p.chmod(0o444)
+print("Dedicated key generated; never printed or committed.")
+PY
+    echo "Back up, rebuild, then run python manage.py migrate_data_encryption in web."
+    echo "Do not rotate django_secret_key until re-encryption and restore are verified."
+    ;;
   update)
     git pull --ff-only origin main
     start
@@ -131,6 +147,7 @@ PY
     cp .env .env.production "$dest/"
     mkdir -m 700 "$dest/secrets"
     cp secrets/postgres_password secrets/django_secret_key "$dest/secrets/"
+    if [[ -s secrets/data_encryption_key ]]; then cp secrets/data_encryption_key "$dest/secrets/"; fi
     chmod 600 "$dest/.env" "$dest/.env.production" "$dest/secrets/"*
     compose exec -T db pg_dump -U wealtharr -d wealtharr -Fc > "$dest/wealtharr.dump.tmp"
     mv "$dest/wealtharr.dump.tmp" "$dest/wealtharr.dump"
@@ -172,6 +189,7 @@ PY
     cat <<'USAGE'
 Wealtharr owner commands (run from your checked-out directory):
   bash wealtharr.sh setup            First-time private configuration
+  bash wealtharr.sh enable-data-key  Generate separate credential encryption key
   bash wealtharr.sh start            Build, migrate, start, verify
   bash wealtharr.sh update           Pull main, rebuild, migrate, verify
   bash wealtharr.sh status           See container health

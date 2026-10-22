@@ -1,0 +1,15 @@
+# Activated only if secrets/data_encryption_key is present.
+services:
+  web:
+    environment:
+      DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
+    secrets:
+      - data_encryption_key
+  reminders:
+    environment:
+      DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
+    secrets:
+      - data_encryption_key
+secrets:
+  data_encryption_key:
+    file: ./secrets/data_encryption_key
