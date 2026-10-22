@@ -58,6 +58,23 @@ class AddStrategyCompareTests(TestCase):
         self.assertNotContains(page, "9Sig")
         self.assertContains(page, "js/compare.js")
 
+    def test_selected_window_api_requires_login_and_has_same_labels(self):
+        self.seed_history()
+        path = reverse("v2_compare_json") + "?amount=1000&monthly=0&range=1y"
+        result = self.client.get(path).json()
+        self.assertTrue(result["ready"])
+        selected = self.client.get(path + "&window_start=5&window_end=125")
+        self.assertEqual(selected.status_code, 200)
+        values = selected.json()
+        self.assertEqual((values["start_index"], values["end_index"]), (5, 125))
+        self.assertIn("nine_sig", values["rows"])
+        self.assertEqual(set(values["rows"]["nine_sig"]), {"final", "gain_pct", "annual", "drawdown"})
+        self.assertIsNone(values["rows"]["nine_sig"]["annual"])  # Short selection
+        self.assertEqual(self.client.get(path + "&window_start=-1&window_end=5").status_code, 400)
+        self.assertEqual(self.client.get(path + "&window_start=5&window_end=999999").status_code, 400)
+        self.client.logout()
+        self.assertEqual(self.client.get(path + "&window_start=5&window_end=125").status_code, 302)
+
     def test_other_pages_do_not_load_the_comparison(self):
         page = self.client.get(reverse("v2_overview"))
         self.assertNotContains(page, "js/compare.js")
