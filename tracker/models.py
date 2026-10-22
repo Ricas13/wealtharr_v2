@@ -358,7 +358,7 @@ class NotificationDelivery(models.Model):
         StrategyInstance, on_delete=models.PROTECT, null=True, blank=True,
         related_name="notification_receipts",
     )
-    channel = models.CharField(max_length=12)
+    channel = models.CharField(max_length=24)
     # Fixed-category provenance lets due retries honor changed owner preferences.
     # Empty for legacy one-off notices which must not be guessed as a category.
     category = models.CharField(max_length=16, blank=True, default="")

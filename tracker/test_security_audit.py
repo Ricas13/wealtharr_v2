@@ -58,3 +58,11 @@ class PublicCompareBudgetTests(TestCase):
         with patch.object(v2_home, "PUBLIC_FRESH_PER_MINUTE", 0):
             response = self.client.get(reverse("v2_compare_json") + "?amount=777&monthly=0&range=1y")
         self.assertEqual(response.status_code, 200)
+
+
+class DeliveryChannelLengthTests(TestCase):
+    def test_every_delivery_channel_fits_the_column(self):
+        from tracker.models import NotificationDelivery
+        from tracker.notification_routing import DELIVERY_CHANNELS
+        limit = NotificationDelivery._meta.get_field("channel").max_length
+        self.assertTrue(all(len(c) <= limit for c in DELIVERY_CHANNELS))
