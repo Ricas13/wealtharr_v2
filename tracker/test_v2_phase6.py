@@ -4,6 +4,8 @@ from decimal import Decimal as D
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
@@ -140,6 +142,31 @@ class V2HistoryTests(TestCase):
         self.assertGreater(report["inception"].xirr_annual, D("0"))
         self.assertIsNone(report["period"])  # No fabricated flow boundaries.
         self.assertContains(self.client.get(self._url()), "Source-verified GBP valuation")
+
+    def test_multiple_verified_history_days_batch_quote_provenance_without_changing_values(self):
+        self._record(amount="1000")
+        self._record(kind="BUY", amount="0", day=self.start+timedelta(days=1),
+                     symbol="LQQ3.L", qty="2", price="100")
+        for i in range(12):
+            day = self.start + timedelta(days=i + 2)
+            value = D("150") + D(i)
+            self._snapshot(self.account, day, str(D("800") + value*2), "1000")
+            MarketObservation.objects.create(
+                symbol="LQQ3.L", as_of=day, price=value,
+                currency="GBP", source="yahoo",
+                raw_quote_unit="GBp", raw_close=value * D("100"),
+                raw_unit_verified=True,
+            )
+        with CaptureQueriesContext(connection) as captured:
+            result = build_history(self.account)
+        self.assertEqual(len(result["all_points"]), 12)
+        self.assertTrue(all(point.certified for point in result["all_points"]))
+        self.assertEqual(result["all_points"][0].value_gbp, D("1100"))
+        self.assertEqual(result["all_points"][-1].value_gbp, D("1122"))
+        quote_reads = [q for q in captured.captured_queries
+                       if "SELECT" in q["sql"].upper()
+                       and "tracker_marketobservation" in q["sql"].lower()]
+        self.assertEqual(len(quote_reads), 1, "Market evidence must be batch-loaded")
 
     def test_raw_unit_scale_mismatch_and_price_hold_both_refuse_xirr(self):
         self._record(amount="1000")
