@@ -121,7 +121,10 @@
     var selected = view && !isFullView();
     var status = box.querySelector("[data-table-status]");
     text("[data-period]", selected ? dateAt(view.start) + " – " + dateAt(view.end) : state.period);
-    text("[data-putin-title]", selected ? "Opening value + top-ups" : "You'd have put in");
+    text("[data-putin-title]", selected
+      ? (selectedMetrics ? selectedMetrics.reference_label + " opening value + top-ups"
+        : "Reference strategy opening value + top-ups")
+      : "You'd have put in");
     text("[data-range-words]", selected ? "selected dates" : state.range_words);
     text("[data-putin]", selected
       ? (selectedMetrics ? money(selectedMetrics.put_in) : "—")

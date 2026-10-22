@@ -14,7 +14,7 @@ def comparison():
     invested = [100.0] * 200 + [150.0] * 201
     return {
         "ready": True, "rows": [
-            {"key": "strategy", "points": points, "annual": 2.0, "final": 140.0},
+            {"key": "strategy", "label": "Reference model", "points": points, "annual": 2.0, "final": 140.0},
             {"key": "flat", "points": [100.0] * 200 + [150.0] * 201, "annual": 0.0,
              "final": 150.0},
         ],
@@ -37,6 +37,7 @@ class SelectedPeriodTests(SimpleTestCase):
         out = selected_period_metrics(data, 0, 400)
         strategy = out["rows"]["strategy"]
         self.assertEqual(out["put_in"], 150.0)
+        self.assertEqual(out["reference_label"], "Reference model")
         self.assertEqual(strategy["final"], 140.0)
         self.assertEqual(strategy["gain_pct"], -6.67)
         self.assertEqual(strategy["drawdown"], -6.67)

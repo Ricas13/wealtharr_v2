@@ -275,8 +275,9 @@ def selected_period_metrics(comparison, start_index, end_index):
         "rows": rows,
         "period": "%s – %s" % (_day(days[0]), _day(days[-1])),
         "put_in": round(comparison["rows"][0]["points"][start_index] + additional, 2),
+        "reference_label": comparison["rows"][0]["label"],
         "start_index": start_index, "end_index": end_index,
-        "description": "opening portfolio value plus top-ups during the selection",
+        "description": "reference strategy's opening value plus top-ups during selection",
     }
 
 
