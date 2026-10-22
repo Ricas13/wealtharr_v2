@@ -1,5 +1,5 @@
 {% load w2_format %}    <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">Growth vs quarter target</h2>{% if dash_target.available %}<span class="w2-chip w2-info">Q to {{ dash_target.quarter_end|date:"j M" }}</span>{% endif %}</div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='target' %} Growth vs quarter target</h2>{% if dash_target.available %}<span class="w2-chip w2-info">Q to {{ dash_target.quarter_end|date:"j M" }}</span>{% endif %}</div>
       {% if dash_target.available %}
         <div class="w2-kv"><span>Target at {{ dash_target.quarter_end|date:"j M" }} (+9%)</span><strong>{{ cur }}{{ dash_target.target|floatformat:"2g" }}</strong></div>
         <div class="w2-kv"><span>Growth ({{ selected_instance.equity_symbol }}) now</span><strong>{% if dash_target.growth is not None %}{{ cur }}{{ dash_target.growth|floatformat:"2g" }}{% else %}—{% endif %}</strong></div>
@@ -15,7 +15,7 @@
     </section>
 
     <section class="w2-card w2-span2" aria-labelledby="w2-quarter-heading">
-      <div class="w2-ch"><h2 class="w2-ct" id="w2-quarter-heading">Quarter by quarter</h2><a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}">Reviews</a></div>
+      <div class="w2-ch"><h2 class="w2-ct" id="w2-quarter-heading">{% include 'partials/icon.html' with name='calendar' %} Quarter by quarter</h2><a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}">Reviews</a></div>
       <div class="w2-table-wrap"><table class="w2-table">
         <thead><tr><th>Quarter</th><th class="w2-r">Growth start</th><th class="w2-r">Target +9%</th><th class="w2-r">Growth at end</th><th class="w2-r">Difference</th><th>Signal</th><th class="w2-r">Amount</th><th>Status</th></tr></thead>
         <tbody>{% for row in dash_quarters %}

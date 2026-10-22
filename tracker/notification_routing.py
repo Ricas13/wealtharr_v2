@@ -15,6 +15,8 @@ CATEGORIES = (
     ("contribution", "Monthly deposit reminder"),
 )
 CATEGORY_KEYS = {value for value, _ in CATEGORIES}
+# A glyph at the start of each alert's subject so it stands out in a chat or inbox.
+CATEGORY_EMOJI = {"quarterly": "📈", "urgent": "🚨", "data": "⚠️", "followup": "⏰", "contribution": "💰"}
 CHANNELS = ("email", "discord", "telegram")
 # Where alerts are delivered. A strategy routes an alert to "discord"; it then
 # goes to each Discord destination the person switched on: a DM from the
@@ -68,6 +70,9 @@ def route_notice(owner, category, event_key, subject, message, *,
     ).values_list("channel", flat=True))
     # The production transport persists the category for future opt-out-safe
     # retries. Explicit injected senders remain compatible with existing tests.
+    emoji = CATEGORY_EMOJI.get(category)
+    if emoji and not subject.startswith(emoji):
+        subject = emoji + " " + subject
     transport = sender or dispatch
     if transport is dispatch:
         outcomes = transport(owner, event_key, subject, message,

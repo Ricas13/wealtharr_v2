@@ -2,7 +2,7 @@
 {% if notification_form.errors %}<div class="w2-form-error" role="alert">{{ notification_form.errors }}</div>{% endif %}
 <div class="w2-grid2">
   <section class="w2-card" aria-labelledby="w2-destination-title">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-destination-title">Where alerts go</h2><span class="w2-muted">All strategies</span></div>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-destination-title">{% include 'partials/icon.html' with name='bell' %} Where alerts go</h2><span class="w2-muted">All strategies</span></div>
     <form method="post" action="{% url 'v2_settings' %}">
       {% csrf_token %}
       <input type="hidden" name="form_kind" value="owner">
@@ -74,7 +74,7 @@
   </section>
 
   <section class="w2-card" aria-labelledby="w2-strategy-notification-title">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-strategy-notification-title">Alerts per strategy</h2></div>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-strategy-notification-title">{% include 'partials/icon.html' with name='list' %} Alerts per strategy</h2></div>
     {% for group in strategy_routes %}
       <div class="w2-kv" id="strategy-{{ group.instance.pk }}"><span>{{ group.instance.name }}</span>
         <span>{% for option in group.rows %}{% if option.email or option.discord or option.telegram %}<span class="w2-chip w2-ok">{{ option.title }}</span> {% endif %}{% empty %}{% endfor %}
@@ -85,13 +85,13 @@
   </section>
 
   <section class="w2-card" aria-labelledby="w2-security-title">
-    <h2 class="w2-ct" id="w2-security-title" style="margin-bottom:6px">Security</h2>
+    <h2 class="w2-ct" id="w2-security-title" style="margin-bottom:6px">{% include 'partials/icon.html' with name='lock' %} Security</h2>
     <div class="w2-setting-row"><span>Password</span><a class="w2-button" href="{% url 'change_password' %}">Change password</a></div>
     <div class="w2-setting-row"><span>Two-factor authentication <span class="w2-muted">· {% if has_authenticator %}on{% else %}off (optional){% endif %}</span></span><a class="w2-button" href="{% url 'totp_setup' %}">{% if has_authenticator %}Manage{% else %}Turn on{% endif %}</a></div>
   </section>
 
   <section class="w2-card" aria-labelledby="w2-receipts-title">
-    <h2 class="w2-ct" id="w2-receipts-title" style="margin-bottom:6px">Recent alerts sent</h2>
+    <h2 class="w2-ct" id="w2-receipts-title" style="margin-bottom:6px">{% include 'partials/icon.html' with name='clock' %} Recent alerts sent</h2>
     <div class="w2-table-wrap">
       <table class="w2-table">
         <thead><tr><th scope="col">When</th><th scope="col">Channel</th><th scope="col">Type</th><th scope="col">Status</th></tr></thead>

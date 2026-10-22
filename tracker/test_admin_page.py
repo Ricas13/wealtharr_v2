@@ -41,7 +41,7 @@ class AdminPageTests(TestCase):
         YahooSync.objects.create(symbol="VUAG.L", last_error="")
         page = self.client.get(reverse("control"))
         for card in ("Email", "Discord", "Telegram", "Status"):
-            self.assertContains(page, '<h2 class="w2-ct" id="w2-admin-%s-title">%s</h2>' % (
+            self.assertRegex(page.content.decode(), r'id="w2-admin-%s-title">.*?</svg> %s</h2>' % (
                 {"Email": "mail", "Status": "test"}.get(card, card.lower()), card))
         self.assertContains(page, "PRICE_HOLD:LARGE_MOVE")
         self.assertNotContains(page, "VUAG.L")

@@ -225,6 +225,9 @@ def today_page(request, instance_id):
         explanation = "No currently outstanding verified %s instruction." % (
             plugin.cadence_word if plugin else "quarterly")
     next_end = next_review(strategy, timezone.localdate())
+    previous_end = last_review_before(strategy, timezone.localdate())
+    span = (next_end - previous_end).days
+    review_progress = (100 * (timezone.localdate() - previous_end).days / span) if span > 0 else None
     price_date = min((m.as_of for m in marks if m is not None), default=None) if ready else None
     display_value = account_value(
         net_cash=report["cash"], portfolio_value=report["value"],
@@ -248,6 +251,7 @@ def today_page(request, instance_id):
         today_cash=report["cash"], today_contributed=report["net_contributed"],
         today_quote_date=price_date, today_next_review=next_end,
         today_days_to_review=(next_end-timezone.localdate()).days,
+        today_review_progress=review_progress,
         today_holdings=holding_rows(report, roles=symbol_roles, show_quotes=ready),
         today_snapshots=_snapshot_rows(strategy),
         today_quarters=_signal_rows(strategy),

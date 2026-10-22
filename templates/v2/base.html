@@ -1,4 +1,4 @@
-{% load static %}
+{% load static w2_format %}
 <!doctype html>
 <html lang="en-GB">
 <head>
@@ -38,7 +38,7 @@
       {% for item in shell_instances %}
       <a class="w2-nav-link {% if selected_instance.pk == item.pk %}w2-active{% endif %}" title="{{ item.name }}"
          href="{% url 'v2_instance_page' instance_id=item.pk section='today' %}" {% if selected_instance.pk == item.pk %}aria-current="page"{% endif %}>
-        <span class="w2-dot {% if item.tracking_only %}w2-off{% endif %}" aria-hidden="true"></span>
+        <span class="w2-dot {% if item.tracking_only %}w2-off{% endif %}" aria-hidden="true"{% if not item.tracking_only %} style="background:{{ item|strategy_colour }}"{% endif %}></span>
         <span class="w2-nav-label w2-instance-name">{{ item.name }}</span>
         <span class="w2-nav-sub w2-nav-label">{% if item.tracking_only %}not live{% else %}{{ item.account.kind }}{% endif %}</span>
       </a>
@@ -87,7 +87,7 @@
     </div>
   </aside>
   <div class="w2-nav-shade" id="v2-nav-shade" aria-hidden="true"></div>
-  <main id="v2-main" class="w2-content" tabindex="-1">
+  <main id="v2-main" class="w2-content" tabindex="-1"{% if selected_instance %} style="--w2-strategy:{{ selected_instance|strategy_colour }}"{% endif %}>
     {% if messages %}<div class="w2-messages" role="status">
       {% for message in messages %}<p>{{ message }}</p>{% endfor %}
     </div>{% endif %}

@@ -256,6 +256,18 @@ _RELEASED = {
 STRATEGIES = MappingProxyType(_RELEASED)
 
 
+# One colour per strategy, used everywhere it appears (sidebar, page, charts).
+COLOURS = {
+    "nasdaq-quarterly-target": "#5b9cf5", "all-weather": "#4fc3a1", "golden-butterfly": "#e06c9f",
+    "dual-momentum": "#e5c07b", "permanent-portfolio": "#56b6c2", "hfea": "#c678dd", "three-sig": "#98c379",
+}
+DEFAULT_COLOUR = "#8a94a3"
+
+
+def colour_for(instance):
+    return COLOURS.get(getattr(instance, "strategy_key", "") or instance.preset.slug, DEFAULT_COLOUR)
+
+
 def describe_strategy(key: str) -> StrategyDescription | None:
     """Resolve a released description or refuse unknown mutable preset rules."""
     return STRATEGIES.get(key)

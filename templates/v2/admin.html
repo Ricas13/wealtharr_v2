@@ -1,6 +1,6 @@
 <div class="w2-grid2">
   <section class="w2-card" aria-labelledby="w2-admin-mail-title" id="email">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-mail-title">Email</h2>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-mail-title">{% include 'partials/icon.html' with name='mail' %} Email</h2>
       <span class="w2-chip {% if smtp_set %}w2-ok{% endif %}">{% if smtp_set %}Set up{% else %}Not set up{% endif %}</span></div>
     <p class="w2-note">The mail server alert emails are sent through. The password is stored encrypted and never shown again; leave it blank to keep the saved one.</p>
     {% include "partials/admin_form.html" with form=email_form kind="email" button="Save email" %}
@@ -8,7 +8,7 @@
   </section>
 
   <section class="w2-card" aria-labelledby="w2-admin-discord-title" id="discord">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-discord-title">Discord</h2>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-discord-title">{% include 'partials/icon.html' with name='chat' %} Discord</h2>
       <span class="w2-chip {% if discord_set %}w2-ok{% endif %}">{% if discord_set %}DMs set up{% else %}DMs not set up{% endif %}</span></div>
     <p class="w2-note">A bot that sends each person who clicks <strong>Connect Discord</strong> a private DM. {{ discord_connected }} connected. People can also post to their own channel with a webhook, which needs nothing here.</p>
     <details class="w2-note" id="discord-setup">
@@ -29,7 +29,7 @@
   </section>
 
   <section class="w2-card" aria-labelledby="w2-admin-telegram-title" id="telegram">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-telegram-title">Telegram</h2>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-telegram-title">{% include 'partials/icon.html' with name='send' %} Telegram</h2>
       <span class="w2-chip {% if telegram_bot %}w2-ok{% endif %}">{% if telegram_bot %}Set up · @{{ telegram_bot }}{% else %}Not set up{% endif %}</span></div>
     <p class="w2-note">A bot that messages each person who clicks <strong>Connect Telegram</strong> in Alerts &amp; settings. {{ telegram_connected }} connected. It needs no public web address, so a private site works.</p>
     <details class="w2-note" id="telegram-setup">
@@ -45,7 +45,7 @@
   </section>
 
   <section class="w2-card" aria-labelledby="w2-admin-test-title">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-test-title">Status</h2></div>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-test-title">{% include 'partials/icon.html' with name='activity' %} Status</h2></div>
     <p class="w2-note">Each test button sends to your own destinations from Alerts &amp; settings.</p>
     <div class="w2-setting-row w2-space-top"><span>Alert sender</span>
       <span class="w2-muted">{% if scheduler_run %}Last ran {{ scheduler_run.started_at|date:"j M H:i" }} · {{ scheduler_run.status|lower }}{% if scheduler_run.error_code %} · {{ scheduler_run.error_code }}{% endif %}{% else %}Hasn't run yet{% endif %}</span></div>
@@ -57,7 +57,7 @@
 
   {% if price_revisions %}
   <section class="w2-card w2-span2" aria-labelledby="w2-admin-revisions-title" id="price-revisions">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-revisions-title">Price corrections waiting for you</h2><span class="w2-muted">The ticker is held until you decide</span></div>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-revisions-title">{% include 'partials/icon.html' with name='alert' %} Price corrections waiting for you</h2><span class="w2-muted">The ticker is held until you decide</span></div>
     <p class="w2-note">Yahoo now reports a close more than 20% away from the one stored, which usually means a stock split or a unit error, so it isn't accepted automatically (smaller corrections are). Check the fund's price before accepting: accepting stores Yahoo's close and releases the hold; the old and new values stay on record.</p>
     <div class="w2-table-wrap">
       <table class="w2-table">
@@ -77,7 +77,7 @@
   {% endif %}
 
   <section class="w2-card w2-span2" aria-labelledby="w2-admin-prices-title">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-prices-title">Price checks with a problem</h2><span class="w2-muted">From the hourly job</span></div>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-prices-title">{% include 'partials/icon.html' with name='activity' %} Price checks with a problem</h2><span class="w2-muted">From the hourly job</span></div>
     <div class="w2-table-wrap">
       <table class="w2-table">
         <thead><tr><th scope="col">Ticker</th><th scope="col">Last tried</th><th scope="col">Problem</th></tr></thead>
