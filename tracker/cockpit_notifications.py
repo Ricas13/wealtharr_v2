@@ -20,6 +20,15 @@ from .strategies.registry import last_review_before, plugin_keys
 D = Decimal
 
 
+
+def review_tag(signal):
+    """The review's key in alert keys. A recalculated review reuses its quarter's
+    key, so it also gets its own id: its new numbers then go out instead of the
+    first, retired review's stored message (or nothing, if that one was sent)."""
+    replaced = signal.strategy.signals.filter(
+        signal_key__startswith=signal.signal_key + ":superseded:").exists()
+    return "%s:%s" % (signal.signal_key, signal.pk) if replaced else signal.signal_key
+
 def symbol_for(currency):
     from .money import symbol_for as lookup
     return lookup(currency)
@@ -90,12 +99,12 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
             if superseded and not partial:
                 # Never retry a digest whose advice no longer holds.
                 NotificationDelivery.objects.filter(
-                    owner=owner, event_key="quarterly-digest:%s:%s" % (strategy.pk, recent.signal_key),
+                    owner=owner, event_key="quarterly-digest:%s:%s" % (strategy.pk, review_tag(recent)),
                     status__in=("PENDING", "FAILED", "SENDING"),
                 ).update(status="CANCELLED", next_retry_at=None, error="Review superseded")
             if actions and reconciled and not partial:
                 count += _send(strategy, owner, "quarterly",
-                    "quarterly-digest:%s:%s" % (strategy.pk, recent.signal_key),
+                    "quarterly-digest:%s:%s" % (strategy.pk, review_tag(recent)),
                     "Wealtharr — quarterly review (%s)" % recent.as_of,
                     "Recorded review %s\n\n%s\n\n"
                     "Open Wealtharr → Today. Check broker availability, actual "
@@ -112,7 +121,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
                          "freshness and record only actual broker fills.")
                 count += _send(strategy, owner, "followup",
                     "rebalance-reminder:%s:%s:%04d-W%02d" % (
-                        strategy.pk, recent.signal_key, week.year, week.week),
+                        strategy.pk, review_tag(recent), week.year, week.week),
                     "Wealtharr — outstanding quarterly review",
                     "%s: %s No automatic trades are placed." % (
                         strategy.name, label))

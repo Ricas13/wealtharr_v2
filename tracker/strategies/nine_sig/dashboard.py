@@ -73,7 +73,7 @@ def quarter_rows(strategy, next_end, report):
             except (ValidationError, ArithmeticError):
                 held = {}
             close = MarketObservation.objects.filter(
-                symbol=strategy.equity_symbol, currency="GBP", as_of__lte=end,
+                symbol=strategy.equity_symbol, currency=strategy.account.currency, as_of__lte=end,
                 as_of__gte=end - timedelta(days=6)).order_by("-as_of").first()
             qty = held.get(strategy.equity_symbol, ZERO)
             growth = qty * close.price if close and qty else None
