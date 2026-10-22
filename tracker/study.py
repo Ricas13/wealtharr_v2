@@ -28,7 +28,7 @@ from .strategies.nine_sig.v3 import advice_for_holdings as v3_advice
 
 TIMEFRAMES = (("1w", "1 week", 7), ("1m", "1 month", 30), ("ytd", "YTD", None),
               ("1y", "1 year", 365), ("5y", "5 years", 1826), ("10y", "10 years", 3652),
-              ("20y", "20 years", 7305))
+              ("20y", "20 years", 7305), ("max", "All available", None))
 # WisdomTree NASDAQ 100 3x Daily Leveraged (LQQ3) ongoing charge, used only to
 # rebuild its history before launch. Borrowing and swap costs aren't modelled.
 GROWTH_CHARGE = 0.0075
@@ -194,8 +194,12 @@ def _fresh_days_only(data):
 def start_index(data, key, today=None):
     today = today or timezone.localdate()
     days = dict((k, n) for k, _, n in TIMEFRAMES)[key]
+    if not data.ready:
+        return None
+    if key == "max":
+        return 0  # All dates for which the selected Study has usable observations.
     target = date(today.year, 1, 1) if key == "ytd" else today - timedelta(days=days)
-    if not data.ready or data.days[0] > target + timedelta(days=7):
+    if data.days[0] > target + timedelta(days=7):
         return None
     i = bisect_left(data.days, target)
     return i if i < len(data.days) - 1 else None
