@@ -8,7 +8,8 @@ import logging
 import re
 from datetime import date, datetime, timedelta, timezone as utc_timezone
 from decimal import Decimal
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from zoneinfo import ZoneInfo
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -29,6 +30,7 @@ class FetchedChart:
     series: list
     raw_unit: str
     raw_closes: dict
+    dividends: dict = field(default_factory=dict)  # {ex-date: cash per share, account units}
 
     def __iter__(self):
         yield self.currency
@@ -42,7 +44,7 @@ def fetch_chart(symbol, since):
     params = urlencode({
         "period1": int(datetime.combine(since, datetime.min.time(), utc_timezone.utc).timestamp()),
         "period2": int(timezone.now().timestamp()) + 86400,
-        "interval": "1d",
+        "interval": "1d", "events": "div",
     })
     last_error = None
     chart = None
@@ -81,6 +83,7 @@ def fetch_chart(symbol, since):
     divisor = Decimal(100) if raw_currency in ("GBp", "GBX") else Decimal(1)
     closes = ((chart.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
     open_from = _unfinished_session_start(chart.get("meta") or {})
+    local = _exchange_zone(chart.get("meta") or {})
     series = []
     raw_closes = {}
     for epoch, raw in zip(chart.get("timestamp") or [], closes):
@@ -89,7 +92,7 @@ def fetch_chart(symbol, since):
         try:
             raw_amount = Decimal(str(raw)).quantize(Decimal("0.00000001"))
             amount = (raw_amount / divisor).quantize(Decimal("0.00000001"))
-            day = datetime.fromtimestamp(epoch, tz=utc_timezone.utc).date()
+            day = datetime.fromtimestamp(epoch, tz=local).date()
             if amount > ZERO and day <= timezone.localdate():
                 series.append((day, amount))
                 raw_closes[day] = raw_amount
@@ -98,7 +101,35 @@ def fetch_chart(symbol, since):
     series = sorted(dict(series).items())
     if not series:
         raise ValueError("No usable Yahoo daily closes")
-    return FetchedChart(currency, series, raw_currency, raw_closes)
+    dividends = {}
+    for item in ((chart.get("events") or {}).get("dividends") or {}).values():
+        try:
+            paid = (Decimal(str(item["amount"])) / divisor).quantize(Decimal("0.00000001"))
+            day = datetime.fromtimestamp(int(item["date"]), tz=local).date()
+        except (KeyError, TypeError, ValueError, ArithmeticError, OverflowError):
+            continue
+        if paid > ZERO and day <= timezone.localdate():
+            dividends[day] = paid
+    return FetchedChart(currency, series, raw_currency, raw_closes, dividends)
+
+
+def _exchange_zone(meta):
+    """The exchange's own time zone for dating daily bars.
+
+    Yahoo stamps a daily bar at the session start in exchange time; for
+    currencies that's midnight London, which is 23:00 UTC the day before in
+    summer. Reading the stamp in UTC would date it a day early.
+    """
+    name = meta.get("exchangeTimezoneName")
+    if isinstance(name, str):
+        try:
+            return ZoneInfo(name)
+        except (ValueError, KeyError, OSError):
+            pass
+    offset = meta.get("gmtoffset")
+    if isinstance(offset, int) and abs(offset) < 86400:
+        return utc_timezone(timedelta(seconds=offset))
+    return utc_timezone.utc
 
 
 # Wait this long after the regular session ends before taking its bar as the
@@ -270,6 +301,14 @@ def sync_ticker(symbol, *, force=False):
         MarketObservation.objects.bulk_create(
             observations, batch_size=250, ignore_conflicts=True,
         )
+        # Cash paid per share (Dual Momentum's 12-month total returns need it).
+        # Only for lines kept in their own currency: a converted USD line's
+        # dividends would need their own exchange rate, so they're left out.
+        from .models import DividendEvent
+        for day, paid in (getattr(fetched, "dividends", None) or {}).items():
+            if not usd_closes:
+                DividendEvent.objects.update_or_create(
+                    symbol=symbol, ex_date=day, defaults={"amount": paid, "currency": currency})
         state.last_success = timezone.now()
         state.last_error = ""
         state.save(update_fields=["last_success", "last_error"])

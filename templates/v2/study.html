@@ -13,6 +13,7 @@
       <label class="w2-field">Start with {{ cur }}<input class="w2-input" style="width:120px" name="amount" inputmode="decimal" value="{{ study_amount|floatformat:'0' }}"></label>
       <label class="w2-field">Add each month {{ cur }}<input class="w2-input" style="width:120px" name="monthly" inputmode="decimal" value="{{ study_monthly|floatformat:'0' }}"></label>
       <input type="hidden" name="scale" value="{{ study_scale }}">
+      <label class="w2-field">Rule trades fill at<select class="w2-input" name="fill">{% for key, label in study_fills %}<option value="{{ key }}" {% if key == study_fill %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
       <button type="submit" name="range" value="{{ study_range }}" class="w2-button w2-button-primary">Update</button>
     </div>
     <div class="w2-seg" role="group" aria-label="Timeframe">
@@ -41,8 +42,8 @@
   <section class="w2-card w2-span2" aria-label="Study chart">
     <div class="w2-ch"><h2 class="w2-ct">{{ cur }}{{ study_amount|floatformat:"0g" }}{% if study_monthly %} + {{ cur }}{{ study_monthly|floatformat:"0g" }} a month{% endif %} from {{ study_selected.start|date:"j M Y" }}</h2>
       <div class="w2-seg" role="group" aria-label="Scale">
-        <a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ study_range }}&amp;scale=linear" {% if study_scale == 'linear' %}class="w2-on" aria-current="true"{% endif %}>Linear</a>
-        <a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ study_range }}&amp;scale=log" {% if study_scale == 'log' %}class="w2-on" aria-current="true"{% endif %}>Log</a>
+        <a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ study_range }}&amp;scale=linear&amp;fill={{ study_fill }}" {% if study_scale == 'linear' %}class="w2-on" aria-current="true"{% endif %}>Linear</a>
+        <a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ study_range }}&amp;scale=log&amp;fill={{ study_fill }}" {% if study_scale == 'log' %}class="w2-on" aria-current="true"{% endif %}>Log</a>
       </div></div>
     {% if study_chart %}
     <div class="w2-legend">{% for line in study_chart.lines %}<span><span class="w2-sw {{ line.css }}"></span>{{ line.label }}</span>{% endfor %}</div>
@@ -86,7 +87,7 @@
     <div class="w2-table-wrap"><table class="w2-table">
       <thead><tr><th>Started</th><th>On</th>{% for name, label in study_series %}<th class="w2-r">{{ label }}</th>{% endfor %}</tr></thead>
       <tbody>{% for row in study_rows %}
-        <tr><td><a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ row.key }}&amp;scale={{ study_scale }}">{% if row.key == 'ytd' %}Since 1 Jan{% else %}{{ row.label }} ago{% endif %}</a></td>
+        <tr><td><a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ row.key }}&amp;scale={{ study_scale }}&amp;fill={{ study_fill }}">{% if row.key == 'ytd' %}Since 1 Jan{% else %}{{ row.label }} ago{% endif %}</a></td>
           {% if row.result %}<td class="w2-muted">{{ row.result.start|date:"j M Y" }}{% if row.result.simulated_notes %}*{% endif %}</td>
             {% for name, cell in row.cells %}<td class="w2-r {% if name == row.best %}w2-best{% endif %}">{% if cell %}{{ cur }}{{ cell.final|floatformat:"0g" }} <small class="{{ cell.gain_pct|tone }}">{{ cell.gain_pct|signed_pct:0 }}</small>{% else %}<span class="w2-muted">—</span>{% endif %}</td>{% endfor %}
           {% else %}<td colspan="{{ study_series|length|add:1 }}" class="w2-muted">Not enough history</td>{% endif %}</tr>
@@ -100,6 +101,7 @@
       <summary>How the study works</summary>
       <ul class="w2-note" style="line-height:1.6;margin:8px 0 0;padding-left:18px">
         {% for line in study_how %}<li>{{ line }}</li>{% endfor %}
+        <li>{% if study_fill == 'next' %}Rule trades fill at the next trading day's close: the decision uses one close and the trade happens a day later, as it would for you.{% else %}Rule trades fill at the same close that triggered them, a mechanical replay of the rules. Choose "Next day's close" above for a more realistic fill.{% endif %}</li>
         <li>Data {{ study_first_day|date:"j M Y" }} – {{ study_last_day|date:"j M Y" }}, from Yahoo, downloaded daily.</li>
       </ul>
     </details>

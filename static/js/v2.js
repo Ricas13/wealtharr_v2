@@ -110,21 +110,22 @@
   "use strict";
   var kind = document.getElementById("w2-entry-kind");
   if (!kind) return;
-  function switchKind() {
-    var trade = kind.value === "BUY" || kind.value === "SELL";
-    document.querySelectorAll("[data-v2-trade-field]").forEach(function (el) {
-      el.hidden = !trade;
+  function show(selector, visible) {
+    document.querySelectorAll(selector).forEach(function (el) {
+      el.hidden = !visible;
       el.querySelectorAll("input, select").forEach(function (input) {
         // Hidden number inputs still participate in native form validation.
-        input.disabled = !trade;
+        input.disabled = !visible;
       });
     });
-    document.querySelectorAll("[data-v2-cash-field]").forEach(function (el) {
-      el.hidden = trade;
-      el.querySelectorAll("input, select").forEach(function (input) {
-        input.disabled = trade;
-      });
-    });
+  }
+  function switchKind() {
+    var trade = kind.value === "BUY" || kind.value === "SELL";
+    var split = kind.value === "SPLIT";
+    show("[data-v2-trade-field]", trade);
+    show("[data-v2-cash-field]", !trade && !split);
+    show("[data-v2-split-field]", split);
+    show("[data-v2-fund-field]", trade || split);
   }
   kind.addEventListener("change", switchKind);
   switchKind();

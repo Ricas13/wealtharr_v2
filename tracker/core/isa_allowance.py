@@ -6,13 +6,17 @@ Other ISA subscriptions and ISA-to-ISA transfers are not known to this app.
 Do not use this estimate to approve or block a subscription.
 """
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 # HMRC: £20,000 overall ISA subscription limit for tax year 2026/27;
 # reviewed 2026-10-19: https://www.gov.uk/individual-savings-accounts
 # Revision needed if legislation changes; this is advisory, not a tax engine.
 OVERALL_LIMIT_2026_GBP = Decimal("20000.00")
+# The tax year the limit above was checked for (starting 6 April of this year).
+# Each spring: check gov.uk, update the limit and this year, and the ISA cards
+# come back. Until then the cards hide rather than show an unchecked limit.
+VERIFIED_TAX_YEAR = 2026
 CAUTION_THRESHOLD = Decimal("0.80")
 
 
@@ -41,7 +45,7 @@ def estimate_allowance(*, as_of: date, recorded_deposits: tuple,
                        ) -> IsaAllowanceEstimate:
     start, end = tax_year_bounds(as_of)
     # Avoid giving a possibly outdated statutory limit for other tax years.
-    if start.year != 2026:
+    if start.year != VERIFIED_TAX_YEAR:
         raise ValueError("ISA limit policy is not verified for this tax year.")
     if other_isa_subscriptions is not None and (
             not isinstance(other_isa_subscriptions, Decimal) or
@@ -91,3 +95,12 @@ def estimate_allowance(*, as_of: date, recorded_deposits: tuple,
                  "need manual HMRC/broker reconciliation. This is advisory, "
                  "not proof of your remaining allowance.")
     )
+
+
+def limit_check_status(today: date) -> dict:
+    """For the admin page: is the ISA limit checked for this tax year, and how long is left?"""
+    start, end = tax_year_bounds(today)
+    checked_until = date(VERIFIED_TAX_YEAR + 1, 4, 5)
+    return {"checked_year": "%d/%02d" % (VERIFIED_TAX_YEAR, (VERIFIED_TAX_YEAR + 1) % 100),
+            "current": start.year == VERIFIED_TAX_YEAR,
+            "days_left": (checked_until - today).days, "expires": checked_until + timedelta(days=1)}

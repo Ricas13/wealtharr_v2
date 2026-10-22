@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
 
 from .strategies.registry import module_for
+from .study import FILLS
 from .models import StrategyInstance, StudyPrice
 from .v2_views import _render
 
@@ -113,12 +114,13 @@ def study_page(request, instance_id):
     if key not in dict((k, l) for k, l, _ in study.TIMEFRAMES):
         key = "10y"
     scale = "log" if request.GET.get("scale") == "log" else "linear"
+    fill = "next" if request.GET.get("fill") == "next" else "close"
     supported = True
     data = _data(study)
     rows, selected = [], None
     if data.ready:
         for k, label, _ in study.TIMEFRAMES:
-            result = study.run(data, k, amount, monthly)
+            result = study.run(data, k, amount, monthly, fill)
             rows.append({"key": k, "label": label, "result": result})
             if k == key:
                 selected = result
@@ -135,6 +137,7 @@ def study_page(request, instance_id):
         request, page_key="instance", page_title="Study", instance=strategy, section="study",
         study_supported=supported, study_ready=data.ready,
         study_amount=amount, study_monthly=monthly, study_range=key, study_scale=scale,
+        study_fill=fill, study_fills=FILLS,
         study_input_error=bad_amount or bad_monthly,
         study_timeframes=study.TIMEFRAMES, study_series=study.SERIES,
         study_rows=rows, study_selected=selected, study_best=best,

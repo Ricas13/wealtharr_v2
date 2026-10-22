@@ -293,6 +293,8 @@ def holdings_detail(strategy, report, roles):
         elif entry.kind == "SELL" and shares.get(entry.symbol):
             cost[entry.symbol] -= cost[entry.symbol] * entry.quantity / shares[entry.symbol]
             shares[entry.symbol] -= entry.quantity
+        elif entry.kind == "SPLIT" and shares.get(entry.symbol):
+            shares[entry.symbol] *= entry.quantity  # same total cost, more (or fewer) shares
     rows = []
     order = {symbol: i for i, symbol in enumerate(roles)}
     for symbol, quantity in sorted(report["positions"].items(),

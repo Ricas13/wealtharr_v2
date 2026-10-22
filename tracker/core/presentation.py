@@ -115,6 +115,8 @@ def ledger_cash_movement(entry) -> Decimal:
         return -((entry.quantity * entry.unit_price).quantize(penny) + entry.fee)
     if entry.kind == "SELL":
         return (entry.quantity * entry.unit_price).quantize(penny) - entry.fee
+    if entry.kind == "SPLIT":
+        return Decimal("0")
     raise ValueError("Unknown ledger kind")
 
 
@@ -122,7 +124,8 @@ def ledger_display_rows(entries) -> tuple[dict, ...]:
     """An event list, not a guessed balance history reconstructed backwards."""
     return tuple({
         "date": entry.occurred_on,
-        "kind": entry.get_kind_display(),
+        "kind": ("Split ×%s" % entry.quantity.normalize() if entry.kind == "SPLIT"
+                 else entry.get_kind_display()),
         "symbol": entry.symbol,
         "quantity": entry.quantity if entry.kind in ("BUY", "SELL") else None,
         "unit_price": entry.unit_price if entry.kind in ("BUY", "SELL") else None,

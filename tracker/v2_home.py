@@ -144,8 +144,9 @@ def compare(amount, monthly, frame, real_names=False, public=False):
                 "drawdown": round(s["drawdown"], 2),
                 "points": [round(s["values"][i], 2) for i in index],
             })
-        simulated_other, left_out = _other_rows(rows, days, index, frame, amount, monthly, real_names)
         base = result["series"]["nine_sig"]
+        simulated_other, left_out = _other_rows(rows, days, index, frame, amount, monthly, real_names,
+                                                money_in=[base["contributed"][i] for i in index])
         first, last = days[0], days[-1]
         out.update({
             "ready": True, "rows": rows,
@@ -167,13 +168,14 @@ def _day(day):
     return "%d %s" % (day.day, day.strftime("%b %Y"))
 
 
-def _other_rows(rows, days, index, frame, amount, monthly, real_names=False):
+def _other_rows(rows, days, index, frame, amount, monthly, real_names=False, money_in=None):
     """Add each other strategy's pound Study to the comparison, on the same dates.
 
     Returns (whether any of them used stand-in history before a fund existed,
     labels of strategies left out). Only a Study that starts and ends on the
-    same days as the others is compared, so every figure covers one period; a
-    strategy whose fresh history doesn't cover it is left out and named.
+    same days as the others, with the same money put in by each charted date,
+    is compared, so every figure covers one period and one set of deposits; a
+    strategy that doesn't match is left out and named.
     """
     from .strategies.registry import module_for_key
     simulated, left_out = False, []
@@ -193,6 +195,10 @@ def _other_rows(rows, days, index, frame, amount, monthly, real_names=False):
         position = {day: i for i, day in enumerate(result["dates"])}
         if any(days[i] not in position for i in index):
             left_out.append(label)  # its trading days differ from the others'
+            continue
+        if money_in is not None and [round(s["contributed"][position[days[i]]], 2) for i in index] != [
+                round(v, 2) for v in money_in]:
+            left_out.append(label)  # its top-ups landed in different months: not a like-for-like comparison
             continue
         rows.append({
             "key": key, "label": label, "what": what, "effort": effort, "color": color,

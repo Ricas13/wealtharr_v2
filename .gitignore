@@ -19,3 +19,4 @@ staticfiles/
 /.env.production
 *.dump
 *.dump.sha256
+.claude/worktrees/

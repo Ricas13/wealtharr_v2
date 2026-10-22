@@ -170,10 +170,15 @@ class LedgerEntry(models.Model):
     DIVIDEND = "DIVIDEND"
     FEE = "FEE"
     INTEREST = "INTEREST"
+    # A share split or consolidation: ``quantity`` holds the ratio (new shares
+    # per old share: 2 for a 2-for-1 split, 0.1 for a 1-for-10 consolidation).
+    # No cash moves and the holding's total cost is unchanged.
+    SPLIT = "SPLIT"
     TYPES = [
         (DEPOSIT, "Add money"), (WITHDRAW, "Withdraw money"),
         (BUY, "Buy"), (SELL, "Sell"),
         (DIVIDEND, "Dividend"), (INTEREST, "Interest on cash"), (FEE, "Other fee"),
+        (SPLIT, "Share split or consolidation"),
     ]
     strategy = models.ForeignKey(StrategyInstance, on_delete=models.CASCADE, related_name="ledger")
     kind = models.CharField(max_length=12, choices=TYPES)
@@ -420,6 +425,18 @@ class MarketObservation(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["symbol", "as_of"], name="unique_market_close")]
         ordering = ["as_of"]
+
+class DividendEvent(models.Model):
+    """Cash paid per share on its ex-date, from Yahoo, in the stored price's units."""
+    symbol = models.CharField(max_length=24)
+    ex_date = models.DateField()
+    amount = models.DecimalField(max_digits=22, decimal_places=8)
+    currency = models.CharField(max_length=3)
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["symbol", "ex_date"], name="unique_dividend_event")]
+
 
 class NotificationSchedulerRun(models.Model):
     """One diagnostic record per scheduled notice run; never stores credentials."""

@@ -18,6 +18,14 @@ PENNY = Decimal("0.01")
 def money(value):
     return value.quantize(PENNY)
 
+SHARE_PLACES = Decimal("0.00000001")
+
+
+def split_quantity(held, ratio):
+    """Shares after a split or consolidation (8 places, like every share quantity)."""
+    return (held * ratio).quantize(SHARE_PLACES)
+
+
 def replay(entries):
     """Cash, net contributions and positions after the given ledger entries."""
     cash = ZERO
@@ -40,6 +48,8 @@ def replay(entries):
         elif e.kind == LedgerEntry.SELL:
             cash += money(e.quantity * e.unit_price) - e.fee
             positions[e.symbol] -= e.quantity
+        elif e.kind == LedgerEntry.SPLIT:
+            positions[e.symbol] = split_quantity(positions[e.symbol], e.quantity)
     return cash, net_contributed, {symbol: qty for symbol, qty in positions.items() if qty != ZERO}
 
 
@@ -75,6 +85,8 @@ def validate_and_record(strategy, entry):
             raise ValidationError("Cannot sell more units than this strategy owns.")
         if entry.kind == LedgerEntry.SELL and money(entry.quantity * entry.unit_price) < entry.fee:
             raise ValidationError("Selling fees exceed the sale proceeds.")
+        if entry.kind == LedgerEntry.SPLIT and (qty <= ZERO or entry.quantity <= ZERO or entry.quantity == 1):
+            raise ValidationError("A split needs shares held and a ratio other than 1.")
         # Back-dated entries are fine as long as every balance from that date
         # on stays valid (no negative cash or shares at any point).
         from .v2_ledger_core import EffectiveEntry, effective_entries, replay

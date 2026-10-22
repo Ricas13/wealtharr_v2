@@ -211,6 +211,35 @@ def _quarter_end(day):
     return date(day.year, month, monthrange(day.year, month)[1])
 
 
+# When the Study's rule trades fill: at the close that triggered them (the
+# default, a mechanical replay) or at the next trading day's close (closer to
+# what someone acting on a close-based signal could actually get).
+FILLS = (("close", "Same close"), ("next", "Next day's close"))
+
+
+def fill_orders(orders, holdings, cash, prices):
+    """Fill decided orders at new prices: sells first, buys never beyond cash.
+
+    ``orders`` is [(key, side, quantity)], ``holdings`` {key: Decimal} (updated
+    in place), ``prices`` {key: Decimal}. Returns (cash, orders filled).
+    """
+    from decimal import ROUND_DOWN
+    filled = 0
+    for key, side, quantity in sorted(orders, key=lambda o: o[1] != "SELL"):
+        price = prices[key]
+        if side == "SELL":
+            quantity = min(quantity, holdings[key])
+            holdings[key] -= quantity
+            cash += quantity * price
+        else:
+            affordable = (cash / price).quantize(D("0.0001"), rounding=ROUND_DOWN) if price > 0 else D("0")
+            quantity = max(min(quantity, affordable), D("0"))
+            holdings[key] += quantity
+            cash -= quantity * price
+        filled += quantity > 0
+    return cash, filled
+
+
 def _buy_and_hold(prices, days, s, amount, monthly):
     if prices[s] is None:
         return None
@@ -226,7 +255,7 @@ def _buy_and_hold(prices, days, s, amount, monthly):
     return {"values": values, "flows": flows, "trades": None}
 
 
-def _nine_sig(data, s, amount, monthly):
+def _nine_sig(data, s, amount, monthly, fill="close"):
     days, growth, safe = data.days, data.growth, data.safe
     g0, s0 = D(str(round(growth[s], 6))), D(str(round(safe[s], 6)))
     equity = _floor_qty(D(amount) * D("0.6"), g0)
@@ -235,9 +264,19 @@ def _nine_sig(data, s, amount, monthly):
     start_day, start_cost = days[s], equity * g0
     contributions, down_q, skipped, trades, resets = [], None, 0, 0, 0
     flows, values = [(days[s], amount)], []
+    pending, pending_reset = [], None
+    lines = data.lines or GBP_LINES
     for i in range(s, len(days)):
         day = days[i]
         g, sf = D(str(round(growth[i], 6))), D(str(round(safe[i], 6)))
+        if pending:
+            # Orders decided at the previous close fill at today's close.
+            held = {lines.growth: equity, lines.safe: reserve}
+            cash, filled = fill_orders(pending, held, cash, {lines.growth: g, lines.safe: sf})
+            equity, reserve, trades, pending = held[lines.growth], held[lines.safe], trades + filled, []
+            if pending_reset:
+                start_day, start_cost = pending_reset, equity * g
+                pending_reset = None
         if i > s and _new_month(days, i) and monthly:
             cash += D(monthly)
             contributions.append((day, D(monthly)))
@@ -247,7 +286,6 @@ def _nine_sig(data, s, amount, monthly):
             qend = _quarter_end(day)
             review_q = quarter_number(qend)
             k = bisect_left(days, day + timedelta(days=1))
-            lines = data.lines or GBP_LINES
             rules = v3_advice if lines.rules == "v3" else advice_for_holdings
             alerts = rules(
                 start_date=start_day, as_of=qend, currency=lines.currency,
@@ -262,7 +300,15 @@ def _nine_sig(data, s, amount, monthly):
             if any(a["kind"] == "THIRTY_DOWN" for a in alerts):
                 down_q, skipped = review_q, 0
             plan = next((a for a in alerts if a["kind"] == "QUARTERLY"), None)
-            if plan:
+            if plan and fill == "next":
+                skipped += sum(a["side"] == "HOLD" for a in plan["actions"])
+                pending = [(a["symbol"], a["side"], D(a["quantity"])) for a in plan["actions"]
+                           if a["side"] in ("BUY", "SELL")]
+                if plan.get("reset_reason"):
+                    pending_reset = qend
+                    contributions, down_q, skipped = [], None, 0
+                    resets += 1
+            elif plan:
                 for action in plan["actions"]:
                     qty = D(action["quantity"])
                     if action["side"] == "HOLD":
@@ -337,13 +383,13 @@ def _summary(days, s, result):
     }
 
 
-def run(data, key, amount, monthly):
+def run(data, key, amount, monthly, fill="close"):
     """All four series for one timeframe, or None when history doesn't reach back."""
     s = start_index(data, key)
     if s is None:
         return None
     raw = {
-        "nine_sig": _nine_sig(data, s, amount, monthly),
+        "nine_sig": _nine_sig(data, s, amount, monthly, fill),
         "hold": _buy_and_hold(data.growth, data.days, s, amount, monthly),
         "spy": _buy_and_hold(data.spy, data.days, s, amount, monthly),
         "vti": _buy_and_hold(data.vti, data.days, s, amount, monthly),
@@ -422,8 +468,8 @@ class NineSigStudy:
     def load_data(self):
         return load_data(self.lines)
 
-    def run(self, data, key, amount, monthly):
-        return run(data, key, amount, monthly)
+    def run(self, data, key, amount, monthly, fill="close"):
+        return run(data, key, amount, monthly, fill)
 
     def how_it_works(self, data):
         return how_it_works(data)
