@@ -297,6 +297,9 @@ class NotificationPreference(models.Model):
     discord_user_id = models.CharField(max_length=24, blank=True)
     discord_username = models.CharField(max_length=100, blank=True)
     discord_connected_at = models.DateTimeField(null=True, blank=True)
+    # Or (and/or) the person's own Discord channel webhook; stored encrypted.
+    discord_webhook_enabled = models.BooleanField(default=False)
+    discord_webhook_ciphertext = models.TextField(blank=True)
     monthly_reminders = models.BooleanField(default=True)
     # Owner-selected delay before a weekly outstanding-review reminder.
     followup_delay_days = models.PositiveSmallIntegerField(default=7)

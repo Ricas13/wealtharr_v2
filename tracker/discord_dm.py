@@ -1,4 +1,4 @@
-"""Discord direct messages: connect a person's Discord account and DM them alerts.
+"""Discord alerts: a DM from the site's bot, and/or the person's own channel webhook.
 
 Discord only lets a bot DM someone who shares a server with it, so connecting
 asks the person (Discord's own consent screen, scopes ``identify`` and
@@ -7,6 +7,7 @@ lives. Only their Discord user id and name are kept; the one-off access token
 is used once and dropped. Nothing here can place trades.
 """
 import json
+import re
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -115,3 +116,27 @@ def send_dm(cfg, user_id, text):
         raise DiscordError("Discord didn't open a DM.")
     _call("POST", "/channels/%s/messages" % channel_id, bot=bot,
           payload={"content": text[:1900], "allowed_mentions": {"parse": []}})
+
+
+WEBHOOK = re.compile(r"https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+")
+
+
+def valid_webhook(url):
+    return bool(WEBHOOK.fullmatch(url or ""))
+
+
+def post_webhook(url, text):
+    """Post into a channel on the person's own server through their webhook."""
+    if not valid_webhook(url):
+        raise DiscordError("Your Discord webhook isn't set up.")
+    request = Request(url, data=json.dumps({"content": text[:1900], "allowed_mentions": {"parse": []}})
+                      .encode("utf-8"), headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
+                      method="POST")
+    try:
+        with urlopen(request, timeout=10) as response:
+            if response.status not in (200, 204):
+                raise DiscordError("Discord refused the webhook post.")
+    except HTTPError as exc:
+        raise DiscordError("Discord refused the webhook post (HTTP %s)." % exc.code) from None
+    except (URLError, OSError):
+        raise DiscordError("Discord couldn't be reached.") from None

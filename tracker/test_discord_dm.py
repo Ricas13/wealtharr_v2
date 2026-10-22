@@ -39,7 +39,7 @@ class ConnectDiscordTests(TestCase):
 
     def test_settings_explain_when_the_owner_has_not_set_up_dms(self):
         page = self.client.get(reverse("v2_settings"))
-        self.assertContains(page, "not set up by the site owner yet")
+        self.assertContains(page, "Not set up by the site owner yet")
         self.assertNotContains(page, "Connect Discord")
         self.assertRedirects(self.client.get(reverse("discord_connect")), reverse("v2_settings"))
 
@@ -133,3 +133,70 @@ class DiscordAdminAndSendingTests(TestCase):
             outcome = dispatch(self.user, "k1", "Subject", "Body", channels=("discord",))
         http.assert_not_called()
         self.assertEqual(outcome["discord"], "retrying")
+
+
+class DiscordWebhookTests(TestCase):
+    """The other Discord option: the person's own channel webhook, alone or with DMs."""
+    HOOK = "https://discord.com/api/webhooks/123456/abc-DEF_ghi"
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("owner", "o@example.com", "a-long-test-password-1")
+        self.client.force_login(self.user)
+
+    def test_both_options_are_explained_on_settings(self):
+        page = self.client.get(reverse("v2_settings"))
+        self.assertContains(page, "Discord: pick one or both")
+        self.assertContains(page, "Private DM")
+        self.assertContains(page, "Your own channel")
+        self.assertContains(page, "You don't join anyone's server")
+        self.assertContains(page, "each alert arrives in both places")
+
+    def test_saving_a_webhook_encrypts_it_and_turns_it_on(self):
+        self.client.post(reverse("v2_settings"), {"form_kind": "owner", "discord_webhook_enabled": "on",
+                                                  "discord_webhook": self.HOOK})
+        pref = NotificationPreference.objects.get(owner=self.user)
+        self.assertTrue(pref.discord_webhook_enabled)
+        self.assertNotIn("abc-DEF_ghi", pref.discord_webhook_ciphertext)
+        page = self.client.get(reverse("v2_settings"))
+        self.assertContains(page, "webhook saved")
+        self.assertNotContains(page, "abc-DEF_ghi")
+        # Saving again with the field blank keeps the stored webhook.
+        self.client.post(reverse("v2_settings"), {"form_kind": "owner", "discord_webhook_enabled": "on"})
+        self.assertEqual(NotificationPreference.objects.get(owner=self.user).discord_webhook_ciphertext,
+                         pref.discord_webhook_ciphertext)
+
+    def test_bad_or_missing_webhooks_are_refused_and_removal_clears_it(self):
+        bad = self.client.post(reverse("v2_settings"), {"form_kind": "owner", "discord_webhook_enabled": "on",
+                                                        "discord_webhook": "https://example.com/hook"})
+        self.assertContains(bad, "That isn")
+        missing = self.client.post(reverse("v2_settings"), {"form_kind": "owner", "discord_webhook_enabled": "on"})
+        self.assertContains(missing, "Paste your channel")
+        self.client.post(reverse("v2_settings"), {"form_kind": "owner", "discord_webhook_enabled": "on",
+                                                  "discord_webhook": self.HOOK})
+        self.client.post(reverse("v2_settings"), {"form_kind": "remove_webhook"})
+        pref = NotificationPreference.objects.get(owner=self.user)
+        self.assertEqual((pref.discord_webhook_ciphertext, pref.discord_webhook_enabled), ("", False))
+
+    def test_an_alert_goes_to_both_destinations_when_both_are_on(self):
+        from tracker.notification_routing import route_notice
+        configure()
+        NotificationPreference.objects.create(
+            owner=self.user, discord_enabled=True, discord_user_id="777", discord_webhook_enabled=True,
+            discord_webhook_ciphertext=encrypt_secret(self.HOOK))
+        calls = replies({"id": "999"}, {}, {})
+        with patch("tracker.discord_dm.urlopen", side_effect=calls) as http:
+            outcome = route_notice(self.user, "quarterly", "q1", "Review", "Time to act")
+        self.assertEqual(outcome, {"discord": "sent", "discord_webhook": "sent"})
+        urls = [c.args[0].full_url for c in http.call_args_list]
+        self.assertTrue(any(u.endswith("/channels/999/messages") for u in urls))
+        self.assertIn(self.HOOK, urls)
+
+    def test_a_strategy_routed_to_discord_reaches_the_webhook_alone(self):
+        from tracker.notification_routing import strategy_channels
+        pref = NotificationPreference.objects.create(owner=self.user, discord_webhook_enabled=True,
+                                                     discord_webhook_ciphertext=encrypt_secret(self.HOOK))
+        strategy = type("S", (), {"alert_routes": {"quarterly": {"email": False, "discord": True}},
+                                  "strategy_key": "x"})()
+        self.assertEqual(strategy_channels(pref, "quarterly", strategy), ("discord_webhook",))
+        strategy.alert_routes = {"quarterly": {"email": False, "discord": False}}
+        self.assertEqual(strategy_channels(pref, "quarterly", strategy), ())

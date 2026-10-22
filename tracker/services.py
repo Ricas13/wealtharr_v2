@@ -141,6 +141,10 @@ def _send_message(channel, owner, cfg, prefs, subject, message):
         if not prefs.discord_user_id:
             raise ValueError("Discord not connected")
         send_dm(cfg, prefs.discord_user_id, subject + "\n" + message)
+    elif channel == "discord_webhook":
+        # The person's own channel webhook (their server, not the site's).
+        from .discord_dm import post_webhook
+        post_webhook(decrypt_secret(prefs.discord_webhook_ciphertext), subject + "\n" + message)
     else:
         raise ValueError("Unsupported notification channel")
 
@@ -157,13 +161,14 @@ def dispatch(owner, key, subject, message, channels=None, *, category="", strate
         raise ValueError("Strategy does not belong to notification owner")
     prefs, _ = NotificationPreference.objects.get_or_create(owner=owner)
     cfg = SystemIntegration.current()
-    channels = channels if channels is not None else ("email", "discord")
+    from .notification_routing import DELIVERY_CHANNELS
+    channels = channels if channels is not None else DELIVERY_CHANNELS
     outcomes = {}
     for channel in channels:
-        if channel not in ("email", "discord"):
+        if channel not in DELIVERY_CHANNELS:
             outcomes[channel] = "unsupported"
             continue
-        if not (prefs.email_enabled if channel == "email" else prefs.discord_enabled):
+        if not getattr(prefs, channel + "_enabled"):
             outcomes[channel] = "disabled"
             continue
         now = timezone.now()

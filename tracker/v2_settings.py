@@ -17,7 +17,7 @@ from .models import (
     NotificationDelivery, NotificationPreference,
     OwnerTOTP, StrategyInstance, SystemIntegration,
 )
-from .notification_routing import CATEGORIES, CHANNELS
+from .notification_routing import CATEGORIES, CHANNELS, DELIVERY_CHANNELS
 from .discord_dm import DiscordError, authorize_url, configured as discord_ready, connect, redirect_uri
 from .services import dispatch
 from .v2_views import _render, _instances
@@ -58,6 +58,7 @@ def strategy_route_rows(strategy):
     return category_rows
 
 
+CHANNEL_NAMES = {"email": "Email", "discord": "Discord DM", "discord_webhook": "Discord channel webhook"}
 CATEGORY_WHEN = {
     "quarterly": "After a quarter end, when trades are needed",
     "urgent": "Big market drop or a reset to review",
@@ -84,12 +85,16 @@ def settings_page(request):
                 if (form.cleaned_data["email_enabled"] and
                         not form.cleaned_data["destination_email"]):
                     form.add_error("destination_email", "An email address is required when email is enabled.")
-                elif form.cleaned_data["discord_enabled"] and not pref.discord_user_id:
-                    form.add_error("discord_enabled", "Connect your Discord account first.")
                 else:
                     form.save()
                     messages.success(request, "Alert destinations saved.")
                     return redirect("v2_settings")
+        elif kind == "remove_webhook":
+            pref.discord_webhook_ciphertext = ""
+            pref.discord_webhook_enabled = False
+            pref.save(update_fields=["discord_webhook_ciphertext", "discord_webhook_enabled"])
+            messages.success(request, "Discord webhook removed. Nothing more will be posted to that channel.")
+            return redirect("v2_settings")
         elif kind == "strategy":
             try:
                 strategy_id = int(request.POST.get("strategy_id", ""))
@@ -145,7 +150,7 @@ def settings_page(request):
 @staff_member_required
 @require_POST
 def test_channel(request, channel):
-    if channel not in CHANNELS:
+    if channel not in DELIVERY_CHANNELS:
         raise Http404("Unknown notification channel")
     pref, _ = NotificationPreference.objects.get_or_create(owner=request.user)
     if not getattr(pref, channel + "_enabled"):
@@ -160,9 +165,9 @@ def test_channel(request, channel):
         channels=(channel,),
     )
     if outcome.get(channel) == "sent":
-        messages.success(request, channel.title() + " test accepted by the transport.")
+        messages.success(request, CHANNEL_NAMES[channel] + " test accepted by the transport.")
     else:
-        messages.error(request, channel.title() + " test was not confirmed; check the integration and receipts.")
+        messages.error(request, CHANNEL_NAMES[channel] + " test was not confirmed; check the integration and receipts.")
     return redirect("control")
 
 

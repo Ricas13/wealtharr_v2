@@ -55,7 +55,7 @@ For tests, run python manage.py test tracker and python manage.py makemigrations
 2. Create a separate private .env holding POSTGRES_PASSWORD. The initial Compose configuration interpolates this into DATABASE_URL; avoid URL-reserved characters in this password, or update to an appropriately encoded URL/secrets mechanism before deployment.
 3. Run docker compose up -d --build. The app binds to **127.0.0.1:8088** by default. Route your existing Traefik HTTPS proxy to that port and **do not expose Gunicorn directly on the internet**. Check https://wealtharr.vpn4u.cc/health/ after configuring DNS/proxy.
 4. Create the owner with docker compose exec web python manage.py createsuperuser.
-5. Inside Wealtharr, My settings configures notification destinations/preferences. Admin control configures SMTP and the Discord bot (people connect their own Discord for DMs); the advanced admin can enable/hide strategy templates.
+5. Inside Wealtharr, My settings configures notification destinations/preferences. Admin control configures SMTP and the Discord bot (people connect their Discord for DMs and/or add their own channel webhook); the advanced admin can enable/hide strategy templates.
 6. Validate docker compose exec web python manage.py check --deploy and docker compose exec web python manage.py test tracker.
 
 The reminders container checks missing monthly contribution targets **and configured 9Sig market reviews** hourly. It does not execute trades. Do not run multiple scheduler replicas. SMTP/Discord credentials are encrypted using a key derived from SECRET_KEY — keep this key on restoration. Make regular PostgreSQL backups using pg_dump and test restoring them; the Compose volume alone is not a backup.

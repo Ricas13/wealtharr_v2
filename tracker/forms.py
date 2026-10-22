@@ -169,17 +169,40 @@ class PriceForm(forms.Form):
 
 class NotificationForm(forms.ModelForm):
     """Where alerts go. Which alerts go where is chosen per strategy."""
+    discord_webhook = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False),
+                                      label="Discord webhook URL")
     class Meta:
         model = NotificationPreference
-        fields = ["destination_email", "email_enabled", "discord_enabled"]
+        fields = ["destination_email", "email_enabled", "discord_enabled", "discord_webhook_enabled"]
         labels = {
             "destination_email": "Send emails to",
             "email_enabled": "Enable email notifications",
-            "discord_enabled": "Enable Discord notifications",
+            "discord_enabled": "Send me Discord DMs",
+            "discord_webhook_enabled": "Post to my Discord channel",
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         style(self.fields)
+        self.fields["discord_webhook"].widget.attrs["placeholder"] = "https://discord.com/api/webhooks/…"
+    def clean(self):
+        from .discord_dm import valid_webhook
+        data = super().clean()
+        url = (data.get("discord_webhook") or "").strip()
+        if url and not valid_webhook(url):
+            self.add_error("discord_webhook", "That isn't a Discord webhook URL (it starts https://discord.com/api/webhooks/).")
+        elif data.get("discord_enabled") and not self.instance.discord_user_id:
+            self.add_error("discord_enabled", "Connect your Discord account first.")
+        elif data.get("discord_webhook_enabled") and not (url or self.instance.discord_webhook_ciphertext):
+            self.add_error("discord_webhook", "Paste your channel's webhook URL to post there.")
+        data["discord_webhook"] = url
+        return data
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self.cleaned_data.get("discord_webhook"):
+            obj.discord_webhook_ciphertext = encrypt_secret(self.cleaned_data["discord_webhook"])
+        if commit:
+            obj.save()
+        return obj
 
 class IntegrationForm(forms.ModelForm):
     smtp_password = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="SMTP password (leave blank to keep existing)")
