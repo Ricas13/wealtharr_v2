@@ -65,6 +65,16 @@ STUDY_SYMBOLS = {
     "TQQQ": (("USD",), "USD", Decimal("1")),
     "3QQQ.DE": (("EUR",), "EUR", Decimal("1")),
     "ERNX.DE": (("EUR",), "EUR", Decimal("1")),
+    # HFEA: pound (3LUS pence line, 3TYL dollar line) and dollar funds; SPY,
+    # IEF and TLT above are the stand-ins rebuilt at 3x before launch.
+    "3LUS.L": (("GBp", "GBX"), "GBP", Decimal("100")),
+    "3TYL.L": (("USD",), "USD", Decimal("1")),
+    "UPRO": (("USD",), "USD", Decimal("1")),
+    "TMF": (("USD",), "USD", Decimal("1")),
+    # 3Sig: S&P SmallCap 600 (pound pence line, dollar IJR, euro Xetra line).
+    "ISP6.L": (("GBp", "GBX"), "GBP", Decimal("100")),
+    "IJR": (("USD",), "USD", Decimal("1")),
+    "IUS3.DE": (("EUR",), "EUR", Decimal("1")),
 }
 FIRST_DAY = date(2000, 1, 1)
 EIGHT = Decimal("0.00000001")

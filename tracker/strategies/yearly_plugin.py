@@ -1,6 +1,7 @@
 """Plug-in wiring for fixed-weight strategies reviewed after each year (or month) end."""
 from tracker.core.calendar import (
-    month_end_before, month_end_on_or_after, year_end_before, year_end_on_or_after,
+    month_end_before, month_end_on_or_after, quarter_end_before, quarter_end_on_or_after,
+    year_end_before, year_end_on_or_after,
 )
 from tracker.strategies.base import StrategyModule
 
@@ -8,6 +9,8 @@ SCHEDULES = {
     # cadence word: (last review before a day, next review on/after a day, title)
     "yearly": (year_end_before, year_end_on_or_after, lambda d: "Yearly rebalance %d" % d.year),
     "monthly": (month_end_before, month_end_on_or_after, lambda d: "Monthly check %s" % d.strftime("%B %Y")),
+    "quarterly": (quarter_end_before, quarter_end_on_or_after,
+                  lambda d: "Quarterly rebalance %d-Q%d" % (d.year, (d.month - 1) // 3 + 1)),
 }
 
 

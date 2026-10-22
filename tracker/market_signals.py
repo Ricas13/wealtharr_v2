@@ -44,6 +44,7 @@ def count_skipped_equity_sells(quarterly_signals):
     return sum(
         any(a.get("side") == "HOLD" for a in row.actions) and
         ("defer this equity sell" in row.message.lower() or
+         "defer this stock sell" in row.message.lower() or
          "skip this sell" in row.message.lower())
         for row in quarterly_signals
     )
@@ -120,9 +121,17 @@ def _alert_intraperiod_spike(strategy, *, now, first_buy, baseline, tqqq_latest,
                      sender=dispatch, strategy=strategy)
 
 
+THREE_SIG = "three-sig"
+
+
 def _rules_for(strategy):
-    """The pinned rule module: v2 for pound accounts, v3 for dollar/euro ones."""
+    """The pinned rule module: 9Sig v2 for pound accounts, v3 for dollar/euro ones; 3Sig v1."""
     from .strategies.nine_sig import v2, v3
+    if strategy.preset.slug == THREE_SIG:
+        from .strategies.three_sig import v1 as three
+        ok = (strategy.strategy_version == three.VERSION
+              and strategy.account.currency in three.CURRENCIES)
+        return three if ok else None
     version = strategy.strategy_version or NINE_SIG_RULE_VERSION
     rules = {v2.VERSION: v2, v3.VERSION: v3}.get(version)
     if rules is v2 and strategy.account.currency != "GBP":
@@ -136,12 +145,14 @@ def review_strategy(strategy):
     """Use actual *completed-quarter* prices and ledger holdings, not today's value."""
     if not strategy.market_data_enabled or not strategy.preset.active:
         return {"status": "disabled"}
-    if strategy.preset.slug != "nasdaq-quarterly-target":
+    if strategy.preset.slug not in ("nasdaq-quarterly-target", THREE_SIG):
         return {"status": "unsupported"}
     # Never run v2 against an old pinned v1 owner portfolio implicitly.
     rules = _rules_for(strategy)
     if rules is None:
-        return {"status": "cannot_compute", "reason": "Pinned 9Sig rule version differs; owner review required"}
+        return {"status": "cannot_compute", "reason": "Pinned rule version differs; owner review required"}
+    # 9Sig also watches TQQQ (its 100%-up reset); 3Sig holds no 3x fund and doesn't.
+    nine_sig = strategy.preset.slug != THREE_SIG
     currency = strategy.account.currency
     if (not TICKER.fullmatch(strategy.equity_symbol) or
             not TICKER.fullmatch(strategy.safe_symbol)):
@@ -157,7 +168,7 @@ def review_strategy(strategy):
     if any(symbol not in (strategy.equity_symbol, strategy.safe_symbol)
            for symbol, qty in report["positions"].items() if qty > ZERO):
         return {"status": "holdings outside the two configured strategy sleeves"}
-    tickers = {strategy.equity_symbol, strategy.safe_symbol, "TQQQ", "SPY"}
+    tickers = {strategy.equity_symbol, strategy.safe_symbol, "SPY"} | ({"TQQQ"} if nine_sig else set())
     data = {symbol: sync_ticker(symbol) for symbol in tickers}
     # Fail closed even if old accepted observations remain in the database.
     # The health issue must be reviewed rather than silently ignored.
@@ -188,22 +199,23 @@ def review_strategy(strategy):
     start_date = baseline.as_of if baseline else first_buy.occurred_on
     if quarter_number(quarter_end) < quarter_number(start_date):
         return {"status": "waiting for first completed quarter"}
-    # A 60/40 reset is a suggestion, never proof that the owner traded.
-    # Future cycles are paused until their actual positions are re-anchored.
+    # A reset (9Sig 60/40, 3Sig 80/20) is a suggestion, never proof that the
+    # owner traded. Future cycles are paused until positions are re-anchored.
     pending_reset = strategy.signals.filter(
         kind__in=("QUARTERLY", "SPIKE_WATCH"), as_of__lt=quarter_end,
-        message__icontains="review a reset to 60%"
+        message__icontains="review a reset to "
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of").first()
     if pending_reset and (baseline is None or baseline.as_of <= pending_reset.as_of):
         return {"status": "manual reset must be confirmed as a new strategy baseline"}
-    _alert_intraperiod_spike(
-        strategy, now=now, first_buy=first_buy, baseline=baseline,
-        tqqq_latest=data.get("TQQQ"), version=rules.VERSION)
+    if nine_sig:
+        _alert_intraperiod_spike(
+            strategy, now=now, first_buy=first_buy, baseline=baseline,
+            tqqq_latest=data.get("TQQQ"), version=rules.VERSION)
     closing = {symbol: settlement_close(symbol, quarter_end) for symbol in tickers}
     if (any(x is None for x in closing.values()) or
             closing[strategy.equity_symbol].currency != currency or
             closing[strategy.safe_symbol].currency != currency or
-            closing["TQQQ"].currency != "USD" or closing["SPY"].currency != "USD"):
+            (nine_sig and closing["TQQQ"].currency != "USD") or closing["SPY"].currency != "USD"):
         return {"status": "incomplete or currency-mismatched quarter-end prices"}
     # Replay only actual fills dated by the quarterly settlement.
     cash = ZERO
@@ -237,7 +249,7 @@ def review_strategy(strategy):
     # drawdown; the trade rules still use only completed-quarter references.
     ref_tqqq = list(MarketObservation.objects.filter(
         symbol="TQQQ", as_of__lte=quarter_end,
-    ).order_by("as_of").values_list("as_of", "price"))
+    ).order_by("as_of").values_list("as_of", "price")) if nine_sig else []
     ref_spy = list(MarketObservation.objects.filter(
         symbol="SPY", as_of__lte=quarter_end,
         as_of__gte=quarter_end - timedelta(days=760),
@@ -277,7 +289,7 @@ def review_strategy(strategy):
         return {"status": "cannot_compute",
                 "reason": "SPY eight-quarter verified quarter-end history incomplete"}
     tqqq_closes = _quarterly_closes(ref_tqqq, quarter_end)
-    if any(q not in tqqq_closes or
+    if nine_sig and any(q not in tqqq_closes or
            (settled_end(q) - tqqq_closes[q][0]).days > 6
            for q in (review_q - 1, review_q)):
         return {"status": "cannot_compute",

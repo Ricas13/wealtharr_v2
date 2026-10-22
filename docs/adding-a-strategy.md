@@ -6,12 +6,14 @@ found with `tracker.strategies.registry.module_for(instance)`. A test
 (`tracker/test_strategy_plugins.py`) fails if a generic module imports a strategy's
 rules directly, and runs a test-only three-fund strategy through the whole loop.
 
-Worked examples: `strategies/nine_sig/` (quarterly signal line),
+Worked examples: `strategies/nine_sig/` (quarterly signal line; `strategies/three_sig/`
+reuses its live review with its own rules and `reset_equity_fraction`),
 `strategies/all_weather/` and `strategies/golden_butterfly/` (fixed weights, yearly
 rebalance). A fixed-weight strategy needs only a `v1.py` with `VERSION`, `WEIGHTS`
 and an `evaluate` calling the shared pure `strategies/fixed_weights.py::rebalance`,
-and a two-line `plugin.py` using `strategies/yearly_plugin.py` (`cadence="monthly"` checks
-after each month end instead; `strategies/permanent_portfolio/` uses it with a band rule). A strategy without
+and a two-line `plugin.py` using `strategies/yearly_plugin.py` (`cadence="monthly"` or `"quarterly"` checks
+after each month or quarter end instead, as `strategies/hfea/` does; leveraged funds can be rebuilt
+before launch with `Source(proxy_leverage=3, proxy_charge=...)`; `strategies/permanent_portfolio/` uses it with a band rule). A strategy without
 fixed weights (`strategies/dual_momentum/`) sets its `role_targets` to 0 ("By signal"
 at setup) and gives its plug-in `current_weights` for the opening buy and allocation.
 

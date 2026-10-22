@@ -27,6 +27,8 @@ ALL_WEATHER = "all-weather"
 GOLDEN_BUTTERFLY = "golden-butterfly"
 DUAL_MOMENTUM = "dual-momentum"
 PERMANENT_PORTFOLIO = "permanent-portfolio"
+HFEA = "hfea"
+THREE_SIG = "three-sig"
 from tracker.core.brokers import ACCOUNT_TYPE_NAMES  # noqa: E402
 ACCOUNT_TYPES = tuple(ACCOUNT_TYPE_NAMES.items())
 
@@ -68,6 +70,16 @@ _OFFERS = {
         PERMANENT_PORTFOLIO, "Permanent Portfolio", "Low risk", "Monthly check",
         "25% each in stocks, long-term government bonds, cash and gold, rebalanced only when a "
         "part drifts below 15% or above 35%.", True,
+    ),
+    HFEA: StrategyOffer(
+        HFEA, "HFEA", "Very high risk", "Quarterly",
+        "55% 3x S&P 500 and 45% 3x long-term US Treasuries, rebalanced every quarter "
+        "(HEDGEFUNDIE's Excellent Adventure). Not affiliated with HEDGEFUNDIE or Bogleheads.", True,
+    ),
+    THREE_SIG: StrategyOffer(
+        THREE_SIG, "3Sig", "High risk", "Quarterly",
+        "80% small-company shares, 20% bonds; each quarter the share side is steered to a 3% growth "
+        "target (Jason Kelly's 3% Signal). Not affiliated with Jason Kelly or The Kelly Letter.", True,
     ),
 }
 OFFERS = MappingProxyType(_OFFERS)
@@ -122,6 +134,8 @@ class CatalogueLine:
             "comm": "Commodities",
             "scv": "Small-cap value", "short": "Short bonds",
     "us": "US shares", "intl": "World ex-US shares", "cashfund": "Cash fund", "bonds": "Bonds",
+            "stocks3x": "3x US shares", "bonds3x": "3x Treasuries",
+            "smallcap": "Small-company shares",
         }.get(self.role, self.role)
 
     @property
@@ -326,6 +340,52 @@ EU_XEON = _eu("Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C", "Xtrackers", 
               "Euro equivalent of Treasury bills: the €STR overnight rate (swap-based), accumulating.",
               TR_BROWSE + "?q=LU0290358497")
 
+# HFEA and 3Sig (22 Oct 2026). No Trading 212 instrument page was readable; the owner
+# confirmed 3LUS/3USL, 3TYL and ISP6 are listed and buyable in their Trading 212 ISA.
+T212_OWNER_CONFIRMED_22 = " Owner confirmed it is listed and buyable in their Trading 212 ISA (22 Oct 2026)."
+HFEA_VERIFIED_ON = date(2026, 10, 22)
+UK_3LUS = Listing(
+    "WisdomTree S&P 500 3x Daily Leveraged", "WisdomTree", "IE00B7Y34M31", "3LUS.L", "GBX",
+    "LSE 3LUS (pence line)",
+    "https://www.wisdomtree.com/gb/products/equities/wisdomtree-sp-500-3x-daily-leveraged",
+    "3x daily S&P 500 (net total return), the UK equivalent of UPRO: an ETP (collateralised note), "
+    "not a fund. Issuer says ISA eligible. Daily leverage loses value in choppy markets. "
+    "Source-cited, not read first-hand." + T212_OWNER_CONFIRMED_22 + " " + ACCOUNT_HOLD,
+    HFEA_VERIFIED_ON, brokers={"TRADING212": T212 % "3LUS"})
+UK_3TYL = Listing(
+    "WisdomTree US Treasuries 10Y 3x Daily Leveraged", "WisdomTree", "IE00BKT09032", "3TYL.L", "USD",
+    "LSE 3TYL (USD line)",
+    "https://www.wisdomtree.com/gb/products/fixed-income/wisdomtree-us-treasuries-10y-3x-daily-leveraged",
+    "3x daily 10-year US Treasury futures: the closest European equivalent of TMF, which is 3x 20+ year "
+    "Treasuries (none trades in Europe), so it reacts about 40% as strongly to rate changes. An ETP, "
+    "very small. Quoted in US dollars: Wealtharr converts each close at that day's GBP/USD close and "
+    "your broker charges its own currency fee. Source-cited, not read first-hand."
+    + T212_OWNER_CONFIRMED_22 + " " + ACCOUNT_HOLD,
+    HFEA_VERIFIED_ON, brokers={"TRADING212": T212 % "3TYL"})
+US_UPRO = _us("ProShares UltraPro S&P500", "ProShares", "US74347X8645", "UPRO",
+              "https://www.proshares.com/our-etfs/leveraged-and-inverse/upro",
+              "3x daily S&P 500, as in the original. Fidelity requires a leveraged-ETF agreement and the "
+              "'Most Aggressive' objective before buying.")
+US_TMF = _us("Direxion Daily 20+ Year Treasury Bull 3X Shares", "Direxion", "US25459W5402", "TMF",
+             "https://www.direxion.com/product/daily-20-year-treasury-bull-bear-3x-etf",
+             "3x daily 20+ year US Treasuries, as in the original. Fidelity requires a leveraged-ETF "
+             "agreement before buying.")
+UK_ISP6 = Listing(
+    "iShares S&P SmallCap 600 UCITS ETF", "iShares", "IE00B2QWCY14", "ISP6.L", "GBX",
+    "LSE ISP6 (pence line)",
+    "https://www.ishares.com/uk/individual/en/products/251856/",
+    "US small companies (S&P SmallCap 600), the same index as the book's IJR. Distributing; "
+    "Wealtharr records dividends as cash. Source-cited, not read first-hand."
+    + T212_OWNER_CONFIRMED_22 + " " + ACCOUNT_HOLD,
+    HFEA_VERIFIED_ON, brokers={"TRADING212": T212 % "ISP6"})
+US_IJR = _us("iShares Core S&P Small-Cap ETF", "iShares", "US4642878049", "IJR",
+             "https://www.ishares.com/us/products/239774/",
+             "US small companies (S&P SmallCap 600), the book's stock fund.")
+EU_IUS3 = _eu("iShares S&P SmallCap 600 UCITS ETF", "iShares", "IE00B2QWCY14", "IUS3.DE",
+              "https://www.ishares.com/de/privatanleger/de/produkte/251856/",
+              "US small companies (S&P SmallCap 600), the same index as the book's IJR, on its Xetra EUR line.",
+              "https://etf.capital/etf/IE00B2QWCY14")
+
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
     (STRATEGY_9SIG, "growth", "GB"): (_from_instrument(EQUITY_UK),),
@@ -381,6 +441,16 @@ ROLE_LISTINGS = {
     (PERMANENT_PORTFOLIO, "long", "DE"): (EU_DBXF,),
     (PERMANENT_PORTFOLIO, "cashfund", "DE"): (EU_XEON,),
     (PERMANENT_PORTFOLIO, "gold", "DE"): (EU_PPFB,),
+    (HFEA, "stocks3x", "GB"): (UK_3LUS,),
+    (HFEA, "bonds3x", "GB"): (UK_3TYL,),
+    (HFEA, "stocks3x", "US"): (US_UPRO,),
+    (HFEA, "bonds3x", "US"): (US_TMF,),
+    (THREE_SIG, "smallcap", "GB"): (UK_ISP6,),
+    (THREE_SIG, "safe", "GB"): (UK_ERNS,),
+    (THREE_SIG, "smallcap", "US"): (US_IJR,),
+    (THREE_SIG, "safe", "US"): (US_AGG,),
+    (THREE_SIG, "smallcap", "DE"): (EU_IUS3,),
+    (THREE_SIG, "safe", "DE"): (EU_ERNX,),
     (STRATEGY_9SIG, "growth", "US"): (US_TQQQ,),
     (STRATEGY_9SIG, "safe", "US"): (US_AGG,),
     (STRATEGY_9SIG, "growth", "DE"): (EU_3QQQ,),
