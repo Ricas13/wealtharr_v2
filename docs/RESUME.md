@@ -1,3 +1,9 @@
+## Comparison chart: sortable, typed amounts, hover readout (22 October 2026)
+
+Branch `feature/compare-interactive` from main (after PR #50). Owner asked for a more interactive comparison (homepage and Add strategy share `partials/compare_card.html` + `js/compare.js`). Table headers sort (Strategy A-Z first; figures best first, click again to flip; `aria-sort`). Sliders replaced by typed whole-pound fields: start £100–£10,000,000, monthly £0–£1,000,000 (`v2_home.LIMITS`; requests debounced, invalid input not sent). Hovering or tapping the chart shows that day's date, each shown strategy's value (largest first) and its gain against the money put in by then, plus money put in (`point_dates` added to the payload). Linear/Log now explains itself ("equal heights are equal pounds" / "equal % growth"). Styles in `home.css` and `compare.css`.
+
+---
+
 ## Small price corrections are accepted automatically (22 October 2026)
 
 Branch `fix/auto-accept-revisions` from main (after PR #50). Owner doesn't want to be asked about routine price corrections. When Yahoo reports a different close than the stored one, the change is still logged in `PriceRevision`; if every changed day is within 20% (`market_data.AUTO_ACCEPT_REVISION`; owner raised it from 10% for leveraged funds, still below a 4-for-3 split's 25%) it is applied at once (`apply_revision`, `accepted_by` empty = automatic) and the line is not held. Bigger changes (a split or a pence/pounds error) still hold the line for the Admin page's Accept button. A correction already waiting is accepted on the next check. Tests updated in `tracker/test_price_revisions.py` and `test_section_c_quality.py`.
