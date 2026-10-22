@@ -293,6 +293,13 @@ class NotificationPreference(models.Model):
     destination_email = models.EmailField(blank=True)
     email_enabled = models.BooleanField(default=False)
     discord_enabled = models.BooleanField(default=False)
+    # Set by "Connect Discord": who the bot DMs. No Discord token is kept.
+    discord_user_id = models.CharField(max_length=24, blank=True)
+    discord_username = models.CharField(max_length=100, blank=True)
+    discord_connected_at = models.DateTimeField(null=True, blank=True)
+    # Or (and/or) the person's own Discord channel webhook; stored encrypted.
+    discord_webhook_enabled = models.BooleanField(default=False)
+    discord_webhook_ciphertext = models.TextField(blank=True)
     monthly_reminders = models.BooleanField(default=True)
     # Owner-selected delay before a weekly outstanding-review reminder.
     followup_delay_days = models.PositiveSmallIntegerField(default=7)
@@ -333,7 +340,11 @@ class SystemIntegration(models.Model):
     smtp_password_ciphertext = models.TextField(blank=True)
     smtp_sender = models.EmailField(blank=True)
     smtp_use_tls = models.BooleanField(default=True)
-    discord_url_ciphertext = models.TextField(blank=True)
+    # Discord bot that DMs each person who connected their Discord account.
+    discord_client_id = models.CharField(max_length=24, blank=True)
+    discord_client_secret_ciphertext = models.TextField(blank=True)
+    discord_bot_token_ciphertext = models.TextField(blank=True)
+    discord_guild_id = models.CharField(max_length=24, blank=True)
 
     @classmethod
     def current(cls):

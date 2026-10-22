@@ -169,43 +169,75 @@ class PriceForm(forms.Form):
 
 class NotificationForm(forms.ModelForm):
     """Where alerts go. Which alerts go where is chosen per strategy."""
+    discord_webhook = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False),
+                                      label="Discord webhook URL")
     class Meta:
         model = NotificationPreference
-        fields = ["destination_email", "email_enabled", "discord_enabled"]
+        fields = ["destination_email", "email_enabled", "discord_enabled", "discord_webhook_enabled"]
         labels = {
             "destination_email": "Send emails to",
             "email_enabled": "Enable email notifications",
-            "discord_enabled": "Enable Discord notifications",
+            "discord_enabled": "Send me Discord DMs",
+            "discord_webhook_enabled": "Post to my Discord channel",
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         style(self.fields)
+        self.fields["discord_webhook"].widget.attrs["placeholder"] = "https://discord.com/api/webhooks/…"
+    def clean(self):
+        from .discord_dm import valid_webhook
+        data = super().clean()
+        url = (data.get("discord_webhook") or "").strip()
+        if url and not valid_webhook(url):
+            self.add_error("discord_webhook", "That isn't a Discord webhook URL (it starts https://discord.com/api/webhooks/).")
+        elif data.get("discord_enabled") and not self.instance.discord_user_id:
+            self.add_error("discord_enabled", "Connect your Discord account first.")
+        elif data.get("discord_webhook_enabled") and not (url or self.instance.discord_webhook_ciphertext):
+            self.add_error("discord_webhook", "Paste your channel's webhook URL to post there.")
+        data["discord_webhook"] = url
+        return data
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self.cleaned_data.get("discord_webhook"):
+            obj.discord_webhook_ciphertext = encrypt_secret(self.cleaned_data["discord_webhook"])
+        if commit:
+            obj.save()
+        return obj
 
 class IntegrationForm(forms.ModelForm):
     smtp_password = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="SMTP password (leave blank to keep existing)")
-    discord_webhook = forms.URLField(required=False, widget=forms.PasswordInput(render_value=False), label="Discord webhook URL (leave blank to keep existing)")
+    discord_client_secret = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="Discord client secret (leave blank to keep existing)")
+    discord_bot_token = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="Discord bot token (leave blank to keep existing)")
     class Meta:
         model = SystemIntegration
-        fields = ["smtp_host", "smtp_port", "smtp_username", "smtp_sender", "smtp_use_tls"]
+        fields = ["smtp_host", "smtp_port", "smtp_username", "smtp_sender", "smtp_use_tls",
+                  "discord_client_id", "discord_guild_id"]
         labels = {
             "smtp_host": "SMTP server", "smtp_port": "SMTP port",
             "smtp_username": "SMTP username", "smtp_sender": "From email",
             "smtp_use_tls": "Use STARTTLS",
+            "discord_client_id": "Discord application ID",
+            "discord_guild_id": "Discord server ID (where the bot lives)",
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         style(self.fields)
-    def clean_discord_webhook(self):
-        url = self.cleaned_data.get("discord_webhook", "")
-        if url and not (url.startswith("https://discord.com/api/webhooks/") or url.startswith("https://discordapp.com/api/webhooks/")):
-            raise forms.ValidationError("Only official HTTPS Discord webhook URLs are accepted.")
-        return url
+    def _snowflake(self, name):
+        value = (self.cleaned_data.get(name) or "").strip()
+        if value and not value.isdigit():
+            raise forms.ValidationError("Discord IDs are numbers only (copy it with Developer Mode on).")
+        return value
+    def clean_discord_client_id(self):
+        return self._snowflake("discord_client_id")
+    def clean_discord_guild_id(self):
+        return self._snowflake("discord_guild_id")
     def save(self, commit=True):
         obj = super().save(commit=False)
         if self.cleaned_data.get("smtp_password"):
             obj.smtp_password_ciphertext = encrypt_secret(self.cleaned_data["smtp_password"])
-        if self.cleaned_data.get("discord_webhook"):
-            obj.discord_url_ciphertext = encrypt_secret(self.cleaned_data["discord_webhook"])
+        for field in ("discord_client_secret", "discord_bot_token"):
+            if self.cleaned_data.get(field):
+                setattr(obj, field + "_ciphertext", encrypt_secret(self.cleaned_data[field].strip()))
         if commit:
             obj.save()
         return obj

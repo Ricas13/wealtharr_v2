@@ -395,6 +395,6 @@ def alerts_summary(owner, strategy=None):
     last = deliveries.order_by("-created_at", "-pk").first()
     return {
         "email": bool(pref and pref.email_enabled and pref.destination_email),
-        "discord": bool(pref and pref.discord_enabled),
+        "discord": bool(pref and (pref.discord_enabled or pref.discord_webhook_enabled)),
         "last": last,
     }

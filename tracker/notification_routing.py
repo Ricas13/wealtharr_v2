@@ -16,13 +16,18 @@ CATEGORIES = (
 )
 CATEGORY_KEYS = {value for value, _ in CATEGORIES}
 CHANNELS = ("email", "discord")
+# Where alerts are delivered. A strategy routes an alert to "discord"; it then
+# goes to each Discord destination the person switched on: a DM from the
+# site's bot and/or a webhook into a channel on their own server.
+DELIVERY_CHANNELS = ("email", "discord", "discord_webhook")
+ROUTE_FOR = {"email": "email", "discord": "discord", "discord_webhook": "discord"}
 
 
 def selected_channels(pref, category):
     """Destinations switched on in Settings; which alerts go where is per strategy."""
     if category not in CATEGORY_KEYS:
         raise ValueError("Unknown notification category")
-    return tuple(channel for channel in CHANNELS
+    return tuple(channel for channel in DELIVERY_CHANNELS
                  if getattr(pref, channel + "_enabled", False))
 
 
@@ -42,7 +47,7 @@ def strategy_channels(pref, category, strategy=None):
     selected = routes.get(kind)
     if not isinstance(selected, dict):
         return ()
-    return tuple(c for c in channels if selected.get(c) is True)
+    return tuple(c for c in channels if selected.get(ROUTE_FOR[c]) is True)
 
 
 def route_notice(owner, category, event_key, subject, message, *,

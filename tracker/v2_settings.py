@@ -17,7 +17,8 @@ from .models import (
     NotificationDelivery, NotificationPreference,
     OwnerTOTP, StrategyInstance, SystemIntegration,
 )
-from .notification_routing import CATEGORIES, CHANNELS
+from .notification_routing import CATEGORIES, CHANNELS, DELIVERY_CHANNELS
+from .discord_dm import DiscordError, authorize_url, configured as discord_ready, connect, redirect_uri
 from .services import dispatch
 from .v2_views import _render, _instances
 
@@ -57,6 +58,7 @@ def strategy_route_rows(strategy):
     return category_rows
 
 
+CHANNEL_NAMES = {"email": "Email", "discord": "Discord DM", "discord_webhook": "Discord channel webhook"}
 CATEGORY_WHEN = {
     "quarterly": "After a quarter end, when trades are needed",
     "urgent": "Big market drop or a reset to review",
@@ -87,6 +89,12 @@ def settings_page(request):
                     form.save()
                     messages.success(request, "Alert destinations saved.")
                     return redirect("v2_settings")
+        elif kind == "remove_webhook":
+            pref.discord_webhook_ciphertext = ""
+            pref.discord_webhook_enabled = False
+            pref.save(update_fields=["discord_webhook_ciphertext", "discord_webhook_enabled"])
+            messages.success(request, "Discord webhook removed. Nothing more will be posted to that channel.")
+            return redirect("v2_settings")
         elif kind == "strategy":
             try:
                 strategy_id = int(request.POST.get("strategy_id", ""))
@@ -134,7 +142,7 @@ def settings_page(request):
         smtp_configured=bool(
             config and config.smtp_host and config.smtp_sender
         ),
-        discord_configured=bool(config and config.discord_url_ciphertext),
+        discord_configured=bool(config and discord_ready(config)),
         has_authenticator=OwnerTOTP.objects.filter(owner=request.user).exists(),
     )
 
@@ -142,7 +150,7 @@ def settings_page(request):
 @staff_member_required
 @require_POST
 def test_channel(request, channel):
-    if channel not in CHANNELS:
+    if channel not in DELIVERY_CHANNELS:
         raise Http404("Unknown notification channel")
     pref, _ = NotificationPreference.objects.get_or_create(owner=request.user)
     if not getattr(pref, channel + "_enabled"):
@@ -157,7 +165,61 @@ def test_channel(request, channel):
         channels=(channel,),
     )
     if outcome.get(channel) == "sent":
-        messages.success(request, channel.title() + " test accepted by the transport.")
+        messages.success(request, CHANNEL_NAMES[channel] + " test accepted by the transport.")
     else:
-        messages.error(request, channel.title() + " test was not confirmed; check the integration and receipts.")
+        messages.error(request, CHANNEL_NAMES[channel] + " test was not confirmed; check the integration and receipts.")
     return redirect("control")
+
+
+@login_required
+@require_http_methods(["GET"])
+def discord_connect(request):
+    """Send the person to Discord's own consent screen."""
+    from secrets import token_urlsafe
+    cfg = SystemIntegration.current()
+    if not discord_ready(cfg):
+        messages.error(request, "Discord DMs aren't set up by the site owner yet.")
+        return redirect("v2_settings")
+    state = token_urlsafe(24)
+    request.session["discord_state"] = state
+    return redirect(authorize_url(cfg, redirect_uri(request), state))
+
+
+@login_required
+@require_http_methods(["GET"])
+def discord_callback(request):
+    """Back from Discord: link the account, join the bot's server, turn DMs on."""
+    from django.utils import timezone
+    expected = request.session.pop("discord_state", None)
+    if not expected or request.GET.get("state") != expected:
+        messages.error(request, "That Discord link expired. Try Connect Discord again.")
+        return redirect("v2_settings")
+    if request.GET.get("error") or not request.GET.get("code"):
+        messages.error(request, "Discord wasn't connected.")
+        return redirect("v2_settings")
+    cfg = SystemIntegration.current()
+    try:
+        user_id, name = connect(cfg, request.GET["code"], redirect_uri(request))
+    except DiscordError as exc:
+        messages.error(request, "Discord wasn't connected: %s" % exc)
+        return redirect("v2_settings")
+    pref, _ = NotificationPreference.objects.get_or_create(
+        owner=request.user, defaults={"destination_email": request.user.email})
+    pref.discord_user_id, pref.discord_username = user_id, name
+    pref.discord_connected_at = timezone.now()
+    pref.discord_enabled = True
+    pref.save(update_fields=["discord_user_id", "discord_username", "discord_connected_at", "discord_enabled"])
+    messages.success(request, "Discord connected. Alerts will arrive as DMs from the Wealtharr bot.")
+    return redirect("v2_settings")
+
+
+@login_required
+@require_POST
+def discord_disconnect(request):
+    pref, _ = NotificationPreference.objects.get_or_create(owner=request.user)
+    pref.discord_user_id = pref.discord_username = ""
+    pref.discord_connected_at = None
+    pref.discord_enabled = False
+    pref.save(update_fields=["discord_user_id", "discord_username", "discord_connected_at", "discord_enabled"])
+    messages.success(request, "Discord disconnected. No more DMs will be sent.")
+    return redirect("v2_settings")
