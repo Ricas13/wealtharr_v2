@@ -9,6 +9,8 @@ from types import MappingProxyType
 
 from tracker.strategies.all_weather.v1 import VERSION as ALL_WEATHER_VERSION, WEIGHTS as ALL_WEATHER_WEIGHTS
 from tracker.strategies.dual_momentum.v1 import VERSION as DUAL_MOMENTUM_VERSION
+from tracker.strategies.hfea.v1 import VERSION as HFEA_VERSION, WEIGHTS as HFEA_WEIGHTS
+from tracker.strategies.three_sig.v1 import VERSION as THREE_SIG_VERSION
 from tracker.strategies.golden_butterfly.v1 import (
     VERSION as GOLDEN_BUTTERFLY_VERSION, WEIGHTS as GOLDEN_BUTTERFLY_WEIGHTS,
 )
@@ -192,6 +194,64 @@ _RELEASED = {
         ),
         earlier_versions=(PERMANENT_V1_VERSION,),
     ),
+    "hfea": StrategyDescription(
+        key="hfea",
+        version=HFEA_VERSION,
+        title="HFEA",
+        summary=("HEDGEFUNDIE's Excellent Adventure as published on the Bogleheads forum (2019): 55% "
+                 "in a 3x S&P 500 fund and 45% in a 3x long-term US Treasury fund, put back to those "
+                 "weights every quarter. Very high risk: it lost roughly 70% from its peak in 2022. "
+                 "All transactions are made by you."),
+        cadence="One rebalance after each calendar quarter end.",
+        rules=(
+            "Target weights, as published (HEDGEFUNDIE's own revision of his first 40/60): 55% 3x daily S&P 500, 45% 3x daily long-term US Treasuries.",
+            "After each quarter end (31 March, 30 June, 30 September, 31 December), holdings are valued at verified closes.",
+            "Funds above their weight are sold back to it; the proceeds and any cash buy the fund below its weight. No bands: every quarter goes back to 55/45.",
+            "The original funds are UPRO and TMF (US). In a UK account the stock side is WisdomTree's 3x S&P 500 (3LUS) and the bond side is WisdomTree's 3x 10-year US Treasuries (3TYL): no 3x 20+ year Treasury fund trades in Europe, so the bond side reacts about 40% as strongly to rate changes as TMF. Each fund is shown with its evidence at setup.",
+            "New money waits as cash until the next quarterly rebalance, or you can split it 55/45 yourself (the original sets no rule for new money). Orders under 1 (pound or dollar) are skipped as too small to place.",
+            "Only owner-confirmed actual fills are recorded. No trade is ever placed for you.",
+        ),
+        role_targets=HFEA_WEIGHTS,
+        target_explanation="55/45 is restored at every quarterly rebalance.",
+        caution=("Not affiliated with HEDGEFUNDIE or the Bogleheads forum. Leveraged daily funds lose value "
+                 "in choppy markets and can fall far more than the market; stocks and bonds fell together "
+                 "in 2022. In a UK account the bond fund is a 10-year, not a 20+ year, 3x fund (a material "
+                 "difference from the original). Brokers may ask knowledge questions before you can buy "
+                 "leveraged products. Your own account's access to each fund is unverified."),
+        release_label="hfea@1",
+        version_history=("hfea@1 (hfea.v1.0.0): 55/45 3x stocks/3x long Treasuries, quarterly rebalance.",),
+    ),
+    "three-sig": StrategyDescription(
+        key="three-sig",
+        version=THREE_SIG_VERSION,
+        title="3Sig",
+        summary=("Jason Kelly's 3% Signal (The 3% Signal, 2015): a small-company stock fund and a bond "
+                 "fund, 80/20 to start. Each quarter the stock side is steered to a 3% growth target, "
+                 "selling the surplus into bonds or buying the shortfall from them. Run with the same "
+                 "later rules as the app's 9Sig. All transactions are made by you."),
+        cadence="Review completed calendar quarters; a reset always waits for you to confirm it.",
+        rules=(
+            "At the first purchase or a confirmed reset, the baseline is 80% small-company stocks and 20% bonds and cash.",
+            "The stock signal line rises by 3% each completed quarter, plus half the actual deposits made during that quarter.",
+            "After each quarter end, stocks above the line are sold into bonds; a shortfall is bought with bonds and cash.",
+            "When bonds and cash pass 30% of the plan, the review asks for a reset to 80/20.",
+            "30 Down: after SPY closes 30% below its highest of the previous eight quarter ends, the next two stock sell signals are skipped; a third would-be sell, or eight quarters passing, asks for a reset.",
+            "Shortfalls between 90% and 100% of the bond reserve buy only 81% of it; a shortfall above the reserve uses it all and suggests reviewing a reset.",
+            "The book's fund is IJR and its bond fund AGG. In a UK account the stock side is iShares S&P SmallCap 600 (ISP6, the same index) and the bond side is ERNS, an ultrashort sterling bond fund, as in 9Sig. Each fund is shown with its evidence at setup.",
+            "Only owner-confirmed actual fills are recorded; ordinary quarterly trades do not create a reset baseline. No trade is ever placed for you.",
+        ),
+        role_targets=(("smallcap", Decimal("0.80")), ("safe", Decimal("0.20"))),
+        target_explanation=("80/20 describes the initial or confirmed-reset mix. "
+                            "It is NOT a standing allocation target every quarter."),
+        caution=("Not affiliated with Jason Kelly or The Kelly Letter. Where the book differs from Kelly's "
+                 "later 9Sig, this follows 9Sig by your choice: the book skips the next four sell signals "
+                 "after 30 Down (here two, then a reset) and has no large-buy throttle. ERNS (and ERNX for "
+                 "euros) is an ultrashort bond fund, not the book's AGG, so the bond side barely moves. "
+                 "Your own account's access to each fund is unverified."),
+        release_label="three-sig@1",
+        version_history=("three-sig@1 (three_sig.v1.0.0): 3% quarterly signal, 80/20, 9Sig-style 30 Down "
+                         "(two skips), throttle and resets.",),
+    ),
 }
 STRATEGIES = MappingProxyType(_RELEASED)
 
@@ -209,7 +269,10 @@ def _plugins():
     from tracker.strategies.golden_butterfly.plugin import GOLDEN_BUTTERFLY
     from tracker.strategies.nine_sig.plugin import NINE_SIG
     from tracker.strategies.permanent_portfolio.plugin import PERMANENT_PORTFOLIO
-    return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY, DUAL_MOMENTUM, PERMANENT_PORTFOLIO)}
+    from tracker.strategies.hfea.plugin import HFEA
+    from tracker.strategies.three_sig.plugin import THREE_SIG
+    return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY, DUAL_MOMENTUM, PERMANENT_PORTFOLIO,
+                               HFEA, THREE_SIG)}
 
 
 _MODULES = {}

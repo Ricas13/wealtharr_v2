@@ -39,6 +39,8 @@ OTHER_LINES = {
                       "#e5c07b"),
     "permanent-portfolio": ("Four equal parts, banded", "shares, long bonds, cash, gold; 15–35% bands",
                             "Rarely", "#56b6c2"),
+    "hfea": ("3× shares + 3× bonds", "55% 3× S&P 500, 45% 3× Treasuries", "4× a year", "#c678dd"),
+    "three-sig": ("Quarterly signal, small companies", "80/20, 3% growth target", "4× a year", "#98c379"),
 }
 # Signed-in pages (Add strategy) may use the strategies' own names; the public
 # homepage keeps the generic ones above.

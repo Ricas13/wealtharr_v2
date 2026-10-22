@@ -61,7 +61,7 @@
     {% endif %}
     {% if study_selected.assumed_resets %}
       <p class="w2-note" data-assumed-resets><span class="w2-chip w2-wait">Assumed resets</span>
-        This run made {{ study_selected.assumed_resets }} 60/40 reset{{ study_selected.assumed_resets|pluralize }}, each assumed confirmed and filled at the quarter close. Live tracking asks you to confirm a reset first, and treats a 100%-up reset as a review warning only.</p>
+        {% if study_selected.reset_mix %}This run made {{ study_selected.assumed_resets }} {{ study_selected.reset_mix }} reset{{ study_selected.assumed_resets|pluralize }}, each assumed confirmed and filled at the quarter close. Live tracking asks you to confirm a reset first.{% else %}This run made {{ study_selected.assumed_resets }} 60/40 reset{{ study_selected.assumed_resets|pluralize }}, each assumed confirmed and filled at the quarter close. Live tracking asks you to confirm a reset first, and treats a 100%-up reset as a review warning only.{% endif %}</p>
     {% endif %}
   </section>
 

@@ -243,13 +243,13 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
         reset = bool(signal.reset_reason)
         baseline = None
         if reset:
-            # A reset (60/40 baseline) exists only for strategies that define one.
+            # A reset baseline (9Sig 60/40, 3Sig 80/20) exists only for strategies that define one.
             plugin = module_for(locked)
             if not (plugin and plugin.supports_reset):
                 raise ValidationError("This strategy has no reset step.")
             actual_equity = before["positions"].get(locked.equity_symbol, ZERO) * marks[0].price
             actual_safe = before["positions"].get(locked.safe_symbol, ZERO) * marks[1].price
-            if abs(actual_equity - before["value"] * D("0.60")) / before["value"] > D("0.05"):
+            if abs(actual_equity - before["value"] * plugin.reset_equity_fraction) / before["value"] > D("0.05"):
                 raise ValidationError("Actual post-fill equity is outside the reviewed reset tolerance.")
             if locked.baselines.filter(as_of__gt=signal.as_of).exists():
                 raise ValidationError("A later confirmed baseline already exists.")

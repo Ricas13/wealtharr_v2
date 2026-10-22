@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
-from .core.calendar import month_end_on_or_after
+from .core.calendar import month_end_on_or_after, quarter_end_on_or_after
 from .models import StudyPrice
 from .study import TIMEFRAMES, _buy_and_hold, _new_month, _summary, start_index  # noqa: F401
 
@@ -36,6 +36,11 @@ class Source:
     # False for a GBP-hedged fund: its stand-in's US-dollar returns are used as
     # they are, since hedging removes most of the currency effect.
     proxy_in_gbp: bool = True
+    # A leveraged fund before launch: this many times the stand-in's daily
+    # return (in its own currency), less ``proxy_charge`` a year. Borrowing and
+    # swap costs aren't modelled, so rebuilt periods can look better than reality.
+    proxy_leverage: int = 1
+    proxy_charge: float = 0.0
 
 
 @dataclass
@@ -69,6 +74,27 @@ def _gbp_series(symbol, fx_days, fx, convert=True, target="GBP"):
                 continue
             value /= fx[fx_days[i]]
         out[r.as_of] = value
+    return out
+
+
+def _leveraged(native, source, fx_days, fx, target):
+    """{day: price in ``target``} rebuilt as ``proxy_leverage`` x the stand-in's daily return.
+
+    The leverage applies to the stand-in's own (US-dollar) returns; the result
+    is then converted like any dollar series, so currency moves aren't leveraged.
+    """
+    level, prev, out = 100.0, None, {}
+    for day in sorted(native):
+        price = native[day]
+        if prev is not None:
+            level *= 1 + source.proxy_leverage * (price / prev - 1) - source.proxy_charge / 252
+        prev = price
+        if target == "USD" or not source.proxy_in_gbp:
+            out[day] = level
+            continue
+        i = bisect_left(fx_days, day + timedelta(days=1)) - 1
+        if i >= 0 and (day - fx_days[i]).days <= 7:
+            out[day] = level / fx[fx_days[i]]
     return out
 
 
@@ -122,7 +148,13 @@ class FixedWeightStudy:
         series = {}
         for role, source in self.sources.items():
             fund = series_of(source.fund)
-            proxy = {} if source.proxy == CASH else series_of(source.proxy, convert=source.proxy_in_gbp)
+            if source.proxy == CASH:
+                proxy = {}
+            elif source.proxy_leverage > 1:
+                proxy = _leveraged(series_of(source.proxy, convert=False), source,
+                                   fx_days, fx, target)
+            else:
+                proxy = series_of(source.proxy, convert=source.proxy_in_gbp)
             series[role] = (fund, sorted(fund), proxy, sorted(proxy))
         grid = [d for d in spy_days if target == "USD" or _last(fx_days, fx, d) is not None]
         columns = {}
@@ -193,6 +225,9 @@ class FixedWeightStudy:
             if self.review_word == "monthly":
                 due = i + 1 < len(days) and days[i + 1].month != days[i].month
                 review_day = month_end_on_or_after(days[i])
+            elif self.review_word == "quarterly":
+                due = i + 1 < len(days) and (days[i + 1].month - 1) // 3 != (days[i].month - 1) // 3
+                review_day = quarter_end_on_or_after(days[i])
             else:
                 due = i + 1 < len(days) and days[i + 1].year != days[i].year
                 review_day = date(days[i].year, 12, 31)
@@ -219,16 +254,21 @@ class FixedWeightStudy:
                 notes.append("Before %s, %s follows %s." % (
                     "%d %s" % (real.day, real.strftime("%b %Y")) if real else "its first price",
                     source.fund_label, source.proxy_label))
-        return {
+        out = {
             "start": start, "end": data.days[-1], "dates": data.days[s:],
             "series": {n: (_summary(data.days, s, v) if v else None) for n, v in raw.items()},
             "simulated_notes": notes,
         }
+        if "resets" in raw["strategy"]:
+            # Rules with resets (3Sig) assume each is confirmed; the page shows the count.
+            out["assumed_resets"] = raw["strategy"]["resets"]
+            out["reset_mix"] = raw["strategy"].get("reset_mix", "")
+        return out
 
     def how_it_works(self, data):
         weights = ", ".join("%s%% %s" % ((w * 100).normalize(), self.sources[r].fund_label)
                             for r, w in self.rules.WEIGHTS)
-        period = "month" if self.review_word == "monthly" else "year"
+        period = {"monthly": "month", "quarterly": "quarter"}.get(self.review_word, "year")
         rule = self.rule_text or (
             "sell what's above its weight, buy what's below, never borrowing.")
         money = {"GBP": "pounds", "USD": "US dollars", "EUR": "euros"}[self.CURRENCY]

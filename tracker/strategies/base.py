@@ -6,6 +6,7 @@ A plug-in's own module may use its strategy's rules; generic code never
 imports them directly.
 """
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Callable
 
 
@@ -30,6 +31,8 @@ class StrategyModule:
     allocation_label: str = "Target"
     # Whether reviews can carry a reset that sets a new baseline (owner must finish those).
     supports_reset: bool = False
+    # The growth share a confirmed reset restores (9Sig 60%, 3Sig 80%), checked within 5 points.
+    reset_equity_fraction: Decimal = Decimal("0.60")
     # Whether a saved review may offer a separate manual 60/40 reset review. (signal) -> bool
     offers_manual_reset: Callable = field(default=lambda signal: False)
     # Creates that separate reset review: (owner=, strategy_id=, signal_id=) -> signal
