@@ -67,14 +67,14 @@
       </div>
     </div>
     <div id="w2-hold-fields" {% if wizard.mode != 'hold' %}hidden{% endif %}>
-      <p class="w2-field-help">What you hold on the start date and that day's price per share. You can correct it later in the Ledger.</p>
+      <p class="w2-field-help">What you hold on the start date and each fund's market price that day, <strong>not</strong> what you originally paid: Wealtharr measures your returns from the start date. You can correct it later in the Ledger.</p>
       <label class="w2-field">Cash in the account ({{ cur }})
         <input class="w2-input" name="cash" inputmode="decimal" type="number" min="0" step="0.01" value="{{ wizard.cash }}" placeholder="0.00"></label>
       {% for holding in wizard_hold_rows %}
       <div class="w2-form-grid">
         <label class="w2-field">{{ holding.line.ticker }} shares
           <input class="w2-input" name="shares_{{ holding.line.role }}" type="number" min="0" step="0.00000001" value="{{ holding.shares }}"></label>
-        <label class="w2-field">{{ holding.line.ticker }} price per share ({{ cur }})
+        <label class="w2-field">{{ holding.line.ticker }} price on the start date ({{ cur }} per share)
           <input class="w2-input" name="cost_{{ holding.line.role }}" type="number" min="0" step="0.00000001" value="{{ holding.cost }}"></label>
       </div>
       {% endfor %}

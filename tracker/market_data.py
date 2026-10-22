@@ -293,19 +293,38 @@ def settlement_close(symbol, quarter_end, *, days=6):
     ).order_by("-as_of").first()
 
 
+def _exchange(symbol):
+    """The listing venue from a Yahoo symbol: ".L", ".DE", or "" for US lines."""
+    return "." + symbol.rsplit(".", 1)[1] if "." in symbol else ""
+
+
 def period_close(symbol, period_end):
     """The settled close for a review date, or None while it may still change.
 
     A review is saved once, so it must not use an earlier day's close just
-    because the period end's own close hasn't been fetched yet. The close
-    counts when it is from the last weekday on or before the period end, or
-    when a later close exists (the market was shut that day, e.g. a holiday).
+    because the period end's own close hasn't been fetched (or Yahoo skipped
+    it). The close counts when it is from the last weekday on or before the
+    period end. An earlier close counts only when a later close exists and
+    no other line on the same exchange traded on the missing days (so the
+    market was shut, e.g. a holiday, rather than the data having a gap).
     A held ticker never counts.
     """
     hold = YahooSync.objects.filter(symbol=symbol, last_error__startswith="PRICE_HOLD").exists()
     close = settlement_close(symbol, period_end)
     if hold or close is None:
         return None
+    last_weekday = period_end - timedelta(days=max(0, period_end.weekday() - 4))
+    if close.as_of >= last_weekday:
+        return close
+    if not MarketObservation.objects.filter(symbol=symbol, as_of__gt=period_end).exists():
+        return None
+    venue = _exchange(symbol)
+    missing = MarketObservation.objects.filter(
+        as_of__gt=close.as_of, as_of__lte=period_end).exclude(symbol=symbol).exclude(
+        symbol__contains="=").values_list("symbol", flat=True)
+    if any(_exchange(other) == venue for other in missing):
+        return None  # the exchange traded that day: our close is missing, not a holiday
+    return close
     last_weekday = period_end - timedelta(days=max(0, period_end.weekday() - 4))
     if close.as_of >= last_weekday or MarketObservation.objects.filter(
             symbol=symbol, as_of__gt=period_end).exists():

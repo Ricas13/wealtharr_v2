@@ -56,8 +56,19 @@ def _linked(locked, signal):
                 .select_related("ledger_entry").order_by("ledger_entry__occurred_on", "pk"))
 
 
+# A fill within this share of the suggestion counts as the trade done: broker
+# orders placed by value or rounded to whole shares rarely match exactly.
+FILL_TOLERANCE = D("0.02")
+
+
 def completion_rows(signal, fills):
-    """A Decimal ledger reconciliation, not a price-based execution estimate."""
+    """A Decimal ledger reconciliation, not a price-based execution estimate.
+
+    An action is complete when the recorded units are within ``FILL_TOLERANCE``
+    of the suggestion, or when the owner accepted it as done with what was
+    recorded (``signal.accepted_actions``).
+    """
+    accepted = signal.accepted_actions if isinstance(signal.accepted_actions, dict) else {}
     actions = proposed_actions(signal)
     delivered = {index: ZERO for index in range(len(actions))}
     for item in fills:
@@ -76,17 +87,49 @@ def completion_rows(signal, fills):
         expected = D(str(suggestion["quantity"]))
         if not expected.is_finite() or expected <= ZERO:
             raise ValidationError("Invalid or missing immutable proposed quantity.")
-        if delivered[index] > expected:
+        if delivered[index] > expected * (ONE + FILL_TOLERANCE):
             raise ValidationError("Recorded fills exceed the original proposed quantity.")
+        close_enough = abs(delivered[index] - expected) <= expected * FILL_TOLERANCE
         result.append({
             "index": index, "side": suggestion["side"],
             "symbol": suggestion["symbol"], "suggested": expected,
             "recorded": delivered[index],
-            "remaining": expected - delivered[index],
-            "complete": delivered[index] == expected,
+            "remaining": max(expected - delivered[index], ZERO),
+            "complete": close_enough or str(index) in accepted,
+            "accepted": accepted.get(str(index)),
+            "max_more": expected * (ONE + FILL_TOLERANCE) - delivered[index],
             "fills": tuple(item for item in fills if item.action_index == index),
         })
     return tuple(result)
+
+
+def accept_action_as_done(*, owner, strategy_id, signal_id, action_index, note=""):
+    """Owner accepts one proposed trade as done with the units already recorded.
+
+    For a real trade that differed from the suggestion (fewer shares, or not
+    placed at all). The deviation is kept on the review; the ledger only ever
+    holds the actual fills. A reset still has to land within its tolerance
+    when the review is finished.
+    """
+    with transaction.atomic():
+        locked = StrategyInstance.objects.select_for_update().select_related(
+            "account", "preset").get(pk=strategy_id, owner=owner)
+        signal = StrategySignal.objects.select_for_update().get(pk=signal_id, strategy=locked)
+        _check_current(locked, signal)
+        rows = completion_rows(signal, _linked(locked, signal))
+        if not isinstance(action_index, int) or not 0 <= action_index < len(rows):
+            raise ValidationError("Select an action from the current review.")
+        row = rows[action_index]
+        if row["complete"]:
+            raise ValidationError("This trade is already recorded as done.")
+        accepted = dict(signal.accepted_actions or {})
+        accepted[str(action_index)] = {
+            "recorded": str(row["recorded"]), "suggested": str(row["suggested"]),
+            "at": timezone.now().isoformat(), "by": owner.pk, "note": (note or "")[:500],
+        }
+        signal.accepted_actions = accepted
+        signal.save(update_fields=["accepted_actions"])
+        return row
 
 
 def late_review_allowed(strategy, signal):
@@ -185,8 +228,11 @@ def record_single_fill(*, owner, strategy_id, signal_id, action_index,
         if _external_after_signal(locked, signal, existing):
             raise ValidationError("Other portfolio activity since the review requires a fresh reconciliation.")
         rows = completion_rows(signal, existing)
-        if quantity > rows[action_index]["remaining"]:
-            raise ValidationError("This fill exceeds the remaining proposed units. Reconcile the larger trade separately.")
+        if quantity > rows[action_index]["max_more"]:
+            raise ValidationError(
+                "This fill is more than 2% above the proposed units. Reconcile the larger trade separately.")
+        if rows[action_index]["accepted"]:
+            raise ValidationError("You already marked this trade as done.")
         action = actions[action_index]
         if action["symbol"] not in symbols(locked):
             raise ValidationError("The proposed broker symbol is not the mapped holding.")

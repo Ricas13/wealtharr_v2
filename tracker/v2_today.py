@@ -19,7 +19,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 
 from .signal_status import _last_action, _next_end, _price_status, changed_since_review
 from .cockpit_execution import (
-    completion_rows, finalize_manual_review, late_review_allowed, proposed_actions,
+    accept_action_as_done, completion_rows, finalize_manual_review, late_review_allowed, proposed_actions,
     record_single_fill,
 )
 from .cockpit_forms import SingleSignalFillForm
@@ -409,6 +409,15 @@ def guided_review(request, instance_id, signal_id):
                 return redirect(
                     "v2_guided_review", instance_id=strategy.pk, signal_id=notice.pk,
                 )
+            if intent == "accept_action":
+                try:
+                    index = int(request.POST.get("action_index", ""))
+                except ValueError:
+                    raise ValidationError("Select an action from the current review.")
+                accept_action_as_done(owner=request.user, strategy_id=strategy.pk, signal_id=notice.pk,
+                                      action_index=index, note=request.POST.get("note", ""))
+                messages.success(request, "Marked done with the shares you recorded. The difference is noted on the review.")
+                return redirect("v2_guided_review", instance_id=strategy.pk, signal_id=notice.pk)
             if intent == "finalize":
                 if not context["review_can_finalize"]:
                     raise ValidationError(
