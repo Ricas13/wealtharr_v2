@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="RateLimitBucket",
             fields=[
-                ("id", models.BigAutoField(primary_key=True, serialize=False)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
                 ("key", models.CharField(max_length=180, unique=True)),
                 ("count", models.PositiveIntegerField(default=0)),
                 ("expires_at", models.DateTimeField(db_index=True)),
