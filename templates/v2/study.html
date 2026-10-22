@@ -1,4 +1,4 @@
-{% load w2_format %}
+{% load w2_format static %}
 <p class="w2-notice" role="note"><strong>Hypothetical study, not your results.</strong> Past prices replayed through the same {{ study_title|default:"strategy" }} rules your live reviews use. Nothing here is used for instructions, alerts or your real figures.</p>
 
 {% if not study_supported %}
@@ -26,15 +26,21 @@
 {% if not study_selected %}
   <section class="w2-card w2-space-top"><p class="w2-muted">Price history doesn't reach back this far yet (data starts {{ study_first_day|date:"j M Y" }}).</p></section>
 {% else %}
+<link rel="stylesheet" href="{% static 'css/study_zoom.css' %}">
+{{ study_zoom_data|json_script:"study-zoom-data" }}
+<div class="w2-study-zoom" data-study-zoom data-study-window-url="{% url 'v2_study_window_json' instance_id=instance.pk %}"
+     data-study-amount="{{ study_amount }}" data-study-monthly="{{ study_monthly }}"
+     data-study-range="{{ study_range }}" data-study-fill="{{ study_fill }}" data-study-currency="{{ cur }}"
+     data-study-primary="{{ study_zoom_data.primary }}">
 {% with s=study_main %}
 <section class="w2-kpis w2-space-top" aria-label="{{ study_title }} result">
-  <div class="w2-kpi"><p class="w2-label">{{ study_title }} value now</p><p class="w2-stat-value">{{ cur }}{{ s.final|floatformat:"0g" }}</p></div>
-  <div class="w2-kpi"><p class="w2-label">Money put in</p><p class="w2-stat-value">{{ cur }}{{ s.put_in|floatformat:"0g" }}</p></div>
-  <div class="w2-kpi"><p class="w2-label">Gain</p><p class="w2-stat-value {{ s.gain|tone }}">{{ s.gain|signed_money:0 }} <small>{{ s.gain_pct|signed_pct }}</small></p></div>
-  <div class="w2-kpi"><p class="w2-label">Annualised</p><p class="w2-stat-value {{ s.annual|tone }}">{% if s.annual is not None %}{{ s.annual|signed_pct }}{% else %}—{% endif %}</p></div>
-  <div class="w2-kpi"><p class="w2-label">Worst fall</p><p class="w2-stat-value w2-neg">{{ s.drawdown|signed_pct }}</p></div>
-  <div class="w2-kpi"><p class="w2-label">Trades</p><p class="w2-stat-value">{{ s.trades }}</p></div>
-  <div class="w2-kpi"><p class="w2-label">From</p><p class="w2-stat-value">{{ study_selected.start|date:"j M Y" }}</p></div>
+  <div class="w2-kpi"><p class="w2-label" data-study-value-label>{{ study_title }} value now</p><p class="w2-stat-value" data-study-primary-metric="final">{{ cur }}{{ s.final|floatformat:"0g" }}</p></div>
+  <div class="w2-kpi"><p class="w2-label" data-study-capital-label>Money put in</p><p class="w2-stat-value" data-study-primary-metric="put_in">{{ cur }}{{ s.put_in|floatformat:"0g" }}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Gain</p><p class="w2-stat-value {{ s.gain|tone }}" data-study-primary-metric="gain">{{ s.gain|signed_money:0 }} <small>{{ s.gain_pct|signed_pct }}</small></p></div>
+  <div class="w2-kpi"><p class="w2-label">Annualised</p><p class="w2-stat-value {{ s.annual|tone }}" data-study-primary-metric="annual">{% if s.annual is not None %}{{ s.annual|signed_pct }}{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label">Worst fall</p><p class="w2-stat-value w2-neg" data-study-primary-metric="drawdown">{{ s.drawdown|signed_pct }}</p></div>
+  <div class="w2-kpi"><p class="w2-label" title="Trade count for the complete simulated run, not only the zoomed dates">Trades (full run)</p><p class="w2-stat-value">{{ s.trades }}</p></div>
+  <div class="w2-kpi"><p class="w2-label">From</p><p class="w2-stat-value" data-study-primary-metric="from">{{ study_selected.start|date:"j M Y" }}</p></div>
 </section>
 {% endwith %}
 
@@ -48,13 +54,31 @@
     {% if study_chart %}
     <div class="w2-legend">{% for line in study_chart.lines %}<span><span class="w2-sw {{ line.css }}"></span>{{ line.label }}</span>{% endfor %}</div>
     <div class="w2-chart">
-      <svg viewBox="0 0 800 200" preserveAspectRatio="none" style="height:240px" role="img" aria-label="Hypothetical value of each approach from {{ study_selected.start|date:'j M Y' }} to {{ study_selected.end|date:'j M Y' }}">
+      <svg viewBox="0 0 800 200" preserveAspectRatio="none" style="height:240px" role="img" data-study-chart aria-label="Hypothetical value of each approach from {{ study_selected.start|date:'j M Y' }} to {{ study_selected.end|date:'j M Y' }}">
         <line class="w2-grid-line" x1="0" y1="100" x2="800" y2="100"></line>
         {% for line in study_chart.lines %}<polyline class="{{ line.css }}" points="{{ line.points }}"></polyline>{% endfor %}
       </svg>
-      <div class="w2-ylabels" aria-hidden="true">{% for y in study_chart.y_labels %}<span>{{ y }}</span>{% endfor %}</div>
+      <div class="w2-ylabels" aria-hidden="true">{% for y in study_chart.y_labels %}<span data-study-y="{{ forloop.counter0 }}">{{ y }}</span>{% endfor %}</div>
+      <div class="study-zoom-tip" data-study-tip hidden></div>
     </div>
-    <div class="w2-axis" aria-hidden="true">{% for t in study_chart.ticks %}<span>{{ t|date:"M Y" }}</span>{% endfor %}</div>
+    <div class="w2-axis" aria-hidden="true" data-study-ticks>{% for t in study_chart.ticks %}<span>{{ t|date:"M Y" }}</span>{% endfor %}</div>
+    <div class="study-zoom-nav" aria-label="Inspect a selected Study period">
+      <div class="study-zoom-head">
+        <span class="w2-muted">Drag the handles to zoom; drag the selected area to move through history.</span>
+        <span data-study-dates class="study-zoom-dates"></span>
+        <button class="study-zoom-reset" type="button" data-study-reset disabled>Reset zoom</button>
+      </div>
+      <div class="study-zoom-track" data-study-track>
+        <svg viewBox="0 0 800 60" preserveAspectRatio="none" data-study-mini aria-hidden="true"></svg>
+        <div class="study-zoom-shade" data-study-before aria-hidden="true"></div>
+        <div class="study-zoom-shade" data-study-after aria-hidden="true"></div>
+        <div class="study-zoom-window" data-study-window role="slider" tabindex="0" aria-label="Move Study date window" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+        <button type="button" class="study-zoom-handle" data-study-handle="start" role="slider" aria-label="Study start date" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></button>
+        <button type="button" class="study-zoom-handle" data-study-handle="end" role="slider" aria-label="Study end date" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"></button>
+      </div>
+      <p class="w2-note">Use arrow keys on a focused handle or selection; Shift + arrow moves further. Hover or tap the chart to inspect a date.</p>
+      <p class="w2-note" data-study-status role="status" aria-live="polite">Full Study period</p>
+    </div>
     {% endif %}
     {% if study_selected.simulated_notes %}
       <p class="w2-note"><span class="w2-chip w2-wait">Includes simulated history</span>
@@ -67,19 +91,19 @@
   </section>
 
   <section class="w2-card w2-span2">
-    <div class="w2-ch"><h2 class="w2-ct">Compared over {{ study_selected.start|date:"j M Y" }} – {{ study_selected.end|date:"j M Y" }}</h2></div>
+    <div class="w2-ch"><h2 class="w2-ct" data-study-comparison-title>Compared over {{ study_selected.start|date:"j M Y" }} – {{ study_selected.end|date:"j M Y" }}</h2></div>
     <div class="w2-table-wrap"><table class="w2-table">
-      <thead><tr><th>Approach</th><th class="w2-r">Value now</th><th class="w2-r">Put in</th><th class="w2-r">Gain</th><th class="w2-r">Gain %</th><th class="w2-r">Annualised</th><th class="w2-r">Worst fall</th><th class="w2-r">Trades</th></tr></thead>
-      <tbody>{% for name, label, css, row in study_selected_rows %}
-        <tr><td><span class="w2-dotsw {{ css }}"></span>{{ label }}{% if name == study_best %} <span class="w2-chip w2-ok">Best</span>{% endif %}</td>
-          {% if row %}<td class="w2-r">{{ cur }}{{ row.final|floatformat:"2g" }}</td><td class="w2-r">{{ cur }}{{ row.put_in|floatformat:"0g" }}</td>
-          <td class="w2-r {{ row.gain|tone }}">{{ row.gain|signed_money }}</td><td class="w2-r {{ row.gain_pct|tone }}">{{ row.gain_pct|signed_pct }}</td>
-          <td class="w2-r">{% if row.annual is not None %}{{ row.annual|signed_pct }}{% else %}—{% endif %}</td>
-          <td class="w2-r w2-neg">{{ row.drawdown|signed_pct }}</td><td class="w2-r">{% if row.trades is not None %}{{ row.trades }}{% else %}—{% endif %}</td>
+      <thead><tr><th>Approach</th><th class="w2-r">Value at end</th><th class="w2-r" data-study-capital-heading>Put in</th><th class="w2-r">Gain</th><th class="w2-r">Gain %</th><th class="w2-r">Annualised</th><th class="w2-r">Worst fall</th><th class="w2-r" title="Trade count over the complete Study replay, not only the selected dates">Trades (full run)</th></tr></thead>
+      <tbody data-study-rows>{% for name, label, css, row in study_selected_rows %}
+        <tr data-study-row="{{ name }}"><td><span class="w2-dotsw {{ css }}"></span>{{ label }}{% if name == study_best %} <span class="w2-chip w2-ok" data-study-best>Best</span>{% endif %}</td>
+          {% if row %}<td class="w2-r" data-study-cell="final">{{ cur }}{{ row.final|floatformat:"2g" }}</td><td class="w2-r" data-study-cell="put_in">{{ cur }}{{ row.put_in|floatformat:"0g" }}</td>
+          <td class="w2-r {{ row.gain|tone }}" data-study-cell="gain">{{ row.gain|signed_money }}</td><td class="w2-r {{ row.gain_pct|tone }}" data-study-cell="gain_pct">{{ row.gain_pct|signed_pct }}</td>
+          <td class="w2-r" data-study-cell="annual">{% if row.annual is not None %}{{ row.annual|signed_pct }}{% else %}—{% endif %}</td>
+          <td class="w2-r w2-neg" data-study-cell="drawdown">{{ row.drawdown|signed_pct }}</td><td class="w2-r">{% if row.trades is not None %}{{ row.trades }}{% else %}—{% endif %}</td>
           {% else %}<td colspan="7" class="w2-muted">No data this far back</td>{% endif %}</tr>
       {% endfor %}</tbody>
     </table></div>
-    <p class="w2-note">Annualised is money-weighted and shown for a year or more. Worst fall ignores the effect of top-ups.</p>
+    <p class="w2-note">While zoomed, gains use each approach's opening portfolio value plus later top-ups. Annualised is money-weighted and shown for a year or more. Worst fall ignores top-ups. Trade counts always describe the entire simulated run.</p>
   </section>
 
   <section class="w2-card w2-span2">
@@ -87,7 +111,7 @@
     <div class="w2-table-wrap"><table class="w2-table">
       <thead><tr><th>Started</th><th>On</th>{% for name, label in study_series %}<th class="w2-r">{{ label }}</th>{% endfor %}</tr></thead>
       <tbody>{% for row in study_rows %}
-        <tr><td><a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ row.key }}&amp;scale={{ study_scale }}&amp;fill={{ study_fill }}">{% if row.key == 'ytd' %}Since 1 Jan{% else %}{{ row.label }} ago{% endif %}</a></td>
+        <tr><td><a href="?amount={{ study_amount|floatformat:'0' }}&amp;monthly={{ study_monthly|floatformat:'0' }}&amp;range={{ row.key }}&amp;scale={{ study_scale }}&amp;fill={{ study_fill }}">{% if row.key == 'ytd' %}Since 1 Jan{% elif row.key == 'max' %}All available{% else %}{{ row.label }} ago{% endif %}</a></td>
           {% if row.result %}<td class="w2-muted">{{ row.result.start|date:"j M Y" }}{% if row.result.simulated_notes %}*{% endif %}</td>
             {% for name, cell in row.cells %}<td class="w2-r {% if name == row.best %}w2-best{% endif %}">{% if cell %}{{ cur }}{{ cell.final|floatformat:"0g" }} <small class="{{ cell.gain_pct|tone }}">{{ cell.gain_pct|signed_pct:0 }}</small>{% else %}<span class="w2-muted">—</span>{% endif %}</td>{% endfor %}
           {% else %}<td colspan="{{ study_series|length|add:1 }}" class="w2-muted">Not enough history</td>{% endif %}</tr>
@@ -106,6 +130,8 @@
       </ul>
     </details>
   </section>
+</div>
+<script defer src="{% static 'js/study_zoom.js' %}"></script>
 </div>
 {% endif %}
 {% endif %}
