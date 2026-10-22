@@ -8,11 +8,11 @@
 {% if page_key == 'instance' %}
 <header class="w2-strategy-head">
   <div class="w2-row">
-    <h1>{{ selected_instance.name }}</h1>
+    <span class="w2-strategy-mark" aria-hidden="true"></span><h1>{{ selected_instance.name }}</h1>
     <span class="w2-muted">{% if selected_instance.account.kind == 'ISA' %}Stocks &amp; Shares ISA{% else %}{{ selected_instance.account.kind }}{% endif %} · {{ selected_instance.account.broker_label|default:"Platform not set" }}{% if fund_symbols %} · {{ fund_symbols|join:" / " }}{% endif %}</span>
   </div>
   <div class="w2-row">
-    {% if selected_instance.tracking_only %}<span class="w2-chip">Not live</span>{% else %}<span class="w2-chip w2-ok">● Live</span>{% endif %}
+    {% if selected_instance.tracking_only %}<span class="w2-chip">Not live</span>{% else %}<span class="w2-chip w2-ok">Live</span>{% endif %}
     {% if head_prices.date %}<span class="w2-chip {% if head_prices.fresh %}w2-ok{% else %}w2-wait{% endif %}">Prices {% if head_prices.fresh %}fresh{% else %}stale{% endif %} · {{ head_prices.date|date:"j M" }}</span>
     {% else %}<span class="w2-chip">No prices yet</span>{% endif %}
     {% if selected_instance.strategy_version %}<span class="w2-chip">Rules {{ selected_instance.strategy_version }}</span>{% endif %}

@@ -34,7 +34,7 @@ class AdvisoryDeliveryIntegrityTests(TestCase):
         send.assert_called_once()
         record = NotificationDelivery.objects.get(owner=self.owner)
         self.assertEqual(record.category, "urgent")
-        self.assertEqual(record.subject, "30 Down advisory")
+        self.assertEqual(record.subject, "🚨 30 Down advisory")
         self.assertEqual(record.message, "Investigate reference prices")
         self.assertEqual(record.attempts, 1)
 

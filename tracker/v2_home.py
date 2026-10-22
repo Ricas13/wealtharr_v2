@@ -18,13 +18,14 @@ from .models import InviteRequest, StudyPrice
 from .services import dispatch
 from .v2_auth import _turnstile_verified, preferred_url
 from .v2_study import _data
+from .strategies.registry import COLOURS
 
 log = logging.getLogger(__name__)
 
 FRAMES = (("ytd", "YTD"), ("1y", "1Y"), ("5y", "5Y"), ("10y", "10Y"), ("20y", "20Y"))
 FRAME_WORDS = {"ytd": "this year", "1y": "1 year", "5y": "5 years", "10y": "10 years", "20y": "20 years"}
 LINES = {
-    "nine_sig": ("Quarterly signal", "60/40, 9% growth target", "4× a year", "#5b9cf5"),
+    "nine_sig": ("Quarterly signal", "60/40, 9% growth target", "4× a year", COLOURS["nasdaq-quarterly-target"]),
     "hold": ("Buy & hold 3× Nasdaq", "100% growth fund", "Never", "#f0a050"),
     "spy": ("S&P 500 (SPY)", "benchmark", "Never", "#9aa3ad"),
     "vti": ("US total market (VTI)", "benchmark", "Never", "#b58cf0"),
@@ -32,15 +33,15 @@ LINES = {
 # The other released strategies, by plug-in key. Generic names only: the
 # public homepage doesn't use third-party strategy brands (CLAUDE.md).
 OTHER_LINES = {
-    "all-weather": ("All-season mix", "30% shares, 55% bonds, 15% gold & commodities", "1× a year", "#4fc3a1"),
+    "all-weather": ("All-season mix", "30% shares, 55% bonds, 15% gold & commodities", "1× a year", COLOURS["all-weather"]),
     "golden-butterfly": ("Five equal parts", "shares, small-cap value, long & short bonds, gold",
-                         "1× a year", "#e06c9f"),
+                         "1× a year", COLOURS["golden-butterfly"]),
     "dual-momentum": ("Monthly momentum switch", "US shares, world shares or bonds", "Up to 12× a year",
-                      "#e5c07b"),
+                      COLOURS["dual-momentum"]),
     "permanent-portfolio": ("Four equal parts, banded", "shares, long bonds, cash, gold; 15–35% bands",
-                            "Rarely", "#56b6c2"),
-    "hfea": ("3× shares + 3× bonds", "55% 3× S&P 500, 45% 3× Treasuries", "4× a year", "#c678dd"),
-    "three-sig": ("Quarterly signal, small companies", "80/20, 3% growth target", "4× a year", "#98c379"),
+                            "Rarely", COLOURS["permanent-portfolio"]),
+    "hfea": ("3× shares + 3× bonds", "55% 3× S&P 500, 45% 3× Treasuries", "4× a year", COLOURS["hfea"]),
+    "three-sig": ("Quarterly signal, small companies", "80/20, 3% growth target", "4× a year", COLOURS["three-sig"]),
 }
 # Signed-in pages (Add strategy) may use the strategies' own names; the public
 # homepage keeps the generic ones above.

@@ -338,9 +338,14 @@ def allocation(report, lines, roles, targets=None):
                  "pct": (report["cash"] / total * HUNDRED).quantize(Decimal("0.1")),
                  "target": None})
     palette = ("w2-c1", "w2-c2", "w2-c3", "w2-c5", "w2-c6", "w2-c7")  # w2-c4 is cash grey
+    end = 0.0
     for i, row in enumerate(rows):
         row["css"] = palette[i % len(palette)] if row["symbol"] else "w2-c4"
         row["width"] = max(min(float(row["pct"]), 100.0), 0.0)
+        # Where this fund's target share ends on the bar, for a marker.
+        if row["target"] is not None:
+            end += float(row["target"])
+            row["target_end"] = end if end < 99.5 else None
     return tuple(rows)
 
 
