@@ -7,10 +7,25 @@ permissions:
 jobs:
   python:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: wealtharr
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d wealtharr"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
     env:
       DEBUG: "1"
       SECRET_KEY: "github-actions-development-only-secret"
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/wealtharr"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -69,6 +84,15 @@ jobs:
           set -eu
           bash -n wealtharr.sh
           bash wealtharr.sh --help
+          python - <<'PY'
+          from pathlib import Path
+          src = Path("wealtharr.sh").read_text()
+          update = src.split("  update)")[1].split("    ;;")[0]
+          assert update.index("backup_snapshot") < update.index("git pull") < update.index("start")
+          assert "scripts/verify_backup.sh" in src
+          assert "age -r" in src and "scp -B" in src
+          print("Mandatory backup and encrypted off-server upload flow: OK")
+          PY
           bash -n scripts/restore_backup.sh
           bash -n scripts/verify_backup.sh
           cp .env.example .env.production
