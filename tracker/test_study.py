@@ -171,6 +171,48 @@ class StudyPageTests(TestCase):
         self.assertContains(page, "Study data not downloaded yet")
         self.assertEqual(self.client.get(self.url(self.theirs)).status_code, 404)
 
+    def test_study_zoom_max_and_cash_flow_aware_endpoint(self):
+        start = TODAY - timedelta(days=800)
+        seed("QQQ", start, lambda d, i: 100 * (1.0005 ** i))
+        seed("SPY", start, lambda d, i: 200 + i * 0.1)
+        seed("VTI", start, lambda d, i: 50 + i * 0.01)
+        seed("GBPUSD=X", start, lambda d, i: 1.3)
+        page = self.client.get(self.url(self.mine, amount="1000", monthly="100", range="max"))
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.context["study_range"], "max")
+        self.assertContains(page, "Reset zoom")
+        self.assertContains(page, "study_zoom.js")
+        self.assertContains(page, "study_zoom.css")
+        self.assertContains(page, 'data-study-range="max"')
+        self.assertNotContains(page, 'name="range" value="20y"')
+        data = page.context["study_zoom_data"]
+        self.assertEqual(data["primary"], "nine_sig")
+        self.assertEqual(len(data["point_dates_iso"]), len(data["put_in_points"]))
+        self.assertTrue(any(r["key"] == "hold" for r in data["rows"]))
+        self.assertGreater(len(data["point_dates_iso"]), 500)
+        endpoint = reverse("v2_study_window_json", args=[self.mine.pk])
+        args = "?range=max&amount=1000&monthly=100&fill=close"
+        result = self.client.get(endpoint + args + "&window_start=60&window_end=160")
+        self.assertEqual(result.status_code, 200)
+        selected = result.json()
+        self.assertEqual(selected["start_index"], 60)
+        self.assertEqual(selected["end_index"], 160)
+        self.assertIsNone(selected["rows"]["nine_sig"]["annual"])
+        self.assertEqual(selected["rows"]["nine_sig"]["put_in"],
+                         round(data["rows"][0]["points"][60] +
+                               data["put_in_points"][160] - data["put_in_points"][60], 2))
+        self.assertAlmostEqual(selected["rows"]["nine_sig"]["gain"],
+                               selected["rows"]["nine_sig"]["final"] -
+                               selected["rows"]["nine_sig"]["put_in"], places=2)
+        self.assertEqual(self.client.get(endpoint + args + "&window_start=-1&window_end=5").status_code, 400)
+        self.assertEqual(self.client.get(endpoint + args + "&window_start=5&window_end=50000").status_code, 400)
+        self.assertEqual(self.client.get(endpoint + args + "&window_start=9&window_end=10").status_code, 400)
+        self.assertEqual(self.client.get(endpoint + args + "&window_start=0&window_end=70&fill=bogus").status_code, 400)
+        self.assertEqual(self.client.get(reverse("v2_study_window_json", args=[self.theirs.pk])
+                                         + args + "&window_start=5&window_end=10").status_code, 404)
+        self.client.logout()
+        self.assertEqual(self.client.get(endpoint + args + "&window_start=60&window_end=160").status_code, 302)
+
     def test_results_table_inputs_and_validation(self):
         start = TODAY - timedelta(days=400)
         seed("QQQ", start, lambda d, i: 100 * (1.0005 ** i))
