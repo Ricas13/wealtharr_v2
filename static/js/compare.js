@@ -29,6 +29,8 @@
   var resetZoom = box.querySelector("[data-zoom-reset]");
   var view = null;  // selected index range; never changes the study or table figures
   var drag = null;
+  var miniState = null, miniSignature = ""; // only replot the overview when its data changes
+  var resetAfterLoad = false;
   var NS = "http://www.w3.org/2000/svg";
   var money = function (v) { return Math.round(v).toLocaleString("en-GB"); };
   var pct = function (v) { return v === null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "%"; };
@@ -186,24 +188,29 @@
   }
 
   function renderTimeline(shown, series) {
-    mini.querySelectorAll("polyline").forEach(function (p) { p.remove(); });
-    var bottom = Infinity, top = -Infinity;
-    series.forEach(function (values) {
-      values.forEach(function (v) {
-        if (v > 0 && Number.isFinite(v)) {
-          bottom = Math.min(bottom, v);
-          top = Math.max(top, v);
-        }
+    var signature = shown.map(function (r) { return r.key; }).join("|") + ":" + log;
+    if (miniState !== state || miniSignature !== signature) {
+      mini.querySelectorAll("polyline").forEach(function (p) { p.remove(); });
+      var bottom = Infinity, top = -Infinity;
+      series.forEach(function (values) {
+        values.forEach(function (v) {
+          if (v > 0 && Number.isFinite(v)) {
+            bottom = Math.min(bottom, v);
+            top = Math.max(top, v);
+          }
+        });
       });
-    });
-    if (!Number.isFinite(top)) return;
-    var f = log ? Math.log10 : function (x) { return x; };
-    var lo = log ? f(bottom) : 0;
-    var span = (f(top) - lo) || 1;
-    var y = function (v) { return 58 - (f(Math.max(v, 1)) - lo) / span * 56; };
-    var samples = indices(0, lastIndex(), 220);
-    drawLine(mini, state.put_in_points || [], samples, 0, lastIndex(), y, null, "putin");
-    shown.forEach(function (r) { drawLine(mini, r.points, samples, 0, lastIndex(), y, r.color); });
+      if (!Number.isFinite(top)) return;
+      var f = log ? Math.log10 : function (x) { return x; };
+      var lo = log ? f(bottom) : 0;
+      var span = (f(top) - lo) || 1;
+      var y = function (v) { return 58 - (f(Math.max(v, 1)) - lo) / span * 56; };
+      var samples = indices(0, lastIndex(), 220);
+      drawLine(mini, state.put_in_points || [], samples, 0, lastIndex(), y, null, "putin");
+      shown.forEach(function (r) { drawLine(mini, r.points, samples, 0, lastIndex(), y, r.color); });
+      miniState = state;
+      miniSignature = signature;
+    }
 
     var last = Math.max(1, lastIndex());
     var left = view.start / last * 100;
@@ -409,7 +416,15 @@
       "&monthly=" + encodeURIComponent(monthly.value) + "&range=" + range;
     fetch(url, { headers: { Accept: "application/json" } })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (data) { if (ticket === latest) { state = data; hideTip(); render(); } })
+      .then(function (data) {
+        if (ticket === latest) {
+          state = data;
+          if (resetAfterLoad) view = null;
+          resetAfterLoad = false;
+          hideTip();
+          render();
+        }
+      })
       .catch(function () {})
       .then(function () { if (ticket === latest) box.classList.remove("loading"); });
   }
@@ -426,7 +441,7 @@
     b.addEventListener("click", function () {
       press(frames, b);
       range = b.dataset.range;
-      view = null;  // a new timeframe starts with its full history visible
+      resetAfterLoad = true;  // reset only when the new series arrives
       load();
     });
   });

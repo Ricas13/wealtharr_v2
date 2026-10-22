@@ -49,6 +49,37 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 page.locator("[data-sort='label']").click()
                 names = page.locator("[data-compare] [data-rows] th").all_text_contents()
                 self.assertEqual(names, sorted(names, key=str.lower))
+                # The shared trim-style timeline zooms only the graph. The
+                # annual returns, gains and value table remain whole-period.
+                nav = page.locator("[data-zoom-track]")
+                start_handle = page.locator('[data-zoom-handle="start"]')
+                full_period = page.locator("[data-zoom-dates]").inner_text()
+                initial_value = page.locator("[data-rows] tr").first.locator("td").nth(1).inner_text()
+                self.assertEqual(start_handle.get_attribute("aria-valuenow"), "0")
+                nav.scroll_into_view_if_needed()
+                track_box = nav.bounding_box()
+                handle_box = start_handle.bounding_box()
+                start_x = handle_box["x"] + handle_box["width"] / 2
+                y = track_box["y"] + track_box["height"] / 2
+                page.mouse.move(start_x, y)
+                page.mouse.down()
+                page.mouse.move(track_box["x"] + track_box["width"] * .4, y, steps=8)
+                page.mouse.up()
+                self.assertGreater(int(start_handle.get_attribute("aria-valuenow")), 0)
+                self.assertNotEqual(page.locator("[data-zoom-dates]").inner_text(), full_period)
+                self.assertEqual(page.locator("[data-rows] tr").first.locator("td").nth(1).inner_text(),
+                                 initial_value)
+                # Move the selected time window with its keyboard slider.
+                window = page.locator("[data-zoom-window]")
+                before = int(window.get_attribute("aria-valuenow"))
+                window.focus()
+                page.keyboard.press("ArrowRight")
+                self.assertGreaterEqual(int(window.get_attribute("aria-valuenow")), before)
+                # Reset restores the complete range and all graph dates.
+                page.locator("[data-zoom-reset]").click()
+                self.assertEqual(start_handle.get_attribute("aria-valuenow"), "0")
+                self.assertEqual(page.locator("[data-zoom-dates]").inner_text(), full_period)
+                self.assertTrue(page.locator("[data-zoom-reset]").is_disabled())
                 # Hover readout.
                 svg = page.locator("[data-compare] [data-chart]")
                 svg.scroll_into_view_if_needed()
