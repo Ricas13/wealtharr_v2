@@ -362,13 +362,13 @@ def history_page(request, instance_id):
     return _render(
         request, page_key="instance", page_title="Performance", section="history",
         instance=strategy, history=report, history_chart=_chart(report["points"]),
-        history_ranges=WINDOWS, **_performance(request, strategy),
+        history_ranges=WINDOWS, **_performance(request, strategy, report),
     )
 
 
-def _performance(request, strategy):
+def _performance(request, strategy, report=None):
     from . import v2_dashboard as dash
-    points = dash.recorded_points(strategy)
+    points = dash.certified_points(strategy, report)
     monthly = dash.monthly_rows(points)
     best, worst = dash.best_worst(monthly)
     returns = dash.period_returns(points)

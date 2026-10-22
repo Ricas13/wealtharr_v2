@@ -55,9 +55,27 @@ def recorded_points(strategy):
     ]
 
 
+def certified_points(strategy, report=None):
+    """Only independently certified historic endpoints may feed performance.
+
+    Saved snapshots remain visible as *records* in History, but a recorded
+    number is not inherently market evidence. The latest endpoint must also
+    be certified; never leave a historical line looking current after a hold.
+    """
+    if report is None:
+        from .v2_history import build_history
+        report = build_history(strategy)
+    if report["latest_certified"] is None:
+        return []
+    return [
+        (p.as_of, p.value_gbp, p.net_contributed_gbp)
+        for p in report["all_points"] if p.certified
+    ]
+
+
 def combine_points(strategies):
-    """Sum recorded values across strategies on dates every strategy has."""
-    series = [dict((d, (v, n)) for d, v, n in recorded_points(s)) for s in strategies]
+    """Sum certified values across strategies on their common dates only."""
+    series = [dict((d, (v, n)) for d, v, n in certified_points(s)) for s in strategies]
     series = [s for s in series if s]
     if not series:
         return []

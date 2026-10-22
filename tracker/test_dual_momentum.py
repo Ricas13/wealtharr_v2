@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 from decimal import Decimal as D
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from tracker.core.calendar import month_end_before, months_before
 from tracker.strategies.dual_momentum.v1 import Lookback, Quote, VERSION, choose, evaluate
@@ -224,3 +224,24 @@ class DualMomentumStudyTests(TestCase):
         s = result["series"]["strategy"]
         self.assertGreater(s["trades"], 0)
         self.assertTrue(any("VEA" in n for n in result["simulated_notes"]))
+
+
+
+class DividendCompletenessTests(TestCase):
+    def test_distributing_usd_line_without_income_proof_is_on_hold(self):
+        from datetime import date
+        from decimal import Decimal as D
+        from tracker.strategies.dual_momentum import v1
+        from tracker.strategies.dual_momentum.plugin import _with_income
+        opening = v1.Quote("BIL", D("90"), date(2025, 9, 30))
+        ending = v1.Quote("BIL", D("91"), date(2026, 9, 30))
+        self.assertIsNone(_with_income(ending, opening, "USD"))
+
+    def test_accumulating_line_can_use_price_only(self):
+        from datetime import date
+        from decimal import Decimal as D
+        from tracker.strategies.dual_momentum import v1
+        from tracker.strategies.dual_momentum.plugin import _with_income
+        opening = v1.Quote("CSH2.L", D("100"), date(2025, 9, 30))
+        ending = v1.Quote("CSH2.L", D("102"), date(2026, 9, 30))
+        self.assertEqual(_with_income(ending, opening, "GBP"), ending)

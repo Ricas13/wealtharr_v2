@@ -13,6 +13,10 @@ KEY = "dual-momentum"
 # 1-3 month T-bills, as in the original; euros: an accumulating €STR fund.
 CASH_SYMBOLS = {"GBP": "CSH2.L", "USD": "BIL", "EUR": "XEON.DE"}
 CASH_SYMBOL = CASH_SYMBOLS["GBP"]
+# These USD lines distribute rather than accumulating the full cash return.
+# No recorded income is not proof of a 0% distribution yield: do not issue a
+# month-end allocation switch on incomplete Yahoo dividend history.
+DISTRIBUTING_USD = frozenset(("BIL", "SPY", "ACWX"))
 
 
 def cash_symbol(instance):
@@ -27,9 +31,13 @@ def _with_income(end, begin, currency):
     added back (not reinvested: a small difference over 12 months).
     """
     from tracker.models import DividendEvent
-    paid = sum(DividendEvent.objects.filter(
-        symbol=end.symbol, currency=currency, ex_date__gt=begin.as_of, ex_date__lte=end.as_of,
-    ).values_list("amount", flat=True), Decimal("0"))
+    payments = list(DividendEvent.objects.filter(
+        symbol=end.symbol, currency=currency,
+        ex_date__gt=begin.as_of, ex_date__lte=end.as_of,
+    ).values_list("amount", flat=True))
+    if currency == "USD" and end.symbol in DISTRIBUTING_USD and not payments:
+        return None  # No verified income events in a 12-month distributing fund window.
+    paid = sum(payments, Decimal("0"))
     return v1.Quote(end.symbol, end.price_gbp + paid, end.as_of) if paid else end
 
 
@@ -58,7 +66,9 @@ def decide(instance, as_of, *, positions=None, cash=None):
     for key, symbol in (("us", funds.get("us")), ("intl", funds.get("intl")), ("cash", cash_symbol(instance))):
         begin, end = (quote(symbol, start), quote(symbol, as_of)) if symbol else (None, None)
         if begin and end:
-            lookbacks[key] = v1.Lookback(begin, _with_income(end, begin, instance.account.currency))
+            adjusted = _with_income(end, begin, instance.account.currency)
+            if adjusted is not None:
+                lookbacks[key] = v1.Lookback(begin, adjusted)
     return v1.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes,
                        lookbacks=lookbacks, as_of=as_of, window_start=start)
 
