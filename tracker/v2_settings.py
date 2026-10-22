@@ -10,6 +10,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import NotificationForm
@@ -54,11 +55,14 @@ def strategy_route_rows(strategy):
                 explicit.get("discord") is True if isinstance(explicit, dict)
                 else inherited
             ),
+            "telegram": isinstance(explicit, dict) and explicit.get("telegram") is True,
         })
     return category_rows
 
 
-CHANNEL_NAMES = {"email": "Email", "discord": "Discord DM", "discord_webhook": "Discord channel webhook"}
+CHANNEL_NAMES = {"email": "Email", "discord": "Discord DM", "discord_webhook": "Discord channel webhook",
+                 "telegram": "Telegram"}
+TELEGRAM_LINK_MINUTES = 15
 CATEGORY_WHEN = {
     "quarterly": "After a quarter end, when trades are needed",
     "urgent": "Big market drop or a reset to review",
@@ -89,6 +93,9 @@ def settings_page(request):
                     form.save()
                     messages.success(request, "Alert destinations saved.")
                     return redirect("v2_settings")
+        elif kind in ("telegram_start", "telegram_finish", "telegram_disconnect"):
+            _telegram_step(request, pref, kind)
+            return redirect(reverse("v2_settings") + "#telegram")
         elif kind == "remove_webhook":
             pref.discord_webhook_ciphertext = ""
             pref.discord_webhook_enabled = False
@@ -143,8 +150,81 @@ def settings_page(request):
             config and config.smtp_host and config.smtp_sender
         ),
         discord_configured=bool(config and discord_ready(config)),
+        telegram_configured=bool(config and config.telegram_bot_username),
+        telegram_link=_telegram_link(pref, config),
         has_authenticator=OwnerTOTP.objects.filter(owner=request.user).exists(),
     )
+
+
+def _telegram_link(pref, config):
+    """The "open the bot" link while a connection is waiting, else ""."""
+    from django.utils import timezone
+    from .telegram_bot import start_link
+    if (config and config.telegram_bot_username and pref.telegram_link_code and
+            pref.telegram_link_expires and pref.telegram_link_expires > timezone.now()):
+        return start_link(config.telegram_bot_username, pref.telegram_link_code)
+    return ""
+
+
+def _copy_discord_routes_to_telegram(owner):
+    """On first connect, strategies send to Telegram what they already send to Discord."""
+    for strategy in StrategyInstance.objects.filter(owner=owner):
+        routes = strategy.alert_routes if isinstance(strategy.alert_routes, dict) else {}
+        changed = False
+        for row in routes.values():
+            if isinstance(row, dict) and "telegram" not in row:
+                row["telegram"] = row.get("discord") is True
+                changed = True
+        if changed:
+            strategy.alert_routes = routes
+            strategy.save(update_fields=["alert_routes"])
+
+
+def _telegram_step(request, pref, kind):
+    from datetime import timedelta
+    from secrets import token_urlsafe
+    from django.utils import timezone
+    from .services import decrypt_secret
+    from .telegram_bot import TelegramError, find_start
+    fields = ["telegram_link_code", "telegram_link_expires"]
+    if kind == "telegram_disconnect":
+        pref.telegram_chat_id = pref.telegram_username = pref.telegram_link_code = ""
+        pref.telegram_connected_at = pref.telegram_link_expires = None
+        pref.telegram_enabled = False
+        pref.save(update_fields=fields + ["telegram_chat_id", "telegram_username",
+                                          "telegram_connected_at", "telegram_enabled"])
+        messages.success(request, "Telegram disconnected. No more Telegram messages will be sent.")
+        return
+    cfg = SystemIntegration.current()
+    if not cfg.telegram_bot_username:
+        messages.error(request, "Telegram isn't set up by the site owner yet.")
+        return
+    if kind == "telegram_start":
+        pref.telegram_link_code = token_urlsafe(24)
+        pref.telegram_link_expires = timezone.now() + timedelta(minutes=TELEGRAM_LINK_MINUTES)
+        pref.save(update_fields=fields)
+        return
+    if not _telegram_link(pref, cfg):
+        messages.error(request, "That Telegram link expired. Click Connect Telegram again.")
+        return
+    try:
+        found = find_start(decrypt_secret(cfg.telegram_bot_token_ciphertext), pref.telegram_link_code)
+    except TelegramError as exc:
+        messages.error(request, "Telegram wasn't connected: %s" % exc)
+        return
+    if not found:
+        messages.error(request, "Telegram hasn't seen you press Start yet. Open the link, press Start, then try again.")
+        return
+    first = not pref.telegram_connected_at
+    pref.telegram_chat_id, pref.telegram_username = found
+    pref.telegram_connected_at = timezone.now()
+    pref.telegram_enabled = True
+    pref.telegram_link_code, pref.telegram_link_expires = "", None
+    pref.save(update_fields=fields + ["telegram_chat_id", "telegram_username",
+                                      "telegram_connected_at", "telegram_enabled"])
+    if first:
+        _copy_discord_routes_to_telegram(request.user)
+    messages.success(request, "Telegram connected. Alerts will arrive from the Wealtharr bot.")
 
 
 @staff_member_required

@@ -111,20 +111,28 @@ def change_password(request):
 @staff_member_required
 def control(request):
     """Owner admin page, inside the normal app shell (staff only)."""
-    from .forms import IntegrationForm
+    from .forms import DiscordIntegrationForm, EmailIntegrationForm, TelegramIntegrationForm
     from .discord_dm import bot_invite_url, configured as discord_ready, redirect_uri
     from .models import (InviteRequest, NotificationPreference, NotificationSchedulerRun, PriceRevision,
                          SystemIntegration, YahooSync)
     from .v2_views import _render
     cfg = SystemIntegration.current()
-    form = IntegrationForm(request.POST or None, instance=cfg)
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Mail and Discord settings saved.")
-        return redirect("control")
+    kinds = {"email": (EmailIntegrationForm, "Mail server saved."),
+             "discord": (DiscordIntegrationForm, "Discord settings saved."),
+             "telegram": (TelegramIntegrationForm, "Telegram bot saved.")}
+    posted = request.POST.get("form_kind") if request.method == "POST" else ""
+    forms = {kind: form_class(request.POST if kind == posted else None, instance=cfg, prefix=kind)
+             for kind, (form_class, _) in kinds.items()}
+    if posted in forms and forms[posted].is_valid():
+        forms[posted].save()
+        messages.success(request, kinds[posted][1])
+        return redirect(reverse("control") + "#" + posted)
     return _render(
         request, page_key="admin", page_title="Admin",
-        form=form,
+        email_form=forms["email"], discord_form=forms["discord"], telegram_form=forms["telegram"],
+        smtp_set=bool(cfg.smtp_host and cfg.smtp_sender),
+        telegram_bot=cfg.telegram_bot_username,
+        telegram_connected=NotificationPreference.objects.exclude(telegram_chat_id="").count(),
         smtp_password_set=bool(cfg.smtp_password_ciphertext),
         discord_set=discord_ready(cfg),
         discord_redirect=redirect_uri(request),

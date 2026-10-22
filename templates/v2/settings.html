@@ -40,10 +40,36 @@
         </div>
         <p class="w2-note">Turn on both and each alert arrives in both places.</p>
       </fieldset>
+      <fieldset class="w2-mode-fieldset w2-space-top" id="telegram">
+        <legend>Telegram</legend>
+        <div class="w2-option w2-discord-option">
+          <span>
+            <strong>Message from the Wealtharr bot</strong>
+            <small>A private chat with the site's Telegram bot. Nobody else sees it.</small>
+            {% if preference.telegram_chat_id %}
+              <label class="w2-check w2-space-top">{{ notification_form.telegram_enabled }} <span>Send me Telegram messages <span class="w2-muted">· connected{% if preference.telegram_username %} as {{ preference.telegram_username }}{% endif %}</span></span></label>
+              <button type="submit" class="w2-button w2-space-top" form="w2-telegram-disconnect">Disconnect</button>
+            {% elif telegram_link %}
+              <ol class="w2-setup-steps w2-space-top">
+                <li><a href="{{ telegram_link }}" target="_blank" rel="noopener noreferrer">Open the Wealtharr bot in Telegram ↗</a> and press <strong>Start</strong>.</li>
+                <li>Come back and click: <button type="submit" class="w2-button" form="w2-telegram-finish">I've pressed Start</button></li>
+              </ol>
+              <small>The link works for 15 minutes.</small>
+            {% elif telegram_configured %}
+              <button type="submit" class="w2-button w2-space-top" form="w2-telegram-start">Connect Telegram</button>
+            {% else %}
+              <small class="w2-space-top">Not set up by the site owner yet.</small>
+            {% endif %}
+          </span>
+        </div>
+      </fieldset>
       <div class="w2-row w2-space-top"><button type="submit" class="w2-button w2-button-primary">Save</button>
         <span class="w2-muted">Choose which alerts go where on each strategy's Strategy &amp; alerts tab.</span></div>
     </form>
     <form method="post" action="{% url 'discord_disconnect' %}" id="w2-discord-disconnect" hidden>{% csrf_token %}</form>
+    <form method="post" action="{% url 'v2_settings' %}" id="w2-telegram-start" hidden>{% csrf_token %}<input type="hidden" name="form_kind" value="telegram_start"></form>
+    <form method="post" action="{% url 'v2_settings' %}" id="w2-telegram-finish" hidden>{% csrf_token %}<input type="hidden" name="form_kind" value="telegram_finish"></form>
+    <form method="post" action="{% url 'v2_settings' %}" id="w2-telegram-disconnect" hidden>{% csrf_token %}<input type="hidden" name="form_kind" value="telegram_disconnect"></form>
     <form method="post" action="{% url 'v2_settings' %}" id="w2-discord-webhook-remove" hidden>{% csrf_token %}<input type="hidden" name="form_kind" value="remove_webhook"></form>
   </section>
 
@@ -51,7 +77,7 @@
     <div class="w2-ch"><h2 class="w2-ct" id="w2-strategy-notification-title">Alerts per strategy</h2></div>
     {% for group in strategy_routes %}
       <div class="w2-kv" id="strategy-{{ group.instance.pk }}"><span>{{ group.instance.name }}</span>
-        <span>{% for option in group.rows %}{% if option.email or option.discord %}<span class="w2-chip w2-ok">{{ option.title }}</span> {% endif %}{% empty %}{% endfor %}
+        <span>{% for option in group.rows %}{% if option.email or option.discord or option.telegram %}<span class="w2-chip w2-ok">{{ option.title }}</span> {% endif %}{% empty %}{% endfor %}
           <a href="{% url 'v2_instance_page' instance_id=group.instance.pk section='strategy' %}#alerts">Edit</a></span></div>
     {% empty %}
       <p class="w2-muted">No strategies yet. <a href="{% url 'v2_add_strategy' %}">Add a strategy</a> to choose its alerts.</p>

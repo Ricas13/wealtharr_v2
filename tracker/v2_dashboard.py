@@ -396,5 +396,6 @@ def alerts_summary(owner, strategy=None):
     return {
         "email": bool(pref and pref.email_enabled and pref.destination_email),
         "discord": bool(pref and (pref.discord_enabled or pref.discord_webhook_enabled)),
+        "telegram": bool(pref and pref.telegram_enabled and pref.telegram_chat_id),
         "last": last,
     }

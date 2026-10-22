@@ -1,9 +1,16 @@
-{% if form.errors %}<div class="w2-form-error" role="alert">{{ form.non_field_errors }}{% for field in form %}{% for error in field.errors %}<p>{{ field.label }}: {{ error }}</p>{% endfor %}{% endfor %}</div>{% endif %}
 <div class="w2-grid2">
-  <section class="w2-card" aria-labelledby="w2-admin-mail-title" id="mail">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-mail-title">Mail server and Discord</h2>
-      <span class="w2-muted">SMTP {% if smtp_password_set %}set up{% else %}not set up{% endif %} · Discord DMs {% if discord_set %}set up{% else %}not set up{% endif %}</span></div>
-    <p class="w2-note">Passwords, the client secret and the bot token are stored encrypted and never shown again; leave them blank to keep the saved ones.</p>
+  <section class="w2-card" aria-labelledby="w2-admin-mail-title" id="email">
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-mail-title">Email</h2>
+      <span class="w2-chip {% if smtp_set %}w2-ok{% endif %}">{% if smtp_set %}Set up{% else %}Not set up{% endif %}</span></div>
+    <p class="w2-note">The mail server alert emails are sent through. The password is stored encrypted and never shown again; leave it blank to keep the saved one.</p>
+    {% include "partials/admin_form.html" with form=email_form kind="email" button="Save email" %}
+    <form method="post" action="{% url 'v2_notification_test' channel='email' %}" class="w2-space-top">{% csrf_token %}<button type="submit" class="w2-button">Send email test</button></form>
+  </section>
+
+  <section class="w2-card" aria-labelledby="w2-admin-discord-title" id="discord">
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-discord-title">Discord</h2>
+      <span class="w2-chip {% if discord_set %}w2-ok{% endif %}">{% if discord_set %}DMs set up{% else %}DMs not set up{% endif %}</span></div>
+    <p class="w2-note">A bot that sends each person who clicks <strong>Connect Discord</strong> a private DM. {{ discord_connected }} connected. People can also post to their own channel with a webhook, which needs nothing here.</p>
     <details class="w2-note" id="discord-setup">
       <summary><strong>Set up Discord DMs</strong> (once)</summary>
       <ol class="w2-setup-steps">
@@ -13,31 +20,35 @@
         <li>Make a private Discord server for Wealtharr. With Developer Mode on, right-click it and copy its <em>Server ID</em>.</li>
         <li>Fill in the four fields below and save, then {% if discord_bot_invite %}<a href="{{ discord_bot_invite }}" target="_blank" rel="noopener noreferrer">add the bot to that server ↗</a>{% else %}add the bot to that server (the link appears once the Application ID is saved){% endif %}.</li>
       </ol>
-      <p>Each person then clicks <strong>Connect Discord</strong> in Alerts &amp; settings. {{ discord_connected }} connected so far.</p>
     </details>
-    <form method="post" action="{% url 'control' %}" class="w2-admin-form">
-      {% csrf_token %}
-      {% for field in form %}
-        {% if field.field.widget.input_type == 'checkbox' %}
-          <label class="w2-check" for="{{ field.id_for_label }}">{{ field }} <span>{{ field.label }}</span></label>
-        {% else %}
-          <label class="w2-field" for="{{ field.id_for_label }}">{{ field.label }} {{ field }}</label>
-        {% endif %}
-      {% endfor %}
-      <div class="w2-row w2-space-top"><button type="submit" class="w2-button w2-button-primary">Save mail and Discord</button></div>
-    </form>
+    {% include "partials/admin_form.html" with form=discord_form kind="discord" button="Save Discord" %}
+    <div class="w2-row w2-space-top">
+      <form method="post" action="{% url 'v2_notification_test' channel='discord' %}">{% csrf_token %}<button type="submit" class="w2-button">Send DM test</button></form>
+      <form method="post" action="{% url 'v2_notification_test' channel='discord_webhook' %}">{% csrf_token %}<button type="submit" class="w2-button">Send channel webhook test</button></form>
+    </div>
+  </section>
+
+  <section class="w2-card" aria-labelledby="w2-admin-telegram-title" id="telegram">
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-telegram-title">Telegram</h2>
+      <span class="w2-chip {% if telegram_bot %}w2-ok{% endif %}">{% if telegram_bot %}Set up · @{{ telegram_bot }}{% else %}Not set up{% endif %}</span></div>
+    <p class="w2-note">A bot that messages each person who clicks <strong>Connect Telegram</strong> in Alerts &amp; settings. {{ telegram_connected }} connected. It needs no public web address, so a private site works.</p>
+    <details class="w2-note" id="telegram-setup">
+      <summary><strong>Set up Telegram</strong> (once)</summary>
+      <ol class="w2-setup-steps">
+        <li>In Telegram, open <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather ↗</a> and send <code>/newbot</code>. Pick a name and a username ending in "bot".</li>
+        <li>Copy the token it gives you (it looks like <code>123456:ABC…</code>), paste it below and save. Wealtharr checks it with Telegram and stores it encrypted.</li>
+        <li>Don't add a webhook to the bot: Wealtharr reads its messages directly.</li>
+      </ol>
+    </details>
+    {% include "partials/admin_form.html" with form=telegram_form kind="telegram" button="Save Telegram" %}
+    <form method="post" action="{% url 'v2_notification_test' channel='telegram' %}" class="w2-space-top">{% csrf_token %}<button type="submit" class="w2-button">Send Telegram test</button></form>
   </section>
 
   <section class="w2-card" aria-labelledby="w2-admin-test-title">
-    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-test-title">Test and status</h2></div>
-    <p class="w2-note">A test goes to your own alert destinations from Alerts &amp; settings (for Discord, your connected account).</p>
-    <div class="w2-row w2-space-top">
-      <form method="post" action="{% url 'v2_notification_test' channel='email' %}">{% csrf_token %}<button type="submit" class="w2-button">Send email test</button></form>
-      <form method="post" action="{% url 'v2_notification_test' channel='discord' %}">{% csrf_token %}<button type="submit" class="w2-button">Send Discord DM test</button></form>
-      <form method="post" action="{% url 'v2_notification_test' channel='discord_webhook' %}">{% csrf_token %}<button type="submit" class="w2-button">Send channel webhook test</button></form>
-    </div>
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-test-title">Status</h2></div>
+    <p class="w2-note">Each test button sends to your own destinations from Alerts &amp; settings.</p>
     <div class="w2-setting-row w2-space-top"><span>Alert sender</span>
-      <span class="w2-muted">{% if scheduler_run %}Alert sender last ran {{ scheduler_run.started_at|date:"j M H:i" }} · {{ scheduler_run.status|lower }}{% if scheduler_run.error_code %} · {{ scheduler_run.error_code }}{% endif %}{% else %}The alert sender hasn't run yet{% endif %}</span></div>
+      <span class="w2-muted">{% if scheduler_run %}Last ran {{ scheduler_run.started_at|date:"j M H:i" }} · {{ scheduler_run.status|lower }}{% if scheduler_run.error_code %} · {{ scheduler_run.error_code }}{% endif %}{% else %}Hasn't run yet{% endif %}</span></div>
     <div class="w2-setting-row"><span>Signed-out bot check (Turnstile)</span>
       <span class="w2-muted">{% if turnstile_set %}set up{% if turnstile_required %} · required{% endif %}{% else %}not set up{% endif %}</span></div>
     <div class="w2-setting-row"><span>Invite requests</span>

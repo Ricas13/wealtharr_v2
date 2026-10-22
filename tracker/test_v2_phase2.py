@@ -139,8 +139,8 @@ class Phase2WizardTests(TestCase):
         self.assertIsNone(for_strategy(instance))
         self.assertTrue(instance.owner_checked_on)
         # Default routes; changed per strategy later on Strategy & alerts.
-        self.assertEqual(instance.alert_routes["quarterly"], {"email": True, "discord": True})
-        self.assertEqual(instance.alert_routes["contribution"], {"email": False, "discord": False})
+        self.assertEqual(instance.alert_routes["quarterly"], {"email": True, "discord": True, "telegram": True})
+        self.assertEqual(instance.alert_routes["contribution"], {"email": False, "discord": False, "telegram": False})
         self.assertEqual(instance.ledger.count(), 1)
         entry = instance.ledger.get()
         self.assertEqual(entry.kind, LedgerEntry.DEPOSIT)

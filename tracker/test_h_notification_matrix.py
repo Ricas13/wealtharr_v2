@@ -102,7 +102,7 @@ class OwnerAlertMatrixTests(TestCase):
         # Staff diagnostics live on the admin page, not in personal settings.
         self.assertNotContains(self.client.get(reverse("v2_settings")), "Alert sender")
         response = self.client.get(reverse("control"))
-        self.assertContains(response, "Alert sender last ran")
+        self.assertContains(response, "Last ran")
 
     def test_turning_off_email_suspends_its_pending_retry(self):
         user = self.owner

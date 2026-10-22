@@ -173,12 +173,14 @@ class NotificationForm(forms.ModelForm):
                                       label="Discord webhook URL")
     class Meta:
         model = NotificationPreference
-        fields = ["destination_email", "email_enabled", "discord_enabled", "discord_webhook_enabled"]
+        fields = ["destination_email", "email_enabled", "discord_enabled", "discord_webhook_enabled",
+                  "telegram_enabled"]
         labels = {
             "destination_email": "Send emails to",
             "email_enabled": "Enable email notifications",
             "discord_enabled": "Send me Discord DMs",
             "discord_webhook_enabled": "Post to my Discord channel",
+            "telegram_enabled": "Send me Telegram messages",
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -194,6 +196,8 @@ class NotificationForm(forms.ModelForm):
             self.add_error("discord_enabled", "Connect your Discord account first.")
         elif data.get("discord_webhook_enabled") and not (url or self.instance.discord_webhook_ciphertext):
             self.add_error("discord_webhook", "Paste your channel's webhook URL to post there.")
+        elif data.get("telegram_enabled") and not self.instance.telegram_chat_id:
+            self.add_error("telegram_enabled", "Connect your Telegram first.")
         data["discord_webhook"] = url
         return data
     def save(self, commit=True):
@@ -204,20 +208,39 @@ class NotificationForm(forms.ModelForm):
             obj.save()
         return obj
 
-class IntegrationForm(forms.ModelForm):
+class EmailIntegrationForm(forms.ModelForm):
+    """Admin: the mail server alerts are sent through."""
     smtp_password = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="SMTP password (leave blank to keep existing)")
-    discord_client_secret = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="Discord client secret (leave blank to keep existing)")
-    discord_bot_token = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="Discord bot token (leave blank to keep existing)")
     class Meta:
         model = SystemIntegration
-        fields = ["smtp_host", "smtp_port", "smtp_username", "smtp_sender", "smtp_use_tls",
-                  "discord_client_id", "discord_guild_id"]
+        fields = ["smtp_host", "smtp_port", "smtp_username", "smtp_sender", "smtp_use_tls"]
         labels = {
             "smtp_host": "SMTP server", "smtp_port": "SMTP port",
             "smtp_username": "SMTP username", "smtp_sender": "From email",
             "smtp_use_tls": "Use STARTTLS",
-            "discord_client_id": "Discord application ID",
-            "discord_guild_id": "Discord server ID (where the bot lives)",
+        }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        style(self.fields)
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self.cleaned_data.get("smtp_password"):
+            obj.smtp_password_ciphertext = encrypt_secret(self.cleaned_data["smtp_password"])
+        if commit:
+            obj.save()
+        return obj
+
+
+class DiscordIntegrationForm(forms.ModelForm):
+    """Admin: the Discord application and bot that send DMs."""
+    discord_client_secret = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="Client secret (leave blank to keep existing)")
+    discord_bot_token = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False), label="Bot token (leave blank to keep existing)")
+    class Meta:
+        model = SystemIntegration
+        fields = ["discord_client_id", "discord_guild_id"]
+        labels = {
+            "discord_client_id": "Application ID",
+            "discord_guild_id": "Server ID (where the bot lives)",
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -233,11 +256,41 @@ class IntegrationForm(forms.ModelForm):
         return self._snowflake("discord_guild_id")
     def save(self, commit=True):
         obj = super().save(commit=False)
-        if self.cleaned_data.get("smtp_password"):
-            obj.smtp_password_ciphertext = encrypt_secret(self.cleaned_data["smtp_password"])
         for field in ("discord_client_secret", "discord_bot_token"):
             if self.cleaned_data.get(field):
                 setattr(obj, field + "_ciphertext", encrypt_secret(self.cleaned_data[field].strip()))
+        if commit:
+            obj.save()
+        return obj
+
+
+class TelegramIntegrationForm(forms.ModelForm):
+    """Admin: the Telegram bot that messages people. The token is checked with Telegram on save."""
+    telegram_bot_token = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False),
+                                         label="Bot token from @BotFather (leave blank to keep existing)")
+    class Meta:
+        model = SystemIntegration
+        fields = []
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        style(self.fields)
+    def clean_telegram_bot_token(self):
+        from .telegram_bot import TelegramError, bot_username, valid_token
+        token = (self.cleaned_data.get("telegram_bot_token") or "").strip()
+        if not token:
+            return ""
+        if not valid_token(token):
+            raise forms.ValidationError("That doesn't look like a bot token (it looks like 123456:ABC...).")
+        try:
+            self.bot_username = bot_username(token)
+        except TelegramError as exc:
+            raise forms.ValidationError("Telegram didn't accept this token: %s" % exc)
+        return token
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self.cleaned_data.get("telegram_bot_token"):
+            obj.telegram_bot_token_ciphertext = encrypt_secret(self.cleaned_data["telegram_bot_token"])
+            obj.telegram_bot_username = self.bot_username
         if commit:
             obj.save()
         return obj
