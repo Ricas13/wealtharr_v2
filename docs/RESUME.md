@@ -1,6 +1,6 @@
 ## Small price corrections are accepted automatically (22 October 2026)
 
-Branch `fix/auto-accept-revisions` from main (after PR #50). Owner doesn't want to be asked about routine price corrections. When Yahoo reports a different close than the stored one, the change is still logged in `PriceRevision`; if every changed day is within 10% (`market_data.AUTO_ACCEPT_REVISION`) it is applied at once (`apply_revision`, `accepted_by` empty = automatic) and the line is not held. Bigger changes (a split or a pence/pounds error) still hold the line for the Admin page's Accept button. A correction already waiting is accepted on the next check. Tests updated in `tracker/test_price_revisions.py` and `test_section_c_quality.py`.
+Branch `fix/auto-accept-revisions` from main (after PR #50). Owner doesn't want to be asked about routine price corrections. When Yahoo reports a different close than the stored one, the change is still logged in `PriceRevision`; if every changed day is within 20% (`market_data.AUTO_ACCEPT_REVISION`; owner raised it from 10% for leveraged funds, still below a 4-for-3 split's 25%) it is applied at once (`apply_revision`, `accepted_by` empty = automatic) and the line is not held. Bigger changes (a split or a pence/pounds error) still hold the line for the Admin page's Accept button. A correction already waiting is accepted on the next check. Tests updated in `tracker/test_price_revisions.py` and `test_section_c_quality.py`.
 
 ---
 

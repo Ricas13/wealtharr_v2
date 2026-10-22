@@ -80,6 +80,14 @@ class PriceRevisionTests(TestCase):
         self.client.force_login(self.staff)
         self.assertNotContains(self.client.get(reverse("control")), "Price corrections waiting for you")
 
+    def test_the_limit_is_20_percent_so_a_4_for_3_split_still_holds(self):
+        with patch("tracker.market_data.fetch_chart", return_value=("USD", [(self.day, D("927.40"))])):
+            self.assertIsNotNone(sync_ticker("SPY", force=True))  # +20.0%: accepted
+        self.assertEqual(MarketObservation.objects.get(symbol="SPY").price, D("927.40"))
+        with patch("tracker.market_data.fetch_chart", return_value=("USD", [(self.day, D("695.55"))])):
+            self.assertIsNone(sync_ticker("SPY", force=True))  # -25%: held
+        self.assertEqual(YahooSync.objects.get(symbol="SPY").last_error, "PRICE_HOLD:REVISED_HISTORICAL_CLOSE")
+
     def test_a_correction_already_waiting_is_accepted_on_the_next_check(self):
         PriceRevision.objects.create(symbol="SPY", as_of=self.day, currency="USD",
                                      stored_price=D("772.84"), yahoo_price=D("773.09"))

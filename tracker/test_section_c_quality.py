@@ -121,7 +121,7 @@ class PersistedMarketPriceHoldTests(TestCase):
     @patch("tracker.market_data.fetch_chart")
     def test_historical_close_cannot_be_rewritten(self, fetch):
         # A big change (split or unit error) holds; owner decision 22 Oct 2026:
-        # changes within 10% are accepted automatically and logged.
+        # changes within 20% are accepted automatically and logged.
         today = timezone.localdate()
         MarketObservation.objects.create(
             symbol="ERNS.L", as_of=today, price=D("100"), currency="GBP")

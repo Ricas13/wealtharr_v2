@@ -125,7 +125,9 @@ def _unfinished_session_start(meta):
 
 # A changed close within this fraction of the stored one is accepted
 # automatically (and logged); a bigger change holds the line for review.
-AUTO_ACCEPT_REVISION = Decimal("0.10")
+# 20% leaves room for leveraged funds and still catches splits (4-for-3 is
+# -25%, 3-for-2 -33%, 2-for-1 -50%) and pence/pounds errors (100x).
+AUTO_ACCEPT_REVISION = Decimal("0.20")
 
 
 def apply_revision(revision, user=None):
