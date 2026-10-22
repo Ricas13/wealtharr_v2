@@ -146,14 +146,15 @@ class CompactPagesTests(TestCase):
         self.assertContains(page, "Test quarterly review")
         self.assertContains(page, "How this was calculated")
 
-    def test_performance_shows_monthly_rows_from_recorded_values(self):
+    def test_unverified_monthly_snapshots_are_not_published_as_performance(self):
         for day, value in ((date(2026, 4, 30), D("1010")), (date(2026, 5, 29), D("1030"))):
             StrategyValueSnapshot.objects.create(
                 strategy=self.s, as_of=day, total_value=value, net_contributed=D("1000"))
         page = self.client.get(self.url("history"))
         self.assertContains(page, "Monthly")
-        self.assertContains(page, "May 2026")
-        self.assertContains(page, "+20.00")
+        self.assertNotContains(page, "+20.00")
+        self.assertEqual(dash.certified_points(self.s), [])
+        self.assertEqual(len(dash.recorded_points(self.s)), 2)
 
     def test_index_lines_use_stored_usd_closes_only(self):
         start = timezone.localdate() - timedelta(days=40)

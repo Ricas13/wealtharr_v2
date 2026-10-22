@@ -272,7 +272,7 @@ def _dashboard(request, strategy, report, ready, roles, next_end):
     except MappingNotAvailable:
         lines = ()
     plugin = module_for(strategy)
-    points = dash.recorded_points(strategy)
+    points = dash.certified_points(strategy)
     span = dash.pick_range(request)
     mode = dash.pick_mode(request)
     change, change_pct = dash.day_change(points) if ready else (None, None)

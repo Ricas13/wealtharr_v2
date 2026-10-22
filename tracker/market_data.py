@@ -216,6 +216,13 @@ def sync_ticker(symbol, *, force=False):
         return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
     first = not MarketObservation.objects.filter(symbol=symbol).exists()
     since = date(2010, 1, 1) if first else timezone.localdate() - timedelta(days=18)
+    # A portfolio pre-dating the dividend-event feature can already have years
+    # of price closes but no dividend coverage. Fetch the complete lookback
+    # once before Dual Momentum's USD rules may evaluate it.
+    if not first and symbol in ("BIL", "SPY", "ACWX"):
+        from .models import DividendEvent
+        if not DividendEvent.objects.filter(symbol=symbol).exists():
+            since = date(2010, 1, 1)
     state.last_attempt = now
     state.save(update_fields=["last_attempt"])
     try:
@@ -364,8 +371,3 @@ def period_close(symbol, period_end):
     if any(_exchange(other) == venue for other in missing):
         return None  # the exchange traded that day: our close is missing, not a holiday
     return close
-    last_weekday = period_end - timedelta(days=max(0, period_end.weekday() - 4))
-    if close.as_of >= last_weekday or MarketObservation.objects.filter(
-            symbol=symbol, as_of__gt=period_end).exists():
-        return close
-    return None
