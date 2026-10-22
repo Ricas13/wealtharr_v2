@@ -1,5 +1,5 @@
 {% load w2_format %}<section class="w2-kpis" aria-label="Summary">
-  <div class="w2-kpi"><p class="w2-label">Value</p>
+  <div class="w2-kpi w2-kpi-hero"><p class="w2-label">Value</p>
     <p class="w2-stat-value">{% if today_value is not None %}{{ cur }}{{ today_value|floatformat:"2g" }}{% else %}—{% endif %}</p>
     <p class="w2-muted">{% if today_quote_date %}Close {{ today_quote_date|date:"j M" }}{% elif today_value is not None %}Recorded cash only{% else %}Not valued yet{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">Net deposits</p>
@@ -13,7 +13,8 @@
   <div class="w2-kpi"><p class="w2-label">Cash</p>
     <p class="w2-stat-value">{{ cur }}{{ today_cash|floatformat:"2g" }}</p></div>
   <div class="w2-kpi"><p class="w2-label">Next review</p>
-    <p class="w2-stat-value">{{ today_next_review|date:"j M" }} <small class="w2-muted">{{ today_days_to_review }} day{{ today_days_to_review|pluralize }}</small></p></div>
+    <p class="w2-stat-value">{{ today_next_review|date:"j M" }} <small class="w2-muted">{{ today_days_to_review }} day{{ today_days_to_review|pluralize }}</small></p>
+    {% if today_review_progress is not None %}<div class="w2-progress" role="img" aria-label="{{ today_review_progress|floatformat:0 }}% of the way to the next review"><span style="width:{{ today_review_progress|floatformat:1 }}%"></span></div>{% endif %}</div>
 </section>
 
 <div class="w2-dash">
@@ -23,9 +24,10 @@
     </section>
 
     <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">Allocation</h2><span class="w2-muted">vs {{ dash_allocation_label|lower }}</span></div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='pie' %} Allocation</h2><span class="w2-muted">vs {{ dash_allocation_label|lower }}</span></div>
       {% if dash_allocation %}
-        <div class="w2-bar" role="img" aria-label="{% for row in dash_allocation %}{{ row.label }} {{ row.pct }}%{% if not forloop.last %}, {% endif %}{% endfor %}">{% for row in dash_allocation %}<span class="{{ row.css }}" style="width:{{ row.width|floatformat:1 }}%"></span>{% endfor %}</div>
+        <div class="w2-bar" role="img" aria-label="{% for row in dash_allocation %}{{ row.label }} {{ row.pct }}%{% if not forloop.last %}, {% endif %}{% endfor %}">{% for row in dash_allocation %}<span class="{{ row.css }}" style="width:{{ row.width|floatformat:1 }}%"></span>{% endfor %}{% for row in dash_allocation %}{% if row.target_end %}<i class="w2-bar-mark" style="left:{{ row.target_end|floatformat:1 }}%"></i>{% endif %}{% endfor %}</div>
+        {% if dash_allocation_label %}<p class="w2-note w2-bar-legend"><i class="w2-bar-mark-key" aria-hidden="true"></i> {{ dash_allocation_label }} split</p>{% endif %}
         <table class="w2-table w2-space-top"><thead><tr><th>Holding</th><th class="w2-r">Now</th><th class="w2-r">{{ dash_allocation_label }}</th><th class="w2-r">{{ cur }}</th></tr></thead><tbody>
           {% for row in dash_allocation %}<tr><td><span class="w2-dotsw {{ row.css }}"></span>{{ row.label }}{% if row.symbol %} · {{ row.symbol }}{% endif %}</td><td class="w2-r">{{ row.pct }}%</td><td class="w2-r w2-muted">{% if row.target is not None %}{{ row.target|floatformat:"-1" }}%{% else %}—{% endif %}</td><td class="w2-r">{{ row.value|floatformat:"2g" }}</td></tr>{% endfor %}
         </tbody></table>
@@ -35,7 +37,7 @@
     {% if dash_plugin_template %}{% include dash_plugin_template %}{% endif %}
 
     <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">Holdings</h2>{% if today_quote_date %}<span class="w2-muted">Closes {{ today_quote_date|date:"j M" }}</span>{% endif %}</div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='list' %} Holdings</h2>{% if today_quote_date %}<span class="w2-muted">Closes {{ today_quote_date|date:"j M" }}</span>{% endif %}</div>
       <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Ticker</th><th class="w2-r">Shares</th><th class="w2-r">Price</th><th class="w2-r">Day</th><th class="w2-r">Value</th><th class="w2-r">P/L</th></tr></thead><tbody>
         {% for h in dash_holdings %}<tr><td>{{ h.symbol }}</td><td class="w2-r">{{ h.quantity|floatformat:2 }}</td><td class="w2-r">{% if h.price %}{{ cur }}{{ h.price|floatformat:2 }}{% else %}—{% endif %}</td>
           <td class="w2-r {{ h.move|tone|default:"w2-muted" }}">{% if h.move is not None %}{{ h.move|signed_pct }}{% else %}—{% endif %}</td>
@@ -48,7 +50,7 @@
     </section>
 
     <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">Returns</h2><span class="w2-muted">Deposits removed</span></div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='trend' %} Returns</h2><span class="w2-muted">Deposits removed</span></div>
       <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Period</th><th class="w2-r">You</th>{% for symbol, name in dash_indexes %}<th class="w2-r">{{ name }}</th>{% endfor %}</tr></thead><tbody>
         {% for row in dash_returns %}<tr><td>{{ row.label }}</td>
           <td class="w2-r {{ row.you|tone }}">{% if row.you is not None %}{{ row.you|signed_pct }}{% else %}—{% endif %}</td>
@@ -62,14 +64,14 @@
   <aside class="w2-side">
     <section class="w2-card w2-card-action w2-state-{{ today_status }}" aria-label="What to do next">
       <div class="w2-ch">
-        <h2 class="w2-ct w2-big">{{ today_headline }}</h2>
+        <h2 class="w2-ct w2-big"><span class="w2-action-icon">{% if today_status == 'trade' %}{% include 'partials/icon.html' with name='trend' %}{% elif today_status == 'record' %}{% include 'partials/icon.html' with name='edit' %}{% elif today_status == 'start' %}{% include 'partials/icon.html' with name='coins' %}{% elif today_status == 'setup' %}{% include 'partials/icon.html' with name='settings' %}{% elif today_status == 'empty' %}{% include 'partials/icon.html' with name='wallet' %}{% elif today_status == 'blocked' %}{% include 'partials/icon.html' with name='pause' %}{% elif today_status == 'review' %}{% include 'partials/icon.html' with name='alert' %}{% else %}{% include 'partials/icon.html' with name='check' %}{% endif %}</span>{{ today_headline }}</h2>
         <span class="w2-chip {% if today_status == 'trade' or today_status == 'record' or today_status == 'start' or today_status == 'setup' or today_status == 'empty' %}w2-wait{% elif today_status == 'idle' %}w2-ok{% endif %}">
           {% if selected_instance.tracking_only %}Not live{% elif today_status == 'setup' %}Setup needed{% elif today_status == 'empty' %}Action needed{% elif today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Part recorded{% elif today_status == 'trade' or today_status == 'start' %}Action needed{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}</span>
       </div>
       {% if selected_instance.onboarding_mode == 'hold' %}<p><span class="w2-chip" title="Your starting position was entered by you. Correct it in the Ledger if needed.">Based on holdings you entered</span></p>{% endif %}
       {% if today_status == 'trade' or today_status == 'record' %}
         <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Side</th><th>Ticker</th><th class="w2-r">≈ Shares</th><th class="w2-r">≈ {{ cur }}</th><th class="w2-r">Recorded</th></tr></thead><tbody>
-          {% for action in today_progress %}<tr><td class="{% if action.side == 'SELL' %}w2-neg{% else %}w2-pos{% endif %}">{{ action.side|title }}</td><td>{{ action.symbol }}</td><td class="w2-r">{{ action.suggested|floatformat:-4 }}</td><td class="w2-r">{% if action.gbp %}{{ action.gbp }}{% else %}—{% endif %}</td><td class="w2-r">{{ action.recorded|floatformat:-4 }}</td></tr>{% endfor %}
+          {% for action in today_progress %}<tr><td class="w2-side-cell {% if action.side == 'SELL' %}w2-neg{% else %}w2-pos{% endif %}">{% if action.side == 'SELL' %}{% include 'partials/icon.html' with name='arrow-down' %}{% else %}{% include 'partials/icon.html' with name='arrow-up' %}{% endif %}{{ action.side|title }}</td><td>{{ action.symbol }}</td><td class="w2-r">{{ action.suggested|floatformat:-4 }}</td><td class="w2-r">{% if action.gbp %}{{ action.gbp }}{% else %}—{% endif %}</td><td class="w2-r">{{ action.recorded|floatformat:-4 }}</td></tr>{% endfor %}
         </tbody></table></div>
         <div class="w2-row w2-space-top">
           <a class="w2-button w2-button-primary" href="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=today_signal.pk %}">{% if today_status == 'record' %}Continue actual fill record{% else %}I did this{% endif %}</a>
@@ -79,7 +81,7 @@
       {% elif today_status == 'start' %}
         <p class="w2-muted">{{ today_explanation }}</p>
         <div class="w2-table-wrap w2-space-top"><table class="w2-table"><tbody>
-          {% for line in today_opening %}<tr><td><strong>Buy {{ cur }}{{ line.amount|floatformat:"2g" }} of {{ line.symbol }}</strong></td><td class="w2-r w2-muted">{{ line.pct|floatformat:0 }}%{% if line.shares %} · ≈ {{ line.shares }} shares at {{ cur }}{{ line.price|floatformat:"2g" }}{% endif %}</td></tr>{% endfor %}
+          {% for line in today_opening %}<tr><td class="w2-side-cell w2-pos">{% include 'partials/icon.html' with name='arrow-up' %}<strong>Buy {{ cur }}{{ line.amount|floatformat:"2g" }} of {{ line.symbol }}</strong></td><td class="w2-r w2-muted">{{ line.pct|floatformat:0 }}%{% if line.shares %} · ≈ {{ line.shares }} shares at {{ cur }}{{ line.price|floatformat:"2g" }}{% endif %}</td></tr>{% endfor %}
         </tbody></table></div>
         {% if not today_opening %}<p class="w2-note">The rules can't pick a fund yet: they need 12 months of verified prices for every series. This updates after the next hourly price check.</p>{% endif %}
         <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">Record what I bought</a>
@@ -114,7 +116,7 @@
 
     <div class="w2-mini">
       <section class="w2-card" aria-labelledby="w2-add-money">
-        <h2 class="w2-ct" id="w2-add-money" style="margin-bottom:8px">Add money</h2>
+        <h2 class="w2-ct" id="w2-add-money" style="margin-bottom:8px">{% include 'partials/icon.html' with name='wallet' %} Add money</h2>
         <form method="post" action="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">
           {% csrf_token %}<input type="hidden" name="intent" value="save"><input type="hidden" name="return_to" value="today">
           <label class="w2-field">Type<select class="w2-input" name="kind"><option value="DEPOSIT">Deposit</option><option value="INTEREST">Interest on cash</option><option value="DIVIDEND">Dividend</option><option value="WITHDRAW">Withdrawal</option><option value="FEE">Fee</option></select></label>
@@ -124,7 +126,7 @@
         </form>
       </section>
       <section class="w2-card" aria-labelledby="w2-add-trade">
-        <h2 class="w2-ct" id="w2-add-trade" style="margin-bottom:8px">Record trade</h2>
+        <h2 class="w2-ct" id="w2-add-trade" style="margin-bottom:8px">{% include 'partials/icon.html' with name='edit' %} Record trade</h2>
         <form method="post" action="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">
           {% csrf_token %}<input type="hidden" name="intent" value="save"><input type="hidden" name="return_to" value="today">
           <div class="w2-pair">
@@ -141,12 +143,12 @@
         </form>
       </section>
       <section class="w2-card">
-        <div class="w2-ch"><h2 class="w2-ct">Recent entries</h2><a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">All</a></div>
+        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='clock' %} Recent entries</h2><a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">All</a></div>
         {% for e in dash_recent %}<div class="w2-kv"><span>{{ e.date|date:"j M" }} · {{ e.label }}</span><span>{{ cur }}{{ e.amount|floatformat:"2g" }}</span></div>
         {% empty %}<p class="w2-muted">Nothing recorded yet.</p>{% endfor %}
       </section>
       <section class="w2-card">
-        <div class="w2-ch"><h2 class="w2-ct">ISA allowance</h2>{% if dash_isa %}<span class="w2-muted">{{ dash_isa.label }}</span>{% endif %}</div>
+        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='shield' %} ISA allowance</h2>{% if dash_isa %}<span class="w2-muted">{{ dash_isa.label }}</span>{% endif %}</div>
         {% if dash_isa %}
           <p class="w2-stat-value" style="font-size:13px">{{ cur }}{{ dash_isa.used|floatformat:"0g" }} <span class="w2-muted" style="font-weight:400">of {{ cur }}{{ dash_isa.limit|floatformat:"0g" }}</span></p>
           <div class="w2-bar" style="margin-top:6px"><span class="w2-c1" style="width:{{ dash_isa.width|floatformat:1 }}%"></span></div>
@@ -156,11 +158,11 @@
     </div>
 
     <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">Alerts</h2><a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}">Edit</a></div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='bell' %} Alerts</h2><a href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}">Edit</a></div>
       <div class="w2-row">
-        <span class="w2-chip {% if dash_alerts.email %}w2-ok{% endif %}">Email {% if dash_alerts.email %}on{% else %}off{% endif %}</span>
-        <span class="w2-chip {% if dash_alerts.discord %}w2-ok{% endif %}">Discord {% if dash_alerts.discord %}on{% else %}off{% endif %}</span>
-        <span class="w2-chip {% if dash_alerts.telegram %}w2-ok{% endif %}">Telegram {% if dash_alerts.telegram %}on{% else %}off{% endif %}</span>
+        <span class="w2-chip {% if dash_alerts.email %}w2-ok{% endif %}">{% include 'partials/icon.html' with name='mail' %}Email {% if dash_alerts.email %}on{% else %}off{% endif %}</span>
+        <span class="w2-chip {% if dash_alerts.discord %}w2-ok{% endif %}">{% include 'partials/icon.html' with name='chat' %}Discord {% if dash_alerts.discord %}on{% else %}off{% endif %}</span>
+        <span class="w2-chip {% if dash_alerts.telegram %}w2-ok{% endif %}">{% include 'partials/icon.html' with name='send' %}Telegram {% if dash_alerts.telegram %}on{% else %}off{% endif %}</span>
         <span class="w2-muted">{% if dash_alerts.last %}Last sent {{ dash_alerts.last.created_at|date:"j M" }}{% else %}Nothing sent yet{% endif %}</span>
       </div>
     </section>

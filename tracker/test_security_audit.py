@@ -150,3 +150,14 @@ class FillPriceCheckTests(TestCase):
         self.assertFalse(SignalFill.objects.filter(signal=fixture.signal).exists())
         self.client.post(fixture.url, fixture.fill(0, "0.4", "105"))
         self.assertTrue(SignalFill.objects.filter(signal=fixture.signal).exists())
+
+
+class VisualPolishTests(TestCase):
+    def test_each_strategy_has_its_own_colour_and_alerts_get_a_glyph(self):
+        from types import SimpleNamespace
+        from tracker.notification_routing import CATEGORIES, CATEGORY_EMOJI
+        from tracker.strategies.registry import COLOURS, STRATEGIES, colour_for
+        self.assertEqual(set(COLOURS), set(STRATEGIES))
+        self.assertEqual(len(set(COLOURS.values())), len(COLOURS))
+        self.assertEqual(colour_for(SimpleNamespace(strategy_key="hfea")), COLOURS["hfea"])
+        self.assertEqual(set(CATEGORY_EMOJI), {key for key, _ in CATEGORIES})

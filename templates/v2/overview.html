@@ -1,5 +1,5 @@
 {% load w2_format %}<section class="w2-kpis" aria-label="Owner portfolio summary">
-  <div class="w2-kpi"><p class="w2-label">Combined value</p>
+  <div class="w2-kpi w2-kpi-hero"><p class="w2-label">Combined value</p>
     <p class="w2-stat-value">{% if overview_total is not None %}{{ cur }}{{ overview_total|floatformat:"2g" }}{% else %}—{% endif %}</p>
     <p class="w2-muted">{% if overview_excluded %}Excludes {{ overview_excluded|join:", " }} (not valued yet){% else %}Latest closes{% endif %}{% if overview_other_currency %}. In another currency, not combined: {{ overview_other_currency|join:", " }}{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">Recorded net contributions</p>
@@ -26,11 +26,11 @@
     </section>
 
     <section class="w2-card w2-span2">
-      <div class="w2-ch"><h2 class="w2-ct">Your strategy accounts</h2><span class="w2-muted">Each tracked separately</span></div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='list' %} Your strategy accounts</h2><span class="w2-muted">Each tracked separately</span></div>
       <div class="w2-table-wrap"><table class="w2-table">
         <thead><tr><th>Strategy</th><th>Account</th><th>Status</th><th class="w2-r">Value</th><th class="w2-r">Net deposits</th><th class="w2-r">Gain</th><th class="w2-r">Annualised</th><th>Next action</th></tr></thead>
         <tbody>{% for row in overview_rows %}
-          <tr><td><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='today' %}">{{ row.strategy.name }}</a></td>
+          <tr><td><span class="w2-dotsw" style="background:{{ row.strategy|strategy_colour }}"></span><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='today' %}">{{ row.strategy.name }}</a></td>
             <td>{{ row.strategy.account.kind }} · {{ row.strategy.account.broker_label }}</td>
             <td>{% if row.strategy.tracking_only %}<span class="w2-chip">Not live</span>{% else %}<span class="w2-chip w2-ok">Live</span>{% endif %}</td>
             <td class="w2-r">{% if row.value is not None %}{{ row.cur }}{{ row.value|floatformat:"2g" }}{% else %}<span class="w2-muted">Not valued yet</span>{% endif %}</td>
@@ -43,15 +43,15 @@
     </section>
 
     <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">Split by strategy</h2></div>
-      {% if overview_total %}<div class="w2-bar">{% for row in overview_rows %}{% if row.share %}<span class="{% cycle 'w2-c1' 'w2-c2' 'w2-c3' 'w2-c4' %}" style="width:{{ row.share|floatformat:1 }}%"></span>{% endif %}{% endfor %}</div>{% endif %}
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='pie' %} Split by strategy</h2></div>
+      {% if overview_total %}<div class="w2-bar">{% for row in overview_rows %}{% if row.share %}<span style="width:{{ row.share|floatformat:1 }}%;background:{{ row.strategy|strategy_colour }}"></span>{% endif %}{% endfor %}</div>{% endif %}
       {% for row in overview_rows %}
-        <div class="w2-kv w2-setting-row"><span>{{ row.strategy.name }}</span><strong>{% if row.value is not None and row.strategy.name not in overview_excluded %}{{ row.cur }}{{ row.value|floatformat:"2g" }}{% else %}Not valued yet{% endif %}</strong></div>
+        <div class="w2-kv w2-setting-row"><span><span class="w2-dotsw" style="background:{{ row.strategy|strategy_colour }}"></span>{{ row.strategy.name }}</span><strong>{% if row.value is not None and row.strategy.name not in overview_excluded %}{{ row.cur }}{{ row.value|floatformat:"2g" }}{% else %}Not valued yet{% endif %}</strong></div>
       {% empty %}<div class="w2-empty">No strategies yet.</div>{% endfor %}
     </section>
 
     <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">Split by asset</h2></div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='coins' %} Split by asset</h2></div>
       {% if ov_assets %}
         <div class="w2-bar" role="img" aria-label="{% for a in ov_assets %}{{ a.label }} {{ a.pct }}%{% if not forloop.last %}, {% endif %}{% endfor %}">{% for a in ov_assets %}<span class="{{ a.css }}" style="width:{{ a.width|floatformat:1 }}%"></span>{% endfor %}</div>
         {% for a in ov_assets %}<div class="w2-kv" style="margin-top:4px"><span><span class="w2-dotsw {{ a.css }}"></span>{{ a.label }}</span><span>{{ a.pct }}% · {{ cur }}{{ a.value|floatformat:"2g" }}</span></div>{% endfor %}
@@ -59,7 +59,7 @@
     </section>
 
     <section class="w2-card w2-span2">
-      <div class="w2-ch"><h2 class="w2-ct">What's coming next</h2></div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='calendar' %} What's coming next</h2></div>
       <div class="w2-table-wrap"><table class="w2-table">
         <thead><tr><th>Date</th><th>In</th><th>Strategy</th><th>Event</th><th>What you'll need to do</th></tr></thead>
         <tbody>{% for c in ov_coming %}
@@ -71,7 +71,7 @@
 
   <aside class="w2-side">
     <section class="w2-card w2-card-action {% if not ov_todos %}w2-state-idle{% endif %}" aria-label="To do">
-      <div class="w2-ch"><h2 class="w2-ct w2-big">Needs your attention</h2><span class="w2-chip {% if ov_todos %}w2-wait{% else %}w2-ok{% endif %}">{% if ov_todos %}{{ ov_todos|length }} open{% else %}All clear{% endif %}</span></div>
+      <div class="w2-ch"><h2 class="w2-ct w2-big">{% include 'partials/icon.html' with name='bell' %} Needs your attention</h2><span class="w2-chip {% if ov_todos %}w2-wait{% else %}w2-ok{% endif %}">{% if ov_todos %}{{ ov_todos|length }} open{% else %}All clear{% endif %}</span></div>
       {% for todo in ov_todos %}
         <div class="w2-todo"><span><strong>{{ todo.strategy.name }}</strong> · {{ todo.title }}<br><span class="w2-muted">{{ todo.detail }}</span></span>
           {% if todo.kind == 'review' %}<a class="w2-button w2-button-primary" href="{% url 'v2_guided_review' instance_id=todo.strategy.pk signal_id=todo.signal.pk %}">Open</a>
@@ -81,7 +81,7 @@
     </section>
     <div class="w2-mini">
       <section class="w2-card">
-        <h2 class="w2-ct" style="margin-bottom:8px">Quick add money</h2>
+        <h2 class="w2-ct" style="margin-bottom:8px">{% include 'partials/icon.html' with name='wallet' %} Quick add money</h2>
         {% if overview_rows %}
         <form method="post" action="{% url 'v2_ledger_add' instance_id=overview_rows.0.strategy.pk %}" id="w2-quick-money">
           {% csrf_token %}<input type="hidden" name="intent" value="save"><input type="hidden" name="return_to" value="today">
@@ -94,12 +94,12 @@
         {% else %}<p class="w2-muted">Add a strategy first.</p>{% endif %}
       </section>
       <section class="w2-card">
-        <div class="w2-ch"><h2 class="w2-ct">Prices</h2>{% if ov_prices %}<span class="w2-chip w2-ok">OK</span>{% endif %}</div>
+        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='activity' %} Prices</h2>{% if ov_prices %}<span class="w2-chip w2-ok">OK</span>{% endif %}</div>
         {% for p in ov_prices %}<div class="w2-kv"><span>{{ p.symbol }}</span><span>{{ cur }}{{ p.price|floatformat:2 }} <small class="w2-muted">{{ p.as_of|date:"j M" }}</small></span></div>{% empty %}<p class="w2-muted">No prices yet.</p>{% endfor %}
         {% if ov_last_sync %}<div class="w2-kv"><span>Last check</span><span>{{ ov_last_sync.last_attempt|date:"j M H:i" }}</span></div>{% endif %}
       </section>
       <section class="w2-card">
-        <div class="w2-ch"><h2 class="w2-ct">UK ISA contributions</h2></div>
+        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='shield' %} UK ISA contributions</h2></div>
         {% if ov_isa %}
           <p class="w2-stat-value" style="font-size:13px">{{ cur }}{{ ov_isa.left|floatformat:"0g" }} <span class="w2-muted" style="font-weight:400">left</span></p>
           <div class="w2-bar" style="margin-top:6px"><span class="w2-c1" style="width:{{ ov_isa.width|floatformat:1 }}%"></span></div>
@@ -108,7 +108,7 @@
         {% else %}<p class="w2-muted">No recorded Wealtharr ISA strategy account.</p>{% endif %}
       </section>
       <section class="w2-card">
-        <div class="w2-ch"><h2 class="w2-ct">Alerts</h2><a href="{% url 'v2_settings' %}">Edit</a></div>
+        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='bell' %} Alerts</h2><a href="{% url 'v2_settings' %}">Edit</a></div>
         <div class="w2-kv"><span>Email</span><span class="{% if ov_alerts.email %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.email %}On{% else %}Off{% endif %}</span></div>
         <div class="w2-kv"><span>Discord</span><span class="{% if ov_alerts.discord %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.discord %}On{% else %}Off{% endif %}</span></div>
         <div class="w2-kv"><span>Telegram</span><span class="{% if ov_alerts.telegram %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.telegram %}On{% else %}Off{% endif %}</span></div>
