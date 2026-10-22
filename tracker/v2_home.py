@@ -96,11 +96,8 @@ def _public_budget():
     import time
     window = int(time.time() // 60)
     key = "home-compare-fresh:%d" % window
-    cache.add(key, 0, 120)
-    try:
-        used = cache.incr(key)
-    except ValueError:
-        used = 1
+    from .rate_limits import increment
+    used = increment(key, 120)
     if used > PUBLIC_FRESH_PER_MINUTE:
         raise Busy()
 
