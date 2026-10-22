@@ -51,7 +51,8 @@ class HfeaRuleTests(SimpleTestCase):
         self.assertFalse(catalogue.selection_available("hfea", "TRADE_REPUBLIC", "DEPOT"))
         units = catalogue.expected_quote_units()
         self.assertEqual(units["3LUS.L"], ("GBp", "GBX"))
-        self.assertEqual(units["3TYL.L"], ("USD",))
+        self.assertEqual(units["3TYL.L"], ("GBp", "GBX"))
+        self.assertEqual(units["ISP6.L"], ("GBp", "GBX"))
 
     def test_difference_from_the_original_is_on_the_page(self):
         from tracker.strategies.registry import describe_strategy
@@ -70,7 +71,7 @@ class HfeaStudyTests(TestCase):
         seed("IEF", start, lambda d, i: 100.0)
         launch = TODAY - timedelta(days=200)
         seed("3LUS.L", launch, lambda d, i: 50.0, currency="GBP")
-        seed("3TYL.L", launch, lambda d, i: 20.0)
+        seed("3TYL.L", launch, lambda d, i: 20.0, currency="GBP")
         study = module_for_key("hfea").study["GBP"]
         data = study.load_data()
         self.assertTrue(data.ready)
@@ -78,8 +79,8 @@ class HfeaStudyTests(TestCase):
         # The rebuilt line moves about three times SPY's daily rise before launch.
         rise = data.prices["stocks3x"][k - 1] / data.prices["stocks3x"][k - 2] - 1
         self.assertAlmostEqual(rise, 0.003 - 0.0075 / 252, places=6)
-        # 3TYL is in dollars: 20 / 1.25 in pounds.
-        self.assertAlmostEqual(data.prices["bonds3x"][-1], 16.0, places=6)
+        # 3TYL's pence line is stored in pounds, used as it is.
+        self.assertAlmostEqual(data.prices["bonds3x"][-1], 20.0, places=6)
         result = study.run(data, "1y", 1000, 0)
         self.assertTrue(any("3x SPY" in n for n in result["simulated_notes"]))
         self.assertIn("quarter", " ".join(study.how_it_works(data)))

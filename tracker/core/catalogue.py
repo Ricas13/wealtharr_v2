@@ -353,13 +353,13 @@ UK_3LUS = Listing(
     "Source-cited, not read first-hand." + T212_OWNER_CONFIRMED_22 + " " + ACCOUNT_HOLD,
     HFEA_VERIFIED_ON, brokers={"TRADING212": T212 % "3LUS"})
 UK_3TYL = Listing(
-    "WisdomTree US Treasuries 10Y 3x Daily Leveraged", "WisdomTree", "IE00BKT09032", "3TYL.L", "USD",
-    "LSE 3TYL (USD line)",
+    "WisdomTree US Treasuries 10Y 3x Daily Leveraged", "WisdomTree", "IE00BKT09032", "3TYL.L", "GBX",
+    "LSE 3TYL (pence line)",
     "https://www.wisdomtree.com/gb/products/fixed-income/wisdomtree-us-treasuries-10y-3x-daily-leveraged",
     "3x daily 10-year US Treasury futures: the closest European equivalent of TMF, which is 3x 20+ year "
     "Treasuries (none trades in Europe), so it reacts about 40% as strongly to rate changes. An ETP, "
-    "very small. Quoted in US dollars: Wealtharr converts each close at that day's GBP/USD close and "
-    "your broker charges its own currency fee. Source-cited, not read first-hand."
+    "very small. A dollar product, but this line is quoted in pence (owner-checked on Yahoo, 22 Oct 2026). "
+    "Source-cited, not read first-hand."
     + T212_OWNER_CONFIRMED_22 + " " + ACCOUNT_HOLD,
     HFEA_VERIFIED_ON, brokers={"TRADING212": T212 % "3TYL"})
 US_UPRO = _us("ProShares UltraPro S&P500", "ProShares", "US74347X8645", "UPRO",
@@ -374,7 +374,8 @@ UK_ISP6 = Listing(
     "iShares S&P SmallCap 600 UCITS ETF", "iShares", "IE00B2QWCY14", "ISP6.L", "GBX",
     "LSE ISP6 (pence line)",
     "https://www.ishares.com/uk/individual/en/products/251856/",
-    "US small companies (S&P SmallCap 600), the same index as the book's IJR. Distributing; "
+    "US small companies (S&P SmallCap 600), the same index as the book's IJR. A dollar fund, but this "
+    "line is quoted in pence (owner-checked on Yahoo, 22 Oct 2026). Distributing; "
     "Wealtharr records dividends as cash. Source-cited, not read first-hand."
     + T212_OWNER_CONFIRMED_22 + " " + ACCOUNT_HOLD,
     HFEA_VERIFIED_ON, brokers={"TRADING212": T212 % "ISP6"})
