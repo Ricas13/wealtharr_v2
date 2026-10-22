@@ -32,6 +32,36 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 page.wait_for_function("document.querySelector('[data-range-words]').textContent === '1 year'")
                 rows = page.locator("[data-compare] [data-rows] tr")
                 self.assertEqual(rows.count(), 5)  # 9Sig, buy & hold, SPY, VTI, All Seasons
+                # Typed amounts: bigger than the old slider limits.
+                page.locator("[data-amount]").fill("250000")
+                with page.expect_response(lambda r: "amount=250000" in r.url):
+                    page.locator("[data-amount]").fill("250000")
+                    page.locator("[data-amount]").dispatch_event("input")
+                page.wait_for_function("document.querySelector('[data-putin]').textContent.startsWith('251,')")
+                # Sort by gain, best first, then flip.
+                page.locator("[data-sort='gain_pct']").click()
+                gains = page.locator("[data-compare] [data-rows] tr td:nth-child(4)").all_text_contents()
+                values = [float(g.replace("+", "").replace("−", "-").rstrip("%")) for g in gains]
+                self.assertEqual(values, sorted(values, reverse=True))
+                self.assertEqual(page.locator("th:has([data-sort='gain_pct'])").get_attribute("aria-sort"), "descending")
+                page.locator("[data-sort='gain_pct']").click()
+                self.assertEqual(page.locator("th:has([data-sort='gain_pct'])").get_attribute("aria-sort"), "ascending")
+                page.locator("[data-sort='label']").click()
+                names = page.locator("[data-compare] [data-rows] th").all_text_contents()
+                self.assertEqual(names, sorted(names, key=str.lower))
+                # Hover readout.
+                svg = page.locator("[data-compare] [data-chart]")
+                svg.scroll_into_view_if_needed()
+                box = svg.bounding_box()
+                page.mouse.move(box["x"] + box["width"] * 0.6, box["y"] + box["height"] / 2)
+                tip = page.locator("[data-tip]")
+                self.assertTrue(tip.is_visible())
+                self.assertEqual(tip.locator(".tip-row").count(), 5)
+                self.assertIn("Money put in by then", tip.text_content())
+                self.assertTrue(tip.locator(".tip-date").text_content())
+                # Log explains itself.
+                page.locator("[data-scale='log']").click()
+                self.assertIn("equal % growth", page.locator("[data-scale-hint]").text_content())
                 page.get_by_label("Show All Seasons").click()
                 self.assertEqual(page.locator("[data-compare] tr.off").count(), 1)
                 self.assertEqual(page.locator("[data-compare] .chart polyline").count(), 5)

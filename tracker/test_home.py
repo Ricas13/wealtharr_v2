@@ -66,11 +66,13 @@ class HomepageTests(TestCase):
         for brand in ("All Weather", "Bridgewater", "Golden Butterfly", "Dual Momentum", "Permanent Portfolio"):
             self.assertNotContains(page, brand)
 
-    def test_comparison_inputs_are_snapped_to_the_sliders(self):
-        data = self.client.get("/compare.json?amount=999999&monthly=-5&range=bogus").json()
-        self.assertEqual((data["amount"], data["monthly"], data["range"]), (20000, 0, "10y"))
+    def test_comparison_inputs_are_whole_pounds_within_limits(self):
+        data = self.client.get("/compare.json?amount=250000&monthly=2500.4&range=bogus").json()
+        self.assertEqual((data["amount"], data["monthly"], data["range"]), (250000, 2500, "10y"))
+        data = self.client.get("/compare.json?amount=99999999999&monthly=-5").json()
+        self.assertEqual((data["amount"], data["monthly"]), (10_000_000, 0))
         data = self.client.get("/compare.json?amount=abc&monthly=37").json()
-        self.assertEqual((data["amount"], data["monthly"]), (1000, 25))
+        self.assertEqual((data["amount"], data["monthly"]), (1000, 37))
         self.assertFalse(data["ready"])
 
 

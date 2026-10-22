@@ -33,3 +33,24 @@
 .cmp .axis{display:flex;justify-content:space-between;color:#7d8692;font-size:10.5px;margin-top:4px}
 .cmp [data-compare].loading [data-filled]{opacity:.6;transition:opacity .2s}
 @media (max-width:900px){.cmp .ctrl{grid-template-columns:1fr}.cmp .chart svg{height:220px}}
+
+/* Sortable headers, typed amounts and the chart's hover readout. */
+.cmp .row.tight{gap:8px}
+.cmp .sort{background:none;border:0;padding:0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;white-space:nowrap}
+.cmp .sort:hover{color:var(--w2-text)}
+.cmp th[aria-sort=ascending] .sort::after{content:" ▲";font-size:9px}
+.cmp th[aria-sort=descending] .sort::after{content:" ▼";font-size:9px}
+.cmp .money-in{display:flex;align-items:center;gap:6px;border:1px solid var(--w2-stroke);border-radius:7px;padding:0 10px;background:var(--w2-bg)}
+.cmp .money-in:focus-within{border-color:var(--w2-primary)}
+.cmp .money-in span{color:#fff;font-size:15px;font-weight:700}
+.cmp .money-in input{flex:1;min-width:0;border:0;background:transparent;color:#fff;font:inherit;font-size:15px;font-weight:700;padding:7px 0;outline:none}
+.cmp .money-in input:invalid{color:var(--w2-negative)}
+.cmp .chart svg{touch-action:pan-y;cursor:crosshair}
+.cmp .chart line.cursor{stroke:var(--w2-subtle);stroke-dasharray:2 3}
+.cmp .chart-tip{position:absolute;top:8px;z-index:2;min-width:220px;max-width:min(320px,100%);background:#0f1319;border:1px solid var(--w2-stroke);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:none}
+.cmp .chart-tip .tip-date{display:block;margin-bottom:4px;color:var(--w2-text)}
+.cmp .chart-tip .tip-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:2px 0}
+.cmp .chart-tip .tip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--w2-muted)}
+.cmp .chart-tip .tip-value{font-weight:600;text-align:right}
+.cmp .chart-tip .tip-gain{text-align:right;min-width:56px}
+.cmp .chart-tip .tip-foot{margin-top:4px;font-size:11px}

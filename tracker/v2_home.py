@@ -56,10 +56,14 @@ def _snap(raw, default, low, high, step):
     return int(round(value / step) * step)
 
 
+# Typed amounts, whole pounds.
+LIMITS = {"amount_min": 100, "amount_max": 10_000_000, "monthly_max": 1_000_000}
+
+
 def _inputs(params):
     frame = params.get("range", "10y")
-    return (_snap(params.get("amount"), 1000, 500, 20000, 500),
-            _snap(params.get("monthly"), 100, 0, 1000, 25),
+    return (_snap(params.get("amount"), 1000, LIMITS["amount_min"], LIMITS["amount_max"], 1),
+            _snap(params.get("monthly"), 100, 0, LIMITS["monthly_max"], 1),
             frame if frame in FRAME_WORDS else "10y")
 
 
@@ -83,7 +87,7 @@ def compare(amount, monthly, frame, real_names=False):
     if out is not None:
         return out
     out = {"ready": False, "amount": amount, "monthly": monthly, "range": frame,
-           "range_words": FRAME_WORDS[frame]}
+           "range_words": FRAME_WORDS[frame], "limits": LIMITS}
     # The homepage compares the flagship strategy's Study against benchmarks.
     from .instrument_mapping import STRATEGY_9SIG
     from .strategies.registry import module_for_key
@@ -122,6 +126,7 @@ def compare(amount, monthly, frame, real_names=False):
             "period": "%s – %s" % (_day(first), _day(last)),
             "left_out": left_out,
             "ticks": [(first + (last - first) * k / 4).strftime("%b %Y") for k in range(5)],
+            "point_dates": [_day(days[i]) for i in index],
             "simulated": bool(result["simulated_growth"] or result["simulated_safe"]),
             "simulated_other": simulated_other,
         })

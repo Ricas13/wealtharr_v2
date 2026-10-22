@@ -150,3 +150,23 @@ input[type=checkbox]{accent-color:#2f6fd6;width:15px;height:15px;margin:0;vertic
 .card.link{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:#e4e7eb;transition:border-color .15s}
 .card.link:hover{border-color:#2f6fd6;color:#fff}
 @media (max-width:900px){.article h1{font-size:28px}}
+
+/* Sortable headers, typed amounts and the chart's hover readout (shared card). */
+.sort{background:none;border:0;padding:0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;white-space:nowrap}
+.sort:hover{color:#e4e7eb}
+th[aria-sort=ascending] .sort::after{content:" ▲";font-size:9px}
+th[aria-sort=descending] .sort::after{content:" ▼";font-size:9px}
+.money-in{display:flex;align-items:center;gap:6px;border:1px solid #2a313b;border-radius:7px;padding:0 10px;background:#0d1014}
+.money-in:focus-within{border-color:#2f6fd6}
+.money-in span{color:#fff;font-size:15px;font-weight:700}
+.money-in input{flex:1;min-width:0;border:0;background:transparent;color:#fff;font-size:15px;font-weight:700;padding:7px 0;outline:none}
+.money-in input:invalid{color:#f2777a}
+.chart svg{touch-action:pan-y;cursor:crosshair}
+.chart line.cursor{stroke:#8a939e;stroke-dasharray:2 3}
+.chart-tip{position:absolute;top:8px;z-index:2;min-width:220px;max-width:min(320px,100%);background:#0f1319;border:1px solid #2a313b;border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:none}
+.chart-tip .tip-date{display:block;margin-bottom:4px;color:#e4e7eb}
+.chart-tip .tip-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:2px 0}
+.chart-tip .tip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b8bfc8}
+.chart-tip .tip-value{font-weight:600;text-align:right}
+.chart-tip .tip-gain{text-align:right;min-width:56px}
+.chart-tip .tip-foot{margin-top:4px;font-size:11px}
