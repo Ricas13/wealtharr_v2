@@ -123,6 +123,30 @@ def _unfinished_session_start(meta):
     return datetime.combine(today, datetime.min.time(), utc_timezone.utc).timestamp()
 
 
+# A changed close within this fraction of the stored one is accepted
+# automatically (and logged); a bigger change holds the line for review.
+# 20% leaves room for leveraged funds and still catches splits (4-for-3 is
+# -25%, 3-for-2 -33%, 2-for-1 -50%) and pence/pounds errors (100x).
+AUTO_ACCEPT_REVISION = Decimal("0.20")
+
+
+def apply_revision(revision, user=None):
+    """Store Yahoo's close for one logged revision; ``user`` is None when automatic."""
+    observation = MarketObservation.objects.select_for_update().filter(
+        symbol=revision.symbol, as_of=revision.as_of).first()
+    if observation is not None and observation.price == revision.stored_price:
+        observation.price = revision.yahoo_price
+        if observation.raw_unit_verified:
+            factor = 100 if observation.raw_quote_unit in ("GBp", "GBX") else 1
+            observation.raw_close = revision.yahoo_raw_close or revision.yahoo_price * factor
+        observation.save(update_fields=["price", "raw_close"])
+    revision.accepted_at, revision.accepted_by = timezone.now(), user
+    revision.save(update_fields=["accepted_at", "accepted_by"])
+    # Older pending rows for the same day are superseded by this one.
+    type(revision).objects.filter(symbol=revision.symbol, as_of=revision.as_of,
+                                  accepted_at__isnull=True).update(accepted_at=revision.accepted_at)
+
+
 # Yahoo's daily GBP/USD close (US dollars per pound) converts USD-quoted
 # holdings to pounds for the same day. No rate that day, no GBP price.
 FX_SYMBOL = "GBPUSD=X"
@@ -197,18 +221,28 @@ def sync_ticker(symbol, *, force=False):
         revised = [(day, price) for day, price in series
                    if day in previous_values and previous_values[day] != price]
         if revised:
-            # Kept for the site owner to review on the Admin page.
+            # Every change is logged. Small ones (a close saved early, a
+            # vendor correction) are accepted at once; a big one (a split or
+            # unit error) holds the line for the site owner on the Admin page.
+            from django.db import transaction
             from .models import PriceRevision
             raw_series = getattr(fetched, "raw_closes", {})
-            for day, price in revised:
-                PriceRevision.objects.get_or_create(
-                    symbol=symbol, as_of=day, yahoo_price=price, accepted_at=None,
-                    defaults={"stored_price": previous_values[day], "currency": currency,
-                              "yahoo_raw_close": raw_series.get(day)})
-            state.last_error = "PRICE_HOLD:REVISED_HISTORICAL_CLOSE"
-            state.save(update_fields=["last_error"])
-            LOG.warning("Market price revision on hold for %s", symbol)
-            return None
+            small = all(abs(price - previous_values[day]) <= previous_values[day] * AUTO_ACCEPT_REVISION
+                        for day, price in revised)
+            with transaction.atomic():
+                for day, price in revised:
+                    revision, _ = PriceRevision.objects.get_or_create(
+                        symbol=symbol, as_of=day, yahoo_price=price, accepted_at=None,
+                        defaults={"stored_price": previous_values[day], "currency": currency,
+                                  "yahoo_raw_close": raw_series.get(day)})
+                    if small:
+                        apply_revision(revision)
+            if not small:
+                state.last_error = "PRICE_HOLD:REVISED_HISTORICAL_CLOSE"
+                state.save(update_fields=["last_error"])
+                LOG.warning("Market price revision on hold for %s", symbol)
+                return None
+            LOG.info("Accepted Yahoo's corrected close for %s", symbol)
         # Capture original quote units only from this vendor response.
         # A patched/legacy two-tuple cannot assert original unit provenance.
         raw_unit = getattr(fetched, "raw_unit", "")

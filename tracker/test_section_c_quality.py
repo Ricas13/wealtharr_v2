@@ -120,15 +120,21 @@ class PersistedMarketPriceHoldTests(TestCase):
 
     @patch("tracker.market_data.fetch_chart")
     def test_historical_close_cannot_be_rewritten(self, fetch):
+        # A big change (split or unit error) holds; owner decision 22 Oct 2026:
+        # changes within 20% are accepted automatically and logged.
         today = timezone.localdate()
         MarketObservation.objects.create(
             symbol="ERNS.L", as_of=today, price=D("100"), currency="GBP")
-        fetch.return_value = ("GBP", [(today, D("101"))])
+        fetch.return_value = ("GBP", [(today, D("150"))])
         self.assertIsNone(sync_ticker("ERNS.L", force=True))
         self.assertEqual(MarketObservation.objects.get(
             symbol="ERNS.L", as_of=today).price, D("100"))
         self.assertEqual(YahooSync.objects.get(symbol="ERNS.L").last_error,
                          "PRICE_HOLD:REVISED_HISTORICAL_CLOSE")
+        fetch.return_value = ("GBP", [(today, D("101"))])
+        self.assertIsNotNone(sync_ticker("ERNS.L", force=True))
+        self.assertEqual(MarketObservation.objects.get(
+            symbol="ERNS.L", as_of=today).price, D("101"))
 
     @patch("tracker.market_data.fetch_chart")
     def test_vendor_unit_change_creates_persistent_hold(self, fetch):
