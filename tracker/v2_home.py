@@ -46,7 +46,7 @@ OTHER_LINES = {
 # Signed-in pages (Add strategy) may use the strategies' own names; the public
 # homepage keeps the generic ones above.
 REAL_NAMES = {"nine_sig": "9Sig", "hold": "Buy & hold 3× Nasdaq (LQQ3)"}
-POINTS = 160
+POINTS = 5500  # Preserve daily observations for timeline zoom; SVG rendering downsamples.
 DAILY_INVITE_ALERTS = 10
 
 

@@ -41,6 +41,25 @@
           <div class="chart-tip" data-tip hidden></div>
         </div>
         <div class="axis" aria-hidden="true" data-ticks>{% for t in compare.ticks %}<span>{{ t }}</span>{% endfor %}</div>
+        <div class="compare-timeline" aria-label="Zoom the historical comparison">
+          <div class="compare-timeline-head">
+            <span class="mut tiny">Drag either end to zoom; drag the highlighted range to move through history.</span>
+            <span class="compare-timeline-current" data-zoom-dates aria-live="off"></span>
+            <button type="button" data-zoom-reset disabled>Reset zoom</button>
+          </div>
+          <div class="compare-timeline-track" data-zoom-track>
+            <svg viewBox="0 0 800 60" preserveAspectRatio="none" data-zoom-mini aria-hidden="true"></svg>
+            <div class="compare-timeline-shade" data-zoom-before aria-hidden="true"></div>
+            <div class="compare-timeline-shade" data-zoom-after aria-hidden="true"></div>
+            <div class="compare-timeline-window" data-zoom-window role="slider" tabindex="0"
+                 aria-label="Move chart date window" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+            <button class="compare-timeline-handle" type="button" data-zoom-handle="start" role="slider"
+                    aria-label="Chart start date" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></button>
+            <button class="compare-timeline-handle" type="button" data-zoom-handle="end" role="slider"
+                    aria-label="Chart end date" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"></button>
+          </div>
+          <p class="mut tiny compare-timeline-help">Use the arrow keys on a focused handle for day-by-day changes, or Shift + arrow for larger steps.</p>
+        </div>
         <p class="mut tiny">Hover over (or tap) the chart to see each strategy's value on that day and its gain against the money put in by then.</p>
       </div>
       <p class="mut tiny gap-top"><strong>Hypothetical, not anyone's real results.</strong> Real daily prices from Yahoo, converted to pounds, replayed through each strategy's fixed rules with no dealing costs or tax.
