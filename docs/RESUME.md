@@ -516,3 +516,12 @@ Make Wealtharr a strategy-agnostic **tracking and notification** platform for a 
 ## User prompt for a new chat
 
 **Use the final Section J handoff at the top of this file and `docs/private-ship-checklist.md`.** The lettered implementation ends here; do not infer a real-money or Oracle production GO from CI.
+
+
+## Reliability work (22 October 2026)
+
+- Python CI now runs tracker tests and migrations against PostgreSQL 16, rather than SQLite. Browser tests remain a separate UI suite.
+- The revised bash wealtharr.sh update creates a checksum-protected preupdate archive and runs a full isolated pg_restore drill before git pull and rebuild. Failed backup/verification blocks the deployment.
+- bash wealtharr.sh backup-offsite AGE_RECIPIENT user@host:/private/path/ uploads an age-encrypted backup over SSH. The private decryption key must be kept OFF the server; SSH and destination storage are owner-configured.
+- Important first-upgrade caveat: an already-installed older wealtharr.sh does not have this protection until you first fetch this change. Take a verified manual backup BEFORE initially fetching/deploying this PR.
+- The off-site archive covers the DB, not the production secrets required for a fresh-server restore. Escrow secrets separately and verify recovery off-server.
