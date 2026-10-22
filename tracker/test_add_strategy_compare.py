@@ -31,9 +31,11 @@ class AddStrategyCompareTests(TestCase):
         self.assertContains(page, "9Sig")
         self.assertContains(page, "All Seasons")
         self.assertContains(page, "Hypothetical, not anyone")
-        # The setup form is still on the same page, below the comparison.
+        # The three setup choices come first, side by side; the comparison sits below them.
         body = page.content.decode()
-        self.assertLess(body.index("How each strategy did in the past"), body.index('name="strategy"'))
+        self.assertEqual(body.count("w2-panel w2-wizard-card\""), 3)
+        self.assertLess(body.index('name="strategy"'), body.index("How each strategy did in the past"))
+        self.assertLess(body.index("Create strategy"), body.index("How each strategy did in the past"))
 
     def test_named_endpoint_needs_sign_in_and_uses_real_names(self):
         self.seed_history()

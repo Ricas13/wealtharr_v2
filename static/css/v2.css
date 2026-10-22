@@ -465,6 +465,26 @@ body.v2 {
 .w2-notice strong{color:var(--w2-text)}
 .w2-form-error{border:1px solid #79373f;background:#281719;border-radius:7px;color:#ffb5b9;padding:12px 14px;font-size:.87rem}
 .w2-wizard-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;border-top:1px solid var(--w2-stroke-soft);padding-top:16px;margin-top:10px}
+/* Add strategy: the three choices side by side, then one action bar. */
+.w2-wizard-wide{max-width:none}
+.w2-wizard-intro{margin:0 0 12px}
+.w2-wizard-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:stretch}
+.w2-wizard-card{display:grid;gap:12px;min-width:0;align-content:start}
+.w2-wizard-card h3{margin:0 0 2px}
+.w2-wizard-card .w2-form-grid{grid-template-columns:minmax(0,1fr)}
+.w2-wizard-card .w2-note{margin:0}
+.w2-panel.w2-wizard-actions{justify-content:space-between;align-items:center;border-top:1px solid var(--w2-stroke-soft);margin-top:0;padding:14px 16px}
+.w2-panel.w2-wizard-actions .w2-check{flex:1 1 320px}
+.w2-fund-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.w2-fund-list li{border:1px solid var(--w2-stroke-soft);border-radius:8px;padding:10px 12px;display:grid;gap:4px;min-width:0}
+.w2-fund-head{display:flex;justify-content:space-between;gap:8px;color:var(--w2-muted);font-size:.84rem}
+.w2-fund-head strong{color:var(--w2-text)}
+.w2-fund-ticker{font-weight:600;color:var(--w2-text);font-variant-numeric:tabular-nums}
+.w2-fund-name{font-size:.9rem;overflow-wrap:anywhere}
+.w2-fund-name small{display:block}
+.w2-fund-links a{color:var(--w2-accent);font-size:.84rem;margin-right:8px}
+@media(max-width:1200px){.w2-wizard-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.w2-wizard-cards>:last-child{grid-column:1/-1}}
+@media(max-width:760px){.w2-wizard-cards{grid-template-columns:minmax(0,1fr)}}
 .w2-wizard-actions .w2-button{min-width:92px;cursor:pointer}
 .w2-alert-matrix th:not(:first-child),.w2-alert-matrix td:not(:first-child){text-align:center}
 .w2-alert-matrix .w2-check{justify-content:center}
