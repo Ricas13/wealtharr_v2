@@ -40,6 +40,14 @@ class HomepageBrowserTests(BrowserHarness):
                 # Comparison: real study rows, untick one, change timeframe and top-up.
                 self.assertEqual(page.locator("[data-rows] tr").count(), 4)
                 self.assertEqual(page.locator(".chart polyline").count(), 5)
+                self.assertTrue(page.locator("[data-zoom-track]").is_visible())
+                page.locator('[data-zoom-handle="end"]').focus()
+                page.keyboard.press("Shift+ArrowLeft")
+                self.assertFalse(page.locator("[data-zoom-reset]").is_disabled())
+                # The whole-period performance table does not rebase after zoom.
+                rows_before = page.locator("[data-rows]").inner_text()
+                page.locator("[data-zoom-reset]").click()
+                self.assertEqual(page.locator("[data-rows]").inner_text(), rows_before)
                 page.get_by_label("Show S&P 500 (SPY)").click()
                 self.assertEqual(page.locator("tr.off").count(), 1)
                 self.assertEqual(page.locator(".chart polyline").count(), 4)

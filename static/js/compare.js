@@ -1,5 +1,5 @@
 // Hypothetical strategy comparison (homepage and Add strategy): sortable table,
-// chart with a hover readout, typed amounts, timeframe and linear/log scale.
+// chart with a hover readout, typed amounts, timeframe, linear/log scale and a draggable timeline.
 (function () {
   "use strict";
 
@@ -21,6 +21,16 @@
   var sortDir = 1;     // 1 ascending, -1 descending
   var scale = null;    // the last drawn y-scale, for the hover readout
   var svg = box.querySelector("[data-chart]");
+  var mini = box.querySelector("[data-zoom-mini]");
+  var track = box.querySelector("[data-zoom-track]");
+  var startHandle = box.querySelector('[data-zoom-handle="start"]');
+  var endHandle = box.querySelector('[data-zoom-handle="end"]');
+  var windowHandle = box.querySelector("[data-zoom-window]");
+  var resetZoom = box.querySelector("[data-zoom-reset]");
+  var view = null;  // selected index range; never changes the study or table figures
+  var drag = null;
+  var miniState = null, miniSignature = ""; // only replot the overview when its data changes
+  var resetAfterLoad = false;
   var NS = "http://www.w3.org/2000/svg";
   var money = function (v) { return Math.round(v).toLocaleString("en-GB"); };
   var pct = function (v) { return v === null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "%"; };
@@ -88,32 +98,66 @@
     });
   }
 
+  function count() { return (state.put_in_points || []).length; }
+  function lastIndex() { return Math.max(0, count() - 1); }
+  function gap() { return Math.min(2, lastIndex()); } // a minimum of three visible observations
+  function clamp(value, low, high) { return Math.min(high, Math.max(low, value)); }
+  function dateAt(i) { return (state.point_dates || [])[i] || ""; }
+
+  function normaliseView() {
+    var last = lastIndex();
+    if (!view) view = { start: 0, end: last };
+    view.start = clamp(Math.round(view.start), 0, Math.max(0, last - gap()));
+    view.end = clamp(Math.round(view.end), view.start + gap(), last);
+  }
+
+  // Keep every returned date available to the zoom. Decimate only the SVG paths,
+  // so narrow periods use the original close observations, not interpolation.
+  function indices(first, last, limit) {
+    var result = [], step = Math.max(1, Math.ceil((last - first) / (limit - 1)));
+    for (var i = first; i <= last; i += step) result.push(i);
+    if (result[result.length - 1] !== last) result.push(last);
+    return result;
+  }
+
+  function drawLine(target, values, samples, first, last, y, color, cls) {
+    var p = document.createElementNS(NS, "polyline");
+    var width = Math.max(1, last - first);
+    p.setAttribute("points", samples.map(function (i) {
+      return ((i - first) / width * 800).toFixed(1) + "," + y(values[i]).toFixed(1);
+    }).join(" "));
+    if (color) p.style.stroke = color;
+    if (cls) p.setAttribute("class", cls);
+    target.appendChild(p);
+  }
+
   function renderChart() {
     svg.querySelectorAll("polyline").forEach(function (p) { p.remove(); });
     var legend = box.querySelector("[data-legend]");
     legend.textContent = "";
     var shown = (state.rows || []).filter(function (r) { return !hidden[r.key]; });
     var series = shown.map(function (r) { return r.points; }).concat([state.put_in_points || []]);
-    var all = [];
-    series.forEach(function (s) { s.forEach(function (v) { if (v > 0) all.push(v); }); });
-    if (!all.length) return;
+    if (!count()) return;
+    normaliseView();
     var f = log ? Math.log10 : function (x) { return x; };
-    var lo = log ? f(Math.min.apply(null, all)) : 0;
-    var hi = f(Math.max.apply(null, all));
+    var smallest = Infinity, greatest = -Infinity;
+    series.forEach(function (values) {
+      for (var i = view.start; i <= view.end; i++) {
+        if (values[i] > 0 && Number.isFinite(values[i])) {
+          smallest = Math.min(smallest, values[i]);
+          greatest = Math.max(greatest, values[i]);
+        }
+      }
+    });
+    if (!Number.isFinite(greatest)) return;
+    var lo = log ? f(smallest) : 0;
+    var hi = f(greatest);
     var span = (hi - lo) || 1;
-    var line = function (values, color, cls) {
-      var p = document.createElementNS(NS, "polyline");
-      p.setAttribute("points", values.map(function (v, i) {
-        return (i / Math.max(1, values.length - 1) * 800).toFixed(1) + "," +
-          (300 - (f(Math.max(v, 1)) - lo) / span * 300).toFixed(1);
-      }).join(" "));
-      if (color) p.style.stroke = color;
-      if (cls) p.setAttribute("class", cls);
-      svg.appendChild(p);
-    };
-    line(state.put_in_points || [], null, "putin");
+    var y = function (v) { return 300 - (f(Math.max(v, 1)) - lo) / span * 300; };
+    var samples = indices(view.start, view.end, 850);
+    drawLine(svg, state.put_in_points || [], samples, view.start, view.end, y, null, "putin");
     shown.forEach(function (r) {
-      line(r.points, r.color);
+      drawLine(svg, r.points, samples, view.start, view.end, y, r.color);
       var item = cell("span");
       var sw = cell("span", "sw");
       sw.style.background = r.color;
@@ -132,6 +176,75 @@
     text('[data-y="0"]', label(hi));
     text('[data-y="1"]', label(lo + span / 2));
     text('[data-y="2"]', label(lo));
+
+    // The labels and hover index follow the selected window; table data does not.
+    var ticks = box.querySelector("[data-ticks]");
+    ticks.textContent = "";
+    for (var t = 0; t < 5; t++) {
+      var at = Math.round(view.start + (view.end - view.start) * t / 4);
+      ticks.appendChild(cell("span", "", dateAt(at)));
+    }
+    renderTimeline(shown, series);
+  }
+
+  function renderTimeline(shown, series) {
+    var signature = shown.map(function (r) { return r.key; }).join("|") + ":" + log;
+    if (miniState !== state || miniSignature !== signature) {
+      mini.querySelectorAll("polyline").forEach(function (p) { p.remove(); });
+      var bottom = Infinity, top = -Infinity;
+      series.forEach(function (values) {
+        values.forEach(function (v) {
+          if (v > 0 && Number.isFinite(v)) {
+            bottom = Math.min(bottom, v);
+            top = Math.max(top, v);
+          }
+        });
+      });
+      if (!Number.isFinite(top)) return;
+      var f = log ? Math.log10 : function (x) { return x; };
+      var lo = log ? f(bottom) : 0;
+      var span = (f(top) - lo) || 1;
+      var y = function (v) { return 58 - (f(Math.max(v, 1)) - lo) / span * 56; };
+      var samples = indices(0, lastIndex(), 220);
+      drawLine(mini, state.put_in_points || [], samples, 0, lastIndex(), y, null, "putin");
+      shown.forEach(function (r) { drawLine(mini, r.points, samples, 0, lastIndex(), y, r.color); });
+      miniState = state;
+      miniSignature = signature;
+    }
+
+    var last = Math.max(1, lastIndex());
+    var left = view.start / last * 100;
+    var right = view.end / last * 100;
+    windowHandle.style.left = left + "%";
+    windowHandle.style.width = (right - left) + "%";
+    startHandle.style.left = left + "%";
+    endHandle.style.left = right + "%";
+    startHandle.style.transform = view.start === 0 ? "translateX(0)" : "translateX(-50%)";
+    endHandle.style.transform = view.end === lastIndex() ? "translateX(-100%)" : "translateX(-50%)";
+    box.querySelector("[data-zoom-before]").style.width = left + "%";
+    box.querySelector("[data-zoom-after]").style.left = right + "%";
+    box.querySelector("[data-zoom-after]").style.width = (100 - right) + "%";
+    text("[data-zoom-dates]", dateAt(view.start) + " – " + dateAt(view.end));
+    resetZoom.disabled = view.start === 0 && view.end === lastIndex();
+    [[startHandle, view.start, 0, view.end - gap(), dateAt(view.start)],
+     [endHandle, view.end, view.start + gap(), lastIndex(), dateAt(view.end)],
+     [windowHandle, view.start, 0, lastIndex() - (view.end - view.start),
+       dateAt(view.start) + " to " + dateAt(view.end)]].forEach(function (row) {
+      row[0].setAttribute("aria-valuemin", row[2]);
+      row[0].setAttribute("aria-valuemax", row[3]);
+      row[0].setAttribute("aria-valuenow", row[1]);
+      row[0].setAttribute("aria-valuetext", row[4]);
+    });
+  }
+
+  function setView(start, end) {
+    var last = lastIndex(), minGap = gap();
+    start = clamp(Math.round(start), 0, last - minGap);
+    end = clamp(Math.round(end), start + minGap, last);
+    if (view.start === start && view.end === end) return;
+    view = { start: start, end: end };
+    hideTip();
+    renderChart();
   }
 
   function render() {
@@ -151,9 +264,7 @@
     if (period) period.hidden = !state.ready;
     if (!state.ready) return;
     text("[data-period]", state.period);
-    var ticks = box.querySelector("[data-ticks]");
-    ticks.textContent = "";
-    state.ticks.forEach(function (t) { ticks.appendChild(cell("span", "", t)); });
+    normaliseView();
     renderTable();
     renderChart();
   }
@@ -177,8 +288,8 @@
     if (!scale || !putIn.length) return;
     var rect = svg.getBoundingClientRect();
     var frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    var i = Math.round(frac * (putIn.length - 1));
-    var x = i / Math.max(1, putIn.length - 1) * 800;
+    var i = Math.round(view.start + frac * (view.end - view.start));
+    var x = (i - view.start) / Math.max(1, view.end - view.start) * 800;
     cursor.setAttribute("x1", x.toFixed(1));
     cursor.setAttribute("x2", x.toFixed(1));
     svg.appendChild(cursor);
@@ -208,6 +319,71 @@
   svg.addEventListener("pointermove", function (e) { showTip(e.clientX); });
   svg.addEventListener("pointerdown", function (e) { showTip(e.clientX); });
   svg.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") hideTip(); });
+
+  // Trim-like drag handles, plus dragging the selection itself. Pointer capture
+  // supports mouse, touch and pen without global listeners.
+  function atPointer(e) {
+    var bounds = track.getBoundingClientRect();
+    if (!bounds.width) return 0;
+    return clamp(Math.round((e.clientX - bounds.left) / bounds.width * lastIndex()), 0, lastIndex());
+  }
+  track.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0 || !count()) return;
+    var handle = e.target.closest("[data-zoom-handle]");
+    var inWindow = e.target.closest("[data-zoom-window]");
+    var kind = handle ? handle.dataset.zoomHandle : "window";
+    if (!handle && !inWindow) {
+      var center = atPointer(e), length = view.end - view.start;
+      var nextStart = clamp(center - Math.round(length / 2), 0, lastIndex() - length);
+      setView(nextStart, nextStart + length);
+    }
+    drag = { pointer: e.pointerId, kind: kind, origin: atPointer(e),
+             start: view.start, end: view.end };
+    track.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  track.addEventListener("pointermove", function (e) {
+    if (!drag || drag.pointer !== e.pointerId) return;
+    var at = atPointer(e);
+    if (drag.kind === "start") setView(Math.min(at, view.end - gap()), view.end);
+    else if (drag.kind === "end") setView(view.start, Math.max(at, view.start + gap()));
+    else {
+      var length = drag.end - drag.start;
+      var start = clamp(drag.start + at - drag.origin, 0, lastIndex() - length);
+      setView(start, start + length);
+    }
+  });
+  function stopDrag(e) {
+    if (drag && drag.pointer === e.pointerId) drag = null;
+  }
+  track.addEventListener("pointerup", stopDrag);
+  track.addEventListener("pointercancel", stopDrag);
+  track.addEventListener("lostpointercapture", stopDrag);
+
+  [startHandle, endHandle, windowHandle].forEach(function (handle) {
+    handle.addEventListener("keydown", function (e) {
+      var kind = handle.dataset.zoomHandle || "window";
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+      var step = e.shiftKey ? 10 : 1;
+      var delta = e.key === "ArrowRight" ? step : -step;
+      if (kind === "start") {
+        var s = e.key === "Home" ? 0 : e.key === "End" ? view.end - gap() : view.start + delta;
+        setView(s, view.end);
+      } else if (kind === "end") {
+        var n = e.key === "Home" ? view.start + gap() : e.key === "End" ? lastIndex() : view.end + delta;
+        setView(view.start, n);
+      } else {
+        var length = view.end - view.start;
+        var next = e.key === "Home" ? 0 : e.key === "End" ? lastIndex() - length : view.start + delta;
+        next = clamp(next, 0, lastIndex() - length);
+        setView(next, next + length);
+      }
+      e.preventDefault();
+    });
+  });
+  resetZoom.addEventListener("click", function () {
+    setView(0, lastIndex());
+  });
 
   box.querySelectorAll("[data-sort]").forEach(function (b) {
     b.addEventListener("click", function () {
@@ -240,7 +416,15 @@
       "&monthly=" + encodeURIComponent(monthly.value) + "&range=" + range;
     fetch(url, { headers: { Accept: "application/json" } })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (data) { if (ticket === latest) { state = data; hideTip(); render(); } })
+      .then(function (data) {
+        if (ticket === latest) {
+          state = data;
+          if (resetAfterLoad) view = null;
+          resetAfterLoad = false;
+          hideTip();
+          render();
+        }
+      })
       .catch(function () {})
       .then(function () { if (ticket === latest) box.classList.remove("loading"); });
   }
@@ -254,7 +438,12 @@
 
   var frames = Array.prototype.slice.call(document.querySelectorAll("[data-range]"));
   frames.forEach(function (b) {
-    b.addEventListener("click", function () { press(frames, b); range = b.dataset.range; load(); });
+    b.addEventListener("click", function () {
+      press(frames, b);
+      range = b.dataset.range;
+      resetAfterLoad = true;  // reset only when the new series arrives
+      load();
+    });
   });
 
   var scales = Array.prototype.slice.call(box.querySelectorAll("[data-scale]"));

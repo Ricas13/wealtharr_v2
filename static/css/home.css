@@ -170,3 +170,23 @@ th[aria-sort=descending] .sort::after{content:" ▼";font-size:9px}
 .chart-tip .tip-value{font-weight:600;text-align:right}
 .chart-tip .tip-gain{text-align:right;min-width:56px}
 .chart-tip .tip-foot{margin-top:4px;font-size:11px}
+
+/* Shared historical chart navigator: the same partial runs on home and Add Strategy. */
+[data-compare] .compare-timeline{margin-top:14px;min-width:0}
+[data-compare] .compare-timeline-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;margin-bottom:8px}
+[data-compare] .compare-timeline-current{font-size:12px;font-variant-numeric:tabular-nums;color:#d5e5fa}
+[data-compare] [data-zoom-reset]{border:1px solid #344153;border-radius:6px;background:#1b2636;color:#dce8f9;padding:4px 10px;cursor:pointer}
+[data-compare] [data-zoom-reset]:disabled{opacity:.45;cursor:default}
+[data-compare] .compare-timeline-track{height:64px;position:relative;touch-action:none;user-select:none;cursor:grab;border:1px solid #2c3542;border-radius:7px;background:#111923}
+[data-compare] .compare-timeline-track:active{cursor:grabbing}
+[data-compare] .compare-timeline-track svg{width:100%;height:100%;display:block;pointer-events:none}
+[data-compare] .compare-timeline-track polyline{fill:none;stroke-width:1.5;vector-effect:non-scaling-stroke}
+[data-compare] .compare-timeline-track polyline.putin{stroke:#8c96a3;stroke-dasharray:3 3}
+[data-compare] .compare-timeline-shade{position:absolute;top:0;bottom:0;left:0;background:rgba(4,8,14,.72);pointer-events:none}
+[data-compare] .compare-timeline-window{position:absolute;top:0;bottom:0;z-index:2;box-sizing:border-box;border:2px solid #69a8f7;background:rgba(71,142,240,.08);cursor:grab}
+[data-compare] .compare-timeline-window:active{cursor:grabbing}
+[data-compare] .compare-timeline-handle{position:absolute;top:0;height:100%;width:26px;padding:0;border:0;background:transparent;cursor:ew-resize;z-index:3;touch-action:none}
+[data-compare] .compare-timeline-handle::after{content:"";display:block;width:8px;height:30px;margin:auto;border-radius:6px;border:1px solid #8ebcff;background:#e3f0ff;box-shadow:0 1px 6px rgba(0,0,0,.5)}
+[data-compare] .compare-timeline-handle:focus-visible,[data-compare] .compare-timeline-window:focus-visible{outline:2px solid #e3f0ff;outline-offset:2px}
+[data-compare] .compare-timeline-help{margin:5px 0 0}
+@media(max-width:600px){[data-compare] .compare-timeline-head{gap:6px}[data-compare] .compare-timeline-head>.mut{flex-basis:100%}}
