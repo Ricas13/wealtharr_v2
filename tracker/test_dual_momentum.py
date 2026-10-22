@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 from decimal import Decimal as D
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from tracker.core.calendar import month_end_before, months_before
 from tracker.strategies.dual_momentum.v1 import Lookback, Quote, VERSION, choose, evaluate
