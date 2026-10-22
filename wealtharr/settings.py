@@ -17,6 +17,9 @@ def _read_secret_file(variable):
 
 
 SECRET_KEY = _read_secret_file("SECRET_KEY_FILE") or os.environ.get("SECRET_KEY", "")
+# Optional separate encryption key; absent on old deployments until explicit upgrade.
+DATA_ENCRYPTION_KEY = (_read_secret_file("DATA_ENCRYPTION_KEY_FILE")
+                       or os.environ.get("DATA_ENCRYPTION_KEY", ""))
 if not SECRET_KEY:
     if not DEBUG:
         raise RuntimeError("SECRET_KEY or SECRET_KEY_FILE is required when DEBUG=0")

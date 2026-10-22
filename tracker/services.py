@@ -4,7 +4,7 @@ import hashlib
 import re
 from collections import defaultdict
 from decimal import Decimal
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.core.mail import EmailMessage, get_connection
 from django.core.exceptions import ValidationError
@@ -122,16 +122,28 @@ def consolidated(owner, *, include_paper=False):
         "missing": missing,
     }
 
+def _fernet_for_secret(secret):
+    key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode("utf-8")).digest())
+    return Fernet(key)
+
+
 def encrypt_secret(raw):
-    secret = settings.SECRET_KEY.encode("utf-8")
-    key = base64.urlsafe_b64encode(hashlib.sha256(secret).digest())
-    return Fernet(key).encrypt(raw.encode("utf-8")).decode("ascii")
+    return _fernet_for_secret(settings.DATA_ENCRYPTION_KEY or settings.SECRET_KEY).encrypt(
+        raw.encode("utf-8")).decode("ascii")
+
 
 def decrypt_secret(encoded):
     if not encoded:
         return ""
-    key = base64.urlsafe_b64encode(hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest())
-    return Fernet(key).decrypt(encoded.encode("ascii")).decode("utf-8")
+    # During migration legacy data stays readable; re-encrypt before rotating
+    # Django's signing key.
+    for key in (settings.DATA_ENCRYPTION_KEY, settings.SECRET_KEY):
+        if key:
+            try:
+                return _fernet_for_secret(key).decrypt(encoded.encode("ascii")).decode("utf-8")
+            except InvalidToken:
+                pass
+    raise InvalidToken("No configured key could decrypt the saved credential.")
 
 def _send_message(channel, owner, cfg, prefs, subject, message):
     """One outbound attempt. Secrets remain on the server and out of logs."""
