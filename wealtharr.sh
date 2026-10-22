@@ -32,6 +32,36 @@ print("Traefik networking: no published web port")
 '
   fi
 }
+backup_snapshot() {
+  # Mandatory, isolated full-restore drill before any production update.
+  preflight
+  compose exec -T db pg_isready -U wealtharr -d wealtharr >/dev/null ||
+    die "Production database is not ready; refusing update without a backup."
+  mkdir -p backups
+  chmod 700 backups
+  local stamp completed pending
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  completed="backups/preupdate-${stamp}.dump"
+  pending="${completed}.tmp"
+  [[ ! -e "$completed" && ! -e "$pending" ]] ||
+    die "Backup already exists for this timestamp; refusing overwrite."
+  if ! compose exec -T db pg_dump -U wealtharr -d wealtharr -Fc > "$pending"; then
+    rm -f "$pending"
+    die "Database export failed; no update attempted."
+  fi
+  if ! compose exec -T db pg_restore --list < "$pending" >/dev/null; then
+    rm -f "$pending"
+    die "Invalid database archive; no update attempted."
+  fi
+  mv -- "$pending" "$completed"
+  (cd backups && sha256sum "$(basename "$completed")" > "$(basename "$completed").sha256")
+  chmod 600 "$completed" "$completed.sha256"
+  bash scripts/verify_backup.sh "$completed" ||
+    die "Backup failed isolated full-restore check. Update has NOT started."
+  BACKUP_CREATED="$completed"
+  echo "Verified pre-update backup: $completed"
+}
+
 start() {
   preflight
   compose up -d --build --wait --wait-timeout 180
@@ -113,8 +143,33 @@ PY
     ;;
   start) start ;;
   update)
+    # Verify a restorable backup before fetching new migrations.
+    backup_snapshot
     git pull --ff-only origin main
     start
+    ;;
+  backup)
+    backup_snapshot
+    ;;
+  backup-offsite)
+    [[ $# -eq 3 ]] || die "Usage: bash wealtharr.sh backup-offsite AGE_RECIPIENT user@host:/secure/path/"
+    command -v age >/dev/null || die "Install age for off-server encryption."
+    command -v scp >/dev/null || die "Install OpenSSH scp for off-server upload."
+    recipient="$2"
+    remote="$3"
+    [[ "$recipient" =~ ^age1[a-z0-9]{20,}$ ]] ||
+      die "Provide an age public recipient (never a private key)."
+    [[ "$remote" == *:* ]] || die "Specify an SSH destination such as user@host:/secure/backups/"
+    backup_snapshot
+    encrypted="${BACKUP_CREATED}.age"
+    [[ ! -e "$encrypted" ]] || die "Encrypted backup already exists; refusing overwrite."
+    age -r "$recipient" -o "${encrypted}.tmp" "$BACKUP_CREATED" ||
+      { rm -f "${encrypted}.tmp"; die "Encryption failed; nothing uploaded."; }
+    mv -- "${encrypted}.tmp" "$encrypted"
+    chmod 600 "$encrypted"
+    scp -B -- "$encrypted" "$remote" ||
+      die "Encrypted upload failed; check remote destination and retry."
+    echo "Encrypted archive uploaded. Keep the age private key OFF the server."
     ;;
   status)
     compose ps
@@ -173,7 +228,9 @@ PY
 Wealtharr owner commands (run from your checked-out directory):
   bash wealtharr.sh setup            First-time private configuration
   bash wealtharr.sh start            Build, migrate, start, verify
-  bash wealtharr.sh update           Pull main, rebuild, migrate, verify
+  bash wealtharr.sh update           Verify backup, pull main, rebuild and migrate
+  bash wealtharr.sh backup           Create and verify a local PostgreSQL archive
+  bash wealtharr.sh backup-offsite AGE_RECIPIENT SSH_DEST   Encrypted upload via age + scp
   bash wealtharr.sh status           See container health
   bash wealtharr.sh logs             Follow relevant logs
   bash wealtharr.sh export DIR       Private portable DB + settings + secret export
