@@ -24,7 +24,7 @@ CENTS = Decimal("0.01")
 PRECISION = Decimal("0.0001")
 # Price downloading is strategy-neutral; kept importable from here too.
 from .market_data import (  # noqa: E402,F401
-    TICKER, FetchedChart, fetch_chart, settlement_close, sync_ticker,
+    TICKER, FetchedChart, fetch_chart, period_close, settlement_close, sync_ticker,
 )
 
 # Pure, immutable versioned rule implementation (Django-free).
@@ -201,9 +201,12 @@ def review_strategy(strategy):
         return {"status": "waiting for first completed quarter"}
     # A reset (9Sig 60/40, 3Sig 80/20) is a suggestion, never proof that the
     # owner traded. Future cycles are paused until positions are re-anchored.
+    # Only a real reset proposal (with a reason and trades) pauses them: a
+    # provisional 100%-up warning has nothing to finish, so pausing on it
+    # stopped reviews for good. It stays on record as an urgent warning.
     pending_reset = strategy.signals.filter(
         kind__in=("QUARTERLY", "SPIKE_WATCH"), as_of__lt=quarter_end,
-        message__icontains="review a reset to "
+        message__icontains="review a reset to ", reset_reason__gt="",
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of").first()
     if pending_reset and (baseline is None or baseline.as_of <= pending_reset.as_of):
         return {"status": "manual reset must be confirmed as a new strategy baseline"}
@@ -211,7 +214,7 @@ def review_strategy(strategy):
         _alert_intraperiod_spike(
             strategy, now=now, first_buy=first_buy, baseline=baseline,
             tqqq_latest=data.get("TQQQ"), version=rules.VERSION)
-    closing = {symbol: settlement_close(symbol, quarter_end) for symbol in tickers}
+    closing = {symbol: period_close(symbol, quarter_end) for symbol in tickers}
     if (any(x is None for x in closing.values()) or
             closing[strategy.equity_symbol].currency != currency or
             closing[strategy.safe_symbol].currency != currency or

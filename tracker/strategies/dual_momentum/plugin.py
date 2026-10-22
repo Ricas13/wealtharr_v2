@@ -21,7 +21,7 @@ def cash_symbol(instance):
 
 def decide(instance, as_of, *, positions=None, cash=None):
     """Run the pure rules at month end ``as_of`` from verified closes. Read-only."""
-    from tracker.market_data import settlement_close
+    from tracker.market_data import period_close, settlement_close
     from tracker.services import replay
     from tracker.strategies.instruments import role_symbols
     from tracker.v2_ledger_core import effective_entries
@@ -33,7 +33,8 @@ def decide(instance, as_of, *, positions=None, cash=None):
     start = months_before(as_of, v1.LOOKBACK_MONTHS)
 
     def quote(symbol, day):
-        close = settlement_close(symbol, day)
+        # The review date's close must be settled; the lookback start is long past.
+        close = period_close(symbol, day) if day == as_of else settlement_close(symbol, day)
         if close and close.currency == instance.account.currency:
             return v1.Quote(symbol, Decimal(close.price), close.as_of)
         return None

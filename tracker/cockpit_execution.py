@@ -27,19 +27,22 @@ CENTS = D("0.01")
 
 
 
-def verified_quote_evidence(marks):
-    """Capture exact accepted GBP observation identities, not estimated prices."""
+def verified_quote_evidence(marks, currency="GBP"):
+    """Capture exact accepted observation identities in the account currency, not estimated prices.
+
+    ``price_gbp`` keeps its old key name for older records; ``currency`` says which money it is in.
+    """
     result = {}
     for role, mark in zip(("growth", "safe"), marks):
         observation = MarketObservation.objects.filter(
-            symbol=mark.symbol, as_of=mark.as_of, currency="GBP",
+            symbol=mark.symbol, as_of=mark.as_of, currency=currency,
             price=mark.price).values_list("pk", flat=True).first()
         if observation is None:
-            raise ValidationError("Missing persisted GBP price observation for the reset.")
+            raise ValidationError("Missing persisted %s price observation for the reset." % currency)
         result[role] = {
             "observation_id": observation, "symbol": mark.symbol,
             "as_of": mark.as_of.isoformat(), "price_gbp": str(mark.price),
-            "currency": "GBP", "price_mark_source": mark.source,
+            "currency": currency, "price_mark_source": mark.source,
         }
     return result
 
@@ -187,6 +190,16 @@ def record_single_fill(*, owner, strategy_id, signal_id, action_index,
         action = actions[action_index]
         if action["symbol"] not in symbols(locked):
             raise ValidationError("The proposed broker symbol is not the mapped holding.")
+        # A fill price far from the review's price is almost always a typing or
+        # units slip (e.g. pence entered as pounds), and fills can't be edited later.
+        try:
+            expected = D(str(action["estimated_gbp"])) / D(str(action["quantity"]))
+        except (ArithmeticError, KeyError, ValueError, TypeError):
+            expected = ZERO
+        if expected > ZERO and not expected / 2 <= unit_price <= expected * 2:
+            raise ValidationError(
+                "That price is far from the review's price of about %s per share. Check it's per "
+                "share and in the account's currency (not pence)." % expected.quantize(D("0.01")))
         entry = LedgerEntry(
             kind=action["side"], occurred_on=executed_on,
             symbol=action["symbol"], amount=ZERO, quantity=quantity,
@@ -261,7 +274,7 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
                 cash_value=before["cash"],
                 strategy_version=locked.strategy_version,
                 mapping_version=locked.mapping_version,
-                quote_evidence=verified_quote_evidence(marks))
+                quote_evidence=verified_quote_evidence(marks, locked.account.currency))
         completed = RebalanceExecution.objects.create(
             signal=signal, strategy=locked, executed_on=last_day,
             baseline=baseline)
