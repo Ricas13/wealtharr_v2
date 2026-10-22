@@ -145,6 +145,12 @@ def _send_message(channel, owner, cfg, prefs, subject, message):
         # The person's own channel webhook (their server, not the site's).
         from .discord_dm import post_webhook
         post_webhook(decrypt_secret(prefs.discord_webhook_ciphertext), subject + "\n" + message)
+    elif channel == "telegram":
+        # A message from the site's Telegram bot to the owner's connected chat.
+        from .telegram_bot import send
+        if not prefs.telegram_chat_id:
+            raise ValueError("Telegram not connected")
+        send(decrypt_secret(cfg.telegram_bot_token_ciphertext), prefs.telegram_chat_id, subject + "\n" + message)
     else:
         raise ValueError("Unsupported notification channel")
 

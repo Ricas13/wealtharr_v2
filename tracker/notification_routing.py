@@ -15,12 +15,12 @@ CATEGORIES = (
     ("contribution", "Monthly deposit reminder"),
 )
 CATEGORY_KEYS = {value for value, _ in CATEGORIES}
-CHANNELS = ("email", "discord")
+CHANNELS = ("email", "discord", "telegram")
 # Where alerts are delivered. A strategy routes an alert to "discord"; it then
 # goes to each Discord destination the person switched on: a DM from the
 # site's bot and/or a webhook into a channel on their own server.
-DELIVERY_CHANNELS = ("email", "discord", "discord_webhook")
-ROUTE_FOR = {"email": "email", "discord": "discord", "discord_webhook": "discord"}
+DELIVERY_CHANNELS = ("email", "discord", "discord_webhook", "telegram")
+ROUTE_FOR = {"email": "email", "discord": "discord", "discord_webhook": "discord", "telegram": "telegram"}
 
 
 def selected_channels(pref, category):

@@ -40,15 +40,17 @@ class AdminPageTests(TestCase):
         YahooSync.objects.create(symbol="SGLN.L", last_error="PRICE_HOLD:LARGE_MOVE")
         YahooSync.objects.create(symbol="VUAG.L", last_error="")
         page = self.client.get(reverse("control"))
-        self.assertContains(page, "Mail server and Discord")
+        for card in ("Email", "Discord", "Telegram", "Status"):
+            self.assertContains(page, '<h2 class="w2-ct" id="w2-admin-%s-title">%s</h2>' % (
+                {"Email": "mail", "Status": "test"}.get(card, card.lower()), card))
         self.assertContains(page, "PRICE_HOLD:LARGE_MOVE")
         self.assertNotContains(page, "VUAG.L")
         self.assertContains(page, "1 waiting to be read")
         self.assertContains(page, 'aria-current="page"')
         response = self.client.post(reverse("control"), {
-            "smtp_host": "smtp.example.com", "smtp_port": "587", "smtp_username": "me",
-            "smtp_sender": "me@example.com", "smtp_use_tls": "on"})
-        self.assertRedirects(response, reverse("control"))
+            "form_kind": "email", "email-smtp_host": "smtp.example.com", "email-smtp_port": "587",
+            "email-smtp_username": "me", "email-smtp_sender": "me@example.com", "email-smtp_use_tls": "on"})
+        self.assertRedirects(response, reverse("control") + "#email")
         self.assertEqual(SystemIntegration.current().smtp_host, "smtp.example.com")
 
     def test_channel_test_returns_to_the_admin_page(self):

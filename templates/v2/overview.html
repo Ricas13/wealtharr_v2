@@ -111,6 +111,7 @@
         <div class="w2-ch"><h2 class="w2-ct">Alerts</h2><a href="{% url 'v2_settings' %}">Edit</a></div>
         <div class="w2-kv"><span>Email</span><span class="{% if ov_alerts.email %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.email %}On{% else %}Off{% endif %}</span></div>
         <div class="w2-kv"><span>Discord</span><span class="{% if ov_alerts.discord %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.discord %}On{% else %}Off{% endif %}</span></div>
+        <div class="w2-kv"><span>Telegram</span><span class="{% if ov_alerts.telegram %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.telegram %}On{% else %}Off{% endif %}</span></div>
         <div class="w2-kv"><span>Last sent</span><span>{% if ov_alerts.last %}{{ ov_alerts.last.created_at|date:"j M" }}{% else %}—{% endif %}</span></div>
       </section>
     </div>

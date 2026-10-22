@@ -160,6 +160,7 @@
       <div class="w2-row">
         <span class="w2-chip {% if dash_alerts.email %}w2-ok{% endif %}">Email {% if dash_alerts.email %}on{% else %}off{% endif %}</span>
         <span class="w2-chip {% if dash_alerts.discord %}w2-ok{% endif %}">Discord {% if dash_alerts.discord %}on{% else %}off{% endif %}</span>
+        <span class="w2-chip {% if dash_alerts.telegram %}w2-ok{% endif %}">Telegram {% if dash_alerts.telegram %}on{% else %}off{% endif %}</span>
         <span class="w2-muted">{% if dash_alerts.last %}Last sent {{ dash_alerts.last.created_at|date:"j M" }}{% else %}Nothing sent yet{% endif %}</span>
       </div>
     </section>

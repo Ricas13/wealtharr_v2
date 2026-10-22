@@ -7,11 +7,12 @@
       <input type="hidden" name="strategy_id" value="{{ selected_instance.pk }}">
       <input type="hidden" name="return_to" value="strategy">
       <div class="w2-table-wrap"><table class="w2-table w2-alert-matrix">
-        <thead><tr><th scope="col">Alert</th><th scope="col" style="text-align:left">When</th><th scope="col">Email</th><th scope="col">Discord</th><th scope="col" style="text-align:left">Last sent</th></tr></thead>
+        <thead><tr><th scope="col">Alert</th><th scope="col" style="text-align:left">When</th><th scope="col">Email</th><th scope="col">Discord</th><th scope="col">Telegram</th><th scope="col" style="text-align:left">Last sent</th></tr></thead>
         <tbody>{% for option in strategy_routes %}
           <tr><th scope="row" style="font-weight:400;text-align:left">{{ option.title }}</th><td class="w2-muted" style="text-align:left">{{ option.when }}</td>
             <td><label class="w2-check"><input type="checkbox" name="route_{{ option.key }}_email" {% if option.email %}checked{% endif %}><span class="w2-sr-only">Email {{ option.title }}</span></label></td>
             <td><label class="w2-check"><input type="checkbox" name="route_{{ option.key }}_discord" {% if option.discord %}checked{% endif %}><span class="w2-sr-only">Discord {{ option.title }}</span></label></td>
+            <td><label class="w2-check"><input type="checkbox" name="route_{{ option.key }}_telegram" {% if option.telegram %}checked{% endif %}><span class="w2-sr-only">Telegram {{ option.title }}</span></label></td>
             <td style="text-align:left">{% if option.last %}{{ option.last|date:"j M" }}{% else %}<span class="w2-muted">Never</span>{% endif %}</td></tr>
         {% endfor %}</tbody>
       </table></div>
@@ -32,8 +33,9 @@
     <div class="w2-ch"><h2 class="w2-ct">Where alerts go</h2><a href="{% url 'v2_settings' %}">Change</a></div>
     <div class="w2-kv"><span>Email</span><span>{% if strategy_alerts.email %}<span class="w2-chip w2-ok">On</span> {{ strategy_preference.destination_email }}{% else %}<span class="w2-chip">Off</span>{% endif %}</span></div>
     <div class="w2-kv"><span>Discord</span><span>{% if strategy_alerts.discord %}<span class="w2-chip w2-ok">On</span>{% else %}<span class="w2-chip">Off</span>{% endif %}</span></div>
+    <div class="w2-kv"><span>Telegram</span><span>{% if strategy_alerts.telegram %}<span class="w2-chip w2-ok">On</span>{% else %}<span class="w2-chip">Off</span>{% endif %}</span></div>
     <div class="w2-kv"><span>Last delivery</span><span>{% if strategy_alerts.last %}{{ strategy_alerts.last.created_at|date:"j M H:i" }} · {{ strategy_alerts.last.channel }} · {{ strategy_alerts.last.status|lower }}{% else %}None yet{% endif %}</span></div>
-    {% if not strategy_alerts.email and not strategy_alerts.discord %}<p class="w2-note">No destination is switched on, so nothing will be sent. Set one in <a href="{% url 'v2_settings' %}">Alerts &amp; settings</a>.</p>{% endif %}
+    {% if not strategy_alerts.email and not strategy_alerts.discord and not strategy_alerts.telegram %}<p class="w2-note">No destination is switched on, so nothing will be sent. Set one in <a href="{% url 'v2_settings' %}">Alerts &amp; settings</a>.</p>{% endif %}
   </section>
 
   {% if needs_setup %}

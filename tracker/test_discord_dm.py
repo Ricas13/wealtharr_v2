@@ -111,19 +111,19 @@ class DiscordAdminAndSendingTests(TestCase):
     def test_admin_saves_bot_settings_encrypted_and_shows_setup_steps(self):
         page = self.client.get(reverse("control"))
         self.assertContains(page, "http://testserver/settings/discord/callback/")
-        self.assertContains(page, "Discord DMs not set up")
+        self.assertContains(page, "DMs not set up")
         self.client.post(reverse("control"), {
-            "smtp_port": "587", "discord_client_id": "1234567890", "discord_guild_id": "5550001",
-            "discord_client_secret": "client-secret-xyz", "discord_bot_token": "bot-token-xyz"})
+            "form_kind": "discord", "discord-discord_client_id": "1234567890", "discord-discord_guild_id": "5550001",
+            "discord-discord_client_secret": "client-secret-xyz", "discord-discord_bot_token": "bot-token-xyz"})
         cfg = SystemIntegration.current()
         self.assertEqual((cfg.discord_client_id, cfg.discord_guild_id), ("1234567890", "5550001"))
         self.assertNotIn("bot-token-xyz", cfg.discord_bot_token_ciphertext)
         page = self.client.get(reverse("control"))
-        self.assertContains(page, "Discord DMs set up")
+        self.assertContains(page, "DMs set up")
         self.assertContains(page, "scope=bot")
         self.assertNotContains(page, "bot-token-xyz")
         self.assertNotContains(page, "client-secret-xyz")
-        bad = self.client.post(reverse("control"), {"smtp_port": "587", "discord_guild_id": "my server"})
+        bad = self.client.post(reverse("control"), {"form_kind": "discord", "discord-discord_guild_id": "my server"})
         self.assertContains(bad, "Discord IDs are numbers only")
 
     def test_an_unconnected_account_gets_no_dm(self):

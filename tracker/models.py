@@ -300,6 +300,14 @@ class NotificationPreference(models.Model):
     # Or (and/or) the person's own Discord channel webhook; stored encrypted.
     discord_webhook_enabled = models.BooleanField(default=False)
     discord_webhook_ciphertext = models.TextField(blank=True)
+    # Set by "Connect Telegram": the chat the site's bot messages.
+    telegram_enabled = models.BooleanField(default=False)
+    telegram_chat_id = models.CharField(max_length=24, blank=True)
+    telegram_username = models.CharField(max_length=100, blank=True)
+    telegram_connected_at = models.DateTimeField(null=True, blank=True)
+    # One-time code while connecting, and when it stops working.
+    telegram_link_code = models.CharField(max_length=64, blank=True)
+    telegram_link_expires = models.DateTimeField(null=True, blank=True)
     monthly_reminders = models.BooleanField(default=True)
     # Owner-selected delay before a weekly outstanding-review reminder.
     followup_delay_days = models.PositiveSmallIntegerField(default=7)
@@ -345,6 +353,9 @@ class SystemIntegration(models.Model):
     discord_client_secret_ciphertext = models.TextField(blank=True)
     discord_bot_token_ciphertext = models.TextField(blank=True)
     discord_guild_id = models.CharField(max_length=24, blank=True)
+    # Telegram bot that messages each person who connected their Telegram.
+    telegram_bot_token_ciphertext = models.TextField(blank=True)
+    telegram_bot_username = models.CharField(max_length=64, blank=True)
 
     @classmethod
     def current(cls):
