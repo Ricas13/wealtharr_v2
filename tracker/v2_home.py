@@ -80,7 +80,31 @@ def _label(key, generic, real_names):
     return description.title if description else generic
 
 
-def compare(amount, monthly, frame, real_names=False):
+# Signed-out visitors can ask for any amount, and each new one is a fresh
+# replay of every Study. Cap how many fresh replays they can start per minute
+# (per web process) so the public page can't be used to tie up the server.
+PUBLIC_FRESH_PER_MINUTE = 30
+DEFAULT_INPUTS = (1000, 100, "10y")
+
+
+class Busy(Exception):
+    pass
+
+
+def _public_budget():
+    import time
+    window = int(time.time() // 60)
+    key = "home-compare-fresh:%d" % window
+    cache.add(key, 0, 120)
+    try:
+        used = cache.incr(key)
+    except ValueError:
+        used = 1
+    if used > PUBLIC_FRESH_PER_MINUTE:
+        raise Busy()
+
+
+def compare(amount, monthly, frame, real_names=False, public=False):
     """Chart-ready hypothetical comparison, cached until the next download."""
     latest = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
     key = "home-compare:%s:%s:%s:%s:%s" % (latest.isoformat() if latest else "none", amount, monthly, frame,
@@ -88,6 +112,8 @@ def compare(amount, monthly, frame, real_names=False):
     out = cache.get(key)
     if out is not None:
         return out
+    if public and (amount, monthly, frame) != DEFAULT_INPUTS:
+        _public_budget()
     out = {"ready": False, "amount": amount, "monthly": monthly, "range": frame,
            "range_words": FRAME_WORDS[frame], "limits": LIMITS}
     # The homepage compares the flagship strategy's Study against benchmarks.
@@ -182,7 +208,10 @@ def landing(request):
     if request.user.is_authenticated:
         return redirect(preferred_url(request.user))
     amount, monthly, frame = _inputs(request.GET)
-    initial = compare(amount, monthly, frame)
+    try:
+        initial = compare(amount, monthly, frame, public=True)
+    except Busy:
+        initial = compare(*DEFAULT_INPUTS)
     return render(request, "v2/home.html", {
         "compare": initial, "frames": FRAMES,
         "invite_state": request.GET.get("invite", ""),
@@ -193,7 +222,10 @@ def landing(request):
 
 @require_GET
 def compare_json(request):
-    return JsonResponse(compare(*_inputs(request.GET)))
+    try:
+        return JsonResponse(compare(*_inputs(request.GET), public=True))
+    except Busy:
+        return JsonResponse({"error": "Busy. Try again in a minute."}, status=429)
 
 
 @login_required

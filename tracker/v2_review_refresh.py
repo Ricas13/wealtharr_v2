@@ -7,7 +7,7 @@ recalculates the quarter from the corrected ledger.
 """
 from django.utils import timezone
 
-from .models import RebalanceExecution, SignalFill
+from .models import NotificationDelivery, RebalanceExecution, SignalFill
 
 
 def retire_stale_reviews(strategy, changed_on):
@@ -26,6 +26,16 @@ def retire_stale_reviews(strategy, changed_on):
             f"Superseded on {timezone.localdate():%d %b %Y}: the ledger changed "
             f"(entry dated {changed_on:%d %b %Y}). Recalculated on the next price run."
         )
+        # Its queued alerts carry advice that no longer holds: never retry them.
+        from .cockpit_notifications import review_tag
+        NotificationDelivery.objects.filter(
+            owner=strategy.owner, status__in=("PENDING", "FAILED", "SENDING"),
+            event_key__in=["quarterly-digest:%s:%s" % (strategy.pk, review_tag(signal))],
+        ).update(status="CANCELLED", next_retry_at=None, error="Review superseded")
+        NotificationDelivery.objects.filter(
+            owner=strategy.owner, status__in=("PENDING", "FAILED", "SENDING"),
+            event_key__startswith="rebalance-reminder:%s:%s:" % (strategy.pk, review_tag(signal)),
+        ).update(status="CANCELLED", next_retry_at=None, error="Review superseded")
         signal.signal_key = f"{signal.signal_key}:superseded:{signal.pk}"[:80]
         signal.save(update_fields=["review_outcome", "review_note", "signal_key"])
         retired += 1

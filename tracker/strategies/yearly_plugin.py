@@ -25,7 +25,7 @@ def yearly_review(instance, *, key, rules, cadence="yearly"):
 
     from django.utils import timezone
 
-    from tracker.market_data import TICKER, settlement_close, sync_ticker
+    from tracker.market_data import TICKER, period_close, sync_ticker
     from tracker.models import PriceMark, StrategySignal
     from tracker.services import replay
     from tracker.strategies.instruments import role_symbols
@@ -63,7 +63,7 @@ def yearly_review(instance, *, key, rules, cadence="yearly"):
     funds = tuple(rules.Fund(role, symbol, weights[role]) for role, symbol in roles.items() if role in weights)
     quotes = {}
     for fund in funds:
-        close = settlement_close(fund.symbol, as_of)
+        close = period_close(fund.symbol, as_of)
         if close and close.currency == instance.account.currency:
             quotes[fund.symbol] = rules.Quote(fund.symbol, Decimal(close.price), close.as_of)
     result = rules.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes, as_of=as_of)

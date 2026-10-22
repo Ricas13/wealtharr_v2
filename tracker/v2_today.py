@@ -75,12 +75,16 @@ def _opening_buys(strategy, cash):
     when it can't be computed there is no opening card rather than a guess.
     """
     from .core.catalogue import rows_for
-    from .models import MarketObservation
+    from .models import MarketObservation, YahooSync
+    from .strategies.instruments import role_symbols
     from .strategies.registry import module_for
     lines = rows_for(strategy.strategy_key or strategy.preset.slug,
                      strategy.account.broker, strategy.account.kind)
+    # The instance's own pinned funds, not whatever the catalogue lists today.
+    pinned = role_symbols(strategy)
+    symbol = {line.role: pinned.get(line.role, line.ticker) for line in lines}
     plugin = module_for(strategy)
-    weights = {line.ticker: line.weight for line in lines}
+    weights = {symbol[line.role]: line.weight for line in lines}
     if plugin and plugin.current_weights:
         weights = plugin.current_weights(strategy)
         if weights is None:
@@ -88,15 +92,17 @@ def _opening_buys(strategy, cash):
     fresh_after = timezone.localdate() - timedelta(days=8)
     rows = []
     for line in lines:
-        weight = weights.get(line.ticker, Decimal("0"))
+        ticker = symbol[line.role]
+        weight = weights.get(ticker, Decimal("0"))
         if not weight:
             continue
         amount = (cash * weight).quantize(Decimal("0.01"))
-        quote = MarketObservation.objects.filter(
-            symbol=line.ticker, currency=strategy.account.currency, as_of__gte=fresh_after,
+        held = YahooSync.objects.filter(symbol=ticker, last_error__startswith="PRICE_HOLD").exists()
+        quote = None if held else MarketObservation.objects.filter(
+            symbol=ticker, currency=strategy.account.currency, as_of__gte=fresh_after,
         ).order_by("-as_of").first()
         rows.append({
-            "symbol": line.ticker, "role": line.role_label, "pct": weight * 100,
+            "symbol": ticker, "role": line.role_label, "pct": weight * 100,
             "amount": amount, "price": quote.price if quote else None,
             "shares": (amount / quote.price).quantize(Decimal("0.01")) if quote else None,
         })

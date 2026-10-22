@@ -23,7 +23,7 @@ SITE_UPDATED = date(2026, 10, 21)
 
 
 def site_url(request=None):
-    """The one public origin, e.g. https://wealtharr.com (no trailing slash)."""
+    """The one public origin, e.g. https://www.example.com (no trailing slash)."""
     if settings.SITE_URL:
         return settings.SITE_URL
     return request.build_absolute_uri("/").rstrip("/") if request else ""
