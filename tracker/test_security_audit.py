@@ -93,6 +93,22 @@ class PeriodCloseTests(TestCase):
         MarketObservation.objects.create(symbol="ABC.L", as_of=date(2024, 4, 2), price=D("12"), currency="GBP")
         self.assertEqual(period_close("ABC.L", end).price, D("10"))
 
+    def test_a_missing_close_on_a_trading_day_is_a_gap_not_a_holiday(self):
+        from datetime import date
+        from decimal import Decimal as D
+        from tracker.market_data import period_close
+        from tracker.models import MarketObservation
+        end = date(2026, 9, 30)
+        for day, price in ((date(2026, 9, 29), "100"), (date(2026, 10, 1), "108")):
+            MarketObservation.objects.create(symbol="ABC.L", as_of=day, price=D(price), currency="GBP")
+        # Another London line traded on the 30th, so ABC.L's close is missing data.
+        MarketObservation.objects.create(symbol="XYZ.L", as_of=end, price=D("5"), currency="GBP")
+        self.assertIsNone(period_close("ABC.L", end))
+        # A US line trading that day says nothing about London.
+        MarketObservation.objects.filter(symbol="XYZ.L").delete()
+        MarketObservation.objects.create(symbol="SPY", as_of=end, price=D("500"), currency="USD")
+        self.assertEqual(period_close("ABC.L", end).price, D("100"))
+
 
 class ResetEvidenceCurrencyTests(TestCase):
     def test_dollar_and_euro_resets_find_their_own_currency_closes(self):

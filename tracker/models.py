@@ -489,6 +489,10 @@ class StrategySignal(models.Model):
         ],
     )
     review_note = models.TextField(blank=True, default="")
+    # Proposed trades the owner accepted as done with a different amount than
+    # suggested: {"<action index>": {"recorded": "9.5", "at": iso, "by": user id, "note": ...}}.
+    # Kept with the review so the deviation stays on record.
+    accepted_actions = models.JSONField(default=dict, blank=True)
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "signal_key"], name="unique_strategy_signal")]
         ordering = ["-created_at"]

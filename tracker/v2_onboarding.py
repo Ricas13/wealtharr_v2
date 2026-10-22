@@ -88,7 +88,7 @@ def _draft_start(post, state):
         "cash": post.get("cash", "").strip()[:20],
         "holdings": {
             line.role: {"shares": post.get("shares_" + line.role, "").strip()[:30],
-                        "average_cost_gbp": post.get("cost_" + line.role, "").strip()[:30]}
+                        "start_price": post.get("cost_" + line.role, "").strip()[:30]}
             for line in rows_for(state["strategy"], state["platform"], state["type"])
         },
     }
@@ -126,7 +126,9 @@ def _validated_start(post, state):
                 "ticker": line.ticker,
                 "isin": line.isin,
                 "shares": str(shares),
-                "average_cost_gbp": str(cost),
+                # That day's market price, not what was originally paid: returns
+                # are measured from the start date, never from older purchases.
+                "start_price": str(cost),
             }
         if not any_holding and cash == 0:
             raise ValidationError("Enter some existing shares or an actual cash balance.")
@@ -203,7 +205,7 @@ def _enroll(owner, state):
             buys = []
             for role, holding in state["holdings"].items():
                 shares = Decimal(holding["shares"])
-                price = Decimal(holding["average_cost_gbp"])
+                price = Decimal(holding.get("start_price", holding.get("average_cost_gbp")))
                 if shares > 0:
                     buys.append(LedgerEntry(
                         kind=LedgerEntry.BUY, symbol=instruments[role].ticker,
@@ -281,7 +283,7 @@ def wizard(request):
     hold_rows = [
         {"line": line,
          "shares": state["holdings"].get(line.role, {}).get("shares", ""),
-         "cost": state["holdings"].get(line.role, {}).get("average_cost_gbp", "")}
+         "cost": state["holdings"].get(line.role, {}).get("start_price", "")}
         for line in lines
     ]
     from .v2_home import FRAMES, compare

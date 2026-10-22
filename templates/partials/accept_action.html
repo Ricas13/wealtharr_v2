@@ -1,0 +1,12 @@
+<details class="w2-accept-action">
+  <summary class="w2-muted">{% if action.recorded %}Bought or sold a different amount? Mark this trade done{% else %}Didn't make this trade? Mark it done without it{% endif %}</summary>
+  <form method="post" action="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=review_signal.pk %}" class="w2-row w2-space-top">
+    {% csrf_token %}
+    <input type="hidden" name="intent" value="accept_action">
+    <input type="hidden" name="action_index" value="{{ action.index }}">
+    <label class="w2-sr-only" for="w2-accept-note-{{ action.index }}">Why it differs (optional)</label>
+    <input id="w2-accept-note-{{ action.index }}" class="w2-input" name="note" maxlength="500" placeholder="Why it differs (optional)">
+    <button type="submit" class="w2-button">Done with {{ action.recorded|floatformat:-4 }} of {{ action.suggested|floatformat:-4 }} shares</button>
+  </form>
+  <p class="w2-note">Fills within 2% of the suggestion count as done automatically. This keeps your actual trades as recorded and notes the difference on the review; the next review starts from what you really hold.</p>
+</details>

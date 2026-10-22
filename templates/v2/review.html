@@ -34,7 +34,7 @@
             <td>{{ action.symbol }}</td>
             <td class="w2-r">{{ action.suggested|floatformat:-4 }}</td>
             <td class="w2-r">{{ action.recorded|floatformat:-4 }}</td>
-            <td class="w2-r">{% if action.complete %}<span class="w2-chip w2-ok">Done</span>{% else %}{{ action.remaining|floatformat:-4 }}{% endif %}</td>
+            <td class="w2-r">{% if action.accepted %}<span class="w2-chip w2-ok" title="You marked this done with {{ action.recorded|floatformat:-4 }} shares">Done as recorded</span>{% elif action.complete %}<span class="w2-chip w2-ok">Done</span>{% else %}{{ action.remaining|floatformat:-4 }}{% endif %}</td>
             {% if review_can_submit %}
               {% if not action.complete %}
               <td colspan="5">
@@ -44,12 +44,13 @@
                   <input type="hidden" name="action_index" value="{{ action.index }}">
                   <input type="hidden" name="idempotency_key" value="{{ review_nonce }}">
                   <input class="w2-input w2-fill-input" style="width:120px" type="date" name="executed_on" max="{% now 'Y-m-d' %}" required aria-label="Date done">
-                  <input class="w2-input w2-fill-input" type="number" name="quantity" step="0.00000001" min="0.00000001" max="{{ action.remaining }}" value="{{ action.remaining }}" required aria-label="Shares got">
+                  <input class="w2-input w2-fill-input" type="number" name="quantity" step="0.00000001" min="0.00000001" max="{{ action.max_more }}" value="{{ action.remaining }}" required aria-label="Shares got">
                   <input class="w2-input w2-fill-input" type="number" name="unit_price" step="0.00000001" min="0.00000001" required aria-label="Price per share in pounds">
                   <input class="w2-input w2-fill-input" style="width:64px" type="number" name="fee" step="0.01" min="0" value="0" required aria-label="Fee in pounds">
                   <label class="w2-check" style="white-space:nowrap;font-size:11px"><input type="checkbox" name="actual_confirmation" value="yes" required> Done in {{ selected_instance.account.broker_label }}</label>
                   <button type="submit" class="w2-button w2-button-primary">I did this</button>
                 </form>
+                {% include "partials/accept_action.html" %}
               </td>
               {% else %}<td colspan="5"></td>{% endif %}
             {% endif %}

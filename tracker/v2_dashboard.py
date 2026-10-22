@@ -12,7 +12,6 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from .core.metrics import VerifiedValuation, evaluate_inception
 from .models import MarketObservation, NotificationDelivery, NotificationPreference
 from .v2_ledger_core import effective_entries, replay
 
@@ -259,25 +258,21 @@ def day_change(points):
     return change.quantize(PENNY), pct
 
 
-def xirr_pct(strategy, points):
-    """Money-weighted annual return using the latest recorded value as the close."""
-    if not points:
+def xirr_pct(strategy, points=None):
+    """Money-weighted annual return, only from History's source-checked valuation.
+
+    Every page shows the same figure: the Performance page's inception XIRR,
+    which needs a certified close for the latest value (not just a saved
+    snapshot). ``points`` is unused and kept for older callers.
+    """
+    from .v2_history import build_history
+    report = build_history(strategy)
+    latest, flows = report["latest_certified"], report["flows"]
+    if report.get("xirr_pct") is None or latest is None or not flows:
         return None
-    day, value, _ = points[-1]
-    flows = []
-    from .core.metrics import ExternalFlow
-    for i, entry in enumerate(e for e in effective_entries(strategy)
-                              if e.occurred_on <= day and e.kind in ("DEPOSIT", "WITHDRAW")):
-        flows.append(ExternalFlow(
-            event_id="entry:%s:v%s" % (entry.pk, entry.version), occurred_on=entry.occurred_on,
-            amount_gbp=entry.amount if entry.kind == "DEPOSIT" else -entry.amount, sequence=i))
-    if not flows or (day - flows[0].occurred_on).days < 30:
+    if (latest.as_of - min(f.occurred_on for f in flows)).days < 30:
         return None
-    result = evaluate_inception(tuple(flows), VerifiedValuation(
-        day, value, ("recorded-value:%s:%s" % (strategy.pk, day.isoformat()),), True))
-    if result.xirr_annual is None:
-        return None
-    return (result.xirr_annual * HUNDRED).quantize(Decimal("0.1"))
+    return report["xirr_pct"].quantize(Decimal("0.1"))
 
 
 def best_worst(monthly):
