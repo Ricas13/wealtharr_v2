@@ -5,7 +5,7 @@ class Migration(migrations.Migration):
     """Discord alerts become private DMs from a bot; the channel webhook is retired."""
 
     dependencies = [
-        ("tracker", "0026_more_account_types"),
+        ("tracker", "0027_price_revision"),
     ]
 
     operations = [

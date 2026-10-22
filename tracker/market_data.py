@@ -80,11 +80,12 @@ def fetch_chart(symbol, since):
         raise ValueError("Unsupported Yahoo quote currency")
     divisor = Decimal(100) if raw_currency in ("GBp", "GBX") else Decimal(1)
     closes = ((chart.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
+    open_from = _unfinished_session_start(chart.get("meta") or {})
     series = []
     raw_closes = {}
     for epoch, raw in zip(chart.get("timestamp") or [], closes):
-        if raw is None:
-            continue
+        if raw is None or epoch >= open_from:
+            continue  # no price yet, or today's session hasn't closed: not a close
         try:
             raw_amount = Decimal(str(raw)).quantize(Decimal("0.00000001"))
             amount = (raw_amount / divisor).quantize(Decimal("0.00000001"))
@@ -98,6 +99,28 @@ def fetch_chart(symbol, since):
     if not series:
         raise ValueError("No usable Yahoo daily closes")
     return FetchedChart(currency, series, raw_currency, raw_closes)
+
+
+# Wait this long after the regular session ends before taking its bar as the
+# close (closing auctions and Yahoo's own settling).
+CLOSE_SETTLE = 30 * 60
+
+
+def _unfinished_session_start(meta):
+    """Epoch from which Yahoo's daily bars are still live prices, not closes.
+
+    During a session Yahoo's daily bar for today is the current price, which
+    then changes at the close. Storing it would later look like a revised
+    historical close and hold the line. Without session times, today's bar
+    (UTC date) is left out to be safe.
+    """
+    regular = (meta.get("currentTradingPeriod") or {}).get("regular") or {}
+    start, end = regular.get("start"), regular.get("end")
+    now = timezone.now().timestamp()
+    if isinstance(start, (int, float)) and isinstance(end, (int, float)):
+        return start if now < end + CLOSE_SETTLE else float("inf")
+    today = datetime.now(utc_timezone.utc).date()
+    return datetime.combine(today, datetime.min.time(), utc_timezone.utc).timestamp()
 
 
 # Yahoo's daily GBP/USD close (US dollars per pound) converts USD-quoted
@@ -171,8 +194,17 @@ def sync_ticker(symbol, *, force=False):
         previous_values = dict(MarketObservation.objects.filter(
             symbol=symbol, as_of__in=[day for day, _ in series]
         ).values_list("as_of", "price"))
-        if any(previous_values[day] != price for day, price in series
-               if day in previous_values):
+        revised = [(day, price) for day, price in series
+                   if day in previous_values and previous_values[day] != price]
+        if revised:
+            # Kept for the site owner to review on the Admin page.
+            from .models import PriceRevision
+            raw_series = getattr(fetched, "raw_closes", {})
+            for day, price in revised:
+                PriceRevision.objects.get_or_create(
+                    symbol=symbol, as_of=day, yahoo_price=price, accepted_at=None,
+                    defaults={"stored_price": previous_values[day], "currency": currency,
+                              "yahoo_raw_close": raw_series.get(day)})
             state.last_error = "PRICE_HOLD:REVISED_HISTORICAL_CLOSE"
             state.save(update_fields=["last_error"])
             LOG.warning("Market price revision on hold for %s", symbol)

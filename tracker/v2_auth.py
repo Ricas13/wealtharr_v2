@@ -93,7 +93,7 @@ def control(request):
     """Owner admin page, inside the normal app shell (staff only)."""
     from .forms import IntegrationForm
     from .discord_dm import bot_invite_url, configured as discord_ready, redirect_uri
-    from .models import (InviteRequest, NotificationPreference, NotificationSchedulerRun,
+    from .models import (InviteRequest, NotificationPreference, NotificationSchedulerRun, PriceRevision,
                          SystemIntegration, YahooSync)
     from .v2_views import _render
     cfg = SystemIntegration.current()
@@ -115,7 +115,38 @@ def control(request):
         scheduler_run=NotificationSchedulerRun.objects.order_by("-started_at", "-pk").first(),
         invite_count=InviteRequest.objects.count(),
         price_problems=YahooSync.objects.exclude(last_error="").order_by("symbol"),
+        price_revisions=PriceRevision.objects.filter(accepted_at__isnull=True),
     )
+
+
+@staff_member_required
+@require_POST
+def accept_price_revision(request, symbol):
+    """Accept Yahoo's close for every pending revision of one ticker and release its hold."""
+    from django.db import transaction
+    from django.utils import timezone
+    from .models import MarketObservation, PriceRevision, YahooSync
+    with transaction.atomic():
+        pending = list(PriceRevision.objects.select_for_update().filter(symbol=symbol, accepted_at__isnull=True))
+        if not pending:
+            messages.error(request, "Nothing is waiting for %s." % symbol)
+            return redirect("control")
+        for revision in pending:
+            observation = MarketObservation.objects.select_for_update().filter(
+                symbol=symbol, as_of=revision.as_of).first()
+            if observation is not None and observation.price == revision.stored_price:
+                observation.price = revision.yahoo_price
+                if observation.raw_unit_verified:
+                    factor = 100 if observation.raw_quote_unit in ("GBp", "GBX") else 1
+                    observation.raw_close = revision.yahoo_raw_close or revision.yahoo_price * factor
+                observation.save(update_fields=["price", "raw_close"])
+            revision.accepted_at, revision.accepted_by = timezone.now(), request.user
+            revision.save(update_fields=["accepted_at", "accepted_by"])
+        # Check again on the next hourly run with the corrected history.
+        YahooSync.objects.filter(symbol=symbol, last_error="PRICE_HOLD:REVISED_HISTORICAL_CLOSE").update(
+            last_error="", last_attempt=None)
+    messages.success(request, "Accepted Yahoo's close for %s. Prices refresh on the next hourly check." % symbol)
+    return redirect("control")
 
 
 @require_GET
