@@ -88,7 +88,7 @@ def _cash_evidence(strategy, state, day, entries):
     )
 
 
-def _invested_evidence(strategy, state, day, entries, snapshot_value):
+def _invested_evidence(strategy, state, day, entries, snapshot_value, *, evidence=None):
     """Source-checked exact-date GBP quote proof, not broker eligibility proof.
 
     The original Yahoo raw unit and price must have been captured by sync_ticker
@@ -107,7 +107,8 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
     }
     # USD-quoted lines: the raw close divided by that day's GBP/USD close.
     from .market_data import fx_rates, usd_holding_symbols, usd_to_gbp
-    rate = fx_rates([day]).get(day)
+    rate = (evidence["rates"].get(day) if evidence is not None
+            else fx_rates([day]).get(day))
     if currency == "GBP":
         expected.update({s: ("USD", None) for s in funds if s in usd_holding_symbols() and rate})
     if not expected or len(expected) != len(funds) or not state["positions"]:
@@ -117,13 +118,15 @@ def _invested_evidence(strategy, state, day, entries, snapshot_value):
     for symbol, qty in state["positions"].items():
         if qty <= ZERO or symbol not in expected:
             return None
-        if YahooSync.objects.filter(
-                symbol=symbol, last_error__startswith="PRICE_HOLD:").exists():
+        if (symbol in evidence["held"] if evidence is not None else
+                YahooSync.objects.filter(
+                    symbol=symbol, last_error__startswith="PRICE_HOLD:").exists()):
             return None
-        obs = MarketObservation.objects.filter(
-            symbol=symbol, as_of=day, currency=currency,
-            source="yahoo", raw_unit_verified=True,
-        ).first()
+        obs = (evidence["observations"].get((symbol, day)) if evidence is not None
+               else MarketObservation.objects.filter(
+                   symbol=symbol, as_of=day, currency=currency,
+                   source="yahoo", raw_unit_verified=True,
+               ).first())
         if obs is None or not isinstance(obs.raw_close, Decimal) or obs.raw_close <= ZERO:
             return None
         allowed = expected[symbol]
@@ -165,8 +168,29 @@ def _flow_rows(entries, until):
 
 def _records(strategy, entries):
     """Never back-fill absent quotes; classify saved data instead of trusting it."""
+    # Bulk-load the exact same evidence used by the previous per-day checks.
+    # Historic charts can have thousands of snapshots; querying one mark and
+    # one FX row per snapshot was a costly N+1 pattern on Overview and History.
+    from .market_data import fx_rates, usd_holding_symbols
+    snapshots = list(strategy.value_snapshots.order_by("as_of", "pk"))
+    days = [row.as_of for row in snapshots if row.as_of <= timezone.localdate()]
+    held_symbols = set(fund_symbols(strategy))
+    evidence = {
+        "observations": {
+            (obs.symbol, obs.as_of): obs for obs in MarketObservation.objects.filter(
+                symbol__in=held_symbols, as_of__in=days,
+                currency=strategy.account.currency,
+                source="yahoo", raw_unit_verified=True,
+            )
+        } if days and held_symbols else {},
+        "held": set(YahooSync.objects.filter(
+            symbol__in=held_symbols, last_error__startswith="PRICE_HOLD:",
+        ).values_list("symbol", flat=True)) if held_symbols else set(),
+        "rates": (fx_rates(days) if strategy.account.currency == "GBP"
+                  and held_symbols.intersection(usd_holding_symbols()) and days else {}),
+    }
     points = []
-    for record in strategy.value_snapshots.order_by("as_of", "pk"):
+    for record in snapshots:
         if record.as_of > timezone.localdate():
             continue
         try:
@@ -186,7 +210,8 @@ def _records(strategy, entries):
                 accepted = None
             if not accepted:
                 accepted = _invested_evidence(
-                    strategy, state, record.as_of, entries, record.total_value
+                    strategy, state, record.as_of, entries, record.total_value,
+                    evidence=evidence,
                 )
             reason = (
                 "Reproduced from actual GBP cash ledger (no positions)."
