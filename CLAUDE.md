@@ -21,8 +21,8 @@ Wealtharr is a private **tracking and notification** application. No broker conn
 
 ## Working workflow
 
-- Continue the **existing** `feature/owner-9sig-cockpit-resumable` branch and PR #11 unless user explicitly changes it; no parallel replacement branch. Read `docs/RESUME.md` for current checkpoints and update it on implementation progress.
-- Follow the user's lettered sections in order and **stop after the requested section**. A is design/docs; B added the verified-issuer / pending-ISA-access code catalogue, not the full new architecture. Read `docs/RESUME.md` for the current section and do not silently implement later sections.
+- Work from the latest protected `main` on a focused feature or fix branch. Open one reviewable PR per independent change. Recheck CI, migration order and conflicts after upstream merges; never reuse a historical PR #11 branch. Read `docs/RESUME.md` for current handoff and archive links.
+- Preserve all shipped owner records, immutable strategies and quote-evidence gates. Deliver requested engineering fixes completely with tests, but do not add SaaS, brokers, billing or new investment strategies unless the owner explicitly requests them.
 - For each change: add tests (pure unit/parity, Django financial invariants, owner permissions; Playwright for critical page flows), run CI, and preserve old safety behaviour until replacements are proven. Refuse to label workbook parity, mapping verification, broker eligibility or deployment complete without evidence.
 - Git history is disposable as far as **unreleased test data/migrations** are concerned, not financial-safety invariants. Never wipe a live database without explicit separate authorisation and backup.
 - Before moving to a next section, describe misinterpretation risks, unverifiable assumptions and what to compare side-by-side with the spreadsheet.
