@@ -63,15 +63,37 @@ class PriceRevisionTests(TestCase):
                                                           is_staff=True, is_superuser=True)
 
     def hold(self):
-        with patch("tracker.market_data.fetch_chart", return_value=("USD", [(self.day, D("770.10"))])):
+        # More than 10% away (like a split): held for the site owner.
+        with patch("tracker.market_data.fetch_chart", return_value=("USD", [(self.day, D("386.42"))])):
             self.assertIsNone(sync_ticker("SPY", force=True))
+
+    def test_a_small_correction_is_accepted_automatically_and_logged(self):
+        with patch("tracker.market_data.fetch_chart", return_value=("USD", [(self.day, D("773.09"))])):
+            self.assertIsNotNone(sync_ticker("SPY", force=True))
+        self.assertEqual(MarketObservation.objects.get(symbol="SPY").price, D("773.09"))
+        self.assertEqual(MarketObservation.objects.get(symbol="SPY").raw_close, D("773.09"))
+        self.assertEqual(YahooSync.objects.get(symbol="SPY").last_error, "")
+        revision = PriceRevision.objects.get()
+        self.assertEqual((revision.stored_price, revision.yahoo_price), (D("772.84"), D("773.09")))
+        self.assertIsNotNone(revision.accepted_at)
+        self.assertIsNone(revision.accepted_by)  # automatic
+        self.client.force_login(self.staff)
+        self.assertNotContains(self.client.get(reverse("control")), "Price corrections waiting for you")
+
+    def test_a_correction_already_waiting_is_accepted_on_the_next_check(self):
+        PriceRevision.objects.create(symbol="SPY", as_of=self.day, currency="USD",
+                                     stored_price=D("772.84"), yahoo_price=D("773.09"))
+        with patch("tracker.market_data.fetch_chart", return_value=("USD", [(self.day, D("773.09"))])):
+            sync_ticker("SPY", force=True)
+        self.assertFalse(PriceRevision.objects.filter(accepted_at__isnull=True).exists())
+        self.assertEqual(MarketObservation.objects.get(symbol="SPY").price, D("773.09"))
 
     def test_a_changed_close_holds_the_line_and_is_listed_for_review(self):
         self.hold()
         self.hold()  # the hourly re-check doesn't duplicate it
         self.assertEqual(YahooSync.objects.get(symbol="SPY").last_error, "PRICE_HOLD:REVISED_HISTORICAL_CLOSE")
         revision = PriceRevision.objects.get()
-        self.assertEqual((revision.stored_price, revision.yahoo_price), (D("772.84"), D("770.10")))
+        self.assertEqual((revision.stored_price, revision.yahoo_price), (D("772.84"), D("386.42")))
         self.assertEqual(MarketObservation.objects.get(symbol="SPY").price, D("772.84"))
         self.client.force_login(self.staff)
         page = self.client.get(reverse("control"))
@@ -84,7 +106,7 @@ class PriceRevisionTests(TestCase):
         response = self.client.post(reverse("accept_price_revision", args=["SPY"]))
         self.assertRedirects(response, reverse("control"))
         observation = MarketObservation.objects.get(symbol="SPY")
-        self.assertEqual((observation.price, observation.raw_close), (D("770.10"), D("770.10")))
+        self.assertEqual((observation.price, observation.raw_close), (D("386.42"), D("386.42")))
         revision = PriceRevision.objects.get()
         self.assertEqual(revision.accepted_by, self.staff)
         self.assertEqual(revision.stored_price, D("772.84"))  # the old value stays on record
