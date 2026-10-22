@@ -30,7 +30,7 @@
 {{ study_zoom_data|json_script:"study-zoom-data" }}
 <div class="w2-study-zoom" data-study-zoom data-study-window-url="{% url 'v2_study_window_json' instance_id=instance.pk %}"
      data-study-amount="{{ study_amount }}" data-study-monthly="{{ study_monthly }}"
-     data-study-range="{{ study_range }}" data-study-fill="{{ study_fill }}" data-study-currency="{{ cur }}"
+     data-study-range="{{ study_range }}" data-study-fill="{{ study_fill }}" data-study-scale="{{ study_scale }}" data-study-currency="{{ cur }}"
      data-study-primary="{{ study_zoom_data.primary }}">
 {% with s=study_main %}
 <section class="w2-kpis w2-space-top" aria-label="{{ study_title }} result">
