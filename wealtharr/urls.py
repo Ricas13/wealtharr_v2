@@ -23,6 +23,7 @@ urlpatterns = [
     path("settings/password/", v2_auth.change_password, name="change_password"),
 
     path("control/", v2_auth.control, name="control"),
+    path("control/prices/<str:symbol>/accept/", v2_auth.accept_price_revision, name="accept_price_revision"),
     path("django-admin/login/",
          RedirectView.as_view(pattern_name="login", permanent=False),
          name="private_admin_login"),

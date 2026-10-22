@@ -416,6 +416,28 @@ class NotificationSchedulerRun(models.Model):
         ordering = ["-started_at", "-pk"]
 
 
+class PriceRevision(models.Model):
+    """A stored close that Yahoo now reports differently (append-only log).
+
+    Created when the hourly check finds the difference (the line is held).
+    The site owner accepts Yahoo's value on the Admin page, which corrects
+    the observation and records who accepted it and when.
+    """
+    symbol = models.CharField(max_length=24)
+    as_of = models.DateField()
+    currency = models.CharField(max_length=3)
+    stored_price = models.DecimalField(max_digits=22, decimal_places=8)
+    yahoo_price = models.DecimalField(max_digits=22, decimal_places=8)
+    yahoo_raw_close = models.DecimalField(max_digits=22, decimal_places=8, null=True, blank=True)
+    detected_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        ordering = ["symbol", "as_of", "pk"]
+
+
 class YahooSync(models.Model):
     symbol = models.CharField(max_length=24, unique=True)
     last_attempt = models.DateTimeField(null=True, blank=True)

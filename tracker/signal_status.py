@@ -43,9 +43,11 @@ def _price_status(strategy, report):
     funds = symbols(strategy)
     references = plugin.reference_symbols if plugin else ()
     required_symbols = funds + tuple(references(strategy) if callable(references) else references)
-    if YahooSync.objects.filter(symbol__in=required_symbols,
-                                last_error__startswith='PRICE_HOLD:').exists():
-        return False, 'A required market price is on hold for verification. No trade instruction is available.', []
+    on_hold = sorted(YahooSync.objects.filter(symbol__in=required_symbols, last_error__startswith='PRICE_HOLD:')
+                     .values_list('symbol', flat=True))
+    if on_hold:
+        return False, ('%s price is on hold for checking, so no trade instruction is available. '
+                       'The site owner can review it on the Admin page.' % ', '.join(on_hold)), []
     if any(q < ZERO for q in report['positions'].values()):
         return False, 'A holding is negative. Reconcile the ledger before trading.', []
     if report['cash'] < ZERO:

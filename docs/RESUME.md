@@ -1,3 +1,9 @@
+## Fix: prices frozen on hold after a mid-session check (22 October 2026)
+
+Branch `fix/price-hold` from main (after PR #49). Owner saw "Cannot compute a reliable instruction" a day after everything worked. Cause: `market_data.fetch_chart` kept Yahoo's bar for a session still trading (SPY/TQQQ fetched at 19:41 UTC on 21 Oct, before the US close), stored as that day's close. The next run saw the real close, flagged `PRICE_HOLD:REVISED_HISTORICAL_CLOSE`, and the hold then rejected every later batch, so prices froze. Fix: (1) a bar whose regular session (Yahoo `currentTradingPeriod`) hasn't ended plus 30 minutes is never stored; without session times, today's UTC bar is left out. (2) New append-only `PriceRevision` (migration 0027) records stored vs Yahoo close when a difference is found; the Admin page lists them under "Price corrections waiting for you" with an **Accept Yahoo's close** button (staff only) that corrects the observation, records who accepted and when, and releases the hold. The Today card now names the held ticker. Tests: `tracker/test_price_revisions.py`. PR #50 (Discord DMs) renumbers its migration to 0028 to follow this one.
+
+---
+
 ## Add strategy layout (21 October 2026)
 
 Branch `feature/add-strategy-layout` from main (after PR #48). Owner asked for the decisions first and the backtest last, with the narrow decisions side by side. The page now shows three cards in a row (1 · Strategy and account, 2 · The funds you'll buy, 3 · Your starting point; two columns under 1200px, stacked under 760px), then one action bar (Go live now + Create strategy), then "How each strategy did in the past". Funds are compact cards instead of a wide table. Form fields, names and behaviour are unchanged.
