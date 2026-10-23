@@ -139,6 +139,27 @@ class StrategyGoLive(models.Model):
         return f"{self.strategy} live since {self.confirmed_at:%Y-%m-%d}"
 
 
+
+class NasdaqTrendState(models.Model):
+    """Persisted progress for 3× Nasdaq Trend + DCA, one state per instance.
+
+    No inferred fills: reserve is tied to a real, recorded exit or actual
+    opening cash and completed_instalments counts reconciled actual buys.
+    """
+    strategy = models.OneToOneField(
+        StrategyInstance, on_delete=models.PROTECT, related_name="nasdaq_trend_state")
+    last_as_of = models.DateField(null=True, blank=True)
+    regime = models.CharField(max_length=8, default="UNKNOWN")
+    guard = models.CharField(max_length=16, default="NONE")
+    off_since = models.DateField(null=True, blank=True)
+    last_target = models.CharField(max_length=16, blank=True, default="")
+    reserve = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
+    reserve_source = models.CharField(max_length=32, blank=True, default="")
+    completed_instalments = models.PositiveSmallIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+
 class InstanceOpeningSnapshot(models.Model):
     # Retired: no longer read or written. Kept so existing rows aren't dropped.
     """Owner-reported initial positions; NOT verified trades or prices.
