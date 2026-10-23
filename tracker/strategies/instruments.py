@@ -5,6 +5,7 @@ their two legacy columns (growth = equity_symbol, safe = safe_symbol).
 """
 ROLE_LABELS = {
     "growth": "Growth", "safe": "Safe",
+    "leveraged": "3× Nasdaq", "unleveraged": "Nasdaq-100",
     "stocks": "Equities", "long": "Long bonds", "inter": "Intermediate bonds",
     "gold": "Gold", "comm": "Commodities", "bonds": "Bonds", "cash": "Cash",
     "scv": "Small-cap value", "short": "Short bonds",
