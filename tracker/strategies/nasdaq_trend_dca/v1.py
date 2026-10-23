@@ -108,6 +108,16 @@ def decide(
         return refuse("Confirmed instalment count must be an integer.")
     if not 0 <= filled_dca_installments <= DCA_INSTALMENTS:
         return refuse("Confirmed instalments must be between zero and twelve.")
+    if previous.regime not in ("UNKNOWN", "ON", "OFF") or previous.guard not in (
+        "NONE", "UNLEVERAGED", "CASH"
+    ):
+        return refuse("Unknown persisted SPY regime or safeguard state.")
+    if previous.regime == "OFF" and previous.off_since is None:
+        return refuse("Persisted exit state has no DCA start date.")
+    if previous.regime != "OFF" and previous.off_since is not None:
+        return refuse("An active/unknown regime cannot retain an old DCA start date.")
+    if previous.regime != "ON" and previous.guard != "NONE":
+        return refuse("A safeguard may be latched only in the active SPY regime.")
     if len(history) < LOOKBACK:
         return refuse("A complete 200-session SPY and QQQ history is required.")
     window = history[-LOOKBACK:]
