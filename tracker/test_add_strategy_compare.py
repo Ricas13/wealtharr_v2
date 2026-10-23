@@ -31,6 +31,8 @@ class AddStrategyCompareTests(TestCase):
         self.assertContains(page, "9Sig")
         self.assertContains(page, "All Seasons")
         self.assertContains(page, "3x Nasdaq Trend + DCA")
+        # Verify the table row, not merely the strategy option or embedded JSON.
+        self.assertContains(page, 'data-key="nasdaq-trend-dca"')
         self.assertContains(page, "Hypothetical, not anyone")
         # The three setup choices come first, side by side; the comparison sits below them.
         body = page.content.decode()
