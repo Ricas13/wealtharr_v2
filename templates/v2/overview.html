@@ -28,7 +28,7 @@
     <section class="w2-card w2-span2">
       <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='list' %} Your strategy accounts</h2><span class="w2-muted">Each tracked separately</span></div>
       <div class="w2-table-wrap"><table class="w2-table">
-        <thead><tr><th>Strategy</th><th>Account</th><th>Status</th><th class="w2-r">Value</th><th class="w2-r">Net deposits</th><th class="w2-r">Gain</th><th class="w2-r">Annualised</th><th>Next action</th></tr></thead>
+        <thead><tr><th>Strategy</th><th>Account</th><th>Status</th><th class="w2-r">Value</th><th class="w2-r">Net deposits</th><th class="w2-r">Gain</th><th class="w2-r">Annualised</th><th>Price data</th><th>Next action</th></tr></thead>
         <tbody>{% for row in overview_rows %}
           <tr><td><span class="w2-dotsw" style="background:{{ row.strategy|strategy_colour }}"></span><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='today' %}">{{ row.strategy.name }}</a></td>
             <td>{{ row.strategy.account.kind }} · {{ row.strategy.account.broker_label }}</td>
@@ -37,8 +37,9 @@
             <td class="w2-r">{% if row.contributed is not None %}{{ row.contributed|floatformat:"2g" }}{% else %}—{% endif %}</td>
             <td class="w2-r {{ row.gain|tone }}">{% if row.gain is not None %}{{ row.gain|signed_num }}{% else %}—{% endif %}</td>
             <td class="w2-r">{% if row.xirr is not None %}{{ row.xirr|signed_pct }}{% else %}—{% endif %}</td>
+            <td><span class="w2-chip {% if row.price_health.state == 'ok' %}w2-ok{% elif row.price_health.state != 'off' %}w2-wait{% endif %}" title="{{ row.price_health.summary }}">{{ row.price_health.label }}</span></td>
             <td>{% if row.action %}<span class="w2-chip {% if row.action.kind != 'golive' %}w2-wait{% endif %}">{{ row.action.title }}</span>{% else %}<span class="w2-muted">Nothing due</span>{% endif %}</td></tr>
-          {% empty %}<tr><td colspan="8"><div class="w2-empty">No strategies yet. Add a strategy to start tracking.</div></td></tr>{% endfor %}
+          {% empty %}<tr><td colspan="9"><div class="w2-empty">No strategies yet. Add a strategy to start tracking.</div></td></tr>{% endfor %}
         </tbody></table></div>
     </section>
 
@@ -94,9 +95,9 @@
         {% else %}<p class="w2-muted">Add a strategy first.</p>{% endif %}
       </section>
       <section class="w2-card">
-        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='activity' %} Prices</h2>{% if ov_prices %}<span class="w2-chip w2-ok">OK</span>{% endif %}</div>
+        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='activity' %} Prices</h2>{% if ov_prices %}<span class="w2-chip" title="Stored quote observations, not confirmation that each strategy is ready">Stored</span>{% endif %}</div>
         {% for p in ov_prices %}<div class="w2-kv"><span>{{ p.symbol }}</span><span>{{ cur }}{{ p.price|floatformat:2 }} <small class="w2-muted">{{ p.as_of|date:"j M" }}</small></span></div>{% empty %}<p class="w2-muted">No prices yet.</p>{% endfor %}
-        {% if ov_last_sync %}<div class="w2-kv"><span>Last check</span><span>{{ ov_last_sync.last_attempt|date:"j M H:i" }}</span></div>{% endif %}
+        {% if ov_last_sync %}<div class="w2-kv"><span>Last attempt</span><span>{{ ov_last_sync.last_attempt|date:"j M H:i" }}</span></div>{% endif %}
       </section>
       <section class="w2-card">
         <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='shield' %} UK ISA contributions</h2></div>

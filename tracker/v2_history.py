@@ -508,6 +508,7 @@ def _overview_extras(request, items, rows, today):
     from . import v2_dashboard as dash
     from .models import NotificationPreference
     from .services import ledger_summary
+    from .price_health import price_health
     span = dash.pick_range(request)
     mode = dash.pick_mode(request)
     home = items[0].account.currency if items else "GBP"
@@ -517,6 +518,7 @@ def _overview_extras(request, items, rows, today):
     assets = {}
     for row in rows:
         strategy = row["strategy"]
+        row["price_health"] = price_health(strategy)
         try:
             summary = ledger_summary(strategy)
         except (ValidationError, ArithmeticError):
