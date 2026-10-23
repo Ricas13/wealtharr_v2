@@ -31,7 +31,7 @@ from .models import (
 )
 from .services import ledger_summary
 from .strategies.instruments import symbol_labels, symbols
-from .strategies.registry import last_review_before, module_for, next_review
+from .strategies.registry import is_current_review, last_review_before, module_for, next_review
 from .v2_views import _render
 from .v2_go_live import setup_missing
 
@@ -107,6 +107,19 @@ def _opening_buys(strategy, cash):
             "shares": (amount / quote.price).quantize(Decimal("0.01")) if quote else None,
         })
     return tuple(rows)
+
+
+def _opening_allocation_available(strategy, plugin):
+    """Don't instruct a first purchase while a cash allocation is intentional.
+
+    A missing dynamic weight signal must not turn into a guessed opening buy.
+    """
+    if not plugin or not plugin.allows_cash_only:
+        return True
+    if plugin.current_weights is None:
+        return False
+    weights = plugin.current_weights(strategy)
+    return weights is not None and any(w > ZERO for w in weights.values())
 
 
 def _signal_rows(strategy):
@@ -187,8 +200,8 @@ def today_page(request, instance_id):
         status = "review"
         headline = notice.title
         explanation = notice.message
-    elif (not strategy.tracking_only and not report["positions"]
-          and report["cash"] > ZERO):
+    elif (not strategy.tracking_only and not notice and not report["positions"]
+          and report["cash"] > ZERO and _opening_allocation_available(strategy, plugin)):
         status = "start"
         headline = "Buy your opening position"
         explanation = (
@@ -322,7 +335,7 @@ def _review_context(strategy, notice, *, form=None, error=""):
     completed = RebalanceExecution.objects.filter(
         strategy=strategy, signal=notice
     ).exists()
-    current = notice.as_of == last_review_before(strategy, timezone.localdate())
+    current = is_current_review(strategy, notice.as_of, timezone.localdate())
     late = not current and not completed and late_review_allowed(strategy, notice)
     blocked = (
         strategy.tracking_only or

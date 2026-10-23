@@ -3,7 +3,7 @@ Updated 22 October 2026. Read this file first; the historical, chronological bui
 
 ## What is shipped on main
 - Django 5.2 server-rendered, owner-scoped PostgreSQL investment tracker with a mobile-first dark UI. No brokerage API connections, automatic trade execution, subscriptions or public customer registration.
-- Versioned strategies: 9Sig, 3Sig, HFEA, All Seasons, Golden Butterfly, Permanent Portfolio, Dual Momentum. UK, USD and EUR instrument mappings remain explicitly pinned and are not assumed equivalent.
+- Versioned strategies: 9Sig, 3Sig, HFEA, All Seasons, Golden Butterfly, Permanent Portfolio, Dual Momentum, 3× Nasdaq Trend + DCA ([rules](nasdaq-trend-dca.md)). UK, USD and EUR instrument mappings remain explicitly pinned and are not assumed equivalent.
 - Onboard an owner-reported portfolio; record real deposits, trades, fees, distributions and corporate share splits. Only explicitly owner-confirmed fills complete action records. Rules compute advisory reviews, not broker orders.
 - Yahoo chart snapshots and study history are distinct inputs. Quote-unit validation, price holds and provenance are required for certified historical valuations. Email, Discord and Telegram notification transports are available.
 - Homepage comparison and strategy Study are hypothetical with disclosed proxy / execution-model caveats. No fabricated market quotations or broker records.

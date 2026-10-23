@@ -10,6 +10,7 @@ from types import MappingProxyType
 from tracker.strategies.all_weather.v1 import VERSION as ALL_WEATHER_VERSION, WEIGHTS as ALL_WEATHER_WEIGHTS
 from tracker.strategies.dual_momentum.v1 import VERSION as DUAL_MOMENTUM_VERSION
 from tracker.strategies.hfea.v1 import VERSION as HFEA_VERSION, WEIGHTS as HFEA_WEIGHTS
+from tracker.strategies.nasdaq_trend_dca.v1 import VERSION as NASDAQ_TREND_DCA_VERSION
 from tracker.strategies.three_sig.v1 import VERSION as THREE_SIG_VERSION
 from tracker.strategies.golden_butterfly.v1 import (
     VERSION as GOLDEN_BUTTERFLY_VERSION, WEIGHTS as GOLDEN_BUTTERFLY_WEIGHTS,
@@ -82,6 +83,31 @@ _RELEASED = {
             "TQQQ drawdown information only, no sell-half.",
             "nine-sig@1 (nine_sig.v1.0.0): frozen original with shortage reset/HOLD.",
         ),
+    ),
+    "nasdaq-trend-dca": StrategyDescription(
+        key="nasdaq-trend-dca",
+        version=NASDAQ_TREND_DCA_VERSION,
+        title="3x Nasdaq Trend + DCA",
+        summary=("Daily SPY/QQQ 200-session trend switching between 3x Nasdaq-100, "
+                 "unleveraged Nasdaq-100 and cash, with twelve monthly DCA instalments "
+                 "after a bear-market exit. All fills are entered by you."),
+        cadence="Daily US market-close checks; monthly DCA when below the exit threshold.",
+        rules=(
+            "SPY above 104% of its own 200-session moving average: enter 3x Nasdaq.",
+            "SPY below 97% of its average: sell 3x, hold proceeds in cash.",
+            "While outside 3x, gradually buy unleveraged Nasdaq in 12 equal monthly cash instalments.",
+            "A new SPY bullish entry ends DCA and returns to 3x Nasdaq.",
+            "While bullish, QQQ above 130% of its average reduces to unleveraged Nasdaq; above 140% exits to cash.",
+            "Market signals use the USD reference indexes. Actual fills use the approved account-currency instruments.",
+            "These are daily-reset leveraged products. Maximum loss can be substantial; Wealtharr never places trades.",
+        ),
+        role_targets=(("leveraged", Decimal("0")), ("unleveraged", Decimal("0"))),
+        target_explanation="Allocation changes with the trend; weights are not fixed.",
+        caution=("Extremely high risk. Historic TQQQ backtests are not LQQ3 returns. "
+                 "A moving-average exit cannot eliminate crash, overnight or execution risk. "
+                 "DCA funds are sale proceeds, not new contributions."),
+        release_label="nasdaq-trend-dca@1",
+        version_history=("nasdaq-trend-dca@1 (nasdaq_trend_dca.v1.0.0): fixed daily rules.",),
     ),
     "all-weather": StrategyDescription(
         key="all-weather",
@@ -259,7 +285,7 @@ STRATEGIES = MappingProxyType(_RELEASED)
 # One colour per strategy, used everywhere it appears (sidebar, page, charts).
 COLOURS = {
     "nasdaq-quarterly-target": "#5b9cf5", "all-weather": "#4fc3a1", "golden-butterfly": "#e06c9f",
-    "dual-momentum": "#e5c07b", "permanent-portfolio": "#56b6c2", "hfea": "#c678dd", "three-sig": "#98c379",
+    "dual-momentum": "#e5c07b", "nasdaq-trend-dca": "#ff956b", "permanent-portfolio": "#56b6c2", "hfea": "#c678dd", "three-sig": "#98c379",
 }
 DEFAULT_COLOUR = "#8a94a3"
 
@@ -282,9 +308,10 @@ def _plugins():
     from tracker.strategies.nine_sig.plugin import NINE_SIG
     from tracker.strategies.permanent_portfolio.plugin import PERMANENT_PORTFOLIO
     from tracker.strategies.hfea.plugin import HFEA
+    from tracker.strategies.nasdaq_trend_dca.plugin import NASDAQ_TREND_DCA
     from tracker.strategies.three_sig.plugin import THREE_SIG
     return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY, DUAL_MOMENTUM, PERMANENT_PORTFOLIO,
-                               HFEA, THREE_SIG)}
+                               HFEA, THREE_SIG, NASDAQ_TREND_DCA)}
 
 
 _MODULES = {}
@@ -322,6 +349,24 @@ def last_review_before(instance, day):
     from tracker.core.calendar import quarter_end_before
     plugin = module_for(instance)
     return (plugin.last_review_before if plugin else quarter_end_before)(day)
+
+
+def current_review_range(instance, day):
+    """(earliest, latest) review dates that still count as the current review.
+
+    Quarterly/monthly plug-ins accept only their last completed review; daily
+    plug-ins keep a review open for a few sessions so fills can still be recorded
+    once the next close lands.
+    """
+    latest = last_review_before(instance, day)
+    plugin = module_for(instance)
+    floor = plugin.current_review_floor(day) if plugin and plugin.current_review_floor else latest
+    return min(floor, latest), latest
+
+
+def is_current_review(instance, as_of, day):
+    earliest, latest = current_review_range(instance, day)
+    return earliest <= as_of <= latest
 
 
 def next_review(instance, day):

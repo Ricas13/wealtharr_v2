@@ -19,6 +19,9 @@ class StrategyModule:
     next_review: Callable
     # The last completed review date before a day. (date) -> date
     last_review_before: Callable
+    # Daily strategies keep a review actionable for a few sessions: the earliest
+    # review date that still counts as current. (day) -> date; None = only the last one.
+    current_review_floor: Callable | None = None
     # Market series the rules need besides the held funds (e.g. reference indexes):
     # a tuple, or (instance) -> tuple when it depends on the account.
     reference_symbols: tuple | Callable = ()
@@ -37,6 +40,8 @@ class StrategyModule:
     offers_manual_reset: Callable = field(default=lambda signal: False)
     # Creates that separate reset review: (owner=, strategy_id=, signal_id=) -> signal
     manual_reset: Callable | None = None
+    # A legitimate cash regime can have no holdings and still issue reviews.
+    allows_cash_only: bool = False
     # Target split right now when it isn't fixed weights (e.g. momentum picks one
     # fund): (instance) -> {symbol: weight 0..1}, or None when it can't be computed.
     current_weights: Callable | None = None

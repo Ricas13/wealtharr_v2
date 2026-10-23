@@ -15,7 +15,7 @@ from .models import (
 from .services import dispatch, ledger_summary
 from .notification_routing import route_notice, newly_delivered
 from .signal_status import _price_status, changed_since_review
-from .strategies.registry import last_review_before, plugin_keys
+from .strategies.registry import current_review_range, plugin_keys
 
 D = Decimal
 
@@ -84,7 +84,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
 
         recent = StrategySignal.objects.filter(
             strategy=strategy, kind="QUARTERLY",
-            as_of=last_review_before(strategy, today)).exclude(
+            as_of__range=current_review_range(strategy, today)).exclude(
                 review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"),
             ).order_by("-as_of", "-pk").first()
         if (strategy.market_data_enabled and recent and

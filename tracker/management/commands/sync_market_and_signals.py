@@ -16,8 +16,23 @@ def save_verified_strategy_snapshot(strategy):
     if strategy.tracking_only or for_strategy(strategy) is None:
         return None
     summary = ledger_summary(strategy)
-    if summary["value"] is None or not summary["positions"]:
+    if summary["value"] is None:
         return None
+    if not summary["positions"]:
+        # Unlike fixed-weight strategies, a trend strategy may deliberately
+        # hold 100% cash. Its owner-ledger value needs no market quote and
+        # the existing History verifier can independently certify it.
+        plugin = module_for(strategy)
+        if not (plugin and plugin.allows_cash_only and summary["cash"] > 0
+                and strategy.ledger.exists()):
+            return None
+        as_of = timezone.localdate()
+        StrategyValueSnapshot.objects.update_or_create(
+            strategy=strategy, as_of=as_of,
+            defaults={"total_value": summary["cash"],
+                      "net_contributed": summary["net_contributed"]},
+        )
+        return as_of
     dates = []
     for symbol, qty in summary["positions"].items():
         if qty <= 0:
