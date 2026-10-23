@@ -65,6 +65,9 @@ def decide(instance, as_of, *, signal=None, positions=None, cash=None):
 
     funds = role_symbols(instance)
     signal = signal or _reference(as_of)
+    if signal is not None and signal.as_of != as_of:
+        return v1.Result(v1.VERSION, "cannot_compute", "REFERENCE_GAP",
+                         "SPY and QQQ do not have a matching completed close.")
     if positions is None:
         entries = [e for e in effective_entries(instance) if e.occurred_on <= as_of]
         cash, _, positions = replay(entries)
@@ -110,14 +113,10 @@ def review(instance):
                     strategy=instance, symbol=symbol,
                     defaults={"price": close.price, "as_of": close.as_of, "source": "yahoo"})
     as_of = last_review_before(today)
-    if as_of >= today and today.weekday() < 5:
-        # Same-day settled Yahoo closes are permitted; the fetcher itself
-        # excludes incomplete sessions.
-        pass
     if instance.started_on and as_of < instance.started_on:
         return {"status": "waiting for the first session"}
     signal = _reference(as_of)
-    if signal is None or signal.as_of < today - timedelta(days=8):
+    if signal is None or signal.as_of != as_of or signal.as_of < today - timedelta(days=8):
         return {"status": "cannot_compute", "reason": "No fresh settled 200-session signal."}
     result = decide(instance, as_of, signal=signal)
     if result.status == "cannot_compute":
@@ -159,7 +158,7 @@ def current_weights(instance):
     if not recent or recent.as_of < timezone.localdate() - timedelta(days=8):
         return None
     signal = _reference(recent.as_of)
-    if signal is None:
+    if signal is None or signal.as_of != recent.as_of:
         return None
     return {symbol: Decimal("1") if signal.mode == role else Decimal("0")
             for role, symbol in funds.items()}
