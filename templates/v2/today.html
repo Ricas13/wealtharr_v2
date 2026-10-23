@@ -112,7 +112,7 @@
             {% if today_price_health.action == 'setup' or selected_instance.tracking_only %}
               <a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Check setup</a>
             {% elif today_price_health.action == 'admin' and request.user.is_staff %}
-              <a class="w2-button" href="{% url 'control/' %}#price-revisions">Review held prices</a>
+              <a class="w2-button" href="{% url 'control' %}#price-revisions">Review held prices</a>
             {% elif today_price_health.action == 'ledger' %}
               <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Reconcile the ledger</a>
             {% else %}
