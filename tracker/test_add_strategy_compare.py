@@ -87,6 +87,53 @@ class AddStrategyCompareTests(TestCase):
         self.client.logout()
         self.assertEqual(self.client.get(path + "&window_start=5&window_end=125").status_code, 302)
 
+    def test_zoom_rebases_to_entered_start_not_accumulated_portfolio(self):
+        from datetime import date, timedelta
+        from tracker.v2_home import selected_period_metrics
+
+        days = [(date(2026, 1, 1) + timedelta(days=i)).isoformat()
+                for i in range(4)]
+        comparison = {
+            "ready": True, "amount": 1000,
+            "point_dates_iso": days,
+            "put_in_points": [1000, 1000, 1100, 1100],
+            "rows": [
+                {"key": "nine_sig", "label": "9Sig", "points": [1000, 1100, 1200, 1350]},
+                {"key": "spy", "label": "SPY", "points": [1000, 1000, 1100, 1000]},
+                {"key": "missing", "label": "Missing", "points": []},
+            ],
+        }
+        metrics = selected_period_metrics(comparison, 1, 3)
+        self.assertEqual(metrics["put_in"], 1100)
+        self.assertEqual(metrics["reference_label"], "Selected start amount")
+        # Jan 2: rebased £1,000. Jan 3: portfolio earns no return,
+        # receives £100. Jan 4: 12.5% on £1,100 = £1,237.50.
+        self.assertEqual(metrics["rows"]["nine_sig"]["final"], 1237.50)
+        self.assertEqual(metrics["rows"]["nine_sig"]["gain_pct"], 12.50)
+        self.assertEqual(metrics["rows"]["nine_sig"]["drawdown"], 0)
+        self.assertEqual(metrics["rows"]["nine_sig"]["annual"], None)
+        self.assertEqual(metrics["rows"]["spy"]["final"], 1000)
+        self.assertLess(metrics["rows"]["spy"]["drawdown"], 0)
+        self.assertNotIn("missing", metrics["rows"])
+        # No monthly top-up is double counted just because the zoom moves.
+
+    def test_zoom_api_uses_entered_amount_instead_of_older_holdings(self):
+        self.seed_history()
+        path = reverse("v2_compare_json") + "?amount=2500&monthly=100&range=1y"
+        comparison = self.client.get(path).json()
+        self.assertTrue(comparison["ready"])
+        indices = (60, 125)
+        selected = self.client.get(
+            path + "&window_start=%d&window_end=%d" % indices
+        ).json()
+        invested = comparison["put_in_points"]
+        expected = 2500 + invested[indices[1]] - invested[indices[0]]
+        self.assertAlmostEqual(selected["put_in"], expected, places=2)
+        self.assertNotEqual(
+            selected["put_in"], comparison["rows"][0]["points"][indices[0]] +
+            invested[indices[1]] - invested[indices[0]]
+        )
+
     def test_other_pages_do_not_load_the_comparison(self):
         page = self.client.get(reverse("v2_overview"))
         self.assertNotContains(page, "js/compare.js")
