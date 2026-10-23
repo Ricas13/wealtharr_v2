@@ -82,11 +82,20 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
                 "Open Today to see the data status. Do not trade from old "
                 "recommendations." % (strategy.name, why))
 
-        recent = StrategySignal.objects.filter(
-            strategy=strategy, kind="QUARTERLY",
-            as_of=last_review_before(strategy, today)).exclude(
-                review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"),
-            ).order_by("-as_of", "-pk").first()
+        if getattr(strategy, "strategy_key", "") == "nasdaq-trend-dca":
+            from .signal_status import is_current_review
+            latest = StrategySignal.objects.filter(
+                strategy=strategy, kind="QUARTERLY").exclude(
+                    review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"),
+                ).order_by("-as_of", "-pk").first()
+            recent = latest if latest and is_current_review(strategy, latest, today) else None
+        else:
+            recent = StrategySignal.objects.filter(
+                strategy=strategy, kind="QUARTERLY",
+                as_of=last_review_before(strategy, today)).exclude(
+                    review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"),
+                ).order_by("-as_of", "-pk").first()
+        cadence = "daily" if getattr(strategy, "strategy_key", "") == "nasdaq-trend-dca" else "quarterly"
         if (strategy.market_data_enabled and recent and
                 not RebalanceExecution.objects.filter(signal=recent).exists()):
             actions = trade_lines(recent)
@@ -105,7 +114,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
             if actions and reconciled and not partial:
                 count += _send(strategy, owner, "quarterly",
                     "quarterly-digest:%s:%s" % (strategy.pk, review_tag(recent)),
-                    "Wealtharr — quarterly review (%s)" % recent.as_of,
+                    "Wealtharr — %s review (%s)" % (cadence, recent.as_of),
                     "Recorded review %s\n\n%s\n\n"
                     "Open Wealtharr → Today. Check broker availability, actual "
                     "prices, quantities and fees. No orders have been placed." % (
@@ -122,7 +131,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
                 count += _send(strategy, owner, "followup",
                     "rebalance-reminder:%s:%s:%04d-W%02d" % (
                         strategy.pk, review_tag(recent), week.year, week.week),
-                    "Wealtharr — outstanding quarterly review",
+                    "Wealtharr — outstanding %s review" % cadence,
                     "%s: %s No automatic trades are placed." % (
                         strategy.name, label))
 
