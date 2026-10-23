@@ -1,6 +1,9 @@
 """Study tab: hypothetical past performance for one strategy. Read-only."""
 import math
 from decimal import Decimal, InvalidOperation
+from hashlib import sha256
+
+from django.http import HttpResponseBadRequest, JsonResponse
 
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
@@ -14,6 +17,11 @@ from .v2_views import _render
 
 CSS = {"nine_sig": "w2-c1", "strategy": "w2-c1", "hold": "w2-c2", "spy": "w2-c3", "vti": "w2-c5"}
 MAX_POINTS = 600
+# Keep the Study's short presets; replace 20 years with all available history.
+STUDY_FRAMES = (("1w", "1 week", 7), ("1m", "1 month", 30),
+                ("ytd", "YTD", None), ("1y", "1 year", 365),
+                ("5y", "5 years", 1826), ("10y", "10 years", 3652),
+                ("max", "All available", None))
 
 
 def _number(raw, default, low, high):
@@ -95,6 +103,98 @@ def study_for(plugin, currency):
     return study
 
 
+
+def _study_payload(study, result):
+    """Complete dated hypothetical Study history for interactive inspection.
+
+    The source remains the Study engine, not the live portfolio. Preserve every
+    trading close for zooming; the browser alone downsamples drawn SVGs.
+    """
+    main = result["series"][study.PRIMARY]
+    dates = result["dates"]
+    rows = []
+    for key, label in study.SERIES:
+        series = result["series"].get(key)
+        if series is not None:
+            rows.append({
+                "key": key, "label": label, "css": CSS[key],
+                "points": [round(value, 2) for value in series["values"]],
+            })
+    return {
+        "ready": True,
+        "point_dates_iso": [day.isoformat() for day in dates],
+        "put_in_points": [round(x, 2) for x in main["contributed"]],
+        "rows": rows,
+        "primary": study.PRIMARY,
+        "currency": getattr(study, "CURRENCY", "GBP"),
+    }
+
+
+def _cached_window_payload(strategy, study, data, frame, amount, monthly, fill):
+    """Bound replays in the per-owner, per-engine, per-price-history cache."""
+    # Data cache invalidation is based on fetch timestamp in _data; mirror it
+    # here so a newly downloaded price never reuses an older simulation.
+    last_fetch = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
+    raw_key = repr((strategy.pk, strategy.strategy_key, study.TITLE,
+                    getattr(study, "CURRENCY", "GBP"), str(last_fetch),
+                    frame, amount, monthly, fill))
+    key = "study-zoom:" + sha256(raw_key.encode("utf-8")).hexdigest()
+    value = cache.get(key)
+    if value is None:
+        result = study.run(data, frame, amount, monthly, fill)
+        if result is None:
+            return None
+        value = _study_payload(study, result)
+        cache.set(key, value, 3600)
+    return value
+
+
+@login_required
+@require_GET
+def study_window_json(request, instance_id):
+    """Owner-only selected-period metrics, never an execution recommendation."""
+    strategy = get_object_or_404(
+        StrategyInstance.objects.select_related("account", "preset").filter(
+            owner=request.user, account__owner=request.user
+        ).exclude(account__kind="PAPER"), pk=instance_id)
+    study = study_for(module_for(strategy), strategy.account.currency)
+    if study is None:
+        return HttpResponseBadRequest("Study unavailable")
+    frame = request.GET.get("range", "10y")
+    if frame not in {k for k, _, _ in STUDY_FRAMES}:
+        return HttpResponseBadRequest("Unknown Study timeframe")
+    amount, bad_amount = _number(request.GET.get("amount", ""), "1000", 1, 10_000_000)
+    monthly, bad_monthly = _number(request.GET.get("monthly", ""), "0", 0, 1_000_000)
+    fill = request.GET.get("fill", "close")
+    if bad_amount or bad_monthly or fill not in ("close", "next"):
+        return HttpResponseBadRequest("Invalid Study inputs")
+    raw_start, raw_end = request.GET.get("window_start", ""), request.GET.get("window_end", "")
+    if (not raw_start.isascii() or not raw_end.isascii()
+            or not raw_start.isdecimal() or not raw_end.isdecimal()
+            or len(raw_start) > 5 or len(raw_end) > 5):
+        return HttpResponseBadRequest("Invalid Study dates")
+    data = _data(study)
+    if not data.ready:
+        return HttpResponseBadRequest("History unavailable")
+    payload = _cached_window_payload(strategy, study, data, frame, amount, monthly, fill)
+    if payload is None:
+        return HttpResponseBadRequest("History unavailable")
+    from .v2_home import selected_period_metrics
+    start, end = int(raw_start), int(raw_end)
+    try:
+        metrics = selected_period_metrics(payload, start, end)
+    except (ValueError, TypeError, IndexError, KeyError, ArithmeticError):
+        return HttpResponseBadRequest("Invalid selected Study dates")
+    # Study's selected cash flow and gain, for both comparison table and hero.
+    additional = payload["put_in_points"][end] - payload["put_in_points"][start]
+    for row in payload["rows"]:
+        figures = metrics["rows"][row["key"]]
+        invested = row["points"][start] + additional
+        figures["put_in"] = round(invested, 2)
+        figures["gain"] = round(row["points"][end] - invested, 2)
+    return JsonResponse(metrics)
+
+
 @login_required
 @require_GET
 def study_page(request, instance_id):
@@ -111,7 +211,7 @@ def study_page(request, instance_id):
         return _render(request, page_key="instance", page_title="Study", instance=strategy,
                        section="study", study_supported=False, study_title="")
     key = request.GET.get("range", "10y")
-    if key not in dict((k, l) for k, l, _ in study.TIMEFRAMES):
+    if key not in {k for k, _, _ in STUDY_FRAMES}:
         key = "10y"
     scale = "log" if request.GET.get("scale") == "log" else "linear"
     fill = "next" if request.GET.get("fill") == "next" else "close"
@@ -119,7 +219,7 @@ def study_page(request, instance_id):
     data = _data(study)
     rows, selected = [], None
     if data.ready:
-        for k, label, _ in study.TIMEFRAMES:
+        for k, label, _ in STUDY_FRAMES:
             result = study.run(data, k, amount, monthly, fill)
             rows.append({"key": k, "label": label, "result": result})
             if k == key:
@@ -139,7 +239,7 @@ def study_page(request, instance_id):
         study_amount=amount, study_monthly=monthly, study_range=key, study_scale=scale,
         study_fill=fill, study_fills=FILLS,
         study_input_error=bad_amount or bad_monthly,
-        study_timeframes=study.TIMEFRAMES, study_series=study.SERIES,
+        study_timeframes=STUDY_FRAMES, study_series=study.SERIES,
         study_rows=rows, study_selected=selected, study_best=best,
         study_selected_rows=[(n, label, CSS[n], selected["series"].get(n))
                              for n, label in study.SERIES] if selected else (),
@@ -149,4 +249,5 @@ def study_page(request, instance_id):
         study_how=study.how_it_works(data),
         study_first_day=data.days[0] if data.ready else None,
         study_last_day=data.days[-1] if data.ready else None,
+        study_zoom_data=_study_payload(study, selected) if selected else None,
     )

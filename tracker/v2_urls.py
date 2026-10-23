@@ -1,11 +1,13 @@
 """Stable URLs for the phased, server-rendered Wealtharr v2 design."""
 from django.urls import path
 
-from . import v2_views, v2_ledger_views, v2_today, v2_settings, v2_go_live, v2_strategy, v2_home
+from . import v2_views, v2_ledger_views, v2_today, v2_settings, v2_go_live, v2_strategy, v2_home, v2_study
 
 urlpatterns = [
     path("overview/", v2_views.overview, name="v2_overview"),
     # Before the generic section route, which would otherwise capture it.
+    path("s/<int:instance_id>/study-window.json", v2_study.study_window_json,
+         name="v2_study_window_json"),
     path("s/<int:instance_id>/go-live/", v2_go_live.go_live_view, name="v2_go_live"),
     path("s/<int:instance_id>/plan/", v2_strategy.plan_view, name="v2_strategy_plan"),
     path(
