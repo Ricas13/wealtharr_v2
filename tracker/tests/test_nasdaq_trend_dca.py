@@ -110,6 +110,12 @@ class NasdaqTrendDcaTests(SimpleTestCase):
         self.assertEqual(decide(series(110, "NaN"), State()).status, "cannot_compute")
         self.assertEqual(decide(tuple(reversed(series(110))), State()).status, "cannot_compute")
 
+    def test_corrupted_persisted_state_fails_closed(self):
+        self.assertEqual(decide(series(110), State("OFF")).status, "cannot_compute")
+        self.assertEqual(decide(series(110), State("ON", guard="WRONG")).status, "cannot_compute")
+        self.assertEqual(decide(series(110), State("OFF", date(2025, 1, 1), "CASH")).status,
+                         "cannot_compute")
+
     def test_historical_prices_do_not_look_ahead(self):
         before = series(110)
         later = before + (Close(date(2027, 1, 1), Decimal("1"), Decimal("1")),)
