@@ -93,9 +93,35 @@
         <a class="w2-button w2-button-primary w2-space-top" href="#w2-add-money">Add money</a>
       {% elif today_status == 'blocked' %}
         <p class="w2-muted">{{ today_explanation }}</p>
+        {% if head_prices.state != 'ok' and head_prices.state != 'off' %}
+        <section class="w2-space-top" id="price-health" aria-label="Price check details">
+          <h3 class="w2-ct">{{ head_prices.label }}</h3>
+          <p class="w2-note">{{ head_prices.summary }}</p>
+          <div class="w2-table-wrap"><table class="w2-table">
+            <thead><tr><th>Instrument</th><th>Accepted close</th><th>Check</th></tr></thead>
+            <tbody>{% for item in head_prices.rows %}
+              <tr><td><strong>{{ item.symbol }}</strong></td>
+                <td>{% if item.date %}{{ item.date|date:"j M Y" }}{% else %}—{% endif %}</td>
+                <td>{% if item.state == 'ok' %}<span class="w2-chip w2-ok">Current</span>{% elif item.state == 'hold' %}<span class="w2-chip w2-wait">On hold</span>{% else %}<span class="w2-chip w2-wait">{{ item.state|capfirst }}</span>{% endif %}
+                  <p class="w2-note">{{ item.detail }}</p></td></tr>
+            {% endfor %}</tbody>
+          </table></div>
+          {% if head_prices.checked %}<p class="w2-note">Last automatic price-check attempt: {{ head_prices.checked|date:"j M Y H:i" }}. This is not proof that a new close was accepted.</p>
+          {% else %}<p class="w2-note">No recorded price-check attempt for these instruments.</p>{% endif %}
+          {% if head_prices.has_hold and request.user.is_staff %}
+            <a class="w2-button" href="{% url 'control' %}">Review held prices in Admin</a>
+          {% else %}
+            <p class="w2-note">For missing or delayed market closes, wait for the next scheduled check. Only correct the ledger if a transaction you entered is wrong.</p>
+          {% endif %}
+        </section>
+        {% endif %}
         <div class="w2-row w2-space-top">
           {% if selected_instance.tracking_only %}<a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Go live</a>
-          {% else %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Open the ledger</a>{% endif %}
+          {% elif head_prices.state != 'ok' and head_prices.state != 'off' %}
+            <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}">Check instrument setup</a>
+          {% else %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Review ledger</a>{% endif %}
+        </div>
+      {% else %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Open the ledger</a>{% endif %}
         </div>
       {% else %}
         <p class="w2-muted">{{ today_explanation }}</p>
