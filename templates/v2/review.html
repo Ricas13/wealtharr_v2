@@ -85,7 +85,7 @@
       </details>
     </section>
     {% else %}
-    <section class="w2-card"><h2 class="w2-ct">No strategy review yet</h2>
+    <section class="w2-card"><h2 class="w2-ct">{% if selected_instance.strategy_key == 'nasdaq-trend-dca' %}No daily review yet{% else %}No quarterly review yet{% endif %}</h2>
       <p class="w2-muted">Reviews arrive on the strategy's review schedule once verified closing prices are available. You'll get an alert.</p></section>
     {% endif %}
 
