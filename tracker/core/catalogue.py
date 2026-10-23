@@ -30,6 +30,7 @@ PERMANENT_PORTFOLIO = "permanent-portfolio"
 HFEA = "hfea"
 THREE_SIG = "three-sig"
 NASDAQ_TREND_DCA = "nasdaq-trend-dca"
+NASDAQ_TREND_DCA = "nasdaq-trend-dca"
 from tracker.core.brokers import ACCOUNT_TYPE_NAMES  # noqa: E402
 ACCOUNT_TYPES = tuple(ACCOUNT_TYPE_NAMES.items())
 
@@ -81,6 +82,12 @@ _OFFERS = {
         HFEA, "HFEA", "Very high risk", "Quarterly",
         "55% 3x S&P 500 and 45% 3x long-term US Treasuries, rebalanced every quarter "
         "(HEDGEFUNDIE's Excellent Adventure). Not affiliated with HEDGEFUNDIE or Bogleheads.", True,
+    ),
+    NASDAQ_TREND_DCA: StrategyOffer(
+        NASDAQ_TREND_DCA, "3× Nasdaq Trend + DCA", "Very high risk", "Daily",
+        "Use SPY's 200-day moving average to switch between 3x Nasdaq, Nasdaq, "
+        "and cash; after an exit, invest confirmed sale proceeds in 12 monthly "
+        "unleveraged Nasdaq instalments. No broker trades are placed.", True,
     ),
     THREE_SIG: StrategyOffer(
         THREE_SIG, "3Sig", "High risk", "Quarterly",
@@ -322,6 +329,19 @@ EU_VAGF = _eu("Vanguard Global Aggregate Bond UCITS ETF EUR Hedged (Acc)", "Vang
               "Euro equivalent of US aggregate bonds: global aggregate bonds hedged to euros. Accumulating.",
               TR_BROWSE + "?q=vanguard")
 
+# 3× Nasdaq Trend + DCA: use the exact existing reviewed 9Sig LQQ3
+# trading line. The DCA sleeve is a distributing UCITS ETF, so tracked cash
+# dividends must not silently be treated as reinvested in performance.
+UK_NASDAQ_1X = Listing(
+    "Invesco EQQQ Nasdaq-100 UCITS ETF (Dist)", "Invesco", "IE0032077012",
+    "EQQQ.L", "GBX", "LSE EQQQ (pence line)",
+    "https://www.invesco.com/uk/en/financial-products/etfs/invesco-eqqq-nasdaq-100-ucits-etf-dist.html",
+    "Physical Nasdaq-100 UCITS ETF, GBP trading line, quarterly cash dividends. "
+    "The owner must confirm personal ISA permissions. " + ACCOUNT_HOLD,
+    date(2026, 10, 23),
+    brokers={"TRADING212": "https://www.trading212.com/trading-instruments/isa/EQQQ.GB"},
+)
+
 US_TQQQ = _us("ProShares UltraPro QQQ", "ProShares", "US74347X8314", "TQQQ",
               "https://www.proshares.com/our-etfs/leveraged-and-inverse/tqqq",
               "3x daily Nasdaq-100, Kelly's own 9Sig growth fund. Fidelity requires a leveraged-ETF "
@@ -412,6 +432,8 @@ US_QQQ = _us(
 
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
+    (NASDAQ_TREND_DCA, "leveraged", "GB"): (_from_instrument(EQUITY_UK),),
+    (NASDAQ_TREND_DCA, "unleveraged", "GB"): (UK_NASDAQ_1X,),
     (NASDAQ_TREND_DCA, "leveraged", "GB"): (_from_instrument(EQUITY_UK),),
     (NASDAQ_TREND_DCA, "unleveraged", "GB"): (UK_EQQQ,),
     (NASDAQ_TREND_DCA, "leveraged", "US"): (US_TQQQ,),
