@@ -114,6 +114,14 @@ class NasdaqTrendRuleTests(SimpleTestCase):
         self.assertEqual([(t.side, t.symbol) for t in dca.trades], [("BUY", "EQQQ.L")])
         self.assertEqual(dca.trades[0].estimated_gbp, D("100.00"))
 
+    def test_cash_taken_out_slows_the_remaining_schedule(self):
+        exit_on = date(2026, 1, 10)
+        flows = [(exit_on, D("1200")), (date(2026, 4, 10), D("-600"))]
+        # Month 3: nothing withdrawn yet. Month 5: 500 less 2 months of the 600 withdrawn.
+        self.assertEqual(v1.dca_target(flows, exit_on, date(2026, 4, 10)), D("300"))
+        self.assertEqual(v1.dca_target(flows, exit_on, date(2026, 6, 10)), D("400"))
+        self.assertEqual(v1.dca_target(flows, exit_on, date(2027, 6, 1)), D("600"))
+
     def test_instalments_are_not_repeated_and_later_buys_are_not_sold(self):
         exit_on = date(2026, 8, 20)
         off = signal("dca", "off", exit_on=exit_on)
@@ -181,6 +189,13 @@ class NasdaqLedgerScheduleTests(SimpleTestCase):
         self.assertEqual(inflows, ((exit_on, D("500")), (date(2026, 8, 21), D("199")),
                                    (date(2026, 9, 1), D("100"))))
         self.assertEqual(spent, D("60"))
+        more = entries + [
+            E(kind="WITHDRAW", occurred_on=date(2026, 9, 10), amount=D("50"), symbol="",
+              quantity=D("0"), unit_price=D("0"), fee=D("0")),
+            E(kind="FEE", occurred_on=date(2026, 9, 11), amount=D("5"), symbol="",
+              quantity=D("0"), unit_price=D("0"), fee=D("0"))]
+        flows, _ = _cash_flows(None, off, FUNDS, more)
+        self.assertEqual(flows[-2:], ((date(2026, 9, 10), D("-50")), (date(2026, 9, 11), D("-5"))))
         self.assertEqual(_cash_flows(None, signal("leveraged"), FUNDS, entries), ((), D("0")))
 
     def test_released_alongside_ninesig_with_real_uk_lines(self):
@@ -360,9 +375,9 @@ class NasdaqCurrentReviewWindowTests(TestCase):
         for i, d in enumerate(self.dates[:-1]):
             self.add_session(d, D("110") if i >= 200 else D("100"))
 
-    def add_session(self, day, spy):
+    def add_session(self, day, spy, fund=D("10")):
         for symbol, value, currency in (("SPY", spy, "USD"), ("QQQ", D("100"), "USD"),
-                                        ("LQQ3.L", D("10"), "GBP"), ("EQQQ.L", D("10"), "GBP")):
+                                        ("LQQ3.L", fund, "GBP"), ("EQQQ.L", fund, "GBP")):
             self.MarketObservation.objects.create(
                 symbol=symbol, as_of=day, price=value, currency=currency, source="yahoo",
                 raw_quote_unit="GBp" if currency == "GBP" else "USD",
@@ -415,3 +430,37 @@ class NasdaqCurrentReviewWindowTests(TestCase):
         self.assertEqual(self.run_review()["status"], "ok")
         old.refresh_from_db()
         self.assertEqual(old.review_outcome, "NOT_APPLICABLE")
+
+    def test_a_large_price_move_reissues_the_instruction_with_fresh_share_counts(self):
+        from tracker.models import StrategySignal
+        self.run_review()
+        old = StrategySignal.objects.get(strategy=self.strategy)
+        self.add_session(self.dates[-1], D("110"), fund=D("14"))
+        self.run_review()
+        old.refresh_from_db()
+        self.assertEqual(old.review_outcome, "NOT_APPLICABLE")
+        new = StrategySignal.objects.exclude(pk=old.pk).get(strategy=self.strategy)
+        self.assertNotEqual(new.actions[0]["quantity"], old.actions[0]["quantity"])
+
+    def test_owner_is_told_when_an_alerted_instruction_is_withdrawn(self):
+        from unittest.mock import patch
+        from tracker.cockpit_notifications import send_due_cockpit_notices
+        from tracker.models import NotificationDelivery, StrategySignal
+        self.run_review()
+        old = StrategySignal.objects.get(strategy=self.strategy)
+        self.add_session(self.dates[-1], D("40"))  # rules no longer say buy 3x
+        self.run_review()
+        old.refresh_from_db()
+        self.assertEqual(old.review_outcome, "NOT_APPLICABLE")
+        calls = []
+        with patch("tracker.cockpit_notifications._send",
+                   side_effect=lambda *a, **k: calls.append(a[3]) or 1):
+            send_due_cockpit_notices(self.today)
+            self.assertFalse([c for c in calls if c.startswith("withdrawn:")])  # never alerted
+            NotificationDelivery.objects.create(
+                owner=self.strategy.owner, strategy=self.strategy, channel="email",
+                category="quarterly", status="SENT",
+                event_key="quarterly-digest:%s:%s" % (self.strategy.pk, old.signal_key))
+            send_due_cockpit_notices(self.today)
+        self.assertEqual([c for c in calls if c.startswith("withdrawn:")],
+                         ["withdrawn:%s:%s" % (self.strategy.pk, old.pk)])
