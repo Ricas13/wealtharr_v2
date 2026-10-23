@@ -14,11 +14,11 @@
   </form>
   {% endif %}
   {% if review_completed %}
-    <div class="w2-notice">Completed and immutable. A confirmed quarterly execution cannot be reopened as a new trade. Corrections require independently audited reconciliation.</div>
+    <div class="w2-notice">Completed and immutable. A confirmed execution cannot be reopened as a new trade. Corrections require independently audited reconciliation.</div>
   {% elif review_late and review_can_finalize %}
-    <div class="w2-notice">This review is from an earlier quarter. Every trade is recorded, so it can still be finished; it finishes by itself after the next closing prices, or press the button below.</div>
+    <div class="w2-notice">This review is from an earlier review period. Every trade is recorded, so it can still be finished; it finishes by itself after the next closing prices, or press the button below.</div>
   {% elif not review_is_current %}
-    <div class="w2-notice">Historical review: read-only. Old advice cannot be used to record a new suggested trade.{% if review_late %} Record any later trades in the Ledger; the current quarter's review will include them.{% endif %}</div>
+    <div class="w2-notice">Historical review: read-only. Old advice cannot be used to record a new suggested trade.{% if review_late %} Record any later trades in the Ledger; the current review period's review will include them.{% endif %}</div>
   {% elif review_blocked %}
     <div class="w2-notice">Recording against this proposal is unavailable. Verify pinned instrument access, actual opening holdings and any historical corrections first. Manual ledger entries remain separate from advice.</div>
   {% endif %}
