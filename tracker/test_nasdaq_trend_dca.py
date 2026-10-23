@@ -50,6 +50,9 @@ class NasdaqTrendRuleTests(SimpleTestCase):
         self.assertGreaterEqual(state.months_elapsed, 1)
         self.assertEqual(state.exit_on, days[200])
 
+    def test_end_of_month_anniversary(self):
+        self.assertEqual(v1.elapsed_months(date(2026, 1, 31), date(2026, 2, 28)), 1)
+
     def test_proceeds_dca_and_reentry_are_manual_actions(self):
         day = date(2026, 9, 30)
         funds = {"leveraged": "LQQ3.L", "unleveraged": "EQQQ.L"}
@@ -58,10 +61,14 @@ class NasdaqTrendRuleTests(SimpleTestCase):
                              1, D("0.9"), D("1.0"))
         result = v1.evaluate(funds=funds, positions={"LQQ3.L": D("12")},
                              cash=D("120"), quotes=quotes, signal=off)
-        self.assertEqual([t.side for t in result.trades], ["SELL", "BUY"])
+        self.assertEqual([t.side for t in result.trades], ["SELL"])
         self.assertEqual(result.trades[0].symbol, "LQQ3.L")
-        self.assertEqual(result.trades[1].symbol, "EQQQ.L")
-        self.assertEqual(result.trades[1].estimated_gbp, D("20.00"))
+        # The next confirmed review spends exactly 1/12 of cash proceeds.
+        dca = v1.evaluate(funds=funds, positions={}, cash=D("240"),
+                          quotes=quotes, signal=off)
+        self.assertEqual([t.side for t in dca.trades], ["BUY"])
+        self.assertEqual(dca.trades[0].symbol, "EQQQ.L")
+        self.assertEqual(dca.trades[0].estimated_gbp, D("20.00"))
         # The same monthly purchase, once confirmed, must not be repeated.
         hold = v1.evaluate(funds=funds, positions={"EQQQ.L": D("2")},
                            cash=D("220"), quotes=quotes, signal=off, completed_dca=1)
