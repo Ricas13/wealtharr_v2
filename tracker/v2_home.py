@@ -226,6 +226,77 @@ def _other_rows(rows, days, index, frame, amount, monthly, real_names=False, mon
 
 
 def selected_period_metrics(comparison, start_index, end_index):
+    """Recompute a table for a selected chart window, without rerunning Studies.
+
+    Opening capital is the *portfolio value at the first selected close*, not
+    the contributions made since the strategy's inception. Contributions after
+    that close are external cash flows; the same flow dates are used for each
+    strategy. Money-weighted annual return uses Study's existing XIRR convention.
+    Drawdown uses Study's contribution-neutral chain, restarted at the chosen
+    opening close. Displaying the table does not restart a strategy or alter
+    its historical holdings.
+    """
+    from .study import _xirr
+
+    if not comparison.get("ready"):
+        raise ValueError("Comparison history unavailable")
+    dates = comparison.get("point_dates_iso", ())
+    invested = comparison.get("put_in_points", ())
+    n = len(dates)
+    if (not (2 <= n <= POINTS + 1) or len(invested) != n
+            or type(start_index) is not int or type(end_index) is not int
+            or not (0 <= start_index < end_index - 1 < n)):
+        raise ValueError("Invalid selected dates")
+    days = [date.fromisoformat(raw) for raw in dates[start_index:end_index + 1]]
+    if any(days[i] <= days[i - 1] for i in range(1, len(days))):
+        raise ValueError("Selected dates are not chronological")
+    flows = [(days[i - start_index], invested[i] - invested[i - 1])
+             for i in range(start_index + 1, end_index + 1)
+             if invested[i] != invested[i - 1]]
+    if any(not (flow > 0) for _, flow in flows):
+        raise ValueError("Invalid comparison contribution history")
+    additional = sum((amount for _, amount in flows), 0.0)
+    span = (days[-1] - days[0]).days
+    rows = {}
+    for row in comparison["rows"]:
+        values = row["points"]
+        if len(values) != n:
+            raise ValueError("Comparison series dates differ")
+        opening = values[start_index]
+        closing = values[end_index]
+        if opening <= 0 or closing < 0:
+            raise ValueError("Undefined opening or closing value")
+        capital = opening + additional
+        gain = closing - capital
+        # Same flow-neutral NAV/drawdown algorithm as study._summary.
+        peak, level, worst = 1.0, 1.0, 0.0
+        for i in range(start_index + 1, end_index + 1):
+            prior = values[i - 1]
+            movement = invested[i] - invested[i - 1]
+            if prior <= 0 or values[i] <= 0:
+                raise ValueError("Undefined daily flow-adjusted value")
+            level *= (values[i] - movement) / prior
+            peak = max(peak, level)
+            worst = min(worst, level / peak - 1)
+        annual = _xirr([(days[0], opening)] + flows, days[-1], closing) if span >= 360 else None
+        rows[row["key"]] = {
+            "final": round(closing, 2),
+            "gain_pct": round(gain / capital * 100, 2) if capital > 0 else None,
+            "annual": round(annual, 2) if annual is not None else None,
+            "drawdown": round(worst * 100, 2),
+        }
+    return {
+        "rows": rows,
+        "period": "%s – %s" % (_day(days[0]), _day(days[-1])),
+        "put_in": round(comparison["rows"][0]["points"][start_index] + additional, 2),
+        "reference_label": comparison["rows"][0]["label"],
+        "start_index": start_index, "end_index": end_index,
+        "description": "reference strategy's opening value plus top-ups during selection",
+    }
+
+
+
+def rebased_comparison_metrics(comparison, start_index, end_index):
     """Show a selected slice with the *entered start amount* as its baseline.
 
     The full-length Study replay cannot be restarted by moving a chart handle:
@@ -318,7 +389,7 @@ def _comparison_response(request, *, public, real_names):
             or len(first) > 5 or len(last) > 5):
         return HttpResponseBadRequest("Invalid comparison window")
     try:
-        data = selected_period_metrics(comparison, int(first), int(last))
+        data = rebased_comparison_metrics(comparison, int(first), int(last))
     except (ValueError, IndexError, KeyError, TypeError, ArithmeticError):
         return HttpResponseBadRequest("Comparison dates unavailable")
     return JsonResponse(data)
