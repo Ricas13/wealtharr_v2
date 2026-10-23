@@ -37,6 +37,8 @@ class StrategyModule:
     offers_manual_reset: Callable = field(default=lambda signal: False)
     # Creates that separate reset review: (owner=, strategy_id=, signal_id=) -> signal
     manual_reset: Callable | None = None
+    # A legitimate cash regime can have no holdings and still issue reviews.
+    allows_cash_only: bool = False
     # Target split right now when it isn't fixed weights (e.g. momentum picks one
     # fund): (instance) -> {symbol: weight 0..1}, or None when it can't be computed.
     current_weights: Callable | None = None
