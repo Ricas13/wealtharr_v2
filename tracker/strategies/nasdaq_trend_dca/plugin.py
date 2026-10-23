@@ -53,7 +53,14 @@ def _completed_dca(instance, signal):
     completed = RebalanceExecution.objects.filter(
         strategy=instance, signal__signal_key__contains=prefix,
     ).select_related("signal")
-    months = {e.signal.as_of.strftime("%Y-%m") for e in completed}
+    # The exit-only review is not a DCA instalment; count actual completed
+    # proposals that included a purchase of the unleveraged fund.
+    unleveraged = role_symbols(instance).get("unleveraged")
+    months = {
+        e.signal.as_of.strftime("%Y-%m") for e in completed
+        if any(action.get("side") == "BUY" and action.get("symbol") == unleveraged
+               for action in e.signal.actions)
+    }
     return min(12, len(months)), signal.as_of.strftime("%Y-%m") in months
 
 
@@ -186,4 +193,5 @@ NASDAQ_TREND_DCA = StrategyModule(
     reference_symbols=("SPY", "QQQ"),
     cadence_word="daily", allocation_label="Trend allocation",
     current_weights=current_weights, study=STUDY,
+    allows_cash_only=True,
 )
