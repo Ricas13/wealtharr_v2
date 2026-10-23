@@ -152,7 +152,7 @@ def _reconcile_dca(instance, row):
         row.reserve_source = "confirmed_exit_fills"
     else:
         entries = effective_entries(instance)
-        _, _, positions = replay(entries)
+        positions = replay(entries)["positions"]
         # Additional deposits after the exit must NOT inflate the fixed
         # twelve-part reserve from the exit.
         later_deposits = any(
