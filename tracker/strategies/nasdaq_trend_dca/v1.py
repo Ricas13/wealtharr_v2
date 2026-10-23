@@ -10,8 +10,11 @@ Faithfulness:
 
 This module does not fetch prices, place trades, assume fills, or infer cash
 balances. The application must verify 200 aligned, consecutive US trading
-sessions, completed closes and quote provenance; persist each returned State;
-and generate DCA orders only from confirmed proceeds, subtracting recorded
+sessions, completed chart-compatible closes and quote provenance; persist each
+returned State. The author uses TradingView `close` on SPY/QQQ (not a
+dividend-reinvested total-return series); a different data basis requires
+independent threshold parity tests. Generate DCA orders only from confirmed
+proceeds, subtracting recorded
 purchases rather than continuously rebalancing market-value weights.
 """
 from calendar import monthrange
