@@ -528,6 +528,14 @@ def _overview_extras(request, items, rows, today):
                        if row["value"] is not None and row["contributed"] is not None else None)
         row["xirr"] = dash.xirr_pct(strategy, own) if not strategy.tracking_only else None
         row["action"] = _open_action(strategy, summary, today) if summary else None
+        # An existing, saved review can be historical even while one required
+        # quote is now missing/held. Never make it look executable on Overview.
+        if (row["action"] and row["action"]["kind"] == "review"
+                and row["price_health"]["state"] != "ok"):
+            row["action"] = {
+                "kind": "blocked", "title": "Price data needs checking",
+                "detail": row["price_health"]["summary"],
+            }
         if row["action"]:
             todos.append({"strategy": strategy, **row["action"]})
         if (summary and summary["value"] is not None and not strategy.tracking_only
