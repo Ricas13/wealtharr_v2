@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from tracker.strategies.base import StrategyModule
+from tracker.strategies.base import DAILY_SUPERSEDED_NOTE, StrategyModule
 from tracker.strategies.nasdaq_trend_dca import v1
 from tracker.strategies.instruments import role_symbols
 
@@ -17,6 +17,7 @@ CURRENT_DAYS = 7   # a proposal stays actionable (fills can be recorded) this lo
 REFRESH_DAYS = 5   # an unchanged pending instruction is kept, not re-issued
 MAX_GAP_DAYS = 6   # longest calendar gap in a trustworthy daily series
 ZERO = Decimal("0")
+QUANTITY_DRIFT = Decimal("0.03")  # kept only while share counts stay this close
 
 
 def last_review_before(day):
@@ -81,6 +82,9 @@ def _cash_flows(instance, signal, funds, entries):
             continue
         if e.kind in ("DEPOSIT", "DIVIDEND", "INTEREST"):
             inflows.append((e.occurred_on, e.amount))
+        elif e.kind in ("WITHDRAW", "FEE"):
+            # Cash taken out slows the remaining schedule pro rata.
+            inflows.append((e.occurred_on, -e.amount))
         elif e.kind == "SELL":
             inflows.append((e.occurred_on, e.quantity * e.unit_price - e.fee))
         elif e.kind == "BUY" and e.symbol == funds["unleveraged"]:
@@ -116,8 +120,16 @@ def decide(instance, as_of, *, signal=None):
 
 
 def _same_orders(prior, result):
-    return ([(a.get("side"), a.get("symbol")) for a in prior.actions] ==
-            [(t.side, t.symbol) for t in result.trades])
+    """The pending instruction is unchanged: same orders and, within
+    QUANTITY_DRIFT, the same share counts (a 3x fund moves fast)."""
+    if ([(a.get("side"), a.get("symbol")) for a in prior.actions] !=
+            [(t.side, t.symbol) for t in result.trades]):
+        return False
+    for action, trade in zip(prior.actions, result.trades):
+        old = Decimal(str(action.get("quantity") or 0))
+        if old <= ZERO or abs(trade.quantity - old) > old * QUANTITY_DRIFT:
+            return False
+    return True
 
 
 def review(instance):
@@ -170,7 +182,7 @@ def review(instance):
                     and prior.as_of >= as_of - timedelta(days=REFRESH_DAYS)):
                 return {"status": "ok"}  # Same instruction still pending: no new alert.
             prior.review_outcome = "NOT_APPLICABLE"
-            prior.review_note = "Superseded by a later settled daily review before any fills."
+            prior.review_note = DAILY_SUPERSEDED_NOTE
             prior.save(update_fields=["review_outcome", "review_note"])
     if result.status != "action_needed":
         return {"status": "ok"}  # Avoid a daily HOLD notification.

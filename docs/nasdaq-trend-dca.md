@@ -32,7 +32,7 @@ review.
 
 The post doesn't cover cash added while out of the market. Wealtharr treats
 every cash inflow since the exit (cash held at the exit, sale proceeds,
-deposits, dividends) as its own 12-month schedule from its own date. The amount
+deposits, dividends; withdrawals and fees count as negative inflows) as its own 12-month schedule from its own date. The amount
 due is `Σ inflow × months_elapsed / 12 − actually bought`, read from the
 ledger alone, so a missed month is caught up and nothing is repeated. After 12
 months everything is invested. Only 3× holdings are sold once instalments have
@@ -54,8 +54,9 @@ independently verified: confirm it is buyable in the account before use.
 The hourly review saves a `QUARTERLY`-kind review only when an order is due.
 A review stays actionable for 7 days (`StrategyModule.current_review_floor`),
 so fills can still be recorded after the next close has been fetched. An
-unchanged pending instruction is kept (no daily repeat alert); a changed one
-supersedes it before any fill. Once fills are recorded the review finishes
+unchanged pending instruction (same orders, share counts within 3%) is kept
+(no daily repeat alert); a changed one supersedes it before any fill, and if
+the owner had already been alerted about it a "withdrawn" alert says so. Once fills are recorded the review finishes
 through the normal checked finalisation, and a new review waits for that.
 
 Study replays the same pure rules on stored history with next-session fills.

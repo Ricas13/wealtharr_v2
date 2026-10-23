@@ -10,6 +10,11 @@ from decimal import Decimal
 from typing import Callable
 
 
+# Review note a daily plug-in stamps on an unfilled proposal it replaces; the
+# notification job tells the owner such an instruction was withdrawn.
+DAILY_SUPERSEDED_NOTE = "Superseded by a later settled daily review before any fills."
+
+
 @dataclass(frozen=True)
 class StrategyModule:
     key: str

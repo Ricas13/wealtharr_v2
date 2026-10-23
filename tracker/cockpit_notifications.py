@@ -15,6 +15,7 @@ from .models import (
 from .services import dispatch, ledger_summary
 from .notification_routing import route_notice, newly_delivered
 from .signal_status import _price_status, changed_since_review
+from .strategies.base import DAILY_SUPERSEDED_NOTE
 from .strategies.registry import current_review_range, plugin_keys
 
 D = Decimal
@@ -125,6 +126,32 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
                     "Wealtharr — outstanding quarterly review",
                     "%s: %s No automatic trades are placed." % (
                         strategy.name, label))
+
+        # An instruction the owner was told about, replaced before any fill:
+        # say so, so nobody acts on the earlier alert.
+        withdrawn = StrategySignal.objects.filter(
+            strategy=strategy, kind="QUARTERLY", review_outcome="NOT_APPLICABLE",
+            review_note=DAILY_SUPERSEDED_NOTE, as_of__gte=today - timedelta(days=14))
+        for old in withdrawn:
+            if not NotificationDelivery.objects.filter(
+                    owner=owner, event_key="quarterly-digest:%s:%s" % (
+                        strategy.pk, review_tag(old))).exists():
+                continue  # Never alerted, nothing to retract.
+            if SignalFill.objects.filter(strategy=strategy, signal=old).exists():
+                continue
+            shape = [(a.get("side"), a.get("symbol")) for a in old.actions]
+            if any([(a.get("side"), a.get("symbol")) for a in later.actions] == shape
+                   for later in StrategySignal.objects.filter(
+                       strategy=strategy, kind="QUARTERLY", as_of__gt=old.as_of
+                   ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE"))):
+                continue  # Same orders re-issued with fresh numbers: its own alert covers it.
+            count += _send(strategy, owner, "quarterly",
+                "withdrawn:%s:%s" % (strategy.pk, old.pk),
+                "Wealtharr — earlier instruction withdrawn (%s)" % old.as_of,
+                "%s: the review of %s is no longer current because the rules now "
+                "say something different. Do not act on that alert. Open Today "
+                "for the current instruction, if any. No orders were placed." % (
+                    strategy.name, old.as_of))
 
         if (pref.monthly_reminders and strategy.contribution_alerts and
                 strategy.monthly_target > 0 and today.day >= 3):
