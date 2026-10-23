@@ -83,12 +83,15 @@
     sortedRows().forEach(function (row) {
       var tr = document.createElement("tr");
       tr.dataset.key = row.key;
+      var available = Array.isArray(row.points) && row.points.length === count();
       if (hidden[row.key]) tr.className = "off";
       var td = cell("td");
       var box_ = document.createElement("input");
       box_.type = "checkbox";
-      box_.checked = !hidden[row.key];
-      box_.setAttribute("aria-label", "Show " + row.label);
+      box_.checked = available && !hidden[row.key];
+      box_.disabled = !available;
+      box_.setAttribute("aria-label", available ? "Show " + row.label :
+        "No comparable history for " + row.label);
       td.appendChild(box_);
       tr.appendChild(td);
       var name = cell("th");
@@ -97,7 +100,8 @@
       sw.style.background = row.color;
       name.appendChild(sw);
       name.appendChild(document.createTextNode(row.label + " "));
-      name.appendChild(cell("span", "mut", "· " + row.what));
+      name.appendChild(cell("span", "mut", "· " + row.what +
+        (available ? "" : " · No comparable history for these dates")));
       tr.appendChild(name);
       var value = cell("td", "r");
       value.appendChild(cell("strong", "", row.final === null ? "—" : "£" + money(row.final)));
@@ -203,7 +207,9 @@
     svg.querySelectorAll("polyline").forEach(function (p) { p.remove(); });
     var legend = box.querySelector("[data-legend]");
     legend.textContent = "";
-    var shown = (state.rows || []).filter(function (r) { return !hidden[r.key]; });
+    var shown = (state.rows || []).filter(function (r) {
+      return !hidden[r.key] && Array.isArray(r.points) && r.points.length === count();
+    });
     var series = shown.map(function (r) { return r.points; }).concat([state.put_in_points || []]);
     if (!count()) return;
     normaliseView();
@@ -537,6 +543,8 @@
   box.querySelector("[data-rows]").addEventListener("click", function (e) {
     var tr = e.target.closest("tr");
     if (!tr) return;
+    var row = (state.rows || []).find(function (r) { return r.key === tr.dataset.key; });
+    if (!row || !Array.isArray(row.points) || row.points.length !== count()) return;
     hidden[tr.dataset.key] = !hidden[tr.dataset.key];
     hideTip();
     renderTable();
