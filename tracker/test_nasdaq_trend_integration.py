@@ -59,6 +59,9 @@ class NasdaqEnrollmentTests(TestCase):
                 page = self.client.get(reverse(
                     "v2_instance_page", args=[instance.pk, section]))
                 self.assertEqual(page.status_code, 200)
+        # Notifications and other strategy settings live on the existing
+        # owner-global Settings page, not /s/<id>/settings/.
+        self.assertEqual(self.client.get(reverse("v2_settings")).status_code, 200)
 
 
 class NasdaqDailyReviewTests(TestCase):
