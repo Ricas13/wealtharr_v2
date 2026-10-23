@@ -153,7 +153,13 @@ def _reconcile_dca(instance, row):
     else:
         entries = effective_entries(instance)
         _, _, positions = replay(entries)
-        if not any(qty > ZERO for qty in positions.values()):
+        # Additional deposits after the exit must NOT inflate the fixed
+        # twelve-part reserve from the exit.
+        later_deposits = any(
+            entry.kind == "DEPOSIT" and entry.occurred_on > row.off_since
+            for entry in entries
+        )
+        if not later_deposits and not any(qty > ZERO for qty in positions.values()):
             cash = ledger_summary(instance)["cash"]
             if cash > ZERO and row.completed_instalments == 0:
                 row.reserve = cash.quantize(CENT)
