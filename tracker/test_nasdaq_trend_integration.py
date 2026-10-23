@@ -135,7 +135,9 @@ class NasdaqDailyReviewTests(TestCase):
         other_version = fill("LQQ3.L", "other.v1", "SPY exit active", "100")
         fake_result = MagicMock()
         fake_result.select_related.return_value = [valid, unrelated, other_version]
-        with patch.object(plugin.StrategySignal.objects, "filter", return_value=[]), \\
+        empty_signals = MagicMock()
+        empty_signals.order_by.return_value = []
+        with patch.object(plugin.StrategySignal.objects, "filter", return_value=empty_signals), \\
              patch.object(plugin.SignalFill.objects, "filter", return_value=fake_result):
             plugin._reconcile_dca(self.instance, row)
         self.assertEqual(row.reserve, D("400.00"))
