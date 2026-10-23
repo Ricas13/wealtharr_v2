@@ -5,6 +5,7 @@ SPY/QQQ in USD; trades use the account's pinned actual trading lines.
 """
 from dataclasses import dataclass
 from datetime import date
+from calendar import monthrange
 from decimal import Decimal, ROUND_DOWN
 
 from tracker.strategies.fixed_weights import Quote, Result, Trade
@@ -39,7 +40,7 @@ def elapsed_months(start, end):
     if not start or end < start:
         return 0
     count = (end.year - start.year) * 12 + end.month - start.month
-    if end.day < start.day:
+    if end.day < min(start.day, monthrange(end.year, end.month)[1]):
         count -= 1
     return min(12, max(0, count))
 
@@ -137,7 +138,9 @@ def evaluate(*, funds, positions, cash, quotes, signal, completed_dca=0):
     if mode in ("leveraged", "unleveraged"):
         chosen = mode
         amount = budget
-    elif mode == "dca" and signal.months_elapsed > completed_dca:
+    elif mode == "dca" and signal.months_elapsed > completed_dca and not sells:
+        # Exit proceeds must be actually recorded before any DCA purchase.
+        # Never propose a premature monthly buy in the same review as an exit.
         chosen = "unleveraged"
         amount = budget / (12 - completed_dca)
     else:
