@@ -43,6 +43,8 @@ OTHER_LINES = {
                             "Rarely", COLOURS["permanent-portfolio"]),
     "hfea": ("3× shares + 3× bonds", "55% 3× S&P 500, 45% 3× Treasuries", "4× a year", COLOURS["hfea"]),
     "three-sig": ("Quarterly signal, small companies", "80/20, 3% growth target", "4× a year", COLOURS["three-sig"]),
+    "nasdaq-trend-dca": ("Daily Nasdaq trend + DCA", "3× Nasdaq in uptrends; monthly 1× Nasdaq buys after exit",
+                         "Daily check; monthly DCA", COLOURS["nasdaq-trend-dca"]),
 }
 # Signed-in pages (Add strategy) may use the strategies' own names; the public
 # homepage keeps the generic ones above.
@@ -106,7 +108,7 @@ def _public_budget():
 def compare(amount, monthly, frame, real_names=False, public=False):
     """Chart-ready hypothetical comparison, cached until the next download."""
     latest = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
-    key = "home-compare:%s:%s:%s:%s:%s" % (latest.isoformat() if latest else "none", amount, monthly, frame,
+    key = "home-compare:v2:%s:%s:%s:%s:%s" % (latest.isoformat() if latest else "none", amount, monthly, frame,
                                          "real" if real_names else "generic")
     out = cache.get(key)
     if out is not None:
@@ -178,26 +180,37 @@ def _other_rows(rows, days, index, frame, amount, monthly, real_names=False, mon
     """
     from .strategies.registry import module_for_key
     simulated, left_out = False, []
+
+    def unavailable(key, label, what, color):
+        """Keep strategies visible without inventing like-for-like returns."""
+        left_out.append(label)
+        rows.append({
+            "key": key, "label": label, "what": what, "effort": "—", "color": color,
+            "final": None, "put_in": None, "gain_pct": None, "annual": None,
+            "drawdown": None, "points": [], "available": False,
+        })
+
     for key, (label, what, effort, color) in OTHER_LINES.items():
         label = _label(key, label, real_names)
         plugin = module_for_key(key)
         study = plugin.study.get("GBP") if plugin and isinstance(plugin.study, dict) else None
         if study is None:
+            unavailable(key, label, what, color)
             continue
         data = _data(study)
         result = study.run(data, frame, amount, monthly) if data.ready else None
         s = result["series"].get("strategy") if result else None
         if not s or result["start"] != days[0] or result["end"] != days[-1]:
-            left_out.append(label)
+            unavailable(key, label, what, color)
             continue
         simulated = simulated or bool(result["simulated_notes"])
         position = {day: i for i, day in enumerate(result["dates"])}
         if any(days[i] not in position for i in index):
-            left_out.append(label)  # its trading days differ from the others'
+            unavailable(key, label, what, color)  # Study dates differ; don't fabricate prices.
             continue
         if money_in is not None and [round(s["contributed"][position[days[i]]], 2) for i in index] != [
                 round(v, 2) for v in money_in]:
-            left_out.append(label)  # its top-ups landed in different months: not a like-for-like comparison
+            unavailable(key, label, what, color)  # Deposits differ; no fabricated returns.
             continue
         rows.append({
             "key": key, "label": label, "what": what, "effort": effort, "color": color,
@@ -206,6 +219,7 @@ def _other_rows(rows, days, index, frame, amount, monthly, real_names=False, mon
             "annual": round(s["annual"], 2) if s["annual"] is not None else None,
             "drawdown": round(s["drawdown"], 2),
             "points": [round(s["values"][position[days[i]]], 2) for i in index],
+            "available": True,
         })
     return simulated, left_out
 
@@ -246,6 +260,8 @@ def selected_period_metrics(comparison, start_index, end_index):
     rows = {}
     for row in comparison["rows"]:
         values = row["points"]
+        if not values:  # Not comparable for this window; return no fabricated metrics.
+            continue
         if len(values) != n:
             raise ValueError("Comparison series dates differ")
         opening = values[start_index]
