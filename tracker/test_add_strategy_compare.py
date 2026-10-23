@@ -31,8 +31,12 @@ class AddStrategyCompareTests(TestCase):
         self.assertContains(page, "9Sig")
         self.assertContains(page, "All Seasons")
         self.assertContains(page, "3x Nasdaq Trend + DCA")
-        # Verify the table row, not merely the strategy option or embedded JSON.
-        self.assertContains(page, 'data-key="nasdaq-trend-dca"')
+        # The default 10-year table has no rows with only ~2 years seeded.
+        # The named 1-year API supplies the same table once comparable prices exist.
+        named = self.client.get(
+            reverse("v2_compare_json") + "?amount=1000&monthly=0&range=1y"
+        ).json()
+        self.assertIn("nasdaq-trend-dca", [r["key"] for r in named["rows"]])
         self.assertContains(page, "Hypothetical, not anyone")
         # The three setup choices come first, side by side; the comparison sits below them.
         body = page.content.decode()
