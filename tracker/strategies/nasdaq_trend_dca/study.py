@@ -9,7 +9,7 @@ from decimal import Decimal as D
 
 from tracker.models import StudyPrice
 from tracker.study import _new_month, _buy_and_hold, _summary, start_index, fill_orders
-from tracker.study_fixed import FixedWeightStudy, _gbp_series, _last
+from tracker.study_fixed import FixedWeightStudy
 from tracker.strategies.nasdaq_trend_dca import v1
 
 
@@ -26,7 +26,7 @@ class TrendStudy(FixedWeightStudy):
             return data
         usd = {}
         for symbol in ("SPY", "QQQ"):
-            usd[symbol] = {r.as_of: r.adj_close
+            usd[symbol] = {r.as_of: r.close
                            for r in StudyPrice.objects.filter(symbol=symbol).only(
                                "as_of", "adj_close")}
         if not usd["SPY"] or not usd["QQQ"]:
