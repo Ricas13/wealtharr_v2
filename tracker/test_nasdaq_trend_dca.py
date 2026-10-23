@@ -179,3 +179,67 @@ class NasdaqCashRegimeIntegrationTests(TestCase):
             allows_cash_only=True,
             current_weights=lambda strategy: {"LQQ3.L": D("0"), "EQQQ.L": D("0")})
         self.assertFalse(_opening_allocation_available(instance, cash_mode))
+
+
+class NasdaqDailyOwnerJourneyTests(TestCase):
+    def test_add_strategy_review_is_deduplicated_and_today_shows_trade(self):
+        from unittest.mock import patch
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        from django.utils import timezone
+        from tracker.core.catalogue import onboarding_manifest, CATALOGUE_VERSION
+        from tracker.models import (
+            Account, LedgerEntry, MarketObservation, StrategyInstance,
+            StrategyPreset, StrategySignal)
+        from tracker.strategies.nasdaq_trend_dca.plugin import review
+
+        owner = get_user_model().objects.create_user("trend-journey", password="test-strong-1")
+        account = Account.objects.create(
+            owner=owner, name="Trend Journey ISA", kind="ISA", broker="TRADING212")
+        preset, _ = StrategyPreset.objects.get_or_create(
+            slug="nasdaq-trend-dca", defaults={"name": "3x Nasdaq Trend + DCA",
+                                             "summary": "", "risk": "HIGH"})
+        # Historical SPY/QQQ observations ending on the last weekday before today.
+        today = timezone.localdate()
+        dates = sorted(today - timedelta(days=i) for i in range(1, 340)
+                       if (today - timedelta(days=i)).weekday() < 5)[-220:]
+        strategy = StrategyInstance.objects.create(
+            owner=owner, account=account, preset=preset, name="Trend Journey",
+            strategy_key="nasdaq-trend-dca", started_on=dates[-10],
+            platform_code="TRADING212", account_type_code="ISA",
+            strategy_version=v1.VERSION, mapping_version=CATALOGUE_VERSION,
+            resolved_instruments=onboarding_manifest(
+                "nasdaq-trend-dca", "TRADING212", "ISA"),
+            tracking_only=False, market_data_enabled=True)
+        LedgerEntry.objects.create(strategy=strategy, kind=LedgerEntry.DEPOSIT,
+                                   amount=D("1000"), occurred_on=dates[-2])
+        for i, d in enumerate(dates):
+            for symbol, value in (("SPY", D("110") if i >= 200 else D("100")),
+                                  ("QQQ", D("100"))):
+                MarketObservation.objects.create(
+                    symbol=symbol, as_of=d, price=value, currency="USD",
+                    source="yahoo", raw_quote_unit="USD", raw_unit_verified=True,
+                    raw_close=value)
+        for symbol in ("LQQ3.L", "EQQQ.L"):
+            MarketObservation.objects.create(
+                symbol=symbol, as_of=dates[-1], price=D("10"),
+                currency="GBP", source="yahoo", raw_quote_unit="GBp",
+                raw_unit_verified=True, raw_close=D("1000"))
+
+        def cached_sync(symbol, **kwargs):
+            return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
+
+        with patch("tracker.market_data.sync_ticker", side_effect=cached_sync):
+            self.assertEqual(review(strategy)["status"], "ok")
+            self.assertEqual(review(strategy)["status"], "ok")
+        signals = StrategySignal.objects.filter(strategy=strategy)
+        self.assertEqual(signals.count(), 1)
+        signal = signals.get()
+        self.assertEqual(signal.strategy_version, v1.VERSION)
+        self.assertEqual(signal.actions[0]["side"], "BUY")
+        self.assertEqual(signal.actions[0]["symbol"], "LQQ3.L")
+        self.client.force_login(owner)
+        page = self.client.get(reverse("v2_instance_page",
+                                       args=(strategy.pk, "today")))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Review the verified daily proposal")
