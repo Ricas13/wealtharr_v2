@@ -153,6 +153,24 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
                 "for the current instruction, if any. No orders were placed." % (
                     strategy.name, old.as_of))
 
+        # A confirmed new deposit should not sit unnoticed until the next
+        # quarter or year. This is an opt-in contribution-category *nudge*;
+        # never email estimated orders (those may become stale before delivery).
+        if (strategy.market_data_enabled and not strategy.tracking_only
+                and fresh and not (recent and trade_lines(recent)
+                    and not RebalanceExecution.objects.filter(signal=recent).exists())):
+            from .contribution_guidance import new_money_guidance
+            suggestion = new_money_guidance(strategy, report, prices_ready=True, today=today)
+            if suggestion:
+                key = "new-money:%s:%s:%s" % (
+                    strategy.pk, suggestion["deposit_id"], suggestion["last_trade_id"])
+                count += _send(strategy, owner, "contribution", key,
+                    "Wealtharr — new cash ready for investment",
+                    "%s: a confirmed deposit is waiting to be invested. "
+                    "Open Today for the CURRENT strategy-specific suggestion. "
+                    "Do not place trades from this message; cash and prices can "
+                    "change. No orders have been placed." % strategy.name)
+
         if (pref.monthly_reminders and strategy.contribution_alerts and
                 strategy.monthly_target > 0 and today.day >= 3):
             from .v2_ledger_core import effective_entries
