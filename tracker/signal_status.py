@@ -57,7 +57,7 @@ def _price_status(strategy, report):
         return False, 'An unmodelled holding exists. Reconcile the broker portfolio first.', []
     if report['missing']:
         return False, 'A held instrument has no price. Fetch verified GBP closes.', []
-    if not held:
+    if not held and not (plugin and plugin.allows_cash_only and report['cash'] > ZERO):
         return False, 'Record your purchases in the Ledger.', []
     # Every fund needs a verified quote, even one held at zero shares,
     # because a BUY instruction may require its price.
