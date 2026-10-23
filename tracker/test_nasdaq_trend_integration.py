@@ -31,6 +31,36 @@ class NasdaqOfferTests(SimpleTestCase):
         self.assertIsNotNone(module_for_key("nasdaq-trend-dca").study)
 
 
+
+class NasdaqEnrollmentTests(TestCase):
+    def test_add_strategy_go_live_and_open_standard_pages(self):
+        owner = get_user_model().objects.create_user(
+            "trend-enrol", password="long-random-password")
+        self.client.force_login(owner)
+        add = reverse("v2_add_strategy")
+        page = self.client.get(add)
+        self.assertContains(page, "3× Nasdaq Trend + DCA")
+        posted = self.client.post(add, {
+            "strategy": "nasdaq-trend-dca",
+            "platform": "TRADING212", "account_type": "ISA",
+            "ack": "yes", "mode": "fresh", "name": "Nasdaq Trend",
+            "start": (timezone.localdate()-timedelta(days=2)).isoformat(),
+            "amount": "1000", "deposited": "yes", "go_live": "yes",
+        })
+        self.assertEqual(posted.status_code, 302)
+        instance = StrategyInstance.objects.get(owner=owner)
+        self.assertEqual(instance.strategy_version, v1.VERSION)
+        self.assertEqual(set(instance.resolved_instruments["roles"]),
+                         {"leveraged", "unleveraged"})
+        self.assertFalse(instance.tracking_only)
+        self.assertTrue(instance.market_data_enabled)
+        for section in ("today", "study", "history", "ledger", "strategy", "settings"):
+            with self.subTest(section=section):
+                page = self.client.get(reverse(
+                    "v2_instance_page", args=[instance.pk, section]))
+                self.assertEqual(page.status_code, 200)
+
+
 class NasdaqDailyReviewTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_user(
