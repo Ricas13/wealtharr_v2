@@ -64,6 +64,26 @@ def _completed_dca(instance, signal):
     return min(12, len(months)), signal.as_of.strftime("%Y-%m") in months
 
 
+def _remaining_exit_proceeds(instance, signal, funds, cash):
+    """Pool only actual sale proceeds, less actual DCA purchases.
+
+    Deposits, dividends and idle cash from other sources do not become a
+    strategy-generated DCA instalment by mistake.
+    """
+    from tracker.v2_ledger_core import effective_entries
+    if signal is None or signal.mode != "dca" or not signal.exit_on:
+        return Decimal("0")
+    pool = Decimal("0")
+    for entry in effective_entries(instance):
+        if entry.occurred_on < signal.exit_on or entry.occurred_on > signal.as_of:
+            continue
+        if entry.kind == "SELL" and entry.symbol == funds["leveraged"]:
+            pool += entry.quantity * entry.unit_price - entry.fee
+        elif entry.kind == "BUY" and entry.symbol == funds["unleveraged"]:
+            pool -= entry.quantity * entry.unit_price + entry.fee
+    return max(Decimal("0"), min(cash, pool))
+
+
 def decide(instance, as_of, *, signal=None, positions=None, cash=None):
     from tracker.market_data import settlement_close
     from tracker.models import YahooSync
@@ -90,8 +110,10 @@ def decide(instance, as_of, *, signal=None, positions=None, cash=None):
     completed, done_this_month = _completed_dca(instance, signal) if signal else (0, False)
     if signal and signal.mode == "dca" and done_this_month:
         completed = max(completed, signal.months_elapsed)
+    pool = (_remaining_exit_proceeds(instance, signal, funds, cash)
+            if signal and signal.mode == "dca" else None)
     return v1.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes,
-                       signal=signal, completed_dca=completed)
+                       signal=signal, completed_dca=completed, dca_budget=pool)
 
 
 def review(instance):
