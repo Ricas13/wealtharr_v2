@@ -125,7 +125,7 @@ class HomepageSamePeriodTests(TestCase):
     def setUp(self):
         cache.clear()
 
-    def test_a_strategy_whose_prices_stop_early_is_left_out_and_named(self):
+    def test_a_strategy_whose_prices_stop_early_is_shown_without_fake_returns(self):
         from tracker.models import StudyPrice
         from tracker.test_study_fixed import seed_all_weather
         start = TODAY - timedelta(days=800)
@@ -133,10 +133,13 @@ class HomepageSamePeriodTests(TestCase):
         seed_all_weather(start, start)
         StudyPrice.objects.filter(symbol="VUAG.L", as_of__gt=TODAY - timedelta(days=60)).delete()
         data = self.client.get("/compare.json?amount=1000&monthly=0&range=1y").json()
-        self.assertNotIn("all-weather", [r["key"] for r in data["rows"]])
+        unavailable = next(r for r in data["rows"] if r["key"] == "all-weather")
+        self.assertFalse(unavailable["available"])
+        self.assertIsNone(unavailable["final"])
+        self.assertEqual(unavailable["points"], [])
         self.assertIn("All-season mix", data["left_out"])
         page = self.client.get("/?range=1y")
-        self.assertContains(page, "Left out because")
+        self.assertContains(page, "Historical figures unavailable")
         self.assertContains(page, "money-weighted (XIRR)")
 
     def test_compared_rows_share_the_same_dates(self):

@@ -17,18 +17,19 @@
             <th scope="col">Effort</th></tr></thead>
           <tbody data-rows>
             {% for row in compare.rows %}<tr data-key="{{ row.key }}">
-              <td><input type="checkbox" checked aria-label="Show {{ row.label }}"></td>
-              <th scope="row"><span class="sw" style="background:{{ row.color }}"></span>{{ row.label }} <span class="mut">· {{ row.what }}</span></th>
-              <td class="r"><strong>£{{ row.final|floatformat:"0g" }}</strong></td>
-              <td class="r">{{ row.gain_pct|floatformat:1 }}%</td>
+              <td><input type="checkbox" {% if row.points %}checked aria-label="Show {{ row.label }}"{% else %}disabled aria-label="No comparable history for {{ row.label }}"{% endif %}></td>
+              <th scope="row"><span class="sw" style="background:{{ row.color }}"></span>{{ row.label }} <span class="mut">· {{ row.what }}{% if not row.points %} · No comparable history for these dates{% endif %}</span></th>
+              <td class="r"><strong>{% if row.final is not None %}£{{ row.final|floatformat:"0g" }}{% else %}—{% endif %}</strong></td>
+              <td class="r">{% if row.gain_pct is not None %}{{ row.gain_pct|floatformat:1 }}%{% else %}—{% endif %}</td>
               <td class="r">{% if row.annual is not None %}{{ row.annual|floatformat:1 }}%{% else %}—{% endif %}</td>
-              <td class="r neg">{{ row.drawdown|floatformat:1 }}%</td>
+              <td class="r neg">{% if row.drawdown is not None %}{{ row.drawdown|floatformat:1 }}%{% else %}—{% endif %}</td>
               <td class="mut">{{ row.effort }}</td>
             </tr>{% endfor %}
           </tbody>
         </table></div>
 
         <p class="mut tiny" data-table-status role="status" aria-live="polite">Showing results for the full selected timeframe.</p>
+        <p class="mut tiny" data-rebased-note hidden></p>
         <div class="row between gap-top">
           <div class="legend" data-legend></div>
           <div class="row tight"><span class="mut tiny" data-scale-hint>Linear: equal heights are equal pounds.</span>
@@ -64,11 +65,11 @@
         <p class="mut tiny">Hover over (or tap) the chart to see each strategy's value on that day and its gain against the money put in by then.</p>
       </div>
       <p class="mut tiny gap-top"><strong>Hypothetical, not anyone's real results.</strong> Real daily prices from Yahoo, converted to pounds, replayed through each strategy's fixed rules with no dealing costs or tax.
-        The table and chart use the selected dates. Each strategy has its own opening portfolio value for a zoomed period; gain is measured against that opening value plus subsequent top-ups. The summary above uses the first reference strategy.
-        Every row covers the same dates<span data-period-wrap{% if not compare.ready %} hidden{% endif %}> (<span data-period>{{ compare.period }}</span>)</span>, the same money and the same top-up days.
+        The table and chart use the selected dates. Zooming rebases every comparable return path to your chosen starting amount at the selected start, adding only subsequent monthly top-ups. This indexes the original simulation's daily returns; it does not restart strategy decisions or claim a fresh backtest. The summary above uses the first reference strategy.
+        Every row with calculated figures covers the same dates<span data-period-wrap{% if not compare.ready %} hidden{% endif %}> (<span data-period>{{ compare.period }}</span>)</span>, the same money and the same top-up days.
         *Per year is money-weighted (XIRR) where the selected period has at least 360 days of data; worst fall removes the effect of top-ups.
         The {{ signal_name|default:"quarterly signal" }}'s 60/40 resets are assumed confirmed and filled at the quarter close.
-        <span data-left-out{% if not compare.left_out %} hidden{% endif %}>Left out because their price history doesn't cover these dates: <span data-left-out-names>{{ compare.left_out|join:", " }}</span>.</span>
+        <span data-left-out{% if not compare.left_out %} hidden{% endif %}>Historical figures unavailable for these dates (missing prices, dates or matching contributions): <span data-left-out-names>{{ compare.left_out|join:", " }}</span>.</span>
         <span data-simulated{% if not compare.simulated %} hidden{% endif %}>Before the 3× Nasdaq fund launched, its history is rebuilt from 3× QQQ's daily moves, which can look better than reality.</span>
         <span data-simulated-other{% if not compare.simulated_other %} hidden{% endif %}>Before some other funds launched, their history follows a similar older fund or index.</span>
         Past performance doesn't guarantee future returns.</p>

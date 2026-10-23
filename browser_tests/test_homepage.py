@@ -7,6 +7,7 @@ from django.core.cache import cache
 from browser_tests.harness import BrowserHarness
 from tracker.models import InviteRequest
 from tracker.test_study import TODAY, seed
+from tracker.v2_home import OTHER_LINES
 
 
 class HomepageBrowserTests(BrowserHarness):
@@ -38,7 +39,10 @@ class HomepageBrowserTests(BrowserHarness):
                 page.get_by_role("button", name="↺ Replay").click()
                 self.assertTrue(page.locator(".notif").is_visible())
                 # Comparison: real study rows, untick one, change timeframe and top-up.
-                self.assertEqual(page.locator("[data-rows] tr").count(), 4)
+                self.assertEqual(page.locator("[data-rows] tr").count(), 4 + len(OTHER_LINES))
+                trend = page.locator("[data-rows] tr[data-key='nasdaq-trend-dca']")
+                self.assertTrue(trend.is_visible())
+                self.assertTrue(trend.locator("input[type='checkbox']").is_disabled())
                 self.assertEqual(page.locator(".chart polyline").count(), 5)
                 self.assertTrue(page.locator("[data-zoom-track]").is_visible())
                 page.locator('[data-zoom-handle="end"]').focus()

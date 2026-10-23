@@ -36,7 +36,11 @@ class HomepageTests(TestCase):
         seed("GBPUSD=X", start, lambda d, i: 1.25)
         data = self.client.get("/compare.json?amount=2000&monthly=0&range=1y").json()
         self.assertTrue(data["ready"])
-        self.assertEqual([r["key"] for r in data["rows"]], ["nine_sig", "hold", "spy", "vti"])
+        self.assertEqual([r["key"] for r in data["rows"][:4]], ["nine_sig", "hold", "spy", "vti"])
+        trend = next(r for r in data["rows"] if r["key"] == "nasdaq-trend-dca")
+        self.assertEqual(trend["label"], "Daily Nasdaq trend + DCA")
+        self.assertIsNone(trend["final"])
+        self.assertEqual(trend["points"], [])
         spy = next(r for r in data["rows"] if r["key"] == "spy")
         # Flat SPY at a flat rate: value is what went in.
         self.assertAlmostEqual(spy["final"], 2000, places=2)
@@ -62,15 +66,57 @@ class HomepageTests(TestCase):
         data = self.client.get("/compare.json?amount=1000&monthly=0&range=1y").json()
         keys = [r["key"] for r in data["rows"]]
         self.assertIn("all-weather", keys)
-        # Strategies whose price history isn't downloaded are left out, not guessed.
-        self.assertNotIn("golden-butterfly", keys)
+        # Missing histories appear as unavailable rows, never invented figures.
+        self.assertIn("golden-butterfly", keys)
+        golden = next(r for r in data["rows"] if r["key"] == "golden-butterfly")
+        self.assertIsNone(golden["final"])
+        self.assertEqual(golden["points"], [])
         row = next(r for r in data["rows"] if r["key"] == "all-weather")
         self.assertEqual(row["label"], "All-season mix")
         self.assertEqual(len(row["points"]), len(data["put_in_points"]))
         page = self.client.get("/?range=1y")
         self.assertContains(page, "All-season mix")
+        self.assertContains(page, "Daily Nasdaq trend + DCA")
+        # Verify the table row, not merely the strategy option or embedded JSON.
+        self.assertContains(page, 'data-key="nasdaq-trend-dca"')
+        self.assertContains(page, "No comparable history for these dates")
         for brand in ("All Weather", "Bridgewater", "Golden Butterfly", "Dual Momentum", "Permanent Portfolio"):
             self.assertNotContains(page, brand)
+
+    def test_trend_joins_comparison_when_study_prices_are_complete(self):
+        from tracker.test_study_fixed import seed_all_weather
+        start = TODAY - timedelta(days=800)
+        seed_all_weather(start, start)
+        seed("QQQ", start, lambda d, i: 100 * (1.001 ** i))
+        seed("LQQ3.L", start, lambda d, i: 25 + i * 0.02, currency="GBP")
+        seed("EQQQ.L", start, lambda d, i: 40 + i * 0.01, currency="GBP")
+        result = self.client.get("/compare.json?amount=1000&monthly=0&range=1y").json()
+        self.assertTrue(result["ready"])
+        row = next(r for r in result["rows"] if r["key"] == "nasdaq-trend-dca")
+        self.assertTrue(row["available"])
+        self.assertIsNotNone(row["final"])
+        self.assertEqual(len(row["points"]), len(result["point_dates_iso"]))
+        end = min(100, len(row["points"]) - 1)
+        zoom = self.client.get(
+            "/compare.json?amount=1000&monthly=0&range=1y&window_start=0&window_end=%d" % end
+        ).json()
+        self.assertIn("nasdaq-trend-dca", zoom["rows"])
+
+    def test_missing_trend_history_stays_visible_without_fake_zoom_results(self):
+        start = TODAY - timedelta(days=800)
+        seed("QQQ", start, lambda d, i: 100 * (1.001 ** i))
+        seed("SPY", start, lambda d, i: 200)
+        seed("VTI", start, lambda d, i: 50)
+        seed("GBPUSD=X", start, lambda d, i: 1.25)
+        comparison = self.client.get("/compare.json?amount=1000&monthly=0&range=1y").json()
+        row = next(r for r in comparison["rows"] if r["key"] == "nasdaq-trend-dca")
+        self.assertFalse(row["available"])
+        self.assertIsNone(row["gain_pct"])
+        zoom = self.client.get(
+            "/compare.json?amount=1000&monthly=0&range=1y&window_start=0&window_end=100"
+        ).json()
+        self.assertNotIn("nasdaq-trend-dca", zoom["rows"])
+        self.assertIn("nine_sig", zoom["rows"])
 
     def test_comparison_inputs_are_whole_pounds_within_limits(self):
         data = self.client.get("/compare.json?amount=250000&monthly=2500.4&range=bogus").json()

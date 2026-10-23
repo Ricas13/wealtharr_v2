@@ -7,6 +7,7 @@ from django.core.cache import cache
 
 from browser_tests.harness import BrowserHarness
 from tracker.test_study import TODAY, seed
+from tracker.v2_home import OTHER_LINES
 
 
 class AddStrategyCompareBrowserTests(BrowserHarness):
@@ -31,7 +32,10 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                     page.locator("[data-range='1y']").click()
                 page.wait_for_function("document.querySelector('[data-range-words]').textContent === '1 year'")
                 rows = page.locator("[data-compare] [data-rows] tr")
-                self.assertEqual(rows.count(), 5)  # 9Sig, buy & hold, SPY, VTI, All Seasons
+                self.assertEqual(rows.count(), 4 + len(OTHER_LINES))
+                trend = page.locator("[data-rows] tr[data-key='nasdaq-trend-dca']")
+                self.assertTrue(trend.is_visible())
+                self.assertTrue(trend.locator("input[type='checkbox']").is_disabled())
                 # Typed amounts: bigger than the old slider limits.
                 page.locator("[data-amount]").fill("250000")
                 with page.expect_response(lambda r: "amount=250000" in r.url):
@@ -41,7 +45,8 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 # Sort by gain, best first, then flip.
                 page.locator("[data-sort='gain_pct']").click()
                 gains = page.locator("[data-compare] [data-rows] tr td:nth-child(4)").all_text_contents()
-                values = [float(g.replace("+", "").replace("−", "-").rstrip("%")) for g in gains]
+                values = [float(g.replace("+", "").replace("−", "-").rstrip("%"))
+                          for g in gains if "—" not in g]
                 self.assertEqual(values, sorted(values, reverse=True))
                 self.assertEqual(page.locator("th:has([data-sort='gain_pct'])").get_attribute("aria-sort"), "descending")
                 page.locator("[data-sort='gain_pct']").click()
@@ -54,8 +59,8 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 nav = page.locator("[data-zoom-track]")
                 start_handle = page.locator('[data-zoom-handle="start"]')
                 full_period = page.locator("[data-zoom-dates]").inner_text()
-                initial_value = page.locator("[data-rows] tr").first.locator("td").nth(1).inner_text()
-                initial_gain = page.locator("[data-rows] tr").first.locator("td").nth(2).inner_text()
+                initial_value = page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(1).inner_text()
+                initial_gain = page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(2).inner_text()
                 self.assertEqual(start_handle.get_attribute("aria-valuenow"), "0")
                 nav.scroll_into_view_if_needed()
                 track_box = nav.bounding_box()
@@ -69,13 +74,29 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 self.assertGreater(int(start_handle.get_attribute("aria-valuenow")), 0)
                 self.assertNotEqual(page.locator("[data-zoom-dates]").inner_text(), full_period)
                 page.wait_for_function("document.querySelector('[data-table-status]').textContent.includes('Showing results for the selected dates')")
-                # Trimming the start changes the return, not the end-date value.
-                self.assertEqual(page.locator("[data-rows] tr").first.locator("td").nth(1).inner_text(),
-                                 initial_value)
-                self.assertNotEqual(page.locator("[data-rows] tr").first.locator("td").nth(2).inner_text(),
+                # Zoomed simulations are indexed back to the chosen start
+                # amount, rather than claiming the older £100k balance was
+                # the investment made on the zoom's first day.
+                self.assertIn("Rebased start + selected top-ups",
+                              page.locator("[data-putin-title]").inner_text())
+                self.assertIn("not a fresh strategy backtest",
+                              page.locator("[data-rebased-note]").inner_text())
+                self.assertNotEqual(
+                    page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(1).inner_text(),
+                    initial_value)
+                self.assertNotEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(2).inner_text(),
                                     initial_gain)
+                # Main chart tooltip at its selected left boundary must begin
+                # at the entered 250,000 pounds for every available strategy.
+                start_chart = page.locator("[data-chart]").bounding_box()
+                page.mouse.move(start_chart["x"] + 1, start_chart["y"] + start_chart["height"] / 2)
+                page.wait_for_timeout(80)
+                first_tooltip = page.locator("[data-tip]")
+                self.assertTrue(first_tooltip.is_visible())
+                self.assertIn("£250,000", first_tooltip.inner_text())
+                self.assertIn("Money put in by then: £250,000", first_tooltip.inner_text())
                 # Shorter than 360 days: no misleading annualised return.
-                self.assertIn("—", page.locator("[data-rows] tr").first.locator("td").nth(3).inner_text())
+                self.assertIn("—", page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(3).inner_text())
                 # Move the selected time window with its keyboard slider.
                 window = page.locator("[data-zoom-window]")
                 before = int(window.get_attribute("aria-valuenow"))
@@ -87,9 +108,9 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 self.assertEqual(start_handle.get_attribute("aria-valuenow"), "0")
                 self.assertEqual(page.locator("[data-zoom-dates]").inner_text(), full_period)
                 self.assertTrue(page.locator("[data-zoom-reset]").is_disabled())
-                self.assertEqual(page.locator("[data-rows] tr").first.locator("td").nth(1).inner_text(),
+                self.assertEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(1).inner_text(),
                                  initial_value)
-                self.assertEqual(page.locator("[data-rows] tr").first.locator("td").nth(2).inner_text(),
+                self.assertEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(2).inner_text(),
                                  initial_gain)
                 # Hover readout.
                 svg = page.locator("[data-compare] [data-chart]")

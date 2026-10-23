@@ -83,12 +83,15 @@
     sortedRows().forEach(function (row) {
       var tr = document.createElement("tr");
       tr.dataset.key = row.key;
+      var available = Array.isArray(row.points) && row.points.length === count();
       if (hidden[row.key]) tr.className = "off";
       var td = cell("td");
       var box_ = document.createElement("input");
       box_.type = "checkbox";
-      box_.checked = !hidden[row.key];
-      box_.setAttribute("aria-label", "Show " + row.label);
+      box_.checked = available && !hidden[row.key];
+      box_.disabled = !available;
+      box_.setAttribute("aria-label", available ? "Show " + row.label :
+        "No comparable history for " + row.label);
       td.appendChild(box_);
       tr.appendChild(td);
       var name = cell("th");
@@ -97,7 +100,8 @@
       sw.style.background = row.color;
       name.appendChild(sw);
       name.appendChild(document.createTextNode(row.label + " "));
-      name.appendChild(cell("span", "mut", "· " + row.what));
+      name.appendChild(cell("span", "mut", "· " + row.what +
+        (available ? "" : " · No comparable history for these dates")));
       tr.appendChild(name);
       var value = cell("td", "r");
       value.appendChild(cell("strong", "", row.final === null ? "—" : "£" + money(row.final)));
@@ -121,13 +125,20 @@
     var selected = view && !isFullView();
     var status = box.querySelector("[data-table-status]");
     text("[data-period]", selected ? dateAt(view.start) + " – " + dateAt(view.end) : state.period);
-    text("[data-putin-title]", selected
-      ? (selectedMetrics ? selectedMetrics.reference_label + " opening value + top-ups"
-        : "Reference strategy opening value + top-ups")
-      : "You'd have put in");
+    text("[data-putin-title]", selected ? "Rebased start + selected top-ups" : "You'd have put in");
+    var rebasedNote = box.querySelector("[data-rebased-note]");
+    if (rebasedNote) {
+      rebasedNote.hidden = !selected;
+      if (selected) {
+        rebasedNote.textContent = "Selected-period values start at £" + money(state.amount) +
+          " and follow the original simulation's daily returns, with your selected monthly " +
+          "top-ups. This is a rebased comparison, not a fresh strategy backtest.";
+      }
+    }
     text("[data-range-words]", selected ? "selected dates" : state.range_words);
     text("[data-putin]", selected
-      ? (selectedMetrics ? money(selectedMetrics.put_in) : "—")
+      ? money(selectedMetrics ? selectedMetrics.put_in :
+          Number(state.amount) + state.put_in_points[view.end] - state.put_in_points[view.start])
       : money(state.put_in));
     status.textContent = selected
       ? (tablePending ? "Calculating selected-period returns…" :
@@ -188,6 +199,33 @@
     return result;
   }
 
+  // Rebase the already simulated daily growth factors. We intentionally do
+  // not re-run path-dependent strategy rules at the selection boundary.
+  // The server uses the same recurrence for its selected-period metrics.
+  function rebasedPoints(points) {
+    if (isFullView()) return points;
+    var values = [];
+    var putIn = state.put_in_points;
+    values[view.start] = Number(state.amount);
+    for (var i = view.start + 1; i <= view.end; i++) {
+      var change = putIn[i] - putIn[i - 1];
+      if (!(points[i - 1] > 0) || !(points[i] > change) || change < 0) return [];
+      values[i] = values[i - 1] * (points[i] - change) / points[i - 1] + change;
+    }
+    return values;
+  }
+
+  function rebasedContributions() {
+    var original = state.put_in_points || [];
+    if (isFullView()) return original;
+    var out = [];
+    out[view.start] = Number(state.amount);
+    for (var i = view.start + 1; i <= view.end; i++) {
+      out[i] = out[i - 1] + original[i] - original[i - 1];
+    }
+    return out;
+  }
+
   function drawLine(target, values, samples, first, last, y, color, cls) {
     var p = document.createElementNS(NS, "polyline");
     var width = Math.max(1, last - first);
@@ -203,10 +241,16 @@
     svg.querySelectorAll("polyline").forEach(function (p) { p.remove(); });
     var legend = box.querySelector("[data-legend]");
     legend.textContent = "";
-    var shown = (state.rows || []).filter(function (r) { return !hidden[r.key]; });
-    var series = shown.map(function (r) { return r.points; }).concat([state.put_in_points || []]);
     if (!count()) return;
     normaliseView();
+    var originalShown = (state.rows || []).filter(function (r) {
+      return !hidden[r.key] && Array.isArray(r.points) && r.points.length === count();
+    });
+    var shown = originalShown.map(function (r) {
+      return Object.assign({}, r, { points: rebasedPoints(r.points) });
+    }).filter(function (r) { return r.points.length; });
+    var putIn = rebasedContributions();
+    var series = shown.map(function (r) { return r.points; }).concat([putIn]);
     var f = log ? Math.log10 : function (x) { return x; };
     var smallest = Infinity, greatest = -Infinity;
     series.forEach(function (values) {
@@ -223,7 +267,7 @@
     var span = (hi - lo) || 1;
     var y = function (v) { return 300 - (f(Math.max(v, 1)) - lo) / span * 300; };
     var samples = indices(view.start, view.end, 850);
-    drawLine(svg, state.put_in_points || [], samples, view.start, view.end, y, null, "putin");
+    drawLine(svg, putIn, samples, view.start, view.end, y, null, "putin");
     shown.forEach(function (r) {
       drawLine(svg, r.points, samples, view.start, view.end, y, r.color);
       var item = cell("span");
@@ -239,7 +283,7 @@
     put.appendChild(psw);
     put.appendChild(document.createTextNode("Money put in"));
     legend.appendChild(put);
-    scale = { f: f, lo: lo, span: span, shown: shown };
+    scale = { f: f, lo: lo, span: span, shown: shown, putIn: putIn };
     var label = function (x) { return "£" + money(log ? Math.pow(10, x) : x); };
     text('[data-y="0"]', label(hi));
     text('[data-y="1"]', label(lo + span / 2));
@@ -252,7 +296,10 @@
       var at = Math.round(view.start + (view.end - view.start) * t / 4);
       ticks.appendChild(cell("span", "", dateAt(at)));
     }
-    renderTimeline(shown, series);
+    // The mini-map remains the full, unre-based history so moving the window
+    // retains its original context; only the selected main chart is rebased.
+    renderTimeline(originalShown, originalShown.map(function (r) { return r.points; })
+      .concat([state.put_in_points || []]));
   }
 
   function renderTimeline(shown, series) {
@@ -355,8 +402,8 @@
   }
 
   function showTip(clientX) {
-    var putIn = state.put_in_points || [];
-    if (!scale || !putIn.length) return;
+    var putIn = scale && scale.putIn;
+    if (!scale || !putIn || !putIn.length) return;
     var rect = svg.getBoundingClientRect();
     var frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
     var i = Math.round(view.start + frac * (view.end - view.start));
@@ -537,6 +584,8 @@
   box.querySelector("[data-rows]").addEventListener("click", function (e) {
     var tr = e.target.closest("tr");
     if (!tr) return;
+    var row = (state.rows || []).find(function (r) { return r.key === tr.dataset.key; });
+    if (!row || !Array.isArray(row.points) || row.points.length !== count()) return;
     hidden[tr.dataset.key] = !hidden[tr.dataset.key];
     hideTip();
     renderTable();
