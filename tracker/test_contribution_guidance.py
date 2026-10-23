@@ -5,10 +5,12 @@ from types import SimpleNamespace as NS
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from tracker.contribution_guidance import new_money_guidance, uninvested_deposits
-from tracker.models import Account, LedgerEntry, PriceMark, StrategyInstance, StrategyPreset
+from tracker.instrument_mapping import MAPPING_VERSION
+from tracker.models import Account, LedgerEntry, MarketObservation, PriceMark, StrategyInstance, StrategyPreset
 from tracker.services import ledger_summary, validate_and_record
 from tracker.strategies.contributions import allocation
 from tracker.strategies.registry import describe_strategy
@@ -71,6 +73,7 @@ class LiveContributionGuidanceTests(TestCase):
             owner=self.owner, account=account, preset=preset,
             strategy_key=key, name="9Sig contributions",
             strategy_version=describe_strategy(key).version,
+            mapping_version=MAPPING_VERSION,
             equity_symbol="LQQ3.L", safe_symbol="ERNS.L",
             market_data_enabled=True, tracking_only=False)
         self.day = timezone.localdate() - timedelta(days=2)
@@ -85,6 +88,8 @@ class LiveContributionGuidanceTests(TestCase):
             PriceMark.objects.create(
                 strategy=self.strategy, symbol=symbol, price=price,
                 as_of=self.day, source="yahoo")
+            MarketObservation.objects.create(
+                symbol=symbol, as_of=self.day, price=price, currency="GBP")
 
     def test_existing_9sig_deposit_has_safe_fund_prompt_then_partial_fill(self):
         self.record("DEPOSIT", amount="1000")
@@ -102,6 +107,21 @@ class LiveContributionGuidanceTests(TestCase):
         self.record("BUY", symbol="ERNS.L", quantity="6", price="50")
         self.assertIsNone(new_money_guidance(
             self.strategy, ledger_summary(self.strategy), prices_ready=True))
+
+    def test_today_shows_new_cash_card_after_verified_close(self):
+        self.record("DEPOSIT", amount="1000")
+        self.record("BUY", symbol="LQQ3.L", quantity="6", price="100")
+        self.record("BUY", symbol="ERNS.L", quantity="8", price="50")
+        self.record("DEPOSIT", amount="500")
+        self.prices()
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("v2_instance_page", args=[
+            self.strategy.pk, "today"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invest your new deposit")
+        self.assertContains(response, "ERNS.L")
+        self.assertContains(response, "500.00")
+        self.assertContains(response, "Record what I bought")
 
     def test_blocks_for_missing_or_held_prices_and_tracking_only(self):
         self.record("DEPOSIT", amount="1000")
