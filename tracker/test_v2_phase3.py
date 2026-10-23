@@ -79,6 +79,27 @@ class LedgerVersioningTests(TestCase):
         result.update(overrides)
         return result
 
+    def test_csv_headers_match_account_currency_without_changing_gbp_schema(self):
+        from types import SimpleNamespace
+        from tracker.v2_ledger_views import _export, _input_payload
+        from django.core.exceptions import ValidationError
+
+        for currency in ("GBP", "USD", "EUR"):
+            with self.subTest(currency=currency):
+                target = SimpleNamespace(pk=42, account=SimpleNamespace(currency=currency))
+                content = _export(target, []).content.decode("utf-8")
+                self.assertIn("unit_price_" + currency.lower(), content)
+                self.assertIn("amount_" + currency.lower(), content)
+                self.assertIn("fee_" + currency.lower(), content)
+        pseudo = SimpleNamespace(started_on=self.day,
+                                 account=SimpleNamespace(currency="USD"))
+        invalid = dict(self._payload(), amount="not-a-price")
+        with self.assertRaisesMessage(ValidationError, "actual USD cash amount"):
+            _input_payload(invalid, pseudo)
+        # Existing GBP consumer column names are unchanged.
+        self.assertIn("amount_gbp", self.client.get(
+            self._ledger() + "?export=csv").content.decode("utf-8"))
+
     def test_authenticated_owner_only_real_entries_and_exports(self):
         self._entry(note="=SUM(1+1)")
         self._entry(self.other_instance, amount="98765.43", note="SECRET_OTHER_USER")

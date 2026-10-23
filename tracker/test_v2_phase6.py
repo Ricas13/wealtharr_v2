@@ -62,6 +62,13 @@ class V2HistoryTests(TestCase):
     def _url(self, inst=None):
         return reverse("v2_instance_page", args=[(inst or self.account).pk,"history"])
 
+    def test_performance_does_not_claim_unmatched_usd_index_outperformance(self):
+        html = self.client.get(self._url())
+        self.assertContains(html, "QQQ (Nasdaq-100 proxy) · USD price")
+        self.assertContains(html, "Not like-for-like with your portfolio")
+        self.assertNotContains(html, "vs Nasdaq-100")
+        self.assertContains(html, "cash-flow timing and dividends differ")
+
     def test_genuine_cash_ledger_supports_inception_xirr_zero(self):
         self._record()
         report = build_history(self.account)

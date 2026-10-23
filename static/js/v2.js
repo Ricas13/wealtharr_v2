@@ -135,6 +135,13 @@
 (function () {
   "use strict";
   document.querySelectorAll("select[data-w2-form-action]").forEach(function (select) {
-    select.addEventListener("change", function () { select.form.action = select.value; });
+    function updateTarget() {
+      select.form.action = select.value;
+      var current = select.options[select.selectedIndex];
+      var label = select.form.querySelector("[data-w2-selected-currency]");
+      if (label && current) label.textContent = current.dataset.currencySymbol || "";
+    }
+    select.addEventListener("change", updateTarget);
+    updateTarget();
   });
 })();

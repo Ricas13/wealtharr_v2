@@ -115,6 +115,33 @@ class Phase6HistoryBrowserTests(BrowserHarness):
                     self.assertTrue(target.is_file())
                     self.assertEqual(self.browser_errors, [])
 
+    def test_quick_add_amount_currency_changes_with_selected_strategy(self):
+        from tracker.models import Account, StrategyInstance
+        usd_account = Account.objects.create(
+            owner=self.owner, name="USD account", kind="GIA",
+            broker="TRADING212", currency="USD", country="US",
+        )
+        usd = StrategyInstance.objects.create(
+            owner=self.owner, account=usd_account,
+            preset=self.cash.preset, name="USD test portfolio",
+            tracking_only=True,
+        )
+        self.new_page(390)
+        self.sign_in()
+        self.visit("v2_overview")
+        picker = self.page.locator("select[data-w2-form-action]")
+        self.assertTrue(picker.is_visible())
+        symbol = self.page.locator("[data-w2-selected-currency]")
+        self.assertEqual(symbol.inner_text(), "£")
+        picker.select_option(label="USD test portfolio (USD)")
+        self.assertEqual(symbol.inner_text(), "$")
+        self.assertIn("/s/%s/ledger/new/" % usd.pk,
+                      self.page.locator("#w2-quick-money").get_attribute("action"))
+        self.assertLessEqual(
+            self.page.evaluate("document.documentElement.scrollWidth"), 391
+        )
+        self.assertEqual(self.browser_errors, [])
+
     def test_history_range_selector_preserves_no_synthetic_returns(self):
         self.new_page(390)
         self.sign_in()

@@ -131,7 +131,7 @@ def replay(entries, *, strict=True):
             raise ValidationError("Ledger contains an invalid amount, price, share quantity or fee.")
         if row.kind in MONEY_KINDS:
             if row.amount <= ZERO or row.quantity != ZERO or row.unit_price != ZERO or row.fee != ZERO:
-                raise ValidationError("Cash entries require a positive GBP amount and no shares or price.")
+                raise ValidationError("Cash entries require a positive amount in the account currency and no shares or price.")
             if row.kind == "DEPOSIT":
                 cash += row.amount
                 funded += row.amount
