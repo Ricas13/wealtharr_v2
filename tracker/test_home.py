@@ -77,6 +77,8 @@ class HomepageTests(TestCase):
         page = self.client.get("/?range=1y")
         self.assertContains(page, "All-season mix")
         self.assertContains(page, "Daily Nasdaq trend + DCA")
+        # Verify the table row, not merely the strategy option or embedded JSON.
+        self.assertContains(page, 'data-key="nasdaq-trend-dca"')
         self.assertContains(page, "No comparable history for these dates")
         for brand in ("All Weather", "Bridgewater", "Golden Butterfly", "Dual Momentum", "Permanent Portfolio"):
             self.assertNotContains(page, brand)
