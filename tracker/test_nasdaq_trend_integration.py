@@ -171,7 +171,7 @@ class NasdaqStudyTests(TestCase):
         data = study.load_data()
         self.assertTrue(data.ready)
         self.assertGreaterEqual(len(data.signal_history), 200)
-        result = study.run(data, "1m", 10000, 0, "next")
+        result = study.run(data, "max", 10000, 0, "next")
         self.assertIsNotNone(result)
         self.assertIn("strategy", result["series"])
         self.assertEqual(result["simulated_notes"], [])
