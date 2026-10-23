@@ -103,6 +103,22 @@ class Phase4TodayBrowserTests(BrowserHarness):
                         self.assertTrue(output.is_file())
                     self.assertEqual(self.browser_errors, [])
 
+    def test_missing_instrument_blocks_review_with_usable_mobile_diagnostics(self):
+        PriceMark.objects.filter(strategy=self.strategy, symbol="ERNS.L").delete()
+        self.new_page(390)
+        self.sign_in()
+        self.visit("v2_instance_page", self.strategy.pk, "today")
+        self.page.get_by_text("Prices missing", exact=False).first.wait_for()
+        self.page.get_by_text("Show instrument price checks").click()
+        self.assertTrue(self.page.get_by_text("No accepted closing price").is_visible())
+        self.assertTrue(self.page.get_by_text("Wealtharr will retry", exact=False).is_visible())
+        self.assertNotIn("Review the verified quarterly proposal", self.page.content())
+        self.visit("v2_overview")
+        self.page.get_by_text("Review blocked by data").first.wait_for()
+        self.assertIn("Not a readiness check", self.page.content())
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"), 391)
+        self.assertEqual(self.browser_errors, [])
+
     def test_real_fill_requires_explicit_broker_confirmation(self):
         self.new_page(390)
         self.sign_in()

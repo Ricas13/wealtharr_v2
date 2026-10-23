@@ -92,10 +92,35 @@
         <p class="w2-muted">{{ today_explanation }}</p>
         <a class="w2-button w2-button-primary w2-space-top" href="#w2-add-money">Add money</a>
       {% elif today_status == 'blocked' %}
-        <p class="w2-muted">{{ today_explanation }}</p>
-        <div class="w2-row w2-space-top">
-          {% if selected_instance.tracking_only %}<a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Go live</a>
-          {% else %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Open the ledger</a>{% endif %}
+        <div id="price-health">
+          <p class="w2-muted">{{ today_explanation }}</p>
+          {% if today_price_health.details and today_price_health.status != 'inactive' %}
+          <details class="w2-space-top">
+            <summary class="w2-muted">Show instrument price checks</summary>
+            <ul class="w2-note">
+              {% for item in today_price_health.details %}
+                <li><strong>{{ item.symbol }}</strong> ·
+                    {% if item.issue %}{{ item.issue }}{% else %}Accepted close{% endif %}
+                    {% if item.as_of %} ({{ item.as_of|date:"j M Y" }}){% endif %}
+                    {% if item.checked %} · Last check {{ item.checked|date:"j M H:i" }}{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+          {% endif %}
+          <div class="w2-row w2-space-top">
+            {% if today_price_health.action == 'setup' or selected_instance.tracking_only %}
+              <a class="w2-button w2-button-primary" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Check setup</a>
+            {% elif today_price_health.action == 'admin' and request.user.is_staff %}
+              <a class="w2-button" href="{% url 'control' %}#price-revisions">Review held prices</a>
+            {% elif today_price_health.action == 'admin' %}
+              <p class="w2-note">The held or unverified price needs site-owner review before instructions can resume.</p>
+            {% elif today_price_health.action == 'ledger' %}
+              <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Reconcile the ledger</a>
+            {% else %}
+              <p class="w2-note">Wealtharr will retry on its next scheduled market-data check. Do not act on an older instruction.</p>
+            {% endif %}
+          </div>
         </div>
       {% else %}
         <p class="w2-muted">{{ today_explanation }}</p>

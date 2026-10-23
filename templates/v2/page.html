@@ -13,8 +13,12 @@
   </div>
   <div class="w2-row">
     {% if selected_instance.tracking_only %}<span class="w2-chip">Not live</span>{% else %}<span class="w2-chip w2-ok">Live</span>{% endif %}
-    {% if head_prices.date %}<span class="w2-chip {% if head_prices.fresh %}w2-ok{% else %}w2-wait{% endif %}">Prices {% if head_prices.fresh %}fresh{% else %}stale{% endif %} · {{ head_prices.date|date:"j M" }}</span>
-    {% else %}<span class="w2-chip">No prices yet</span>{% endif %}
+    <span class="w2-chip {% if head_prices.ready %}w2-ok{% elif head_prices.status != 'inactive' %}w2-wait{% endif %}" title="{{ head_prices.reason }}">
+      {{ head_prices.label }}{% if head_prices.date %} · {{ head_prices.date|date:"j M" }}{% endif %}
+    </span>
+    {% if not head_prices.ready and head_prices.status != 'inactive' %}
+      <a class="w2-muted" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='today' %}#price-health">Why?</a>
+    {% endif %}
     {% if selected_instance.strategy_version %}<span class="w2-chip">Rules {{ selected_instance.strategy_version }}</span>{% endif %}
     <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}?export=csv">Export CSV</a>
   </div>
@@ -47,7 +51,7 @@
   </div>
   {% if page_key == 'overview' %}
     <div class="w2-row">
-      {% if ov_last_sync %}<span class="w2-chip w2-ok">Prices checked {{ ov_last_sync.last_attempt|date:"j M H:i" }}</span>{% endif %}
+      {% if ov_last_sync %}<span class="w2-chip" title="A price check attempt is not proof that every instrument passed.">Last attempted {{ ov_last_sync.last_attempt|date:"j M H:i" }}</span>{% endif %}
       <a class="w2-button w2-button-primary" href="{% url 'v2_add_strategy' %}">{% include 'partials/icon.html' with name='plus' %} Add strategy</a>
     </div>
   {% endif %}

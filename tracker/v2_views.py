@@ -33,20 +33,9 @@ def _instances(request):
 
 
 def _price_freshness(instance):
-    """Latest stored close for the strategy's instruments, for the header chip."""
-    from datetime import timedelta
-    from django.utils import timezone
-    from .models import MarketObservation, YahooSync
-    from .strategies.instruments import symbols as fund_symbols
-    symbols = list(fund_symbols(instance))
-    latest = MarketObservation.objects.filter(
-        symbol__in=symbols, currency=instance.account.currency).order_by("-as_of").first()
-    sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()
-    return {
-        "date": latest.as_of if latest else None,
-        "fresh": bool(latest and latest.as_of >= timezone.localdate() - timedelta(days=4)),
-        "checked": sync.last_attempt if sync else None,
-    }
+    """Every required line must pass the same check used by live reviews."""
+    from .v2_price_health import strategy_price_health
+    return strategy_price_health(instance)
 
 
 def _render(request, *, page_key, page_title, instance=None, section=None, **extra):

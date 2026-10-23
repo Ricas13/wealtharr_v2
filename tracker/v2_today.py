@@ -238,10 +238,13 @@ def today_page(request, instance_id):
         else None
     )
     symbol_roles = symbol_labels(strategy)
+    from .v2_price_health import strategy_price_health
+    health = strategy_price_health(strategy, report)
     return _render(
         request, page_key="instance", page_title="Dashboard",
         instance=strategy, section="today",
         **_dashboard(request, strategy, report, ready, symbol_roles, next_end),
+        head_prices=health, today_price_health=health,
         today_status=status, today_headline=headline,
         today_explanation=explanation, today_blocking_reason=reason,
         today_ready=ready, today_signal=notice, today_partial=partial, today_executed=executed,

@@ -508,6 +508,7 @@ def _overview_extras(request, items, rows, today):
     from . import v2_dashboard as dash
     from .models import NotificationPreference
     from .services import ledger_summary
+    from .v2_price_health import strategy_price_health
     span = dash.pick_range(request)
     mode = dash.pick_mode(request)
     home = items[0].account.currency if items else "GBP"
@@ -525,7 +526,16 @@ def _overview_extras(request, items, rows, today):
         row["gain"] = (row["value"] - row["contributed"]
                        if row["value"] is not None and row["contributed"] is not None else None)
         row["xirr"] = dash.xirr_pct(strategy, own) if not strategy.tracking_only else None
+        health = strategy_price_health(strategy, summary)
+        row["price_health"] = health
         row["action"] = _open_action(strategy, summary, today) if summary else None
+        # A stored quarterly signal is not permission to display a trade as
+        # actionable when today's complete price evidence is missing.
+        if row["action"] and row["action"]["kind"] == "review" and not health["ready"]:
+            row["action"] = {
+                "kind": "data", "title": "Review blocked by data",
+                "detail": health["reason"] or "The required closing prices are not verified.",
+            }
         if row["action"]:
             todos.append({"strategy": strategy, **row["action"]})
         if (summary and summary["value"] is not None and not strategy.tracking_only
