@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from .signal_status import _last_action, _next_end, _price_status, changed_since_review
+from .signal_status import _last_action, _next_end, _price_status, changed_since_review, is_current_review
 from .cockpit_execution import (
     accept_action_as_done, completion_rows, finalize_manual_review, late_review_allowed, proposed_actions,
     record_single_fill,
@@ -224,6 +224,11 @@ def today_page(request, instance_id):
         headline = "Nothing to do right now"
         explanation = "No currently outstanding verified %s instruction." % (
             plugin.cadence_word if plugin else "quarterly")
+    if status == "start" and plugin and plugin.current_weights and not plugin.current_weights(strategy):
+        status = "idle"
+        headline = "Hold cash until the next eligible entry or DCA instalment"
+        explanation = ("Your strategy currently calls for cash. The next daily "
+                       "evaluation will determine whether any manual purchase is due.")
     next_end = next_review(strategy, timezone.localdate())
     previous_end = last_review_before(strategy, timezone.localdate())
     span = (next_end - previous_end).days
@@ -319,7 +324,7 @@ def _review_context(strategy, notice, *, form=None, error=""):
     completed = RebalanceExecution.objects.filter(
         strategy=strategy, signal=notice
     ).exists()
-    current = notice.as_of == last_review_before(strategy, timezone.localdate())
+    current = is_current_review(strategy, notice)
     late = not current and not completed and late_review_allowed(strategy, notice)
     blocked = (
         strategy.tracking_only or
@@ -447,7 +452,7 @@ def guided_review(request, instance_id, signal_id):
             context = _review_context(strategy, notice, error=err)
     return _render(
         request, page_key="instance",
-        page_title="Quarterly review", instance=strategy,
+        page_title="Daily review" if strategy.strategy_key == "nasdaq-trend-dca" else "Quarterly review", instance=strategy,
         section="review", guided_review=True,
         **_review_extras(strategy, notice), **context,
     )
