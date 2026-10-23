@@ -373,7 +373,7 @@ def _performance(request, strategy, report=None):
     best, worst = dash.best_worst(monthly)
     returns = dash.period_returns(points)
     since = next((r for r in returns if r["label"] == "Since start"), None)
-    # USD index price change is NOT a like-for-like comparison with a
+    # USD QQQ ETF price change (a Nasdaq-100 proxy) is NOT like-for-like with a
     # cash-flow-adjusted portfolio in its account currency. Show it separately,
     # without fabricating 'outperformance' in percentage points.
     nasdaq_usd = since["indexes"][0] if since and since["indexes"] else None
