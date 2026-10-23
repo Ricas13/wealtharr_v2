@@ -118,6 +118,29 @@ class NasdaqDailyReviewTests(TestCase):
     def sync_existing(self, symbol, **kwargs):
         return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
 
+    def test_dca_reserve_ignores_unrelated_confirmed_sales(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+        off_since = self.today - timedelta(days=35)
+        row = SimpleNamespace(
+            regime="OFF", off_since=off_since, reserve=D("0"),
+            reserve_source="", completed_instalments=0)
+        def fill(symbol, version, message, amount):
+            return SimpleNamespace(
+                ledger_entry=SimpleNamespace(symbol=symbol, quantity=D("1"),
+                                             unit_price=D(amount), fee=D("0")),
+                signal=SimpleNamespace(strategy_version=version, message=message))
+        valid = fill("EQQQ.L", v1.VERSION, "SPY exit active: sell holdings.", "400")
+        unrelated = fill("LQQ3.L", v1.VERSION, "Ordinary portfolio rebalance.", "900")
+        other_version = fill("LQQ3.L", "other.v1", "SPY exit active", "100")
+        fake_result = MagicMock()
+        fake_result.select_related.return_value = [valid, unrelated, other_version]
+        with patch.object(plugin.StrategySignal.objects, "filter", return_value=[]), \\
+             patch.object(plugin.SignalFill.objects, "filter", return_value=fake_result):
+            plugin._reconcile_dca(self.instance, row)
+        self.assertEqual(row.reserve, D("400.00"))
+        self.assertEqual(row.reserve_source, "confirmed_exit_fills")
+
     def test_rotation_never_buys_using_unconfirmed_sale_proceeds(self):
         from types import SimpleNamespace
         # Moving from leverage to the unleveraged guard can require a sale.
