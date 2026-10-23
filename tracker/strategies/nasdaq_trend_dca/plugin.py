@@ -209,8 +209,13 @@ def _trades(decision, roles, quotes, positions, cash, reserve, *, new_exit=False
     for role in roles:
         if role != target:
             sell(role)
+    # A proposed sale is not settled cash. Wait for the owner to record its
+    # actual execution before proposing a purchase in a later review.
+    # Never finance a buy from hypothetical sale proceeds.
+    if trades:
+        return tuple(trades)
     if target:
-        budget = cash + sum((Decimal(t["estimated_gbp"]) for t in trades), ZERO)
+        budget = cash
         if budget >= CENT:
             qty = (budget / quotes[target].price).quantize(SHARE, rounding=ROUND_DOWN)
             cost = (qty * quotes[target].price).quantize(CENT)
