@@ -7,6 +7,7 @@ from django.core.cache import cache
 
 from browser_tests.harness import BrowserHarness
 from tracker.test_study import TODAY, seed
+from tracker.v2_home import OTHER_LINES
 
 
 class AddStrategyCompareBrowserTests(BrowserHarness):
@@ -31,7 +32,10 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                     page.locator("[data-range='1y']").click()
                 page.wait_for_function("document.querySelector('[data-range-words]').textContent === '1 year'")
                 rows = page.locator("[data-compare] [data-rows] tr")
-                self.assertEqual(rows.count(), 5)  # 9Sig, buy & hold, SPY, VTI, All Seasons
+                self.assertEqual(rows.count(), 4 + len(OTHER_LINES))
+                trend = page.locator("[data-rows] tr[data-key='nasdaq-trend-dca']")
+                self.assertTrue(trend.is_visible())
+                self.assertTrue(trend.locator("input[type='checkbox']").is_disabled())
                 # Typed amounts: bigger than the old slider limits.
                 page.locator("[data-amount]").fill("250000")
                 with page.expect_response(lambda r: "amount=250000" in r.url):
@@ -41,7 +45,8 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 # Sort by gain, best first, then flip.
                 page.locator("[data-sort='gain_pct']").click()
                 gains = page.locator("[data-compare] [data-rows] tr td:nth-child(4)").all_text_contents()
-                values = [float(g.replace("+", "").replace("−", "-").rstrip("%")) for g in gains]
+                values = [float(g.replace("+", "").replace("−", "-").rstrip("%"))
+                          for g in gains if "—" not in g]
                 self.assertEqual(values, sorted(values, reverse=True))
                 self.assertEqual(page.locator("th:has([data-sort='gain_pct'])").get_attribute("aria-sort"), "descending")
                 page.locator("[data-sort='gain_pct']").click()
