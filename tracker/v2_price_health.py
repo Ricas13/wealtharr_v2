@@ -52,7 +52,8 @@ def strategy_price_health(strategy, report=None):
     )
     today = timezone.localdate()
     observation_keys = set(MarketObservation.objects.filter(
-        symbol__in=funds, currency=strategy.account.currency
+        symbol__in=funds, currency=strategy.account.currency,
+        as_of__gte=today - timedelta(days=8), as_of__lte=today,
     ).values_list("symbol", "as_of", "price"))
     details = []
     missing = stale = unverified = held = False

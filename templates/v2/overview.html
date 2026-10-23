@@ -32,7 +32,8 @@
         <tbody>{% for row in overview_rows %}
           <tr><td><span class="w2-dotsw" style="background:{{ row.strategy|strategy_colour }}"></span><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='today' %}">{{ row.strategy.name }}</a></td>
             <td>{{ row.strategy.account.kind }} · {{ row.strategy.account.broker_label }}</td>
-            <td>{% if row.strategy.tracking_only %}<span class="w2-chip">Not live</span>{% else %}<span class="w2-chip w2-ok">Live</span>{% endif %}</td>
+            <td>{% if row.strategy.tracking_only %}<span class="w2-chip">Not live</span>
+              {% else %}<span class="w2-chip w2-ok">Live</span> <span class="w2-chip {% if row.price_health.ready %}w2-ok{% else %}w2-wait{% endif %}" title="{{ row.price_health.reason }}">{{ row.price_health.label }}</span>{% endif %}</td>
             <td class="w2-r">{% if row.value is not None %}{{ row.cur }}{{ row.value|floatformat:"2g" }}{% else %}<span class="w2-muted">Not valued yet</span>{% endif %}</td>
             <td class="w2-r">{% if row.contributed is not None %}{{ row.contributed|floatformat:"2g" }}{% else %}—{% endif %}</td>
             <td class="w2-r {{ row.gain|tone }}">{% if row.gain is not None %}{{ row.gain|signed_num }}{% else %}—{% endif %}</td>
@@ -94,8 +95,11 @@
         {% else %}<p class="w2-muted">Add a strategy first.</p>{% endif %}
       </section>
       <section class="w2-card">
-        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='activity' %} Prices</h2>{% if ov_prices %}<span class="w2-chip w2-ok">OK</span>{% endif %}</div>
+        <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='activity' %} Last stored closes</h2>{% if ov_prices %}<span class="w2-chip">Not a readiness check</span>{% endif %}</div>
         {% for p in ov_prices %}<div class="w2-kv"><span>{{ p.symbol }}</span><span>{{ cur }}{{ p.price|floatformat:2 }} <small class="w2-muted">{{ p.as_of|date:"j M" }}</small></span></div>{% empty %}<p class="w2-muted">No prices yet.</p>{% endfor %}
+        {% for row in overview_rows %}{% if not row.strategy.tracking_only and not row.price_health.ready %}
+          <p class="w2-note"><a href="{% url 'v2_instance_page' instance_id=row.strategy.pk section='today' %}#price-health">{{ row.strategy.name }}</a>: {{ row.price_health.label }}. {{ row.price_health.reason }}</p>
+        {% endif %}{% endfor %}
         {% if ov_last_sync %}<div class="w2-kv"><span>Last check</span><span>{{ ov_last_sync.last_attempt|date:"j M H:i" }}</span></div>{% endif %}
       </section>
       <section class="w2-card">
