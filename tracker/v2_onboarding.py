@@ -225,7 +225,7 @@ ROUTE_DEFAULTS = {
     "quarterly": {"email": True, "discord": True, "telegram": True},
     "urgent": {"email": True, "discord": True, "telegram": True},
     "unacted": {"email": True, "discord": False, "telegram": False},
-    "contribution": {"email": False, "discord": False, "telegram": False},
+    "contribution": {"email": True, "discord": False, "telegram": False},
     "data": {"email": True, "discord": True, "telegram": True},
 }
 
