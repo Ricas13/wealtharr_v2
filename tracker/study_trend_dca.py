@@ -79,64 +79,67 @@ class TrendDcaStudy(FixedWeightStudy):
         return data
 
     def _strategy(self, data, s, amount, monthly, fill="close"):
-        days = data.days
-        signal_history = data.signal_history
-        prices = data.prices
+        """Replay decisions chronologically and fill ONLY on the following bar.
+
+        A deliberately deterministic hypothetical: no forced fills at signal
+        close, no use of next-day execution prices to size yesterday's order,
+        and no rebalancing of already-purchased DCA ETF shares.
+        """
+        days, prices = data.days, data.prices
+        signals = data.signal_history
         shares = {"leveraged": D(0), "unleveraged": D(0)}
         cash = D(str(amount))
-        pending = None
-        strategy = v1.State()
         reserve = D(0)
         filled = 0
         trades = 0
-        values = []
+        pending = None
         flows = [(days[s], amount)]
-        signal_index = {point.day: i for i, point in enumerate(signal_history)}
+        values = []
+        state = v1.State()
+        signal_index = {point.day: index for index, point in enumerate(signals)}
 
-        def price(role, i):
-            return D(str(prices[role][i]))
+        def price(role, index):
+            return D(str(prices[role][index]))
 
-        def execute(kind, i):
+        def execute(order, index):
             nonlocal cash, reserve, filled, trades
-            if kind in ("LEVERAGED", "UNLEVERAGED", "CASH", "DCA"):
-                # Sells precede any buys; the USD close that triggers the
-                # trade cannot be used as a contemporaneous UK execution.
-                wanted = {"LEVERAGED": "leveraged", "UNLEVERAGED": "unleveraged"}.get(kind)
-                for role in shares:
-                    if shares[role] and role != wanted and kind != "DCA":
-                        cash += shares[role] * price(role, i)
-                        shares[role] = D(0)
-                        trades += 1
-                if kind == "DCA":
-                    if shares["leveraged"]:
-                        cash += shares["leveraged"] * price("leveraged", i)
-                        shares["leveraged"] = D(0)
-                        trades += 1
-                    if shares["unleveraged"]:
-                        cash += shares["unleveraged"] * price("unleveraged", i)
-                        shares["unleveraged"] = D(0)
-                        trades += 1
-                    reserve, filled = cash, 0
-                elif wanted and cash:
-                    shares[wanted] += cash / price(wanted, i)
-                    cash = D(0)
+            kind, count = order
+            if kind == "INSTALLMENT":
+                spent = min(cash, (reserve / D(12) * D(count)).quantize(D("0.01")))
+                if spent > 0:
+                    shares["unleveraged"] += spent / price("unleveraged", index)
+                    cash -= spent
+                    filled += count
                     trades += 1
+                return
+            wanted = {"LEVERAGED": "leveraged",
+                      "UNLEVERAGED": "unleveraged"}.get(kind)
+            for role in shares:
+                if shares[role] and role != wanted:
+                    cash += shares[role] * price(role, index)
+                    shares[role] = D(0)
+                    trades += 1
+            if kind == "EXIT":
+                reserve, filled = cash, 0
+            elif wanted and cash > 0:
+                shares[wanted] += cash / price(wanted, index)
+                cash = D(0)
+                trades += 1
 
-        # Feed the state machine all preceding US sessions, not just the
-        # selected chart window. No historical holdings are fabricated.
-        for point in signal_history[199:]:
-            if point.day >= days[s]:
+        # Warm up the exact same pure state machine using historical sessions.
+        for j in range(199, len(signals)):
+            if signals[j].day >= days[s]:
                 break
-            i = signal_index[point.day]
-            outcome = v1.decide(signal_history[:i+1], strategy)
-            if outcome.status == "ok":
-                strategy = outcome.state
+            decision = v1.decide(signals[:j+1], state)
+            if decision.status == "ok":
+                state = decision.state
+        if state.regime == "OFF":
+            # This study starts with actual hypothetical new capital today,
+            # not fabricated old sales/DCA purchases.
+            state = v1.State("OFF", days[s])
 
         last_target = None
         for i in range(s, len(days)):
-            # Pending signal fills on the NEXT eligible study day. Even when
-            # the UI selects "same close", US signals can only be known after
-            # London trading ended.
             if pending:
                 execute(pending, i)
                 pending = None
@@ -144,28 +147,23 @@ class TrendDcaStudy(FixedWeightStudy):
                 cash += D(str(monthly))
                 flows.append((days[i], monthly))
             j = signal_index.get(days[i])
-            if j is not None and j >= 199 and i + 1 < len(days):
-                outcome = v1.decide(signal_history[:j+1], strategy,
-                                    filled_dca_installments=filled if strategy.regime == "OFF" else 0)
-                if outcome.status == "ok":
-                    strategy = outcome.state
-                    target = outcome.target
+            if j is not None and j >= 199 and i < len(days)-1:
+                decision = v1.decide(
+                    signals[:j+1], state,
+                    filled_dca_installments=filled if state.regime == "OFF" else 0)
+                if decision.status == "ok":
+                    state = decision.state
+                    target = decision.target
                     if target == "DCA":
                         if last_target != "DCA":
-                            pending = "DCA"
-                        elif outcome.dca_installments_due and reserve > 0:
-                            # Monthly purchases are based on the ORIGINAL
-                            # proceeds, not rebalanced fractions of NAV.
-                            to_spend = min(cash, reserve / D(12) * outcome.dca_installments_due)
-                            if to_spend > 0:
-                                shares["unleveraged"] += to_spend / price("unleveraged", i+1)
-                                cash -= to_spend
-                                filled += outcome.dca_installments_due
-                                trades += 1
-                    elif target != last_target:
-                        pending = target
+                            pending = ("EXIT", 0)
+                        elif decision.dca_installments_due and reserve > 0:
+                            pending = ("INSTALLMENT", decision.dca_installments_due)
+                    elif target != last_target or (cash > 0 and monthly):
+                        pending = (target, 0)
                     last_target = target
-            values.append(float(cash + sum(shares[role] * price(role, i) for role in shares)))
+            values.append(float(cash + sum(
+                shares[role] * price(role, i) for role in shares)))
         return {"values": values, "flows": flows, "trades": trades}
 
     def how_it_works(self, data):
