@@ -160,7 +160,7 @@ def _reconcile_dca(instance, row):
                 row.reserve_source = "confirmed_cash_only"
 
 
-def _trades(decision, roles, quotes, positions, cash, reserve):
+def _trades(decision, roles, quotes, positions, cash, reserve, *, new_exit=False):
     """Return manual trade suggestions; all amounts use vetted *local* closes."""
     trades = []
     held = {role: positions.get(symbol, ZERO) for role, symbol in roles.items()}
@@ -177,8 +177,11 @@ def _trades(decision, roles, quotes, positions, cash, reserve):
         trades.append({"side": "SELL", "symbol": roles[role],
                        "quantity": str(qty), "estimated_gbp": str(estimate)})
     if decision.target == "DCA":
-        # Sell risk positions first. Never sell/rebalance previous DCA buys.
+        # On a NEW exit also liquidate the 1x bodyguard holdings. Once in
+        # DCA, do not sell/rebalance completed QQQ instalments.
         sell("leveraged")
+        if new_exit:
+            sell("unleveraged")
         if trades:
             return tuple(trades)
         if reserve <= ZERO or decision.dca_installments_due <= 0:
@@ -230,7 +233,7 @@ def _state_decision(history, row, eligible):
         previous = state
     else:
         new = [point for point in eligible_history if point.day > row.last_as_of]
-        if len(new) > 6:
+        if len(new) > 30:
             return None  # Too many unchecked trading sessions; no silently skipped crossings.
         state = previous
         for point in new:
@@ -296,7 +299,11 @@ def review(instance):
             row.reserve = ZERO
             row.reserve_source = ""
             row.completed_instalments = 0
-        trades = _trades(decision, roles, quotes, positions, report["cash"], row.reserve)
+        trades = _trades(
+            decision, roles, quotes, positions, report["cash"], row.reserve,
+            new_exit=decision.state.regime == "OFF" and
+                     (old_off != decision.state.off_since or row.last_target != "DCA"),
+        )
         if trades and (row.last_as_of != eligible or row.last_target != decision.target):
             StrategySignal.objects.get_or_create(
                 strategy=instance,
