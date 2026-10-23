@@ -3,7 +3,7 @@
     <p class="w2-stat-value {{ perf_gain_pct|tone }}">{% if perf_gain_pct is not None %}{{ perf_gain_pct|signed_pct }}{% else %}—{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">Annualised (XIRR)</p>
     <p class="w2-stat-value {{ perf_xirr|tone }}">{% if perf_xirr is not None %}{{ perf_xirr|signed_pct }}{% else %}—{% endif %}</p></div>
-  <div class="w2-kpi"><p class="w2-label" title="Unhedged Nasdaq-100 index price change in USD; not matched for FX, investor cash flows or dividends">Nasdaq-100 · USD price</p>
+  <div class="w2-kpi"><p class="w2-label" title="Unhedged Nasdaq-100 index price change in USD; not matched for FX, investor cash flows or dividends">QQQ (Nasdaq-100 proxy) · USD price</p>
     <p class="w2-stat-value {{ perf_nasdaq_usd|tone }}">{% if perf_nasdaq_usd is not None %}{{ perf_nasdaq_usd|signed_pct }}{% else %}—{% endif %}</p>
     <p class="w2-muted">Not like-for-like with your portfolio</p></div>
   <div class="w2-kpi"><p class="w2-label">Max drawdown</p>
