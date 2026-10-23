@@ -141,12 +141,21 @@ def _reconcile_dca(instance, row):
     # Cash becomes an eligible reserve only following a verified exit sale, or
     # an explicitly entered cash-only opening. Deposits added later never
     # inflate this fixed reserve.
+    # Only count confirmed exit liquidation, never unrelated later sales.
+    # Proposals and unrelated manually recorded sells are not DCA proceeds.
     confirmed_sells = (SignalFill.objects.filter(
         strategy=instance, signal__as_of__gte=row.off_since,
         signal__execution__isnull=False, ledger_entry__kind="SELL",
-    ).select_related("ledger_entry"))
-    proceeds = sum((fill.ledger_entry.quantity * fill.ledger_entry.unit_price
-                    - fill.ledger_entry.fee for fill in confirmed_sells), ZERO)
+    ).select_related("ledger_entry", "signal"))
+    role_funds = set(role_symbols(instance).values())
+    proceeds = sum((
+        fill.ledger_entry.quantity * fill.ledger_entry.unit_price
+        - fill.ledger_entry.fee
+        for fill in confirmed_sells
+        if fill.ledger_entry.symbol in role_funds
+        and fill.signal.strategy_version == v1.VERSION
+        and "SPY exit active" in (fill.signal.message or "")
+    ), ZERO)
     if proceeds > ZERO:
         row.reserve = proceeds.quantize(CENT)
         row.reserve_source = "confirmed_exit_fills"
