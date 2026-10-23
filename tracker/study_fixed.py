@@ -16,7 +16,7 @@ are fresh.
 from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 
 from .core.calendar import month_end_on_or_after, quarter_end_on_or_after
 from .models import StudyPrice
