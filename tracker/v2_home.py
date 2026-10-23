@@ -226,15 +226,15 @@ def _other_rows(rows, days, index, frame, amount, monthly, real_names=False, mon
 
 
 def selected_period_metrics(comparison, start_index, end_index):
-    """Recompute a table for a selected chart window, without rerunning Studies.
+    """Show a selected slice with the *entered start amount* as its baseline.
 
-    Opening capital is the *portfolio value at the first selected close*, not
-    the contributions made since the strategy's inception. Contributions after
-    that close are external cash flows; the same flow dates are used for each
-    strategy. Money-weighted annual return uses Study's existing XIRR convention.
-    Drawdown uses Study's contribution-neutral chain, restarted at the chosen
-    opening close. Displaying the table does not restart a strategy or alter
-    its historical holdings.
+    The full-length Study replay cannot be restarted by moving a chart handle:
+    several strategies are stateful, so a fresh account on the selected date
+    would make different trades. We therefore preserve each Study's realised
+    daily contribution-neutral growth factors and rebase that return path to
+    the entered start amount. The selected-period table and client chart use
+    the identical recurrence: new = old * (original_today - topup) /
+    original_yesterday + topup. Never claim this is a newly run strategy.
     """
     from .study import _xirr
 
@@ -256,31 +256,34 @@ def selected_period_metrics(comparison, start_index, end_index):
     if any(not (flow > 0) for _, flow in flows):
         raise ValueError("Invalid comparison contribution history")
     additional = sum((amount for _, amount in flows), 0.0)
+    start_amount = float(comparison["amount"])
+    if not (start_amount > 0):
+        raise ValueError("Invalid rebased start amount")
     span = (days[-1] - days[0]).days
     rows = {}
     for row in comparison["rows"]:
         values = row["points"]
-        if not values:  # Not comparable for this window; return no fabricated metrics.
+        if not values:  # Missing history: visible row, never fabricate returns.
             continue
         if len(values) != n:
             raise ValueError("Comparison series dates differ")
-        opening = values[start_index]
-        closing = values[end_index]
-        if opening <= 0 or closing < 0:
-            raise ValueError("Undefined opening or closing value")
-        capital = opening + additional
-        gain = closing - capital
-        # Same flow-neutral NAV/drawdown algorithm as study._summary.
+        closing = start_amount
         peak, level, worst = 1.0, 1.0, 0.0
         for i in range(start_index + 1, end_index + 1):
-            prior = values[i - 1]
-            movement = invested[i] - invested[i - 1]
-            if prior <= 0 or values[i] <= 0:
+            previous = values[i - 1]
+            topup = invested[i] - invested[i - 1]
+            if previous <= 0 or values[i] <= 0 or topup < 0:
                 raise ValueError("Undefined daily flow-adjusted value")
-            level *= (values[i] - movement) / prior
+            factor = (values[i] - topup) / previous
+            if factor <= 0:
+                raise ValueError("Undefined daily investment return")
+            closing = closing * factor + topup
+            level *= factor
             peak = max(peak, level)
             worst = min(worst, level / peak - 1)
-        annual = _xirr([(days[0], opening)] + flows, days[-1], closing) if span >= 360 else None
+        capital = start_amount + additional
+        gain = closing - capital
+        annual = _xirr([(days[0], start_amount)] + flows, days[-1], closing) if span >= 360 else None
         rows[row["key"]] = {
             "final": round(closing, 2),
             "gain_pct": round(gain / capital * 100, 2) if capital > 0 else None,
@@ -290,10 +293,10 @@ def selected_period_metrics(comparison, start_index, end_index):
     return {
         "rows": rows,
         "period": "%s – %s" % (_day(days[0]), _day(days[-1])),
-        "put_in": round(comparison["rows"][0]["points"][start_index] + additional, 2),
-        "reference_label": comparison["rows"][0]["label"],
+        "put_in": round(start_amount + additional, 2),
+        "reference_label": "Selected start amount",
         "start_index": start_index, "end_index": end_index,
-        "description": "reference strategy's opening value plus top-ups during selection",
+        "description": "Rebased to the entered starting amount using existing daily returns, not a new strategy replay",
     }
 
 
