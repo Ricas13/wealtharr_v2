@@ -3,8 +3,9 @@
     <p class="w2-stat-value {{ perf_gain_pct|tone }}">{% if perf_gain_pct is not None %}{{ perf_gain_pct|signed_pct }}{% else %}—{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">Annualised (XIRR)</p>
     <p class="w2-stat-value {{ perf_xirr|tone }}">{% if perf_xirr is not None %}{{ perf_xirr|signed_pct }}{% else %}—{% endif %}</p></div>
-  <div class="w2-kpi"><p class="w2-label">vs Nasdaq-100</p>
-    <p class="w2-stat-value {{ perf_vs_nasdaq|tone }}">{% if perf_vs_nasdaq is not None %}{{ perf_vs_nasdaq|signed_num:1 }} pts{% else %}—{% endif %}</p></div>
+  <div class="w2-kpi"><p class="w2-label" title="Unhedged Nasdaq-100 index price change in USD; not matched for FX, investor cash flows or dividends">Nasdaq-100 · USD price</p>
+    <p class="w2-stat-value {{ perf_nasdaq_usd|tone }}">{% if perf_nasdaq_usd is not None %}{{ perf_nasdaq_usd|signed_pct }}{% else %}—{% endif %}</p>
+    <p class="w2-muted">Not like-for-like with your portfolio</p></div>
   <div class="w2-kpi"><p class="w2-label">Max drawdown</p>
     <p class="w2-stat-value {% if not perf_drawdown.empty %}w2-neg{% endif %}">{% if not perf_drawdown.empty %}{{ perf_drawdown.max|signed_pct }}{% else %}—{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">Best month</p>
@@ -18,7 +19,7 @@
 <div class="w2-grid2">
   <section class="w2-card w2-span2" aria-label="Return chart">
     {% include 'v2/_chart.html' with c=perf_chart ranges=perf_ranges label="Return since start, deposits removed" height=210 %}
-    <p class="w2-note">Index lines show the index's own price change over the same dates; they're not a simulated portfolio.</p>
+    <p class="w2-note">Index lines show USD price-only changes, not a simulated portfolio. FX, cash-flow timing and dividends differ; do not interpret differences as investment outperformance.</p>
   </section>
 
   <section class="w2-card">

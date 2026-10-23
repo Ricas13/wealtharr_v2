@@ -85,10 +85,10 @@
         {% if overview_rows %}
         <form method="post" action="{% url 'v2_ledger_add' instance_id=overview_rows.0.strategy.pk %}" id="w2-quick-money">
           {% csrf_token %}<input type="hidden" name="intent" value="save"><input type="hidden" name="return_to" value="today">
-          {% if overview_rows|length > 1 %}<label class="w2-field">Strategy<select class="w2-input" data-w2-form-action>{% for row in overview_rows %}<option value="{% url 'v2_ledger_add' instance_id=row.strategy.pk %}">{{ row.strategy.name }}</option>{% endfor %}</select></label>{% endif %}
+          {% if overview_rows|length > 1 %}<label class="w2-field">Strategy<select class="w2-input" data-w2-form-action>{% for row in overview_rows %}<option value="{% url 'v2_ledger_add' instance_id=row.strategy.pk %}" data-currency-symbol="{{ row.cur }}">{{ row.strategy.name }} ({{ row.strategy.account.currency }})</option>{% endfor %}</select></label>{% endif %}
           <label class="w2-field">Type<select class="w2-input" name="kind"><option value="DEPOSIT">Deposit</option><option value="INTEREST">Interest on cash</option><option value="DIVIDEND">Dividend</option></select></label>
           <input type="hidden" name="occurred_on" value="{{ ov_today|date:'Y-m-d' }}">
-          <label class="w2-field">Amount {{ cur }}<input class="w2-input" type="number" name="amount" step="0.01" min="0.01" placeholder="0.00" required></label>
+          <label class="w2-field">Amount <span data-w2-selected-currency>{{ cur }}</span><input class="w2-input" type="number" name="amount" step="0.01" min="0.01" placeholder="0.00" required></label>
           <button type="submit" class="w2-button w2-button-primary w2-full">Save</button>
         </form>
         {% else %}<p class="w2-muted">Add a strategy first.</p>{% endif %}

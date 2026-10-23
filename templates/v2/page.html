@@ -39,7 +39,7 @@
   <div>
     <h1>{{ page_title }}</h1>
     <p class="w2-overline">
-      {% if page_key == 'overview' %}All strategies · GBP
+      {% if page_key == 'overview' %}All strategies · reporting in {{ overview_reporting_currency }}
       {% elif page_key == 'settings' %}Applies to all strategies
       {% elif page_key == 'admin' %}Site owner only · not visible to other users
       {% else %}Fixed, code-defined strategies{% endif %}

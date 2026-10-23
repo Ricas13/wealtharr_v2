@@ -373,9 +373,10 @@ def _performance(request, strategy, report=None):
     best, worst = dash.best_worst(monthly)
     returns = dash.period_returns(points)
     since = next((r for r in returns if r["label"] == "Since start"), None)
-    vs_nasdaq = (since["you"] - since["indexes"][0]
-                 if since and since["you"] is not None and since["indexes"][0] is not None
-                 else None)
+    # USD index price change is NOT a like-for-like comparison with a
+    # cash-flow-adjusted portfolio in its account currency. Show it separately,
+    # without fabricating 'outperformance' in percentage points.
+    nasdaq_usd = since["indexes"][0] if since and since["indexes"] else None
     last = points[-1] if points else None
     return {
         "perf_points": bool(points),
@@ -391,7 +392,7 @@ def _performance(request, strategy, report=None):
         "perf_gain_pct": ((last[1] - last[2]) / last[2] * 100).quantize(Decimal("0.1"))
         if last and last[2] > ZERO else None,
         "perf_xirr": dash.xirr_pct(strategy, points),
-        "perf_vs_nasdaq": vs_nasdaq,
+        "perf_nasdaq_usd": nasdaq_usd,
         "perf_days": (timezone.localdate() - points[0][0]).days if points else None,
     }
 
@@ -462,7 +463,7 @@ def overview_page(request):
         request, page_key="overview", page_title="Overview",
         **_overview_extras(request, items, rows, today),
         overview_rows=rows, overview_total=aggregate, overview_other_currency=other_currency,
-        page_currency=home,
+        page_currency=home, overview_reporting_currency=home,
         overview_contributed=contributed if complete_funding and items else None,
         overview_gain=gained, overview_same_date=bool(items) and not excluded,
         overview_excluded=excluded,

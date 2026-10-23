@@ -38,13 +38,13 @@
           <label class="w2-field" data-v2-split-field hidden>New shares for each old share
             <input class="w2-input" name="ratio" type="number" min="0.00000001" step="0.00000001" value="{% if edit_values.kind == 'SPLIT' %}{{ edit_values.quantity }}{% endif %}" placeholder="2 for a 2-for-1 split, 0.1 for 1-for-10">
             <small class="w2-muted">Your share count is multiplied by this; no cash moves and your total cost stays the same. If the broker paid cash for a fraction left over, record that as a Sell.</small></label>
-          <label class="w2-field" data-v2-cash-field>Actual GBP amount
+          <label class="w2-field" data-v2-cash-field>Actual {{ selected_instance.account.currency }} amount
             <input class="w2-input" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="{{ edit_values.amount }}" placeholder="500.00"></label>
           <label class="w2-field" data-v2-trade-field>Actual shares
             <input class="w2-input" name="quantity" type="number" min="0.00000001" step="0.00000001" value="{{ edit_values.quantity }}"></label>
-          <label class="w2-field" data-v2-trade-field>Execution price in GBP per share
+          <label class="w2-field" data-v2-trade-field>Execution price in {{ selected_instance.account.currency }} per share
             <input class="w2-input" name="unit_price" type="number" min="0.00000001" step="0.00000001" value="{{ edit_values.unit_price }}"></label>
-          <label class="w2-field" data-v2-trade-field>Actual fee in GBP
+          <label class="w2-field" data-v2-trade-field>Actual fee in {{ selected_instance.account.currency }}
             <input class="w2-input" name="fee" type="number" min="0" step="0.01" value="{{ edit_values.fee }}"></label>
         </div>
         <label class="w2-field">Private reference / note

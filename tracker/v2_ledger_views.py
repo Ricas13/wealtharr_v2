@@ -78,9 +78,12 @@ def _export(strategy, entries):
         'attachment; filename="wealtharr-v2-ledger-%s.csv"' % strategy.pk
     )
     writer = csv.writer(response)
+    unit = strategy.account.currency.lower()
+    # GBP exports keep their existing schema. USD/EUR owners get accurate
+    # headers; values are already stored in their account's local currency.
     writer.writerow([
         "entry_id", "revision", "status", "occurred_on", "kind", "symbol",
-        "quantity", "unit_price_gbp", "amount_gbp", "fee_gbp", "note",
+        "quantity", f"unit_price_{unit}", f"amount_{unit}", f"fee_{unit}", "note",
         "source", "created_at",
     ])
     for e in entries:
@@ -277,13 +280,13 @@ def _input_payload(post, strategy):
             post.get("quantity", ""), "actual shares", precision=8, allow_zero=False
         ))
         payload["unit_price"] = str(_decimal(
-            post.get("unit_price", ""), "actual GBP execution price", precision=8,
+            post.get("unit_price", ""), f"actual {strategy.account.currency} execution price", precision=8,
             allow_zero=False,
         ))
-        payload["fee"] = str(_decimal(post.get("fee", ""), "actual GBP fee"))
+        payload["fee"] = str(_decimal(post.get("fee", ""), f"actual {strategy.account.currency} fee"))
     else:
         payload["amount"] = str(_decimal(
-            post.get("amount", ""), "actual GBP cash amount", allow_zero=False
+            post.get("amount", ""), f"actual {strategy.account.currency} cash amount", allow_zero=False
         ))
     return payload
 
