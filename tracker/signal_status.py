@@ -82,11 +82,36 @@ def is_current_review(strategy, signal, today=None):
     """Ordinary current review; daily strategies resolve the latest dated signal."""
     today = today or timezone.localdate()
     if getattr(strategy, "strategy_key", "") == "nasdaq-trend-dca":
-        from .models import StrategySignal
+        from .models import StrategySignal, NasdaqTrendState
+        from .strategies.instruments import role_symbols
         latest = StrategySignal.objects.filter(
             strategy=strategy, kind="QUARTERLY").order_by("-as_of", "-pk").first()
-        return bool(latest and latest.pk == signal.pk and
-                    timedelta(days=0) <= today - signal.as_of <= timedelta(days=5))
+        row = NasdaqTrendState.objects.filter(strategy=strategy).first()
+        if (not latest or latest.pk != signal.pk or not row or row.last_as_of != signal.as_of
+                or not timedelta(days=0) <= today - signal.as_of <= timedelta(days=5)):
+            return False
+        # A newer eligible US session invalidates an unexecuted old proposal.
+        roles = role_symbols(strategy)
+        references = [
+            MarketObservation.objects.filter(symbol=symbol, source="yahoo",
+                raw_unit_verified=True).order_by("-as_of").values_list(
+                    "as_of", flat=True).first()
+            for symbol in ("SPY", "QQQ")
+        ]
+        holdings = [
+            MarketObservation.objects.filter(symbol=symbol,
+                currency=strategy.account.currency, source="yahoo",
+                raw_unit_verified=True).order_by("-as_of").values_list(
+                    "as_of", flat=True).first()
+            for symbol in roles.values()
+        ]
+        if any(day is None for day in references + holdings):
+            return False
+        eligible = min(references + [
+            min(holdings) - timedelta(days=1)
+            if strategy.account.currency == "GBP" else min(holdings)
+        ])
+        return eligible <= signal.as_of
     from .strategies.registry import last_review_before
     return signal.as_of == last_review_before(strategy, today)
 
