@@ -31,6 +31,9 @@ at setup) and gives its plug-in `current_weights` for the opening buy and alloca
      (`side`, `symbol`, `quantity`, `estimated_gbp`). Must be idempotent.
    - `next_review(day)` and `last_review_before(day)`: the schedule
      (`tracker/core/calendar.py` has quarter and year helpers).
+   - Daily strategies also set `current_review_floor(day)` so a proposal stays
+     current for a few sessions (otherwise only the last review is current), and
+     `allows_cash_only` when a cash regime with no holdings is legitimate.
    - Optional: `reference_symbols` (index series the rules need), extra
      `dashboard_template` and `dashboard_context`, `supports_reset`,
      `review_detail` and `review_export` ("How this was calculated"), `study`.

@@ -57,7 +57,7 @@ def _price_status(strategy, report):
         return False, 'An unmodelled holding exists. Reconcile the broker portfolio first.', []
     if report['missing']:
         return False, 'A held instrument has no price. Fetch verified GBP closes.', []
-    if not held:
+    if not held and not (plugin and plugin.allows_cash_only and report['cash'] > ZERO):
         return False, 'Record your purchases in the Ledger.', []
     # Every fund needs a verified quote, even one held at zero shares,
     # because a BUY instruction may require its price.
@@ -81,15 +81,15 @@ def _price_status(strategy, report):
 def _last_action(strategy):
     # Only the most recently completed quarter can supply executable orders.
     # Old unacknowledged notices remain in History, not resurrected as trades.
-    from .strategies.registry import last_review_before
-    quarter = last_review_before(strategy, timezone.localdate())
+    from .strategies.registry import current_review_range
+    quarter, latest = current_review_range(strategy, timezone.localdate())
     manual = strategy.signals.filter(kind__in=('SPIKE_WATCH', 'THIRTY_DOWN'),
              as_of__gte=quarter, acknowledged_at__isnull=True).exclude(
              review_outcome__in=('FALSE_POSITIVE', 'NOT_APPLICABLE')).order_by('-as_of', '-pk').first()
     if manual:
         return manual
-    sig = strategy.signals.filter(kind='QUARTERLY', as_of=quarter).exclude(
-             review_outcome__in=('FALSE_POSITIVE', 'NOT_APPLICABLE')).order_by('-pk').first()
+    sig = strategy.signals.filter(kind='QUARTERLY', as_of__range=(quarter, latest)).exclude(
+             review_outcome__in=('FALSE_POSITIVE', 'NOT_APPLICABLE')).order_by('-as_of', '-pk').first()
     if sig and (any(a.get('side') in ('BUY', 'SELL') for a in sig.actions)
                 or 'Your reserve is now empty' in sig.message):
         if not RebalanceExecution.objects.filter(signal=sig).exists():

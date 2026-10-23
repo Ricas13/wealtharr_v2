@@ -18,7 +18,7 @@ from .models import (
 )
 from .services import ledger_summary, validate_and_record
 from .strategies.instruments import symbols
-from .strategies.registry import last_review_before, module_for
+from .strategies.registry import is_current_review, module_for
 
 D = Decimal
 ZERO = D("0")
@@ -138,7 +138,7 @@ def late_review_allowed(strategy, signal):
     It can still be finished against the fills already recorded (never new
     fills: trades after the quarter belong to the next review).
     """
-    if signal.kind != "QUARTERLY" or signal.as_of >= last_review_before(strategy, timezone.localdate()):
+    if signal.kind != "QUARTERLY" or signal.as_of >= timezone.localdate() or is_current_review(strategy, signal.as_of, timezone.localdate()):
         return False
     if not SignalFill.objects.filter(signal=signal, strategy=strategy).exists():
         return False
@@ -148,7 +148,7 @@ def late_review_allowed(strategy, signal):
 
 
 def _check_current(locked, signal, *, allow_late=False):
-    current = signal.as_of == last_review_before(locked, timezone.localdate())
+    current = is_current_review(locked, signal.as_of, timezone.localdate())
     if (signal.strategy_id != locked.pk or signal.kind != "QUARTERLY" or
             not (current or (allow_late and late_review_allowed(locked, signal))) or
             signal.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")):

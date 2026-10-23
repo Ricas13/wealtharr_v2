@@ -31,7 +31,7 @@ from .models import (
 from .v2_ledger_core import effective_entries, replay
 from .v2_views import _render
 from .strategies.instruments import symbol_labels, symbols as fund_symbols
-from .strategies.registry import last_review_before
+from .strategies.registry import current_review_range
 
 ZERO = Decimal("0")
 WINDOWS = (("all", "All"), ("ytd", "YTD"), ("1y", "1 year"),
@@ -485,8 +485,8 @@ def _open_action(strategy, summary, today):
         return {"kind": "start", "title": "Buy your opening position",
                 "detail": "Buy what the strategy holds today"}
     signal = strategy.signals.filter(
-        kind="QUARTERLY", as_of=last_review_before(strategy, today),
-    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-pk").first()
+        kind="QUARTERLY", as_of__range=current_review_range(strategy, today),
+    ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of", "-pk").first()
     if signal and proposed_actions(signal) and not RebalanceExecution.objects.filter(
             signal=signal).exists():
         from .money import symbol_for

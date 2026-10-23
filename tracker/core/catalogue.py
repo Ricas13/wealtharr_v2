@@ -29,6 +29,7 @@ DUAL_MOMENTUM = "dual-momentum"
 PERMANENT_PORTFOLIO = "permanent-portfolio"
 HFEA = "hfea"
 THREE_SIG = "three-sig"
+NASDAQ_TREND_DCA = "nasdaq-trend-dca"
 from tracker.core.brokers import ACCOUNT_TYPE_NAMES  # noqa: E402
 ACCOUNT_TYPES = tuple(ACCOUNT_TYPE_NAMES.items())
 
@@ -48,6 +49,12 @@ _OFFERS = {
         STRATEGY_9SIG, "9Sig", "High risk", "Quarterly",
         "A leveraged Nasdaq-100 growth sleeve with a defensive sleeve. "
         "Quarterly decisions use the versioned 9Sig rules.", True,
+    ),
+    NASDAQ_TREND_DCA: StrategyOffer(
+        NASDAQ_TREND_DCA, "3x Nasdaq Trend + DCA", "Very high risk", "Daily",
+        "Nasdaq-100 trend following using SPY and QQQ 200-day averages: "
+        "3x growth in bull markets, cash exit with 12 monthly unleveraged "
+        "Nasdaq-100 instalments after the bear signal. All trades are manual.", True,
     ),
     ALL_WEATHER: StrategyOffer(
         ALL_WEATHER, "All Seasons", "Moderate risk", "Yearly",
@@ -316,6 +323,9 @@ EU_VAGF = _eu("Vanguard Global Aggregate Bond UCITS ETF EUR Hedged (Acc)", "Vang
               "Euro equivalent of US aggregate bonds: global aggregate bonds hedged to euros. Accumulating.",
               TR_BROWSE + "?q=vanguard")
 
+US_QQQ = _us("Invesco QQQ Trust", "Invesco", "US46090E1038", "QQQ",
+              "https://www.invesco.com/qqq-etf/en/home.html",
+              "Unleveraged Nasdaq-100, distributes dividends.")
 US_TQQQ = _us("ProShares UltraPro QQQ", "ProShares", "US74347X8314", "TQQQ",
               "https://www.proshares.com/our-etfs/leveraged-and-inverse/tqqq",
               "3x daily Nasdaq-100, Kelly's own 9Sig growth fund. Fidelity requires a leveraged-ETF "
@@ -370,6 +380,17 @@ US_TMF = _us("Direxion Daily 20+ Year Treasury Bull 3X Shares", "Direxion", "US2
              "https://www.direxion.com/product/daily-20-year-treasury-bull-bear-3x-etf",
              "3x daily 20+ year US Treasuries, as in the original. Fidelity requires a leveraged-ETF "
              "agreement before buying.")
+UK_EQQQ = Listing(
+    "Invesco EQQQ Nasdaq-100 UCITS ETF (Dist)", "Invesco",
+    "IE0032077012", "EQQQ.L", "GBX", "LSE EQQQ (pence line)",
+    "https://www.invesco.com/uk/en/financial-products/etfs/invesco-eqqq-nasdaq-100-ucits-etf-dist.html",
+    "Unleveraged Nasdaq-100, GBP pence trading line. Distributes dividends "
+    "quarterly; cash income must be recorded from actual broker transactions. "
+    "Issuer and broker listing reviewed, personal ISA permissions unverified. "
+    + ACCOUNT_HOLD,
+    date(2026, 10, 23),
+    brokers={"TRADING212": "https://www.trading212.com/trading-instruments/isa/EQQQ.GB"},
+)
 UK_ISP6 = Listing(
     "iShares S&P SmallCap 600 UCITS ETF", "iShares", "IE00B2QWCY14", "ISP6.L", "GBX",
     "LSE ISP6 (pence line)",
@@ -442,6 +463,10 @@ ROLE_LISTINGS = {
     (PERMANENT_PORTFOLIO, "long", "DE"): (EU_DBXF,),
     (PERMANENT_PORTFOLIO, "cashfund", "DE"): (EU_XEON,),
     (PERMANENT_PORTFOLIO, "gold", "DE"): (EU_PPFB,),
+    (NASDAQ_TREND_DCA, "leveraged", "GB"): (_from_instrument(EQUITY_UK),),
+    (NASDAQ_TREND_DCA, "unleveraged", "GB"): (UK_EQQQ,),
+    (NASDAQ_TREND_DCA, "leveraged", "US"): (US_TQQQ,),
+    (NASDAQ_TREND_DCA, "unleveraged", "US"): (US_QQQ,),
     (HFEA, "stocks3x", "GB"): (UK_3LUS,),
     (HFEA, "bonds3x", "GB"): (UK_3TYL,),
     (HFEA, "stocks3x", "US"): (US_UPRO,),
