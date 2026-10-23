@@ -265,7 +265,13 @@ def review(instance):
     if set(roles) != {"leveraged", "unleveraged"}:
         return {"status": "cannot_compute", "reason": "Trading line mapping unavailable."}
     for symbol in (*roles.values(), "SPY", "QQQ"):
-        if sync_ticker(symbol) is None:
+        if symbol in ("SPY", "QQQ") and MarketObservation.objects.filter(
+                symbol=symbol, source="yahoo", raw_unit_verified=True,
+                raw_quote_unit="USD").count() < 205:
+            fetched = sync_ticker(symbol, backfill_reference_days=420)
+        else:
+            fetched = sync_ticker(symbol)
+        if fetched is None:
             return {"status": "cannot_compute", "reason": "Verified Yahoo data unavailable."}
     history = _verified_history()
     quotes = _held_quotes(instance)
