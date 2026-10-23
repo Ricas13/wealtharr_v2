@@ -118,6 +118,27 @@ class NasdaqDailyReviewTests(TestCase):
     def sync_existing(self, symbol, **kwargs):
         return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
 
+    def test_rotation_never_buys_using_unconfirmed_sale_proceeds(self):
+        from types import SimpleNamespace
+        # Moving from leverage to the unleveraged guard can require a sale.
+        # The next buy must wait for a recorded owner-confirmed sale fill.
+        decision = SimpleNamespace(target="UNLEVERAGED", dca_installments_due=0)
+        roles = {"leveraged": "LQQ3.L", "unleveraged": "EQQQ.L"}
+        quotes = {
+            "leveraged": SimpleNamespace(price=D("100")),
+            "unleveraged": SimpleNamespace(price=D("50")),
+        }
+        positions = {"LQQ3.L": D("5"), "EQQQ.L": D("0")}
+        actions = plugin._trades(
+            decision, roles, quotes, positions, D("500"), D("0"))
+        self.assertEqual([(a["side"], a["symbol"]) for a in actions],
+                         [("SELL", "LQQ3.L")])
+        # Once a sell is actually recorded, available cash can fund the next buy.
+        actions_after_fill = plugin._trades(
+            decision, roles, quotes, {"LQQ3.L": D("0")}, D("1000"), D("0"))
+        self.assertEqual([(a["side"], a["symbol"]) for a in actions_after_fill],
+                         [("BUY", "EQQQ.L")])
+
     def test_daily_spy_exit_generates_one_real_sell_proposal(self):
         NasdaqTrendState.objects.create(
             strategy=self.instance, regime="ON", last_as_of=self.days[-2],
