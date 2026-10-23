@@ -1,7 +1,7 @@
 """Study simulation for Nasdaq Trend + DCA, using the same pure evaluator.
 
 Hypothetical data only. No portfolio ledger, saved signal or notification is
-written here. Signals are USD SPY/QQQ daily adjusted closes and use 200 prior
+written here. Signals are USD SPY/QQQ daily raw closes and use 200 prior
 trading observations. Study fund prices are in the account currency.
 """
 from datetime import timedelta
@@ -28,7 +28,7 @@ class TrendStudy(FixedWeightStudy):
         for symbol in ("SPY", "QQQ"):
             usd[symbol] = {r.as_of: r.close
                            for r in StudyPrice.objects.filter(symbol=symbol).only(
-                               "as_of", "adj_close")}
+                               "as_of", "close")}
         if not usd["SPY"] or not usd["QQQ"]:
             data.days = []
             return data
@@ -44,7 +44,7 @@ class TrendStudy(FixedWeightStudy):
         roles = v1.ROLES
         funds = {role: role for role in roles}
         positions = {role: D("0") for role in roles}
-        cash, trades = D(str(amount)), 0
+        cash, trades, dca_pool = D(str(amount)), 0, D("0")
         values, flows = [], [(days[s], amount)]
         pending, completed, exit_on, completed_month = [], 0, None, None
 
@@ -52,12 +52,19 @@ class TrendStudy(FixedWeightStudy):
             return {r: D(str(data.prices[r][i])) for r in roles}
 
         def apply(orders, i):
-            nonlocal cash, trades
+            nonlocal cash, trades, dca_pool
             if not orders:
                 return 0
+            before = dict(positions)
             cash, filled = fill_orders(
                 [(t.role, t.side, t.quantity) for t in orders],
                 positions, cash, prices(i))
+            if exit_on is not None:
+                sold = max(D("0"), before["leveraged"] - positions["leveraged"])
+                bought = max(D("0"), positions["unleveraged"] - before["unleveraged"])
+                dca_pool = max(D("0"), dca_pool
+                               + sold * prices(i)["leveraged"]
+                               - bought * prices(i)["unleveraged"])
             trades += filled
             return filled
 
@@ -74,9 +81,9 @@ class TrendStudy(FixedWeightStudy):
             signal = data.trend.get(days[i])
             if signal is not None:
                 if signal.regime == "off" and signal.exit_on != exit_on:
-                    exit_on, completed, completed_month = signal.exit_on, 0, None
+                    exit_on, completed, completed_month, dca_pool = signal.exit_on, 0, None, D("0")
                 elif signal.regime == "on":
-                    exit_on, completed, completed_month = None, 0, None
+                    exit_on, completed, completed_month, dca_pool = None, 0, None, D("0")
                 month = days[i].strftime("%Y-%m")
                 count = (max(completed, signal.months_elapsed)
                          if signal.mode == "dca" and completed_month == month
@@ -84,7 +91,7 @@ class TrendStudy(FixedWeightStudy):
                 result = v1.evaluate(
                     funds=funds, positions=positions, cash=cash,
                     quotes={r: v1.Quote(r, prices(i)[r], days[i]) for r in roles},
-                    signal=signal, completed_dca=count)
+                    signal=signal, completed_dca=count, dca_budget=dca_pool)
                 if result.status == "action_needed":
                     is_dca = signal.mode == "dca" and any(
                         t.side == "BUY" and t.role == "unleveraged" for t in result.trades)
