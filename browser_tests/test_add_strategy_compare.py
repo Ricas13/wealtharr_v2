@@ -59,8 +59,8 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 nav = page.locator("[data-zoom-track]")
                 start_handle = page.locator('[data-zoom-handle="start"]')
                 full_period = page.locator("[data-zoom-dates]").inner_text()
-                initial_value = page.locator("[data-rows] tr").first.locator("td").nth(1).inner_text()
-                initial_gain = page.locator("[data-rows] tr").first.locator("td").nth(2).inner_text()
+                initial_value = page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(1).inner_text()
+                initial_gain = page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(2).inner_text()
                 self.assertEqual(start_handle.get_attribute("aria-valuenow"), "0")
                 nav.scroll_into_view_if_needed()
                 track_box = nav.bounding_box()
@@ -75,12 +75,12 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 self.assertNotEqual(page.locator("[data-zoom-dates]").inner_text(), full_period)
                 page.wait_for_function("document.querySelector('[data-table-status]').textContent.includes('Showing results for the selected dates')")
                 # Trimming the start changes the return, not the end-date value.
-                self.assertEqual(page.locator("[data-rows] tr").first.locator("td").nth(1).inner_text(),
+                self.assertEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(1).inner_text(),
                                  initial_value)
-                self.assertNotEqual(page.locator("[data-rows] tr").first.locator("td").nth(2).inner_text(),
+                self.assertNotEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(2).inner_text(),
                                     initial_gain)
                 # Shorter than 360 days: no misleading annualised return.
-                self.assertIn("—", page.locator("[data-rows] tr").first.locator("td").nth(3).inner_text())
+                self.assertIn("—", page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(3).inner_text())
                 # Move the selected time window with its keyboard slider.
                 window = page.locator("[data-zoom-window]")
                 before = int(window.get_attribute("aria-valuenow"))
@@ -92,9 +92,9 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 self.assertEqual(start_handle.get_attribute("aria-valuenow"), "0")
                 self.assertEqual(page.locator("[data-zoom-dates]").inner_text(), full_period)
                 self.assertTrue(page.locator("[data-zoom-reset]").is_disabled())
-                self.assertEqual(page.locator("[data-rows] tr").first.locator("td").nth(1).inner_text(),
+                self.assertEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(1).inner_text(),
                                  initial_value)
-                self.assertEqual(page.locator("[data-rows] tr").first.locator("td").nth(2).inner_text(),
+                self.assertEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(2).inner_text(),
                                  initial_gain)
                 # Hover readout.
                 svg = page.locator("[data-compare] [data-chart]")
