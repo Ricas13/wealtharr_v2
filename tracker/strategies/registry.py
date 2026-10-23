@@ -18,6 +18,7 @@ from tracker.strategies.permanent_portfolio.v1 import VERSION as PERMANENT_V1_VE
 from tracker.strategies.permanent_portfolio.v2 import (
     VERSION as PERMANENT_VERSION, WEIGHTS as PERMANENT_WEIGHTS,
 )
+from tracker.strategies.nasdaq_trend_dca.v1 import VERSION as NASDAQ_TREND_VERSION
 from tracker.strategies.nine_sig.v2 import VERSION as NINE_SIG_VERSION
 from tracker.strategies.nine_sig.v3 import VERSION as NINE_SIG_V3_VERSION
 
@@ -82,6 +83,31 @@ _RELEASED = {
             "TQQQ drawdown information only, no sell-half.",
             "nine-sig@1 (nine_sig.v1.0.0): frozen original with shortage reset/HOLD.",
         ),
+    ),
+    "nasdaq-trend-dca": StrategyDescription(
+        key="nasdaq-trend-dca",
+        version=NASDAQ_TREND_VERSION,
+        title="3× Nasdaq Trend + DCA",
+        summary=("Follow SPY's 200-day moving average, own 3× Nasdaq in confirmed uptrends "
+                 "and gradually buy unleveraged Nasdaq after an exit. The trades are yours to execute."),
+        cadence="Check completed US trading sessions; 12 monthly DCA instalments after a sell.",
+        rules=(
+            "SPY strictly above 104% of its 200-session average: enter 3× Nasdaq.",
+            "SPY strictly below 97% of its average: sell leverage and hold confirmed proceeds in cash.",
+            "After an exit, invest 1/12 of the confirmed cash reserve in 1× Nasdaq each month, never automatically rebalancing prior instalments.",
+            "At QQQ at least 130% of its own 200-day average, switch leverage to 1× Nasdaq.",
+            "At QQQ at least 140% of its average, switch to cash.",
+            "After either QQQ safeguard, stay de-leveraged until an SPY below-97% exit followed by an above-104% entry.",
+            "Decisions use completed SPY/QQQ closes; buy/sell actions are for manual confirmation only.",
+        ),
+        role_targets=(("leveraged", Decimal("0")), ("unleveraged", Decimal("0"))),
+        target_explanation="No standing weights. The latest confirmed SPY/QQQ close and DCA state determine the split.",
+        caution=("Very high risk: 3× daily leverage can lose most of its value. LQQ3 is an ETP, not "
+                 "US TQQQ. Broker availability, exchange hours, currency, financing and dividends differ. "
+                 "This is a documented 12-month variant of a Reddit author's approach, not an endorsement."),
+        release_label="nasdaq-trend-dca@1",
+        version_history=("nasdaq-trend-dca@1: daily 200-SMA +4/-3 bands, latched QQQ guards, "
+                         "12 monthly cash-funded DCA instalments.",),
     ),
     "all-weather": StrategyDescription(
         key="all-weather",
@@ -258,7 +284,7 @@ STRATEGIES = MappingProxyType(_RELEASED)
 
 # One colour per strategy, used everywhere it appears (sidebar, page, charts).
 COLOURS = {
-    "nasdaq-quarterly-target": "#5b9cf5", "all-weather": "#4fc3a1", "golden-butterfly": "#e06c9f",
+    "nasdaq-quarterly-target": "#5b9cf5", "nasdaq-trend-dca": "#ff9f69", "all-weather": "#4fc3a1", "golden-butterfly": "#e06c9f",
     "dual-momentum": "#e5c07b", "permanent-portfolio": "#56b6c2", "hfea": "#c678dd", "three-sig": "#98c379",
 }
 DEFAULT_COLOUR = "#8a94a3"
@@ -276,6 +302,7 @@ def describe_strategy(key: str) -> StrategyDescription | None:
 # Plug-ins, keyed like the descriptions. Generic code finds a strategy's
 # behaviour here and never imports a strategy's rules directly.
 def _plugins():
+    from tracker.strategies.nasdaq_trend_dca.plugin import NASDAQ_TREND_DCA
     from tracker.strategies.all_weather.plugin import ALL_WEATHER
     from tracker.strategies.dual_momentum.plugin import DUAL_MOMENTUM
     from tracker.strategies.golden_butterfly.plugin import GOLDEN_BUTTERFLY
@@ -283,7 +310,7 @@ def _plugins():
     from tracker.strategies.permanent_portfolio.plugin import PERMANENT_PORTFOLIO
     from tracker.strategies.hfea.plugin import HFEA
     from tracker.strategies.three_sig.plugin import THREE_SIG
-    return {p.key: p for p in (NINE_SIG, ALL_WEATHER, GOLDEN_BUTTERFLY, DUAL_MOMENTUM, PERMANENT_PORTFOLIO,
+    return {p.key: p for p in (NINE_SIG, NASDAQ_TREND_DCA, ALL_WEATHER, GOLDEN_BUTTERFLY, DUAL_MOMENTUM, PERMANENT_PORTFOLIO,
                                HFEA, THREE_SIG)}
 
 
