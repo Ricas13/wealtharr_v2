@@ -89,7 +89,7 @@ class AddStrategyCompareTests(TestCase):
 
     def test_zoom_rebases_to_entered_start_not_accumulated_portfolio(self):
         from datetime import date, timedelta
-        from tracker.v2_home import selected_period_metrics
+        from tracker.v2_home import rebased_comparison_metrics
 
         days = [(date(2026, 1, 1) + timedelta(days=i)).isoformat()
                 for i in range(4)]
@@ -103,7 +103,7 @@ class AddStrategyCompareTests(TestCase):
                 {"key": "missing", "label": "Missing", "points": []},
             ],
         }
-        metrics = selected_period_metrics(comparison, 1, 3)
+        metrics = rebased_comparison_metrics(comparison, 1, 3)
         self.assertEqual(metrics["put_in"], 1100)
         self.assertEqual(metrics["reference_label"], "Selected start amount")
         # Jan 2: rebased £1,000. Jan 3: portfolio earns no return,
