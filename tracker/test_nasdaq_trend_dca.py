@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 from decimal import Decimal as D
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from tracker.strategies.fixed_weights import Quote
 from tracker.strategies.nasdaq_trend_dca import v1
@@ -132,7 +132,7 @@ class NasdaqTrendStudyTests(SimpleTestCase):
         self.assertEqual(same["start"], days[0])
 
 
-class NasdaqCashRegimeIntegrationTests(__import__("django.test", fromlist=["TestCase"]).TestCase):
+class NasdaqCashRegimeIntegrationTests(TestCase):
     def test_cash_only_is_not_an_unfunded_strategy(self):
         from unittest.mock import patch
         from django.contrib.auth import get_user_model
@@ -169,6 +169,8 @@ class NasdaqCashRegimeIntegrationTests(__import__("django.test", fromlist=["Test
         self.assertTrue(ready, reason)
         plugin = module_for(instance)
         self.assertTrue(plugin.allows_cash_only)
-        with patch.object(plugin, "current_weights", return_value={
-            "LQQ3.L": D("0"), "EQQQ.L": D("0")}):
-            self.assertFalse(_opening_allocation_available(instance, plugin))
+        from types import SimpleNamespace
+        cash_mode = SimpleNamespace(
+            allows_cash_only=True,
+            current_weights=lambda strategy: {"LQQ3.L": D("0"), "EQQQ.L": D("0")})
+        self.assertFalse(_opening_allocation_available(instance, cash_mode))
