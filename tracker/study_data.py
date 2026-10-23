@@ -23,6 +23,7 @@ STUDY_SYMBOLS = {
     # US dollars per pound.
     "GBPUSD=X": (("USD",), "USD", Decimal("1")),
     "LQQ3.L": (("GBp", "GBX"), "GBP", Decimal("100")),
+    "EQQQ.L": (("GBp", "GBX"), "GBP", Decimal("100")),
     "ERNS.L": (("GBP",), "GBP", Decimal("1")),
     # Fixed-weight strategies (All Weather, Golden Butterfly): their funds and
     # the stand-ins used before each fund existed.
