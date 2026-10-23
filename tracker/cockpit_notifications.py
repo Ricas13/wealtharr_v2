@@ -156,8 +156,9 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
         # A confirmed new deposit should not sit unnoticed until the next
         # quarter or year. This is an opt-in contribution-category *nudge*;
         # never email estimated orders (those may become stale before delivery).
-        if (strategy.market_data_enabled and not strategy.tracking_only
-                and fresh and not (recent and trade_lines(recent)
+        if (strategy.market_data_enabled and strategy.contribution_alerts
+                and not strategy.tracking_only and fresh
+                and not (recent and trade_lines(recent)
                     and not RebalanceExecution.objects.filter(signal=recent).exists())):
             from .contribution_guidance import new_money_guidance
             suggestion = new_money_guidance(strategy, report, prices_ready=True, today=today)
