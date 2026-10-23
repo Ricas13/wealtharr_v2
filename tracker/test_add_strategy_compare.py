@@ -30,6 +30,7 @@ class AddStrategyCompareTests(TestCase):
         self.assertContains(page, "css/compare.css")
         self.assertContains(page, "9Sig")
         self.assertContains(page, "All Seasons")
+        self.assertContains(page, "3x Nasdaq Trend + DCA")
         self.assertContains(page, "Hypothetical, not anyone")
         # The three setup choices come first, side by side; the comparison sits below them.
         body = page.content.decode()
@@ -43,7 +44,11 @@ class AddStrategyCompareTests(TestCase):
         labels = [r["label"] for r in data["rows"]]
         self.assertIn("9Sig", labels)
         self.assertIn("All Seasons", labels)
+        self.assertIn("3x Nasdaq Trend + DCA", labels)
         self.assertNotIn("All-season mix", labels)
+        nasdaq = next(r for r in data["rows"] if r["key"] == "nasdaq-trend-dca")
+        self.assertIsNone(nasdaq["final"])
+        self.assertEqual(nasdaq["points"], [])
         self.client.logout()
         self.assertEqual(self.client.get(reverse("v2_compare_json")).status_code, 302)
 
@@ -54,6 +59,7 @@ class AddStrategyCompareTests(TestCase):
         labels = [r["label"] for r in data["rows"]]
         self.assertIn("Quarterly signal", labels)
         self.assertIn("All-season mix", labels)
+        self.assertIn("Daily Nasdaq trend + DCA", labels)
         page = self.client.get("/?range=1y")
         self.assertNotContains(page, "9Sig")
         self.assertContains(page, "js/compare.js")
