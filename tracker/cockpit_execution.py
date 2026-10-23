@@ -148,7 +148,8 @@ def late_review_allowed(strategy, signal):
 
 
 def _check_current(locked, signal, *, allow_late=False):
-    current = signal.as_of == last_review_before(locked, timezone.localdate())
+    from .signal_status import is_current_review
+    current = is_current_review(locked, signal)
     if (signal.strategy_id != locked.pk or signal.kind != "QUARTERLY" or
             not (current or (allow_late and late_review_allowed(locked, signal))) or
             signal.review_outcome in ("FALSE_POSITIVE", "NOT_APPLICABLE")):
