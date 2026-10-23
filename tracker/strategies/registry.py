@@ -19,6 +19,7 @@ from tracker.strategies.permanent_portfolio.v2 import (
     VERSION as PERMANENT_VERSION, WEIGHTS as PERMANENT_WEIGHTS,
 )
 from tracker.strategies.nasdaq_trend_dca.v1 import VERSION as NASDAQ_TREND_VERSION
+from tracker.strategies.nasdaq_trend_dca.v1 import VERSION as NASDAQ_TREND_VERSION
 from tracker.strategies.nine_sig.v2 import VERSION as NINE_SIG_VERSION
 from tracker.strategies.nine_sig.v3 import VERSION as NINE_SIG_V3_VERSION
 
@@ -247,6 +248,33 @@ _RELEASED = {
         release_label="hfea@1",
         version_history=("hfea@1 (hfea.v1.0.0): 55/45 3x stocks/3x long Treasuries, quarterly rebalance.",),
     ),
+    "nasdaq-trend-dca": StrategyDescription(
+        key="nasdaq-trend-dca",
+        version=NASDAQ_TREND_VERSION,
+        title="3× Nasdaq Trend + DCA",
+        summary="Daily SPY 200-day trend rule; move between a 3× Nasdaq ETP, "
+                "unleveraged Nasdaq ETF and cash. DCA cash proceeds over twelve months "
+                "following an exit. All transactions require your confirmation.",
+        cadence="Check after each completed US market session; invest monthly while exiting.",
+        rules=(
+            "Use the last 200 matching US trading-session SPY closes to calculate its simple moving average.",
+            "Switch on 3× Nasdaq only after SPY closes more than 4% above its moving average.",
+            "Exit 3× Nasdaq to cash after SPY closes more than 3% below its moving average.",
+            "Following exit, invest confirmed original sale proceeds in twelve equal monthly unleveraged Nasdaq purchases, or until SPY re-enters.",
+            "When QQQ reaches 30% above its own 200-day average, switch to unleveraged Nasdaq.",
+            "When QQQ reaches 40% above its own 200-day average, switch to cash.",
+            "Once a QQQ safeguard activates, keep it until a full SPY sell and re-entry cycle.",
+            "UK LQQ3 is an ETP, not TQQQ; EQQQ distributes dividends. Historical US research returns do not predict their GBP returns.",
+            "No broker connection or automatic trades; confirmed fills and approved quotes are mandatory.",
+        ),
+        role_targets=(("leveraged", Decimal("0")), ("unleveraged", Decimal("0"))),
+        target_explanation="Dynamic allocation; no fixed weights. Uninvested cash is a legitimate strategy state.",
+        caution="Very high risk. Historical modelled drawdowns exceeded 80%. The UK trading lines "
+                "are not the same as US TQQQ/QQQ and may behave differently. Quote quality, "
+                "account permissions and available cash must be checked before acting.",
+        release_label="nasdaq-trend-dca@1",
+        version_history=("nasdaq-trend-dca@1: SPY hysteresis, latched QQQ safeguard, 12 monthly confirmed-proceeds instalments.",),
+    ),
     "three-sig": StrategyDescription(
         key="three-sig",
         version=THREE_SIG_VERSION,
@@ -285,7 +313,7 @@ STRATEGIES = MappingProxyType(_RELEASED)
 # One colour per strategy, used everywhere it appears (sidebar, page, charts).
 COLOURS = {
     "nasdaq-quarterly-target": "#5b9cf5", "nasdaq-trend-dca": "#ff9f69", "all-weather": "#4fc3a1", "golden-butterfly": "#e06c9f",
-    "dual-momentum": "#e5c07b", "permanent-portfolio": "#56b6c2", "hfea": "#c678dd", "three-sig": "#98c379",
+    "dual-momentum": "#e5c07b", "permanent-portfolio": "#56b6c2", "hfea": "#c678dd", "three-sig": "#98c379", "nasdaq-trend-dca": "#ff9e64",
 }
 DEFAULT_COLOUR = "#8a94a3"
 
