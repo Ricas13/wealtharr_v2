@@ -52,6 +52,10 @@ def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
     desc = describe_strategy(key)
     if not desc or not desc.accepts(strategy.strategy_version):
         return None
+    # A matching ticker string alone is not a verified fund or live mandate.
+    from .instrument_mapping import for_strategy
+    if for_strategy(strategy) is None:
+        return None
     roles = role_symbols(strategy)
     if not roles or len(set(roles.values())) != len(roles):
         return None
