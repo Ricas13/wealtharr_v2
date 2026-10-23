@@ -74,11 +74,27 @@ class AddStrategyCompareBrowserTests(BrowserHarness):
                 self.assertGreater(int(start_handle.get_attribute("aria-valuenow")), 0)
                 self.assertNotEqual(page.locator("[data-zoom-dates]").inner_text(), full_period)
                 page.wait_for_function("document.querySelector('[data-table-status]').textContent.includes('Showing results for the selected dates')")
-                # Trimming the start changes the return, not the end-date value.
-                self.assertEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(1).inner_text(),
-                                 initial_value)
+                # Zoomed simulations are indexed back to the chosen start
+                # amount, rather than claiming the older £100k balance was
+                # the investment made on the zoom's first day.
+                self.assertIn("Rebased start + selected top-ups",
+                              page.locator("[data-putin-title]").inner_text())
+                self.assertIn("not a fresh strategy backtest",
+                              page.locator("[data-rebased-note]").inner_text())
+                self.assertNotEqual(
+                    page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(1).inner_text(),
+                    initial_value)
                 self.assertNotEqual(page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(2).inner_text(),
                                     initial_gain)
+                # Main chart tooltip at its selected left boundary must begin
+                # at the entered 250,000 pounds for every available strategy.
+                start_chart = page.locator("[data-chart]").bounding_box()
+                page.mouse.move(start_chart["x"] + 1, start_chart["y"] + start_chart["height"] / 2)
+                page.wait_for_timeout(80)
+                first_tooltip = page.locator("[data-tip]")
+                self.assertTrue(first_tooltip.is_visible())
+                self.assertIn("£250,000", first_tooltip.inner_text())
+                self.assertIn("Money put in by then: £250,000", first_tooltip.inner_text())
                 # Shorter than 360 days: no misleading annualised return.
                 self.assertIn("—", page.locator("[data-rows] tr[data-key='nine_sig']").locator("td").nth(3).inner_text())
                 # Move the selected time window with its keyboard slider.
