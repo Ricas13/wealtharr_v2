@@ -78,7 +78,30 @@ def _price_status(strategy, report):
     return True, '', marks
 
 
+def is_current_review(strategy, signal, today=None):
+    """Ordinary current review; daily strategies resolve the latest dated signal."""
+    today = today or timezone.localdate()
+    if getattr(strategy, "strategy_key", "") == "nasdaq-trend-dca":
+        from .models import StrategySignal
+        latest = StrategySignal.objects.filter(
+            strategy=strategy, kind="QUARTERLY").order_by("-as_of", "-pk").first()
+        return bool(latest and latest.pk == signal.pk and
+                    timedelta(days=0) <= today - signal.as_of <= timedelta(days=14))
+    from .strategies.registry import last_review_before
+    return signal.as_of == last_review_before(strategy, today)
+
+
 def _last_action(strategy):
+    if getattr(strategy, "strategy_key", "") == "nasdaq-trend-dca":
+        from .models import StrategySignal
+        notice = StrategySignal.objects.filter(strategy=strategy, kind="QUARTERLY").exclude(
+            review_outcome__in=("CONFIRMED", "FALSE_POSITIVE", "NOT_APPLICABLE")
+        ).order_by("-as_of", "-pk").first()
+        if (notice and any(a.get("side") in ("BUY", "SELL") for a in notice.actions)
+                and not RebalanceExecution.objects.filter(signal=notice).exists()
+                and is_current_review(strategy, notice)):
+            return notice
+        return None
     # Only the most recently completed quarter can supply executable orders.
     # Old unacknowledged notices remain in History, not resurrected as trades.
     from .strategies.registry import last_review_before
