@@ -119,7 +119,7 @@ class Phase4TodayBrowserTests(BrowserHarness):
         self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"), 391)
         self.assertEqual(self.browser_errors, [])
 
-
+    def test_real_fill_requires_explicit_broker_confirmation(self):
         self.new_page(390)
         self.sign_in()
         self.visit("v2_guided_review", self.strategy.pk, self.signal.pk)
