@@ -29,6 +29,7 @@ DUAL_MOMENTUM = "dual-momentum"
 PERMANENT_PORTFOLIO = "permanent-portfolio"
 HFEA = "hfea"
 THREE_SIG = "three-sig"
+NASDAQ_TREND_DCA = "nasdaq-trend-dca"
 from tracker.core.brokers import ACCOUNT_TYPE_NAMES  # noqa: E402
 ACCOUNT_TYPES = tuple(ACCOUNT_TYPE_NAMES.items())
 
@@ -48,6 +49,11 @@ _OFFERS = {
         STRATEGY_9SIG, "9Sig", "High risk", "Quarterly",
         "A leveraged Nasdaq-100 growth sleeve with a defensive sleeve. "
         "Quarterly decisions use the versioned 9Sig rules.", True,
+    ),
+    NASDAQ_TREND_DCA: StrategyOffer(
+        NASDAQ_TREND_DCA, "3× Nasdaq Trend + DCA", "Very high risk", "Daily",
+        "SPY 200-day trend with 3× Nasdaq, latched QQQ safeguards and 12-month "
+        "cash-funded DCA into unleveraged Nasdaq. All orders remain manual.", True,
     ),
     ALL_WEATHER: StrategyOffer(
         ALL_WEATHER, "All Seasons", "Moderate risk", "Yearly",
@@ -387,8 +393,29 @@ EU_IUS3 = _eu("iShares S&P SmallCap 600 UCITS ETF", "iShares", "IE00B2QWCY14", "
               "US small companies (S&P SmallCap 600), the same index as the book's IJR, on its Xetra EUR line.",
               "https://etf.capital/etf/IE00B2QWCY14")
 
+# Nasdaq Trend + DCA: exact pound and US-dollar trading lines.
+# UK listing/ISIN and GBX price unit: issuer and Trading 212 ISA catalogue.
+UK_EQQQ = Listing(
+    "Invesco EQQQ Nasdaq-100 UCITS ETF (Dist)", "Invesco", "IE0032077012",
+    "EQQQ.L", "GBX", "LSE EQQQ (pence line)",
+    "https://www.invesco.com/uk/en/financial-products/etfs/invesco-eqqq-nasdaq-100-ucits-etf-dist.html",
+    "Physical, distributing UCITS ETF; paid distributions must be recorded as cash in the ledger. "
+    "Its daily returns differ from QQQ. " + ACCOUNT_HOLD,
+    date(2026, 10, 23),
+    brokers={"TRADING212": "https://www.trading212.com/trading-instruments/isa/EQQQ.GB"},
+)
+US_QQQ = _us(
+    "Invesco QQQ Trust", "Invesco", "US46090E1038", "QQQ",
+    "https://www.invesco.com/qqq-etf/en/home.html",
+    "Unleveraged Nasdaq-100 fund. QQQ distributions are tracked separately.",
+)
+
 # (strategy, role, country) -> listings, most preferred first.
 ROLE_LISTINGS = {
+    (NASDAQ_TREND_DCA, "leveraged", "GB"): (_from_instrument(EQUITY_UK),),
+    (NASDAQ_TREND_DCA, "unleveraged", "GB"): (UK_EQQQ,),
+    (NASDAQ_TREND_DCA, "leveraged", "US"): (US_TQQQ,),
+    (NASDAQ_TREND_DCA, "unleveraged", "US"): (US_QQQ,),
     (STRATEGY_9SIG, "growth", "GB"): (_from_instrument(EQUITY_UK),),
     (STRATEGY_9SIG, "safe", "GB"): (UK_ERNS,),
     (ALL_WEATHER, "stocks", "GB"): (VUAG,),
