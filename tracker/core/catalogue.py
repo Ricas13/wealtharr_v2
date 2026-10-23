@@ -87,7 +87,7 @@ _OFFERS = {
         NASDAQ_TREND_DCA, "3× Nasdaq Trend + DCA", "Very high risk", "Daily",
         "Use SPY's 200-day moving average to switch between 3x Nasdaq, Nasdaq, "
         "and cash; after an exit, invest confirmed sale proceeds in 12 monthly "
-        "unleveraged Nasdaq instalments. No broker trades are placed.", True,
+        "unleveraged Nasdaq instalments. No broker trades are placed.", False,
     ),
     THREE_SIG: StrategyOffer(
         THREE_SIG, "3Sig", "High risk", "Quarterly",
