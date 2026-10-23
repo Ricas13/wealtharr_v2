@@ -89,10 +89,10 @@ def trend_at(spy, qqq, as_of):
     return result[max(result)] if result else None
 
 
-def evaluate(*, funds, positions, cash, quotes, signal, completed_dca=0):
+def evaluate(*, funds, positions, cash, quotes, signal, completed_dca=0, dca_budget=None):
     """Recommend owner-confirmed fills; never place trades or fabricate holdings.
 
-    DCA spends 1/(12 - completed instalments) of remaining cash at each
+    DCA spends 1/(12 - completed instalments) of remaining exit proceeds at each
     due monthly step. It does not create external contribution transactions.
     """
     def refuse(code, reason):
@@ -101,7 +101,7 @@ def evaluate(*, funds, positions, cash, quotes, signal, completed_dca=0):
         return refuse("HISTORY", "No settled 200-session SPY/QQQ signal is available.")
     if set(funds) != set(ROLES) or len(set(funds.values())) != len(ROLES):
         return refuse("ROLES", "Two distinct mapped funds are required.")
-    if cash < ZERO or any(q < ZERO for q in positions.values()):
+    if cash < ZERO or (dca_budget is not None and dca_budget < ZERO) or any(q < ZERO for q in positions.values()):
         return refuse("NEGATIVE", "Negative cash or holdings require reconciliation.")
     if any(s not in funds.values() for s, q in positions.items() if q > ZERO):
         return refuse("OUTSIDE", "A holding is outside the strategy's two funds.")
@@ -142,7 +142,7 @@ def evaluate(*, funds, positions, cash, quotes, signal, completed_dca=0):
         # Exit proceeds must be actually recorded before any DCA purchase.
         # Never propose a premature monthly buy in the same review as an exit.
         chosen = "unleveraged"
-        amount = budget / (12 - completed_dca)
+        amount = min(cash, cash if dca_budget is None else dca_budget) / (12 - completed_dca)
     else:
         amount = ZERO
     if chosen and amount >= MIN_TRADE:
