@@ -68,13 +68,15 @@ def strategy_price_health(strategy, report=None):
         elif mark is None:
             issue = "No accepted closing price"
             missing = True
-        elif (mark.source != "yahoo" or mark.price <= 0 or
-              (symbol, mark.as_of, mark.price) not in observation_keys):
-            issue = "Price source, value or currency cannot be verified"
+        elif mark.source != "yahoo" or mark.price <= 0:
+            issue = "Price source or value cannot be verified"
             unverified = True
         elif mark.as_of > today or mark.as_of < today - timedelta(days=8):
             issue = "Accepted close is outside the permitted 8-day window"
             stale = True
+        elif (symbol, mark.as_of, mark.price) not in observation_keys:
+            issue = "Price currency or source observation cannot be verified"
+            unverified = True
         if mark is not None:
             close_dates.append(mark.as_of)
         details.append({
