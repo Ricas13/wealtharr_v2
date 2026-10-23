@@ -130,3 +130,45 @@ class NasdaqTrendStudyTests(SimpleTestCase):
         self.assertGreaterEqual(same["series"]["strategy"]["trades"], 2)
         self.assertEqual(same["series"]["strategy"]["put_in"], 1000)
         self.assertEqual(same["start"], days[0])
+
+
+class NasdaqCashRegimeIntegrationTests(__import__("django.test", fromlist=["TestCase"]).TestCase):
+    def test_cash_only_is_not_an_unfunded_strategy(self):
+        from unittest.mock import patch
+        from django.contrib.auth import get_user_model
+        from django.utils import timezone
+        from tracker.models import Account, StrategyPreset, StrategyInstance, PriceMark, MarketObservation
+        from tracker.signal_status import _price_status
+        from tracker.v2_today import _opening_allocation_available
+        from tracker.strategies.registry import module_for
+
+        user = get_user_model().objects.create_user("trend-cash-user", password="example")
+        account = Account.objects.create(owner=user, name="Trend Cash ISA", kind="ISA",
+                                         broker="TRADING212")
+        preset, _ = StrategyPreset.objects.get_or_create(
+            slug="nasdaq-trend-dca", defaults={"name": "Trend", "summary": "",
+                                             "risk": "HIGH"})
+        instance = StrategyInstance.objects.create(
+            owner=user, account=account, preset=preset,
+            name="Trend cash", strategy_key="nasdaq-trend-dca",
+            market_data_enabled=True, tracking_only=False,
+            resolved_instruments={"roles": {
+                "leveraged": {"yahoo_ticker": "LQQ3.L"},
+                "unleveraged": {"yahoo_ticker": "EQQQ.L"}}})
+        day = timezone.localdate() - timedelta(days=1)
+        marks = {}
+        for symbol in ("LQQ3.L", "EQQQ.L"):
+            MarketObservation.objects.create(symbol=symbol, as_of=day,
+                                             currency="GBP", price=D("10"))
+            marks[symbol] = PriceMark.objects.create(
+                strategy=instance, symbol=symbol, as_of=day, source="yahoo",
+                price=D("10"))
+        report = {"cash": D("100"), "positions": {}, "missing": [], "marks": marks}
+        with patch("tracker.signal_status.for_strategy", return_value=object()):
+            ready, reason, _ = _price_status(instance, report)
+        self.assertTrue(ready, reason)
+        plugin = module_for(instance)
+        self.assertTrue(plugin.allows_cash_only)
+        with patch.object(plugin, "current_weights", return_value={
+            "LQQ3.L": D("0"), "EQQQ.L": D("0")}):
+            self.assertFalse(_opening_allocation_available(instance, plugin))
