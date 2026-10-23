@@ -111,7 +111,7 @@ def decide(
     if len(history) < LOOKBACK:
         return refuse("A complete 200-session SPY and QQQ history is required.")
     window = history[-LOOKBACK:]
-    if any(x.spy <= ZERO or x.qqq <= ZERO or not x.spy.is_finite() or not x.qqq.is_finite() for x in window):
+    if any(not x.spy.is_finite() or not x.qqq.is_finite() or x.spy <= ZERO or x.qqq <= ZERO for x in window):
         return refuse("Reference prices must be positive and finite.")
     if any(a.day >= b.day for a, b in zip(window, window[1:])):
         return refuse("Reference dates must be strictly increasing.")
