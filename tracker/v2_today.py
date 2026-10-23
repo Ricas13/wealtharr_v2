@@ -187,8 +187,12 @@ def today_page(request, instance_id):
         status = "review"
         headline = notice.title
         explanation = notice.message
-    elif (not strategy.tracking_only and not report["positions"]
-          and report["cash"] > ZERO):
+    elif (not strategy.tracking_only and not notice and not report["positions"]
+          and report["cash"] > ZERO and not
+          (plugin and plugin.allows_cash_only and
+           plugin.current_weights and
+           plugin.current_weights(strategy) is not None and
+           all(weight == ZERO for weight in plugin.current_weights(strategy).values()))):
         status = "start"
         headline = "Buy your opening position"
         explanation = (
