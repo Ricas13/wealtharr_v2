@@ -100,3 +100,33 @@ class NasdaqTrendRuleTests(SimpleTestCase):
         self.assertEqual(manifest["roles"]["leveraged"]["yahoo_ticker"], "LQQ3.L")
         self.assertEqual(manifest["roles"]["unleveraged"]["yahoo_ticker"], "EQQQ.L")
         self.assertEqual(manifest["roles"]["unleveraged"]["raw_quote_unit"], "GBX")
+
+
+class NasdaqTrendStudyTests(SimpleTestCase):
+    def test_study_uses_the_daily_rules_and_owns_no_ledger(self):
+        from tracker.study_fixed import FixedData
+        from tracker.strategies.nasdaq_trend_dca.study import TrendStudy
+        days = weekdays(270)
+        data = FixedData(
+            days=days,
+            prices={"leveraged": [10.0 + 0.01 * i for i in range(270)],
+                    "unleveraged": [10.0 + 0.005 * i for i in range(270)]},
+            spy=[10.0] * 270, vti=[10.0] * 270)
+        data.trend = {}
+        for i in range(200, 270):
+            if i < 225:
+                data.trend[days[i]] = v1.TrendSignal(
+                    days[i], "leveraged", "on", None, 0, D("1.1"), D("1.01"))
+            else:
+                exit_on = days[225]
+                data.trend[days[i]] = v1.TrendSignal(
+                    days[i], "dca", "off", exit_on,
+                    v1.elapsed_months(exit_on, days[i]), D("0.90"), D("0.95"))
+        engine = TrendStudy(title="Nasdaq trend", sources={})
+        same = engine.run(data, "max", 1000, 0, "close")
+        next_day = engine.run(data, "max", 1000, 0, "next")
+        self.assertIsNotNone(same["series"]["strategy"])
+        self.assertIsNotNone(next_day["series"]["strategy"])
+        self.assertGreaterEqual(same["series"]["strategy"]["trades"], 2)
+        self.assertEqual(same["series"]["strategy"]["put_in"], 1000)
+        self.assertEqual(same["start"], days[0])
