@@ -162,8 +162,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
             from .contribution_guidance import new_money_guidance
             suggestion = new_money_guidance(strategy, report, prices_ready=True, today=today)
             if suggestion:
-                key = "new-money:%s:%s:%s" % (
-                    strategy.pk, suggestion["deposit_id"], suggestion["last_trade_id"])
+                key = "new-money:%s:%s" % (strategy.pk, suggestion["deposit_id"])
                 count += _send(strategy, owner, "contribution", key,
                     "Wealtharr — new cash ready for investment",
                     "%s: a confirmed deposit is waiting to be invested. "
