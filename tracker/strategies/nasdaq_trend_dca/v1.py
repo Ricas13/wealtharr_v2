@@ -44,21 +44,16 @@ def elapsed_months(start, end):
     return min(12, max(0, count))
 
 
-def trend_at(spy, qqq, as_of):
-    """Replay full 200-session SPY hysteresis, never using closes after as_of.
-
-    Each argument is iterable of (date, USD close). A missing joint close is
-    omitted; fewer than 200 overlapping observations means no signal.
-    """
-    sp = {d: Decimal(str(p)) for d, p in spy if d <= as_of and Decimal(str(p)) > ZERO}
-    qp = {d: Decimal(str(p)) for d, p in qqq if d <= as_of and Decimal(str(p)) > ZERO}
+def trend_series(spy, qqq):
+    """Full daily state replay, reusing 200-close rolling sums in O(n) time."""
+    sp = {d: Decimal(str(p)) for d, p in spy if Decimal(str(p)) > ZERO}
+    qp = {d: Decimal(str(p)) for d, p in qqq if Decimal(str(p)) > ZERO}
     days = sorted(set(sp) & set(qp))
     if len(days) < WINDOW:
-        return None
-    regime, exit_on = None, None
+        return {}
+    regime, exit_on, out = None, None, {}
     sp_sum = sum((sp[d] for d in days[:WINDOW]), ZERO)
     q_sum = sum((qp[d] for d in days[:WINDOW]), ZERO)
-    ratio_sp = ratio_qqq = ZERO
     for i in range(WINDOW - 1, len(days)):
         if i >= WINDOW:
             sp_sum += sp[days[i]] - sp[days[i - WINDOW]]
@@ -71,14 +66,26 @@ def trend_at(spy, qqq, as_of):
             if regime != "off":
                 exit_on = days[i]
             regime = "off"
-    if regime is None:
-        return None  # Unclear initial hysteresis state, not a guessed buy.
-    if regime == "off":
-        return TrendSignal(days[-1], "dca", regime, exit_on,
-                           elapsed_months(exit_on, days[-1]), ratio_sp, ratio_qqq)
-    mode = "cash" if ratio_qqq > CASH_GUARD else (
-        "unleveraged" if ratio_qqq > REDUCE else "leveraged")
-    return TrendSignal(days[-1], mode, regime, None, 0, ratio_sp, ratio_qqq)
+        if regime is None:
+            continue
+        if regime == "off":
+            out[days[i]] = TrendSignal(
+                days[i], "dca", regime, exit_on, elapsed_months(exit_on, days[i]),
+                ratio_sp, ratio_qqq)
+        else:
+            mode = ("cash" if ratio_qqq > CASH_GUARD else
+                    "unleveraged" if ratio_qqq > REDUCE else "leveraged")
+            out[days[i]] = TrendSignal(
+                days[i], mode, regime, None, 0, ratio_sp, ratio_qqq)
+    return out
+
+
+def trend_at(spy, qqq, as_of):
+    """The most recent settled signal, without any future closes."""
+    result = trend_series(
+        ((d, p) for d, p in spy if d <= as_of),
+        ((d, p) for d, p in qqq if d <= as_of))
+    return result[max(result)] if result else None
 
 
 def evaluate(*, funds, positions, cash, quotes, signal, completed_dca=0):
