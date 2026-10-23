@@ -86,7 +86,7 @@ def is_current_review(strategy, signal, today=None):
         latest = StrategySignal.objects.filter(
             strategy=strategy, kind="QUARTERLY").order_by("-as_of", "-pk").first()
         return bool(latest and latest.pk == signal.pk and
-                    timedelta(days=0) <= today - signal.as_of <= timedelta(days=14))
+                    timedelta(days=0) <= today - signal.as_of <= timedelta(days=5))
     from .strategies.registry import last_review_before
     return signal.as_of == last_review_before(strategy, today)
 
