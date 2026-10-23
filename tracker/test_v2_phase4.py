@@ -86,6 +86,71 @@ class TodayPhase4Tests(TestCase):
                      if action else []), as_of=self.quarter,
         )
 
+    def test_header_requires_every_fund_close_not_newest_only(self):
+        self._holdings()
+        self._proposal()
+        # One valid recent close cannot certify the strategy if the other is old.
+        old = timezone.localdate() - timedelta(days=12)
+        PriceMark.objects.filter(strategy=self.strategy, symbol="ERNS.L").update(as_of=old)
+        page = self.client.get(self._url())
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Prices stale")
+        self.assertContains(page, "Show instrument price checks")
+        self.assertContains(page, "ERNS.L")
+        self.assertContains(page, "outside the permitted 8-day window")
+        self.assertNotContains(page, "Prices verified")
+        self.assertNotContains(page, "Review the verified quarterly proposal")
+        self.assertNotContains(page, "I did this")
+        self.assertContains(page, "next scheduled market-data check")
+
+    def test_missing_fund_and_held_reference_are_distinct(self):
+        from tracker.models import YahooSync
+        self._holdings()
+        PriceMark.objects.filter(strategy=self.strategy, symbol="ERNS.L").delete()
+        missing = self.client.get(self._url())
+        self.assertContains(missing, "Prices missing")
+        self.assertContains(missing, "No accepted closing price")
+        self.assertNotContains(missing, "Prices verified")
+        PriceMark.objects.create(
+            strategy=self.strategy, symbol="ERNS.L", price=D("51"),
+            as_of=timezone.localdate() - timedelta(days=2), source="yahoo",
+        )
+        YahooSync.objects.create(
+            symbol="SPY", last_error="PRICE_HOLD: vendor correction",
+            last_attempt=timezone.now(),
+        )
+        held = self.client.get(self._url())
+        self.assertContains(held, "Prices on hold")
+        self.assertContains(held, "Reference price held for manual review")
+        self.assertContains(held, "SPY")
+        self.assertContains(held, 'href="/control/#price-revisions"')
+        self.assertNotContains(held, "Prices verified")
+
+    def test_ready_header_and_overview_review_cannot_disagree(self):
+        self._holdings()
+        self._proposal()
+        good = self.client.get(self._url())
+        self.assertContains(good, "Prices verified")
+        self.assertContains(good, "Review the verified quarterly proposal")
+        # An obsolete stored signal is not shown as a tradeable Overview action
+        # once any required market-price evidence goes stale.
+        PriceMark.objects.filter(strategy=self.strategy, symbol="ERNS.L").update(
+            as_of=timezone.localdate() - timedelta(days=13))
+        overview = self.client.get(reverse("v2_overview"))
+        self.assertEqual(overview.status_code, 200)
+        self.assertContains(overview, "Review blocked by data")
+        self.assertContains(overview, "Prices stale")
+        self.assertNotContains(overview, "Q" + str((self.quarter.month - 1) // 3 + 1) + " rebalance")
+        self.assertContains(overview, "Not a readiness check")
+
+    def test_tracking_only_never_claims_ready_even_when_marks_exist(self):
+        self._holdings()
+        self.strategy.tracking_only = True
+        self.strategy.save(update_fields=["tracking_only"])
+        page = self.client.get(self._url())
+        self.assertContains(page, "Tracking only")
+        self.assertNotContains(page, "Prices verified")
+
     def test_today_requires_owner_and_renders_actual_cash_without_fake_gain(self):
         self._add("DEPOSIT", amount="500")
         html = self.client.get(self._url())
