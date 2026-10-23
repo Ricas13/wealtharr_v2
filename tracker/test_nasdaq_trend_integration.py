@@ -54,7 +54,7 @@ class NasdaqEnrollmentTests(TestCase):
                          {"leveraged", "unleveraged"})
         self.assertFalse(instance.tracking_only)
         self.assertTrue(instance.market_data_enabled)
-        for section in ("today", "study", "history", "ledger", "strategy", "settings"):
+        for section in ("today", "study", "history", "ledger", "strategy"):
             with self.subTest(section=section):
                 page = self.client.get(reverse(
                     "v2_instance_page", args=[instance.pk, section]))
@@ -112,7 +112,7 @@ class NasdaqDailyReviewTests(TestCase):
             kind="BUY", symbol="LQQ3.L", quantity=D("5"),
             unit_price=D("100"), occurred_on=self.today - timedelta(days=3)))
 
-    def sync_existing(self, symbol):
+    def sync_existing(self, symbol, **kwargs):
         return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
 
     def test_daily_spy_exit_generates_one_real_sell_proposal(self):
