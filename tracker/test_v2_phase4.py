@@ -123,8 +123,13 @@ class TodayPhase4Tests(TestCase):
         self.assertContains(held, "Prices on hold")
         self.assertContains(held, "Reference price held for manual review")
         self.assertContains(held, "SPY")
-        self.assertContains(held, 'href="/control/#price-revisions"')
+        self.assertContains(held, "needs site-owner review")
         self.assertNotContains(held, "Prices verified")
+        # A staff owner gets the real diagnostics link, not a generic ledger link.
+        self.owner.is_staff = True
+        self.owner.save(update_fields=["is_staff"])
+        admin = self.client.get(self._url())
+        self.assertContains(admin, 'href="/control/#price-revisions"')
 
     def test_ready_header_and_overview_review_cannot_disagree(self):
         self._holdings()
