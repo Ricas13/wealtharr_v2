@@ -92,6 +92,7 @@ def category_for_event_key(key):
         ("data:", "data"),
         ("rebalance-reminder:", "followup"),
         ("monthly:", "contribution"),
+        ("new-money:", "contribution"),
         ("contrib:", "contribution"),
     ):
         if key.startswith(prefix):
