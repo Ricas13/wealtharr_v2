@@ -29,6 +29,7 @@
         </table></div>
 
         <p class="mut tiny" data-table-status role="status" aria-live="polite">Showing results for the full selected timeframe.</p>
+        <p class="mut tiny" data-rebased-note hidden></p>
         <div class="row between gap-top">
           <div class="legend" data-legend></div>
           <div class="row tight"><span class="mut tiny" data-scale-hint>Linear: equal heights are equal pounds.</span>
@@ -64,7 +65,7 @@
         <p class="mut tiny">Hover over (or tap) the chart to see each strategy's value on that day and its gain against the money put in by then.</p>
       </div>
       <p class="mut tiny gap-top"><strong>Hypothetical, not anyone's real results.</strong> Real daily prices from Yahoo, converted to pounds, replayed through each strategy's fixed rules with no dealing costs or tax.
-        The table and chart use the selected dates. Each strategy has its own opening portfolio value for a zoomed period; gain is measured against that opening value plus subsequent top-ups. The summary above uses the first reference strategy.
+        The table and chart use the selected dates. Zooming rebases every comparable return path to your chosen starting amount at the selected start, adding only subsequent monthly top-ups. This indexes the original simulation's daily returns; it does not restart strategy decisions or claim a fresh backtest. The summary above uses the first reference strategy.
         Every row with calculated figures covers the same dates<span data-period-wrap{% if not compare.ready %} hidden{% endif %}> (<span data-period>{{ compare.period }}</span>)</span>, the same money and the same top-up days.
         *Per year is money-weighted (XIRR) where the selected period has at least 360 days of data; worst fall removes the effect of top-ups.
         The {{ signal_name|default:"quarterly signal" }}'s 60/40 resets are assumed confirmed and filled at the quarter close.
