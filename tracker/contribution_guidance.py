@@ -1,8 +1,8 @@
 """Read-only new-deposit guidance. Does not create a quarterly review or execute trades.
 
-Only actual, effective ledger entries count. A later recorded trade ends the
-cash batch (avoids double advising a partial fill); the current cash balance
-is an independent ceiling. No recommendation from held/stale/missing quotes.
+Only actual, effective ledger entries count. Recorded purchases reduce the
+unallocated deposit pool, including partial fills; current cash is an independent
+ceiling. No recommendation from held, stale or missing quotes.
 """
 from datetime import timedelta
 from decimal import Decimal
@@ -16,6 +16,26 @@ from .strategies.registry import describe_strategy, module_for
 from .v2_ledger_core import effective_entries
 
 ZERO = Decimal("0")
+
+
+def uninvested_deposits(entries):
+    """Conservative cash funded by actual deposits, net of *all* recorded buys.
+
+    FIFO purchase debits reduce the outstanding deposit pool even if another
+    cash source could have funded them. Sales/dividends never masquerade as
+    a new contribution. Partial fills keep only the unswept remainder.
+    """
+    outstanding = ZERO
+    last_deposit = None
+    for e in entries:
+        if e.kind == "DEPOSIT":
+            outstanding += e.amount
+            last_deposit = e.pk
+        elif e.kind == "BUY":
+            outstanding = max(ZERO, outstanding - e.quantity * e.unit_price - e.fee)
+        elif e.kind in ("WITHDRAW", "FEE"):
+            outstanding = max(ZERO, outstanding - e.amount)
+    return outstanding, last_deposit
 
 
 def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
@@ -40,15 +60,10 @@ def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
         return None
 
     entries = [e for e in effective_entries(strategy) if e.occurred_on <= today]
-    last_trade = max((i for i, row in enumerate(entries)
-                      if row.kind in ("BUY", "SELL", "SPLIT")), default=-1)
-    pending = entries[last_trade + 1:]
-    deposits = [e for e in pending if e.kind == "DEPOSIT"]
-    if not deposits:
+    deposit_cash, last_deposit = uninvested_deposits(entries)
+    if last_deposit is None:
         return None
-    available = (sum((e.amount for e in deposits), ZERO)
-                 - sum((e.amount for e in pending if e.kind in ("WITHDRAW", "FEE")), ZERO))
-    available = min(report["cash"], available)
+    available = min(report["cash"], deposit_cash)
     if available < Decimal("1"):
         return None
 
@@ -85,8 +100,7 @@ def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
     return {
         "amount": sum((s["amount"] for s in suggestions), ZERO),
         "rows": tuple(suggestions),
-        "deposit_id": deposits[-1].pk,
-        "last_trade_id": entries[last_trade].pk if last_trade >= 0 else 0,
+        "deposit_id": last_deposit,
         "note": ("New deposits only; buy with your broker, then record real fills. "
                  "This is not the scheduled rebalance and no trades were placed."),
     }
