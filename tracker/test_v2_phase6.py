@@ -64,7 +64,7 @@ class V2HistoryTests(TestCase):
 
     def test_performance_does_not_claim_unmatched_usd_index_outperformance(self):
         html = self.client.get(self._url())
-        self.assertContains(html, "Nasdaq-100 · USD price")
+        self.assertContains(html, "QQQ (Nasdaq-100 proxy) · USD price")
         self.assertContains(html, "Not like-for-like with your portfolio")
         self.assertNotContains(html, "vs Nasdaq-100")
         self.assertContains(html, "cash-flow timing and dividends differ")
