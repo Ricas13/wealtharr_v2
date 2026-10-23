@@ -205,17 +205,21 @@ def usd_to_gbp(amount, rate):
     return (amount / rate).quantize(EIGHT_DP)
 
 
-def sync_ticker(symbol, *, force=False):
+def sync_ticker(symbol, *, force=False, backfill_reference_days=None):
     """One fetch per 12 hours per symbol, with durable prices and bounded errors."""
     if not TICKER.fullmatch(symbol):
         raise ValueError("Invalid Yahoo symbol")
     state, _ = YahooSync.objects.get_or_create(symbol=symbol)
     now = timezone.now()
-    if (not force and state.last_attempt and state.last_attempt > now -
+    if (not force and not backfill_reference_days and state.last_attempt and state.last_attempt > now -
             (timedelta(minutes=30) if state.last_error else timedelta(hours=12))):
         return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()
     first = not MarketObservation.objects.filter(symbol=symbol).exists()
     since = date(2010, 1, 1) if first else timezone.localdate() - timedelta(days=18)
+    if backfill_reference_days is not None:
+        if symbol not in ("SPY", "QQQ") or not 300 <= backfill_reference_days <= 800:
+            raise ValueError("Only 300-800 days of US reference-price provenance may be backfilled.")
+        since = min(since, timezone.localdate() - timedelta(days=backfill_reference_days))
     # A portfolio pre-dating the dividend-event feature can already have years
     # of price closes but no dividend coverage. Fetch the complete lookback
     # once before Dual Momentum's USD rules may evaluate it.
@@ -308,6 +312,20 @@ def sync_ticker(symbol, *, force=False):
         MarketObservation.objects.bulk_create(
             observations, batch_size=250, ignore_conflicts=True,
         )
+        if backfill_reference_days is not None:
+            # Older 9Sig deployments can have SPY/QQQ closes captured before
+            # raw-unit/source provenance existed. Upgrade ONLY same-value,
+            # same-currency observations re-observed from Yahoo today.
+            # A disagreement remains on revision hold, never gets overwritten.
+            for item in observations:
+                if item.raw_unit_verified:
+                    MarketObservation.objects.filter(
+                        symbol=item.symbol, as_of=item.as_of, price=item.price,
+                        currency=item.currency, raw_unit_verified=False,
+                    ).update(source=item.source,
+                             raw_quote_unit=item.raw_quote_unit,
+                             raw_close=item.raw_close,
+                             raw_unit_verified=True)
         # Cash paid per share (Dual Momentum's 12-month total returns need it).
         # Only for lines kept in their own currency: a converted USD line's
         # dividends would need their own exchange rate, so they're left out.
