@@ -69,6 +69,11 @@ class NasdaqTrendRuleTests(SimpleTestCase):
         self.assertEqual([t.side for t in dca.trades], ["BUY"])
         self.assertEqual(dca.trades[0].symbol, "EQQQ.L")
         self.assertEqual(dca.trades[0].estimated_gbp, D("20.00"))
+        restricted = v1.evaluate(
+            funds=funds, positions={}, cash=D("240"), quotes=quotes,
+            signal=off, dca_budget=D("120"))
+        self.assertEqual(restricted.trades[0].estimated_gbp, D("10.00"))
+        self.assertEqual(len(restricted.trades), 1)
         # The same monthly purchase, once confirmed, must not be repeated.
         hold = v1.evaluate(funds=funds, positions={"EQQQ.L": D("2")},
                            cash=D("220"), quotes=quotes, signal=off, completed_dca=1)
