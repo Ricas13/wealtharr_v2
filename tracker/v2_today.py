@@ -109,6 +109,19 @@ def _opening_buys(strategy, cash):
     return tuple(rows)
 
 
+def _opening_allocation_available(strategy, plugin):
+    """Don't instruct a first purchase while a cash allocation is intentional.
+
+    A missing dynamic weight signal must not turn into a guessed opening buy.
+    """
+    if not plugin or not plugin.allows_cash_only:
+        return True
+    if plugin.current_weights is None:
+        return False
+    weights = plugin.current_weights(strategy)
+    return weights is not None and any(w > ZERO for w in weights.values())
+
+
 def _signal_rows(strategy):
     signals = strategy.signals.filter(
         kind="QUARTERLY"
@@ -188,11 +201,7 @@ def today_page(request, instance_id):
         headline = notice.title
         explanation = notice.message
     elif (not strategy.tracking_only and not notice and not report["positions"]
-          and report["cash"] > ZERO and not
-          (plugin and plugin.allows_cash_only and
-           plugin.current_weights and
-           plugin.current_weights(strategy) is not None and
-           all(weight == ZERO for weight in plugin.current_weights(strategy).values()))):
+          and report["cash"] > ZERO and _opening_allocation_available(strategy, plugin)):
         status = "start"
         headline = "Buy your opening position"
         explanation = (
