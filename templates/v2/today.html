@@ -121,8 +121,6 @@
             <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}">Check instrument setup</a>
           {% else %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Review ledger</a>{% endif %}
         </div>
-      {% else %}<a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Open the ledger</a>{% endif %}
-        </div>
       {% else %}
         <p class="w2-muted">{{ today_explanation }}</p>
       {% endif %}
