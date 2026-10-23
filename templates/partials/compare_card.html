@@ -17,12 +17,12 @@
             <th scope="col">Effort</th></tr></thead>
           <tbody data-rows>
             {% for row in compare.rows %}<tr data-key="{{ row.key }}">
-              <td><input type="checkbox" checked aria-label="Show {{ row.label }}"></td>
-              <th scope="row"><span class="sw" style="background:{{ row.color }}"></span>{{ row.label }} <span class="mut">· {{ row.what }}</span></th>
-              <td class="r"><strong>£{{ row.final|floatformat:"0g" }}</strong></td>
-              <td class="r">{{ row.gain_pct|floatformat:1 }}%</td>
+              <td><input type="checkbox" {% if row.points %}checked aria-label="Show {{ row.label }}"{% else %}disabled aria-label="No comparable history for {{ row.label }}"{% endif %}></td>
+              <th scope="row"><span class="sw" style="background:{{ row.color }}"></span>{{ row.label }} <span class="mut">· {{ row.what }}{% if not row.points %} · No comparable history for these dates{% endif %}</span></th>
+              <td class="r"><strong>{% if row.final is not None %}£{{ row.final|floatformat:"0g" }}{% else %}—{% endif %}</strong></td>
+              <td class="r">{% if row.gain_pct is not None %}{{ row.gain_pct|floatformat:1 }}%{% else %}—{% endif %}</td>
               <td class="r">{% if row.annual is not None %}{{ row.annual|floatformat:1 }}%{% else %}—{% endif %}</td>
-              <td class="r neg">{{ row.drawdown|floatformat:1 }}%</td>
+              <td class="r neg">{% if row.drawdown is not None %}{{ row.drawdown|floatformat:1 }}%{% else %}—{% endif %}</td>
               <td class="mut">{{ row.effort }}</td>
             </tr>{% endfor %}
           </tbody>
@@ -68,7 +68,7 @@
         Every row covers the same dates<span data-period-wrap{% if not compare.ready %} hidden{% endif %}> (<span data-period>{{ compare.period }}</span>)</span>, the same money and the same top-up days.
         *Per year is money-weighted (XIRR) where the selected period has at least 360 days of data; worst fall removes the effect of top-ups.
         The {{ signal_name|default:"quarterly signal" }}'s 60/40 resets are assumed confirmed and filled at the quarter close.
-        <span data-left-out{% if not compare.left_out %} hidden{% endif %}>Left out because their price history doesn't cover these dates: <span data-left-out-names>{{ compare.left_out|join:", " }}</span>.</span>
+        <span data-left-out{% if not compare.left_out %} hidden{% endif %}>Historical figures unavailable for these dates (missing prices, dates or matching contributions): <span data-left-out-names>{{ compare.left_out|join:", " }}</span>.</span>
         <span data-simulated{% if not compare.simulated %} hidden{% endif %}>Before the 3× Nasdaq fund launched, its history is rebuilt from 3× QQQ's daily moves, which can look better than reality.</span>
         <span data-simulated-other{% if not compare.simulated_other %} hidden{% endif %}>Before some other funds launched, their history follows a similar older fund or index.</span>
         Past performance doesn't guarantee future returns.</p>
