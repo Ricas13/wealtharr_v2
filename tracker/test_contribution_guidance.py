@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from tracker.contribution_guidance import new_money_guidance, uninvested_deposits
 from tracker.instrument_mapping import MAPPING_VERSION
+from tracker.core.catalogue import onboarding_manifest
 from tracker.models import Account, LedgerEntry, MarketObservation, PriceMark, StrategyInstance, StrategyPreset
 from tracker.services import ledger_summary, validate_and_record
 from tracker.strategies.contributions import allocation
