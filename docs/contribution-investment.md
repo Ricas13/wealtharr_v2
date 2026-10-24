@@ -64,6 +64,19 @@ no sales, no borrowing and no change to scheduled review outcomes.
 - All simulations still assume close-based fills, historical proxy limitations
   and no dealing costs; owner cash and broker fills are never inferred.
 
+## Action priority and performance integrity
+- An urgent unacknowledged review or outstanding current trade is higher priority
+  than new-money guidance. Today, Overview and contribution notifications use
+  the same read-only guard; uncompleted fills never show original quantities
+  as new orders in Overview.
+- The combined chart refuses to omit a live strategy silently. Mixed-date
+  account valuations are explicitly called an indicative sum, not one synchronised
+  closing balance.
+- Exact portfolio percentage returns, monthly percentage returns and drawdown
+  are withheld across deposits or withdrawals when before/after-flow valuations
+  are unavailable. GBP gain and cash-flow-aware inception XIRR remain separately
+  visible. This intentionally replaces a misleading close-only TWR approximation.
+
 ## Financial controls
 No broker integration, real trade, automatic deposit, new strategy category or
 modification of historic ledger entries. Do not use Today recommendations

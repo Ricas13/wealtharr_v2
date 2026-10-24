@@ -66,6 +66,14 @@ class DerivedFigureTests(TestCase):
         self.assertEqual(result["max"], D("-25.0"))
         self.assertEqual(result["current"], D("-8.3"))
 
+    def test_combined_chart_never_omits_an_unverified_strategy_silently(self):
+        from unittest.mock import patch
+        first = object()
+        second = object()
+        with patch.object(dash, "certified_points", side_effect=lambda s: (
+                [(date(2026, 1, 1), D("100"), D("100"))] if s is first else [])):
+            self.assertEqual(dash.combine_points([first, second]), [])
+
     def test_chart_needs_two_points_and_never_invents_any(self):
         one = [(timezone.localdate(), D("100"), D("100"))]
         self.assertTrue(dash.chart(one, span="all", mode="gbp")["empty"])
