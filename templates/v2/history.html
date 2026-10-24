@@ -18,7 +18,7 @@
 
 <div class="w2-grid2">
   <section class="w2-card w2-span2" aria-label="Return chart">
-    {% include 'v2/_chart.html' with c=perf_chart ranges=perf_ranges label="Return since start, deposits removed" height=210 %}
+    {% include 'v2/_chart.html' with c=perf_chart ranges=perf_ranges label="Return (only when external cash flows do not prevent exact calculation)" height=210 %}
     <p class="w2-note">Index lines show USD price-only changes, not a simulated portfolio. FX, cash-flow timing and dividends differ; do not interpret differences as investment outperformance.</p>
   </section>
 
@@ -30,12 +30,12 @@
         <td class="w2-r {{ m.pct|tone }}">{% if m.pct is not None %}{{ m.pct|signed_pct }}{% else %}—{% endif %}</td></tr>
       {% empty %}<tr><td colspan="6"><div class="w2-empty">Months appear after the first recorded daily value.</div></td></tr>{% endfor %}
     </tbody></table></div>
-    {% if perf_monthly %}<p class="w2-note">* Month to date. Return = gain ÷ (start + half the month's deposits).</p>{% endif %}
+    {% if perf_monthly %}<p class="w2-note">* Month to date. Monetary gains exclude transfers. Percentage returns are withheld in months containing deposits or withdrawals, because their timing is not proven.</p>{% endif %}
   </section>
 
   <section class="w2-card">
     <div class="w2-ch"><h2 class="w2-ct">Drawdown from peak</h2>{% if not perf_drawdown.empty %}<span class="w2-muted">Now {{ perf_drawdown.current|signed_pct }}</span>{% endif %}</div>
-    {% if perf_drawdown.empty %}<div class="w2-empty">Needs a few recorded daily values.</div>
+    {% if perf_drawdown.empty %}<div class="w2-empty">{{ perf_drawdown.reason|default:"Needs a few recorded daily values." }}</div>
     {% else %}
     <div class="w2-chart"><svg viewBox="0 0 800 120" preserveAspectRatio="none" style="height:120px" role="img" aria-label="Drawdown from peak, worst {{ perf_drawdown.max }}%">
       <line class="w2-zero-line" x1="0" y1="0" x2="800" y2="0"></line>
@@ -52,9 +52,9 @@
   </section>
 
   <section class="w2-card w2-span2">
-    <div class="w2-ch"><h2 class="w2-ct">Period returns</h2><span class="w2-muted">"—" means not enough history</span></div>
+    <div class="w2-ch"><h2 class="w2-ct">Period returns</h2><span class="w2-muted">"—" also means transfers prevent an exact return</span></div>
     <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Measure</th>{% for row in perf_returns %}<th class="w2-r">{{ row.label }}</th>{% endfor %}</tr></thead><tbody>
-      <tr><td>You · time-weighted, from recorded daily values</td>{% for row in perf_returns %}<td class="w2-r {{ row.you|tone }}">{% if row.you is not None %}{{ row.you|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>
+      <tr><td>You · close-to-close return (only for periods without external cash transfers)</td>{% for row in perf_returns %}<td class="w2-r {{ row.you|tone }}">{% if row.you is not None %}{{ row.you|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>
       {% for index in perf_index_rows %}<tr><td>{{ index.name }} · USD price</td>{% for value in index.values %}<td class="w2-r">{% if value is not None %}{{ value|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>{% endfor %}
     </tbody></table></div>
     <p class="w2-note">Money-weighted (XIRR, annualised since your first deposit): {% if perf_xirr is not None %}{{ perf_xirr }}%{% else %}needs 30+ days{% endif %}.</p>

@@ -50,14 +50,14 @@
     </section>
 
     <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='trend' %} Returns</h2><span class="w2-muted">Deposits removed</span></div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='trend' %} Returns</h2><span class="w2-muted">No transfer-timing guesses</span></div>
       <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Period</th><th class="w2-r">You</th>{% for symbol, name in dash_indexes %}<th class="w2-r">{{ name }}</th>{% endfor %}</tr></thead><tbody>
         {% for row in dash_returns %}<tr><td>{{ row.label }}</td>
           <td class="w2-r {{ row.you|tone }}">{% if row.you is not None %}{{ row.you|signed_pct }}{% else %}—{% endif %}</td>
           {% for value in row.indexes %}<td class="w2-r">{% if value is not None %}{{ value|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>
         {% empty %}<tr><td colspan="4"><div class="w2-empty">Returns appear after a few recorded daily values.</div></td></tr>{% endfor %}
       </tbody></table></div>
-      <p class="w2-note">"—" means not enough history. Index columns are USD price change.</p>
+      <p class="w2-note">"—" also means deposits or withdrawals prevent exact close-to-close returns. Index columns are USD price change. XIRR measures cash-flow-aware performance separately.</p>
     </section>
   </div>
 

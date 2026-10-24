@@ -86,8 +86,22 @@ def combine_points(strategies):
             for d in common]
 
 
+def has_intermediate_flows(points):
+    """A dated net deposit/withdrawal needs intraday valuation boundaries for exact TWR."""
+    return any(points[i][2] != points[i-1][2] for i in range(1, len(points)))
+
+
 def growth_index(points):
-    """Chain-linked daily growth of £1 with deposits removed (time-weighted)."""
+    """Exact chain of closes only without intermediate external cash transfers.
+
+    Subtracting a same-day deposit from the close and dividing by yesterday\u2019s
+    portfolio assumes the deposit occurred at the closing bell. It can double
+    the apparent return if the deposit arrived before the market moved.
+    Where intraday flow boundaries are unavailable, fail closed rather than
+    displaying a fabricated time-weighted return.
+    """
+    if has_intermediate_flows(points):
+        return []
     result = []
     level = Decimal("1")
     for i, (day, value, net) in enumerate(points):
@@ -126,6 +140,9 @@ def chart(points, *, span, mode, indexes=True):
     shown = [p for p in points if p[0] >= start]
     if len(shown) < 2:
         return {"empty": True, "span": span, "mode": mode}
+    if mode == "pct" and has_intermediate_flows(shown):
+        return {"empty": True, "span": span, "mode": mode,
+                "reason": "Percentage return withheld: the selected period includes a deposit or withdrawal without verified pre/post-flow valuations. Use the cash-value chart or annualised XIRR."}
     first, last = shown[0][0], shown[-1][0]
     days = max((last - first).days, 1)
 
@@ -189,7 +206,6 @@ def period_returns(points, today=None):
     today = today or timezone.localdate()
     if not points:
         return ()
-    growth = growth_index(points)
     first = points[0][0]
     periods = (("1 week", today - timedelta(days=7)), ("1 month", today - timedelta(days=30)),
                ("3 months", today - timedelta(days=91)), ("6 months", today - timedelta(days=182)),
@@ -199,16 +215,19 @@ def period_returns(points, today=None):
     rows = []
     for label, start in periods:
         enough = start >= first
+        anchor = next((p for p in reversed(points) if p[0] <= start), None)
+        segment = [p for p in points if anchor and p[0] >= anchor[0]]
+        growth = growth_index(segment) if enough and anchor else []
         rows.append({
             "label": label,
-            "you": _change(growth, start) if enough else None,
+            "you": _change(growth, anchor[0]) if len(growth) >= 2 else None,
             "indexes": [_change(index_data[s], start) if enough else None for s, _ in INDEXES],
         })
     return tuple(rows)
 
 
 def monthly_rows(points):
-    """Month by month, deposits separate (modified Dietz return)."""
+    """Month by month, showing exact cash gain; do not guess within-month flow timing."""
     months = OrderedDict()
     for day, value, net in points:
         months[(day.year, day.month)] = (day, value, net)
@@ -221,7 +240,7 @@ def monthly_rows(points):
         rows.append({
             "month": date(year, month, 1), "start": previous_value, "deposits": deposits,
             "end": value, "gain": gain.quantize(PENNY),
-            "pct": (gain / base * HUNDRED).quantize(Decimal("0.1")) if base > ZERO else None,
+            "pct": (gain / base * HUNDRED).quantize(Decimal("0.1")) if base > ZERO and deposits == ZERO else None,
             "partial": (year, month) == (timezone.localdate().year, timezone.localdate().month),
         })
         previous_value, previous_net = value, net
@@ -231,7 +250,9 @@ def monthly_rows(points):
 def drawdown(points):
     growth = growth_index(points)
     if len(growth) < 2:
-        return {"empty": True}
+        return {"empty": True, "reason": (
+            "Exact drawdown needs verified pre/post-deposit valuations; no percentage is inferred."
+            if has_intermediate_flows(points) else "Needs at least two verified valuation dates.")}
     peak = growth[0][1]
     values = []
     for _, level in growth:
@@ -274,7 +295,7 @@ def day_change(points):
         return None, None
     (_, before, net_before), (_, after, net_after) = points[-2], points[-1]
     change = after - before - (net_after - net_before)
-    pct = (change / before * HUNDRED).quantize(Decimal("0.1")) if before > ZERO else None
+    pct = (change / before * HUNDRED).quantize(Decimal("0.1")) if before > ZERO and net_after == net_before else None
     return change.quantize(PENNY), pct
 
 

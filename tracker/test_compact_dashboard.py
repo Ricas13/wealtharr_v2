@@ -22,14 +22,14 @@ KEY = "nasdaq-quarterly-target"
 class DerivedFigureTests(TestCase):
     """Pure arithmetic on recorded daily values."""
 
-    def test_growth_index_removes_deposits(self):
+    def test_growth_index_refuses_unverified_deposit_timing(self):
         points = [(date(2026, 1, 1), D("1000"), D("1000")),
                   (date(2026, 1, 2), D("1600"), D("1500")),   # +500 deposit, +100 growth
                   (date(2026, 1, 3), D("1600"), D("1500"))]
         growth = dash.growth_index(points)
-        self.assertEqual(growth[0][1], D("1"))
-        self.assertEqual(growth[1][1], D("1.1"))
-        self.assertEqual(growth[2][1], D("1.1"))
+        self.assertEqual(growth, [])
+        self.assertTrue(dash.chart(points, span="all", mode="pct")["empty"])
+        self.assertIn("Percentage return withheld", dash.chart(points, span="all", mode="pct")["reason"])
 
     def test_monthly_rows_keep_deposits_out_of_gain(self):
         points = [(date(2026, 3, 31), D("10000"), D("10000")),
@@ -38,8 +38,26 @@ class DerivedFigureTests(TestCase):
         self.assertEqual(march["deposits"], D("10000"))
         self.assertEqual(april["deposits"], D("500"))
         self.assertEqual(april["gain"], D("200.00"))
-        # Modified Dietz: 200 / (10000 + 250).
-        self.assertEqual(april["pct"], D("2.0"))
+        # End-of-period net flows do not identify their intramonth timing.
+        self.assertIsNone(april["pct"])
+
+    def test_cash_in_before_rally_is_not_a_false_twenty_percent_return(self):
+        points = [(date(2026, 1, 1), D("100"), D("100")),
+                  (date(2026, 1, 2), D("220"), D("200"))]
+        # £100 was deposited before a 10% rally; a close-only cash subtraction
+        # would incorrectly report 20%, not the actual 10%.
+        self.assertTrue(dash.has_intermediate_flows(points))
+        self.assertEqual(dash.growth_index(points), [])
+        self.assertIsNone(dash.day_change(points)[1])
+        self.assertTrue(dash.drawdown(points)["empty"])
+        self.assertEqual(dash.day_change(points)[0], D("20.00"))
+
+    def test_flow_free_closing_returns_remain_available(self):
+        points = [(date(2026, 1, 1), D("100"), D("100")),
+                  (date(2026, 1, 2), D("110"), D("100"))]
+        self.assertEqual(dash.growth_index(points)[-1][1], D("1.1"))
+        self.assertFalse(dash.chart(points, span="all", mode="pct")["empty"])
+        self.assertEqual(dash.day_change(points)[1], D("10.0"))
 
     def test_drawdown_reports_worst_fall_from_peak(self):
         points = [(date(2026, 1, d), v, D("100")) for d, v in
