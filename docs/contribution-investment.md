@@ -37,9 +37,9 @@ no sales, no borrowing and no change to scheduled review outcomes.
 
 ## Notifications and timing
 - Owner must enable at least one destination (email, Discord, Telegram) **and**
-  the contribution route for the specific strategy. Existing routes are not
-  modified. Newly enrolled strategies opt into contribution **email routing**,
-  but the owner-wide email destination switch starts off and still governs it.
+  the contribution route for the specific strategy. Existing routes and the
+  new-strategy default (all contribution destinations OFF) are preserved; no
+  automatic notification opt-in is introduced.
 - The hourly notification scheduler sends a once-per-deposit **nudge**, only
   when verified new-money guidance is available and no prior trade is pending.
   It does NOT email approximate orders or force immediate trading.
