@@ -41,6 +41,11 @@ def uninvested_deposits(entries):
 def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
     """Return a suggestion with buys, or None; never infer broker fills."""
     today = today or timezone.localdate()
+    # A saved trade or urgent manual review always takes priority over deposits.
+    # Today, notifications and retries all call this one read-only guard.
+    from .signal_status import _last_action
+    if _last_action(strategy) is not None:
+        return None
     if (not prices_ready or strategy.tracking_only or not strategy.market_data_enabled or
             not report["positions"] or report["cash"] <= ZERO or
             strategy.account.kind == "PAPER"):

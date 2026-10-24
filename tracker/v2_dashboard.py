@@ -76,7 +76,9 @@ def certified_points(strategy, report=None):
 def combine_points(strategies):
     """Sum certified values across strategies on their common dates only."""
     series = [dict((d, (v, n)) for d, v, n in certified_points(s)) for s in strategies]
-    series = [s for s in series if s]
+    # Never label a subset of strategies as the combined portfolio.
+    if any(not s for s in series):
+        return []
     if not series:
         return []
     common = sorted(set.intersection(*(set(s) for s in series)))
