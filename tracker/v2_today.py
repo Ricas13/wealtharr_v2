@@ -302,11 +302,12 @@ def _dashboard(request, strategy, report, ready, roles, next_end):
     points = dash.certified_points(strategy)
     span = dash.pick_range(request)
     mode = dash.pick_mode(request)
-    change, change_pct = dash.day_change(points) if ready else (None, None)
-    returns = dash.period_returns(points)
+    flow_days = dash.external_cash_flow_days(strategy)
+    change, change_pct = dash.day_change(points, cash_flow_days=flow_days) if ready else (None, None)
+    returns = dash.period_returns(points, cash_flow_days=flow_days)
     return {
         "dash_points": bool(points),
-        "dash_chart": dash.chart(points, span=span, mode=mode),
+        "dash_chart": dash.chart(points, span=span, mode=mode, cash_flow_days=flow_days),
         "dash_ranges": dash.RANGES, "dash_indexes": dash.INDEXES,
         "dash_day_change": change, "dash_day_pct": change_pct,
         "dash_gain_pct": (

@@ -86,12 +86,27 @@ def combine_points(strategies):
             for d in common]
 
 
-def has_intermediate_flows(points):
-    """A dated net deposit/withdrawal needs intraday valuation boundaries for exact TWR."""
-    return any(points[i][2] != points[i-1][2] for i in range(1, len(points)))
+def external_cash_flow_days(strategy):
+    """Real external transfers, including offsetting deposits and withdrawals."""
+    return frozenset(e.occurred_on for e in effective_entries(strategy)
+                     if e.kind in ("DEPOSIT", "WITHDRAW"))
 
 
-def growth_index(points):
+def has_intermediate_flows(points, cash_flow_days=()):
+    """Dated transfers need intraday valuation boundaries for exact TWR.
+
+    Net contributions alone are insufficient: a deposit and withdrawal on the
+    same date (or in the same valuation interval) can cancel out completely.
+    """
+    if len(points) < 2:
+        return False
+    if any(points[i][2] != points[i-1][2] for i in range(1, len(points))):
+        return True
+    start, end = points[0][0], points[-1][0]
+    return any(start < day <= end for day in cash_flow_days)
+
+
+def growth_index(points, *, cash_flow_days=()):
     """Exact chain of closes only without intermediate external cash transfers.
 
     Subtracting a same-day deposit from the close and dividing by yesterday\u2019s
@@ -100,7 +115,7 @@ def growth_index(points):
     Where intraday flow boundaries are unavailable, fail closed rather than
     displaying a fabricated time-weighted return.
     """
-    if has_intermediate_flows(points):
+    if has_intermediate_flows(points, cash_flow_days=cash_flow_days):
         return []
     result = []
     level = Decimal("1")
@@ -133,14 +148,14 @@ def _scale(values, lo, hi):
     return [float((hi - v) / span * CHART_H) for v in values]
 
 
-def chart(points, *, span, mode, indexes=True):
+def chart(points, *, span, mode, indexes=True, cash_flow_days=()):
     """Server-built SVG polylines; no client charting library."""
     today = timezone.localdate()
     start = range_start(span, today)
     shown = [p for p in points if p[0] >= start]
     if len(shown) < 2:
         return {"empty": True, "span": span, "mode": mode}
-    if mode == "pct" and has_intermediate_flows(shown):
+    if mode == "pct" and has_intermediate_flows(shown, cash_flow_days=cash_flow_days):
         return {"empty": True, "span": span, "mode": mode,
                 "reason": "Percentage return withheld: the selected period includes a deposit or withdrawal without verified pre/post-flow valuations. Use the cash-value chart or annualised XIRR."}
     first, last = shown[0][0], shown[-1][0]
@@ -151,7 +166,7 @@ def chart(points, *, span, mode, indexes=True):
 
     lines = []
     if mode == "pct":
-        growth = growth_index(shown)
+        growth = growth_index(shown, cash_flow_days=cash_flow_days)
         base = growth[0][1]
         series = [("You", "w2-c1", [(d, (v / base - 1) * HUNDRED) for d, v in growth])]
         if indexes:
@@ -201,7 +216,7 @@ def chart(points, *, span, mode, indexes=True):
     }
 
 
-def period_returns(points, today=None):
+def period_returns(points, today=None, *, cash_flow_days=()):
     """Time-weighted returns from recorded values, and the indexes' own change."""
     today = today or timezone.localdate()
     if not points:
@@ -217,7 +232,7 @@ def period_returns(points, today=None):
         enough = start >= first
         anchor = next((p for p in reversed(points) if p[0] <= start), None)
         segment = [p for p in points if anchor and p[0] >= anchor[0]]
-        growth = growth_index(segment) if enough and anchor else []
+        growth = growth_index(segment, cash_flow_days=cash_flow_days) if enough and anchor else []
         rows.append({
             "label": label,
             "you": _change(growth, anchor[0]) if len(growth) >= 2 else None,
@@ -226,12 +241,13 @@ def period_returns(points, today=None):
     return tuple(rows)
 
 
-def monthly_rows(points):
+def monthly_rows(points, *, cash_flow_days=()):
     """Month by month, showing exact cash gain; do not guess within-month flow timing."""
     months = OrderedDict()
     for day, value, net in points:
         months[(day.year, day.month)] = (day, value, net)
     rows = []
+    flow_months = {(day.year, day.month) for day in cash_flow_days}
     previous_value, previous_net = ZERO, ZERO
     for (year, month), (day, value, net) in months.items():
         deposits = net - previous_net
@@ -240,19 +256,21 @@ def monthly_rows(points):
         rows.append({
             "month": date(year, month, 1), "start": previous_value, "deposits": deposits,
             "end": value, "gain": gain.quantize(PENNY),
-            "pct": (gain / base * HUNDRED).quantize(Decimal("0.1")) if base > ZERO and deposits == ZERO else None,
+            "pct": (gain / base * HUNDRED).quantize(Decimal("0.1"))
+            if base > ZERO and deposits == ZERO and (year, month) not in flow_months else None,
             "partial": (year, month) == (timezone.localdate().year, timezone.localdate().month),
         })
         previous_value, previous_net = value, net
     return tuple(reversed(rows))
 
 
-def drawdown(points):
-    growth = growth_index(points)
+def drawdown(points, *, cash_flow_days=()):
+    growth = growth_index(points, cash_flow_days=cash_flow_days)
     if len(growth) < 2:
         return {"empty": True, "reason": (
             "Exact drawdown needs verified pre/post-deposit valuations; no percentage is inferred."
-            if has_intermediate_flows(points) else "Needs at least two verified valuation dates.")}
+            if has_intermediate_flows(points, cash_flow_days=cash_flow_days)
+            else "Needs at least two verified valuation dates.")}
     peak = growth[0][1]
     values = []
     for _, level in growth:
@@ -290,12 +308,13 @@ def money_in_by_month(strategies, months=12):
     return tuple({"month": m, "amount": v, "height": int(abs(v) / top * 100)} for m, v in rows)
 
 
-def day_change(points):
+def day_change(points, *, cash_flow_days=()):
     if len(points) < 2:
         return None, None
     (_, before, net_before), (_, after, net_after) = points[-2], points[-1]
     change = after - before - (net_after - net_before)
-    pct = (change / before * HUNDRED).quantize(Decimal("0.1")) if before > ZERO and net_after == net_before else None
+    pct = (change / before * HUNDRED).quantize(Decimal("0.1"))
+    if before > ZERO and not has_intermediate_flows(points[-2:], cash_flow_days=cash_flow_days) else None
     return change.quantize(PENNY), pct
 
 

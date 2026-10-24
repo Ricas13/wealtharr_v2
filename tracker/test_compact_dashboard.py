@@ -52,6 +52,20 @@ class DerivedFigureTests(TestCase):
         self.assertTrue(dash.drawdown(points)["empty"])
         self.assertEqual(dash.day_change(points)[0], D("20.00"))
 
+    def test_offsetting_same_day_transfers_still_withhold_returns(self):
+        # The net-contributed total is unchanged; the ledger records gross
+        # movements and must still block an unjustified percentage.
+        first = date(2026, 1, 1)
+        second = date(2026, 1, 2)
+        points = [(first, D("100"), D("100")),
+                  (second, D("110"), D("100"))]
+        self.assertFalse(dash.has_intermediate_flows(points))
+        self.assertTrue(dash.has_intermediate_flows(points, cash_flow_days={second}))
+        self.assertEqual(dash.growth_index(points, cash_flow_days={second}), [])
+        self.assertTrue(dash.chart(points, span="all", mode="pct", cash_flow_days={second})["empty"])
+        self.assertIsNone(dash.day_change(points, cash_flow_days={second})[1])
+        self.assertIsNone(dash.monthly_rows(points, cash_flow_days={second})[0]["pct"])
+
     def test_flow_free_closing_returns_remain_available(self):
         points = [(date(2026, 1, 1), D("100"), D("100")),
                   (date(2026, 1, 2), D("110"), D("100"))]

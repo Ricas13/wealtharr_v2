@@ -369,9 +369,10 @@ def history_page(request, instance_id):
 def _performance(request, strategy, report=None):
     from . import v2_dashboard as dash
     points = dash.certified_points(strategy, report)
-    monthly = dash.monthly_rows(points)
+    flow_days = dash.external_cash_flow_days(strategy)
+    monthly = dash.monthly_rows(points, cash_flow_days=flow_days)
     best, worst = dash.best_worst(monthly)
-    returns = dash.period_returns(points)
+    returns = dash.period_returns(points, cash_flow_days=flow_days)
     since = next((r for r in returns if r["label"] == "Since start"), None)
     # USD QQQ ETF price change (a Nasdaq-100 proxy) is NOT like-for-like with a
     # cash-flow-adjusted portfolio in its account currency. Show it separately,
@@ -381,10 +382,10 @@ def _performance(request, strategy, report=None):
     return {
         "perf_points": bool(points),
         "perf_chart": dash.chart(points, span=dash.pick_range(request),
-                                 mode=dash.pick_mode(request, "pct")),
+                                 mode=dash.pick_mode(request, "pct"), cash_flow_days=flow_days),
         "perf_ranges": dash.RANGES, "perf_indexes": dash.INDEXES,
         "perf_monthly": monthly, "perf_best": best, "perf_worst": worst,
-        "perf_drawdown": dash.drawdown(points),
+        "perf_drawdown": dash.drawdown(points, cash_flow_days=flow_days),
         "perf_money_in": dash.money_in_by_month([strategy]),
         "perf_returns": returns,
         "perf_index_rows": tuple({"name": name, "values": [r["indexes"][i] for r in returns]}
@@ -541,6 +542,7 @@ def _overview_extras(request, items, rows, today):
     home = items[0].account.currency if items else "GBP"
     live = [s for s in items if not s.tracking_only and s.account.currency == home]
     points = dash.combine_points(live)
+    combined_flow_days = frozenset(day for s in live for day in dash.external_cash_flow_days(s))
     missing_chart_evidence = bool(live) and any(not dash.certified_points(s) for s in live)
     todos = []
     assets = {}
@@ -609,8 +611,9 @@ def _overview_extras(request, items, rows, today):
     prices = [MarketObservation.objects.filter(symbol=x, currency=home).order_by("-as_of").first()
               for x in symbols]
     last_sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()
-    change, change_pct = dash.day_change(points)
-    combined_chart = dash.chart(points, span=span, mode=mode, indexes=False)
+    change, change_pct = dash.day_change(points, cash_flow_days=combined_flow_days)
+    combined_chart = dash.chart(points, span=span, mode=mode, indexes=False,
+                                cash_flow_days=combined_flow_days)
     if missing_chart_evidence:
         combined_chart["reason"] = (
             "A combined chart needs certified valuations for every live strategy "
