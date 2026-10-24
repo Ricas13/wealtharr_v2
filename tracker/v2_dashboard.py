@@ -313,8 +313,9 @@ def day_change(points, *, cash_flow_days=()):
         return None, None
     (_, before, net_before), (_, after, net_after) = points[-2], points[-1]
     change = after - before - (net_after - net_before)
-    pct = (change / before * HUNDRED).quantize(Decimal("0.1"))
-    if before > ZERO and not has_intermediate_flows(points[-2:], cash_flow_days=cash_flow_days) else None
+    pct = ((change / before * HUNDRED).quantize(Decimal("0.1"))
+           if before > ZERO and not has_intermediate_flows(
+               points[-2:], cash_flow_days=cash_flow_days) else None)
     return change.quantize(PENNY), pct
 
 
