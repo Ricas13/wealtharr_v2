@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from .models import PriceMark, YahooSync
+from .models import MarketObservation, PriceMark, YahooSync
 from .strategies.contributions import allocation, FIXED_STRATEGIES
 from .strategies.instruments import role_symbols
 from .strategies.registry import describe_strategy, module_for
@@ -76,8 +76,11 @@ def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
         if YahooSync.objects.filter(symbol=symbol, last_error__startswith="PRICE_HOLD:").exists():
             return None
         quote = PriceMark.objects.filter(strategy=strategy, symbol=symbol).first()
-        if (not quote or quote.price <= ZERO or quote.as_of > today or
-                today - quote.as_of > timedelta(days=8)):
+        if (not quote or quote.source != "yahoo" or quote.price <= ZERO or
+                quote.as_of > today or today - quote.as_of > timedelta(days=8) or
+                not MarketObservation.objects.filter(
+                    symbol=symbol, as_of=quote.as_of,
+                    price=quote.price, currency=strategy.account.currency).exists()):
             return None
         prices[role] = quote.price
     values = {r: report["positions"].get(symbol, ZERO) * prices[r]
