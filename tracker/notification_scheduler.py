@@ -54,7 +54,8 @@ def retry_due_deliveries(*, as_of=None):
             from .contribution_guidance import new_money_guidance
             from .services import ledger_summary
             from .signal_status import _price_status
-            if row.strategy is None or row.strategy.tracking_only:
+            if (row.strategy is None or row.strategy.tracking_only or
+                    not row.strategy.contribution_alerts):
                 permitted = False
             else:
                 report = ledger_summary(row.strategy)
