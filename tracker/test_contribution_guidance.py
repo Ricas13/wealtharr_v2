@@ -75,6 +75,9 @@ class LiveContributionGuidanceTests(TestCase):
             strategy_key=key, name="9Sig contributions",
             strategy_version=describe_strategy(key).version,
             mapping_version=MAPPING_VERSION,
+            resolved_instruments=onboarding_manifest(key, "TRADING212", "ISA"),
+            started_on=timezone.localdate() - timedelta(days=12),
+            owner_checked_on=timezone.localdate() - timedelta(days=12),
             equity_symbol="LQQ3.L", safe_symbol="ERNS.L",
             market_data_enabled=True, tracking_only=False)
         self.day = timezone.localdate() - timedelta(days=2)
