@@ -615,6 +615,10 @@ def _overview_extras(request, items, rows, today):
         combined_chart["reason"] = (
             "A combined chart needs certified valuations for every live strategy "
             "in the reporting currency. No partial total is plotted.")
+    elif live and not points:
+        combined_chart["reason"] = (
+            "No common certified valuation dates exist for every live strategy "
+            "in the reporting currency. No partial total is plotted.")
     return {
         "ov_chart": combined_chart,
         "ov_ranges": dash.RANGES, "ov_todos": tuple(todos), "ov_assets": asset_rows,

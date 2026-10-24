@@ -160,6 +160,37 @@ class LiveContributionGuidanceTests(TestCase):
         self.assertNotContains(overview, "Buy ≈")
         self.assertNotContains(overview, "Invest new deposit")
 
+    def test_mixed_date_overview_is_labelled_indicative(self):
+        second_account = Account.objects.create(
+            owner=self.owner, name="Second ISA", kind="ISA",
+            country="GB", broker="TRADING212")
+        second = StrategyInstance.objects.create(
+            owner=self.owner, account=second_account, preset=self.strategy.preset,
+            name="Second tracked strategy", tracking_only=False)
+        first_date = timezone.localdate() - timedelta(days=1)
+        second_date = timezone.localdate() - timedelta(days=3)
+
+        def history(instance):
+            day = first_date if instance.pk == self.strategy.pk else second_date
+            return {"actual_net_funding": D("1000"),
+                    "latest_certified": NS(as_of=day, value_gbp=D("1200")),
+                    "status": "verified_market", "reason": "Test only",
+                    "last_point": None}
+
+        self.client.force_login(self.owner)
+        with patch("tracker.v2_history.build_history", side_effect=history), patch(
+                "tracker.v2_history._overview_extras", return_value={
+                    "ov_chart": {"empty": True, "span": "all", "mode": "gbp"},
+                    "ov_ranges": (), "ov_todos": (), "ov_assets": (),
+                    "ov_coming": (), "ov_alerts": {}, "ov_today": timezone.localdate(),
+                }):
+            overview = self.client.get(reverse("v2_overview"))
+        self.assertEqual(overview.status_code, 200)
+        self.assertFalse(overview.context["overview_same_date"])
+        self.assertTrue(overview.context["overview_mixed_dates"])
+        self.assertContains(overview, "Indicative sum of different closing dates")
+        self.assertEqual(overview.context["overview_total"], D("2400"))
+
     def test_existing_9sig_deposit_has_safe_fund_prompt_then_partial_fill(self):
         self.record("DEPOSIT", amount="1000")
         self.record("BUY", symbol="LQQ3.L", quantity="6", price="100")
