@@ -197,7 +197,7 @@ class PermanentStudyTests(TestCase):
         cache.clear()
         start = TODAY - timedelta(days=800)
         seed("SPY", start, lambda d, i: 400.0)
-        seed("VTI", start, lambda d, i: 200 * (1.01 ** i))  # shares run away from the others
+        seed("VTI", start, lambda d, i: 200 * (1.02 ** i))  # decisive >35% band breach at year-end
         seed("TLT", start, lambda d, i: 90.0)
         seed("BIL", start, lambda d, i: 91.0)
         seed("GLD", start, lambda d, i: 250.0)

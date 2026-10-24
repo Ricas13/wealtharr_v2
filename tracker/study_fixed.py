@@ -16,7 +16,7 @@ are fresh.
 from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 
 from .core.calendar import month_end_on_or_after, quarter_end_on_or_after
 from .models import StudyPrice
@@ -115,6 +115,11 @@ class FixedWeightStudy:
         self.rule_text = rule_text
         self.CURRENCY = currency
         self.rules = rules
+        # Study and live use the same source-controlled contribution policy.
+        self.rules_name = {
+            "all_weather": "all-weather", "golden_butterfly": "golden-butterfly",
+            "hfea": "hfea", "permanent_portfolio": "permanent-portfolio",
+        }.get(rules.__name__.split(".")[-2], "")
         self.sources = sources  # {role: Source}
         self.SERIES = (("strategy", title), ("spy", "SPY (S&P 500)"), ("vti", "VTI (US total market)"))
         self.review_word = review_word
@@ -228,8 +233,22 @@ class FixedWeightStudy:
                 cash, filled = fill_orders(pending, positions, cash, {r: q.price_gbp for r, q in quotes(i).items()})
                 trades, pending = trades + filled, []
             if i > s and _new_month(days, i) and monthly:
+                from .strategies.contributions import allocation
                 cash += D(str(monthly))
                 flows.append((days[i], monthly))
+                # Invest new cash into underweight funds, without moving
+                # existing holdings. Yearly/quarterly rebalance stays dated.
+                prices = quotes(i)
+                values_now = {r: positions[r] * prices[r].price_gbp for r in roles}
+                buys = allocation(
+                    self.rules_name, D(str(monthly)), values=values_now, weights=weights)
+                for role, budget in buys.items():
+                    price = prices[role].price_gbp
+                    qty = (budget / price).quantize(D("0.0001"), rounding=ROUND_DOWN)
+                    if qty > 0 and qty * price >= D("1"):
+                        positions[role] += qty
+                        cash -= qty * price
+                        trades += 1
             if self.review_word == "monthly":
                 due = i + 1 < len(days) and days[i + 1].month != days[i].month
                 review_day = month_end_on_or_after(days[i])
@@ -285,8 +304,9 @@ class FixedWeightStudy:
         return (
             "Starts at the published weights (%s) and runs the live %s rule after each %s end: %s"
             % (weights, self.review_word, period, rule),
-            "Monthly top-ups arrive on the first trading day of each month and wait as cash for the "
-            "next %s review; SPY and VTI invest them that day." % self.review_word,
+            "Monthly top-ups arrive on the first trading day of each month and buy "
+            "underweight funds without selling existing holdings. Normal %s reviews "
+            "still do the full rebalance; SPY and VTI invest immediately too." % self.review_word,
             "All values are in %s with dividends reinvested.%s Trades fill at that day's close with "
             "no dealing costs or tax." % (money, fx),
             "Before a fund existed, its role follows a stand-in, flagged on the page.",

@@ -50,23 +50,23 @@
     </section>
 
     <section class="w2-card">
-      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='trend' %} Returns</h2><span class="w2-muted">Deposits removed</span></div>
+      <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='trend' %} Returns</h2><span class="w2-muted">No transfer-timing guesses</span></div>
       <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Period</th><th class="w2-r">You</th>{% for symbol, name in dash_indexes %}<th class="w2-r">{{ name }}</th>{% endfor %}</tr></thead><tbody>
         {% for row in dash_returns %}<tr><td>{{ row.label }}</td>
           <td class="w2-r {{ row.you|tone }}">{% if row.you is not None %}{{ row.you|signed_pct }}{% else %}—{% endif %}</td>
           {% for value in row.indexes %}<td class="w2-r">{% if value is not None %}{{ value|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>
         {% empty %}<tr><td colspan="4"><div class="w2-empty">Returns appear after a few recorded daily values.</div></td></tr>{% endfor %}
       </tbody></table></div>
-      <p class="w2-note">"—" means not enough history. Index columns are USD price change.</p>
+      <p class="w2-note">"—" also means deposits or withdrawals prevent exact close-to-close returns. Index columns are USD price change. XIRR measures cash-flow-aware performance separately.</p>
     </section>
   </div>
 
   <aside class="w2-side">
     <section class="w2-card w2-card-action w2-state-{{ today_status }}" aria-label="What to do next">
       <div class="w2-ch">
-        <h2 class="w2-ct w2-big"><span class="w2-action-icon">{% if today_status == 'trade' %}{% include 'partials/icon.html' with name='trend' %}{% elif today_status == 'record' %}{% include 'partials/icon.html' with name='edit' %}{% elif today_status == 'start' %}{% include 'partials/icon.html' with name='coins' %}{% elif today_status == 'setup' %}{% include 'partials/icon.html' with name='settings' %}{% elif today_status == 'empty' %}{% include 'partials/icon.html' with name='wallet' %}{% elif today_status == 'blocked' %}{% include 'partials/icon.html' with name='pause' %}{% elif today_status == 'review' %}{% include 'partials/icon.html' with name='alert' %}{% else %}{% include 'partials/icon.html' with name='check' %}{% endif %}</span>{{ today_headline }}</h2>
-        <span class="w2-chip {% if today_status == 'trade' or today_status == 'record' or today_status == 'start' or today_status == 'setup' or today_status == 'empty' %}w2-wait{% elif today_status == 'idle' %}w2-ok{% endif %}">
-          {% if selected_instance.tracking_only %}Not live{% elif today_status == 'setup' %}Setup needed{% elif today_status == 'empty' %}Action needed{% elif today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Part recorded{% elif today_status == 'trade' or today_status == 'start' %}Action needed{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}</span>
+        <h2 class="w2-ct w2-big"><span class="w2-action-icon">{% if today_status == 'trade' %}{% include 'partials/icon.html' with name='trend' %}{% elif today_status == 'record' %}{% include 'partials/icon.html' with name='edit' %}{% elif today_status == 'start' or today_status == 'new_money' %}{% include 'partials/icon.html' with name='coins' %}{% elif today_status == 'setup' %}{% include 'partials/icon.html' with name='settings' %}{% elif today_status == 'empty' %}{% include 'partials/icon.html' with name='wallet' %}{% elif today_status == 'blocked' %}{% include 'partials/icon.html' with name='pause' %}{% elif today_status == 'review' %}{% include 'partials/icon.html' with name='alert' %}{% else %}{% include 'partials/icon.html' with name='check' %}{% endif %}</span>{{ today_headline }}</h2>
+        <span class="w2-chip {% if today_status == 'trade' or today_status == 'record' or today_status == 'start' or today_status == 'new_money' or today_status == 'setup' or today_status == 'empty' %}w2-wait{% elif today_status == 'idle' %}w2-ok{% endif %}">
+          {% if selected_instance.tracking_only %}Not live{% elif today_status == 'setup' %}Setup needed{% elif today_status == 'empty' %}Action needed{% elif today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Part recorded{% elif today_status == 'trade' or today_status == 'start' or today_status == 'new_money' %}Action needed{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}</span>
       </div>
       {% if selected_instance.onboarding_mode == 'hold' %}<p><span class="w2-chip" title="Your starting position was entered by you. Correct it in the Ledger if needed.">Based on holdings you entered</span></p>{% endif %}
       {% if today_status == 'trade' or today_status == 'record' %}
@@ -78,6 +78,18 @@
           <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}">How it was calculated</a>
         </div>
         <p class="w2-note">{{ today_explanation }}</p>
+      {% elif today_status == 'new_money' %}
+        <p class="w2-muted">{{ today_explanation }}</p>
+        <div class="w2-table-wrap w2-space-top">
+          <table class="w2-table" aria-label="New money purchase guidance">
+            <thead><tr><th>Consider buying</th><th class="w2-r">Amount</th></tr></thead>
+            <tbody>{% for row in today_new_money.rows %}
+              <tr><td><strong>{{ row.symbol }}</strong></td><td class="w2-r">{{ cur }}{{ row.amount|floatformat:"2g" }}</td></tr>
+            {% endfor %}</tbody>
+          </table>
+        </div>
+        <p class="w2-note">Based on confirmed deposits not followed by a recorded trade. Check your broker's current prices and fees; the figures are cash budgets, not live share quotes. No orders were placed.</p>
+        <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">Record what I bought</a>
       {% elif today_status == 'start' %}
         <p class="w2-muted">{{ today_explanation }}</p>
         <div class="w2-table-wrap w2-space-top"><table class="w2-table"><tbody>
