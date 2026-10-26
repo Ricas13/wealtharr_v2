@@ -291,7 +291,9 @@ DEFAULT_COLOUR = "#8a94a3"
 
 
 def colour_for(instance):
-    return COLOURS.get(getattr(instance, "strategy_key", "") or instance.preset.slug, DEFAULT_COLOUR)
+    preset = getattr(instance, "preset", None)
+    key = getattr(instance, "strategy_key", "") or (preset.slug if preset else "")
+    return COLOURS.get(key, DEFAULT_COLOUR)
 
 
 def describe_strategy(key: str) -> StrategyDescription | None:

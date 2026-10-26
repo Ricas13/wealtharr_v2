@@ -56,11 +56,24 @@ def _turnstile_verified(request):
 # Failed sign-ins per username before a 15-minute pause (shared PostgreSQL row).
 LOGIN_FAILURE_LIMIT = 10
 LOGIN_PAUSE_SECONDS = 15 * 60
+# With a trusted client address the 10-failure pause applies per username *and*
+# address, so a stranger can't lock the owner out from elsewhere. A far higher
+# username-wide ceiling still stops guessing spread over many addresses.
+USERNAME_WIDE_LIMIT = 100
+ADDRESS_WIDE_LIMIT = 40
 
 
-def _failure_key(request):
+def _failure_keys(request):
+    """[(key, limit)] for this attempt."""
+    from .client_ip import client_ip
     username = (request.POST.get("username") or "").strip().lower()[:150]
-    return "login-failures:" + sha256(username.encode("utf-8")).hexdigest()
+    name = sha256(username.encode("utf-8")).hexdigest()
+    ip = client_ip(request)
+    if not ip:
+        return [("login-failures:" + name, LOGIN_FAILURE_LIMIT)]
+    return [("login-failures:%s:%s" % (name, ip), LOGIN_FAILURE_LIMIT),
+            ("login-failures:%s" % name, USERNAME_WIDE_LIMIT),
+            ("login-failures-ip:%s" % ip, ADDRESS_WIDE_LIMIT)]
 
 
 def sign_in(request):
@@ -70,22 +83,23 @@ def sign_in(request):
     form = AuthenticationForm(request=request, data=request.POST or None)
     error = ""
     if request.method == "POST":
-        key = _failure_key(request)
+        keys = _failure_keys(request)
         # An unbound form: a bound one would run the password check when rendered.
         retry = {"username": (request.POST.get("username") or "")[:150]}
         # Checks run before the password, so a failed check never reveals whether it was right.
-        if attempts(key) >= LOGIN_FAILURE_LIMIT:
+        if any(attempts(key) >= limit for key, limit in keys):
             form = AuthenticationForm(request=request, initial=retry)
             error = "Too many failed sign-ins. Try again in 15 minutes."
         elif not _turnstile_verified(request):
             form = AuthenticationForm(request=request, initial=retry)
             error = "Security verification failed. Please try again."
         elif form.is_valid():
-            clear(key)
+            clear(keys[0][0])
             login(request, form.get_user())
             return redirect(preferred_url(request.user))
         else:
-            increment(key, LOGIN_PAUSE_SECONDS)
+            for key, _ in keys:
+                increment(key, LOGIN_PAUSE_SECONDS)
     return render(request, "v2/login.html", {
         "form": form, "login_error": error, "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
         "turnstile_required": settings.TURNSTILE_REQUIRED,

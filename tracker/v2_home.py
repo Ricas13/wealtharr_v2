@@ -95,17 +95,23 @@ class Busy(Exception):
     pass
 
 
-def _public_budget():
+PUBLIC_FRESH_PER_VISITOR = 8
+
+
+def _public_budget(client=""):
+    """Fresh replays a minute: a cap per visitor (when the proxy chain lets us
+    tell visitors apart) so one can't use up the shared cap for everybody."""
     import time
     window = int(time.time() // 60)
-    key = "home-compare-fresh:%d" % window
     from .rate_limits import increment
-    used = increment(key, 120)
+    if client and increment("home-compare-fresh:%d:%s" % (window, client), 120) > PUBLIC_FRESH_PER_VISITOR:
+        raise Busy()
+    used = increment("home-compare-fresh:%d" % window, 120)
     if used > PUBLIC_FRESH_PER_MINUTE:
         raise Busy()
 
 
-def compare(amount, monthly, frame, real_names=False, public=False):
+def compare(amount, monthly, frame, real_names=False, public=False, client=""):
     """Chart-ready hypothetical comparison, cached until the next download."""
     latest = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
     key = "home-compare:v2:%s:%s:%s:%s:%s" % (latest.isoformat() if latest else "none", amount, monthly, frame,
@@ -114,7 +120,7 @@ def compare(amount, monthly, frame, real_names=False, public=False):
     if out is not None:
         return out
     if public and (amount, monthly, frame) != DEFAULT_INPUTS:
-        _public_budget()
+        _public_budget(client)
     out = {"ready": False, "amount": amount, "monthly": monthly, "range": frame,
            "range_words": FRAME_WORDS[frame], "limits": LIMITS}
     # The homepage compares the flagship strategy's Study against benchmarks.
@@ -376,7 +382,9 @@ def _comparison_response(request, *, public, real_names):
     from django.http import HttpResponseBadRequest
 
     try:
-        comparison = compare(*_inputs(request.GET), public=public, real_names=real_names)
+        from .client_ip import client_ip
+        comparison = compare(*_inputs(request.GET), public=public, real_names=real_names,
+                             client=client_ip(request))
     except Busy:
         return JsonResponse({"error": "Busy. Try again in a minute."}, status=429)
 
@@ -399,7 +407,8 @@ def landing(request):
         return redirect(preferred_url(request.user))
     amount, monthly, frame = _inputs(request.GET)
     try:
-        initial = compare(amount, monthly, frame, public=True)
+        from .client_ip import client_ip
+        initial = compare(amount, monthly, frame, public=True, client=client_ip(request))
     except Busy:
         initial = compare(*DEFAULT_INPUTS)
     return render(request, "v2/home.html", {

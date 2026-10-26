@@ -1,6 +1,7 @@
 """Exact ledger maths in Decimal; no guessed market prices or fake returns."""
 import base64
 import hashlib
+import logging
 import re
 from collections import defaultdict
 from decimal import Decimal
@@ -12,6 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 from .models import LedgerEntry, NotificationDelivery, NotificationPreference, PriceMark, SystemIntegration
 
+LOG = logging.getLogger(__name__)
 ZERO = Decimal("0")
 PENNY = Decimal("0.01")
 
@@ -88,7 +90,11 @@ def validate_and_record(strategy, entry):
         if entry.kind == LedgerEntry.SPLIT and (qty <= ZERO or entry.quantity <= ZERO or entry.quantity == 1):
             raise ValidationError("A split needs shares held and a ratio other than 1.")
         # Back-dated entries are fine as long as every balance from that date
-        # on stays valid (no negative cash or shares at any point).
+        # on stays valid (no negative cash or shares at any point). This replay
+        # is the check: the strict v2 replay RAISES on any negative intermediate
+        # balance, so keep it even though its result is unused. The new entry
+        # gets the highest pk (as it will once saved), so among same-day entries
+        # it sorts last here exactly as it will in every later replay.
         from .v2_ledger_core import EffectiveEntry, effective_entries, replay
         replay(list(effective_entries(locked)) + [EffectiveEntry(
             pk=2**62, strategy_id=locked.pk, occurred_on=entry.occurred_on,
@@ -268,5 +274,12 @@ def dispatch(owner, key, subject, message, channels=None, *, category="", strate
             record.error = ""
             record.next_retry_at = None
             outcomes[channel] = "sent"
-        record.save(update_fields=["status", "error", "next_retry_at"])
+        try:
+            record.save(update_fields=["status", "error", "next_retry_at"])
+        except Exception:
+            # The message was (or wasn't) sent, but its record can't be updated:
+            # a later run finds it SENDING and retries after 15 minutes. Don't let
+            # a database hiccup abort the other channels or the caller.
+            LOG.exception("Could not record the delivery result for %s", key)
+            outcomes[channel] = "pending"
     return outcomes

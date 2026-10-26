@@ -25,11 +25,11 @@ class RateLimiterTests(TestCase):
 
     def test_login_bucket_keys_do_not_reveal_username(self):
         from django.test import RequestFactory
-        from tracker.v2_auth import _failure_key
+        from tracker.v2_auth import _failure_keys
         request = RequestFactory().post("/login/", {"username": "someone@example.com"})
-        key = _failure_key(request)
-        self.assertNotIn("someone", key)
-        self.assertEqual(key, _failure_key(request))
+        keys = _failure_keys(request)
+        self.assertFalse(any("someone" in key for key, _ in keys))
+        self.assertEqual(keys, _failure_keys(request))
 
     def test_browser_permission_policy(self):
         response = self.client.get("/login/")
