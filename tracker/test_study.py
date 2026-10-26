@@ -146,6 +146,31 @@ class DownloadTests(TestCase):
         self.assertEqual(StudyPrice.objects.filter(symbol="QQQ").count(), 1)
 
 
+class PartialDownloadTests(TestCase):
+    def rows(self, count, end=None):
+        end = end or TODAY
+        days = [d for d in (end - timedelta(days=i) for i in range(count * 2)) if d.weekday() < 5][:count]
+        return [(d, D("10"), D("10")) for d in sorted(days)]
+
+    def test_a_truncated_download_never_replaces_good_history(self):
+        sync_study_prices(fetch=lambda symbol, since: self.rows(400))
+        before = StudyPrice.objects.filter(symbol="SPY").count()
+        results = sync_study_prices(fetch=lambda symbol, since: self.rows(40), force=True)
+        self.assertTrue(results["SPY"].startswith("rejected"))
+        self.assertEqual(StudyPrice.objects.filter(symbol="SPY").count(), before)
+
+    def test_a_download_that_starts_years_late_is_rejected(self):
+        sync_study_prices(fetch=lambda symbol, since: self.rows(400))
+        late = self.rows(400)[200:]
+        results = sync_study_prices(fetch=lambda symbol, since: late, force=True)
+        self.assertTrue(results["SPY"].startswith("rejected"))
+
+    def test_a_complete_longer_download_replaces_normally(self):
+        sync_study_prices(fetch=lambda symbol, since: self.rows(300))
+        results = sync_study_prices(fetch=lambda symbol, since: self.rows(310), force=True)
+        self.assertEqual(results["SPY"], "310 days")
+
+
 class StudyPageTests(TestCase):
     def setUp(self):
         cache.clear()

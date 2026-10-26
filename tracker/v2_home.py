@@ -460,6 +460,7 @@ def request_invite(request):
         return redirect("/?invite=thanks#invite")
     email = form.cleaned_data["email"].strip().lower()
     invite, created = InviteRequest.objects.get_or_create(email=email)
-    if created:
+    if created or not invite.notified:
+        # An earlier alert may have failed or had no route: try again.
         _notify_owners(invite)
     return redirect("/?invite=thanks#invite")

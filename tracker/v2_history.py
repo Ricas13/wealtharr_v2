@@ -39,7 +39,7 @@ WINDOWS = (("all", "All"), ("ytd", "YTD"), ("1y", "1 year"),
 RETURN_HOLD = (
     "Historical investment values have no saved raw vendor quote-unit and "
     "source identities. They are recorded snapshots, not independently "
-    "certified GBP valuations. XIRR, TWR and drawdown are withheld."
+    "certified valuations. XIRR, TWR and drawdown are withheld."
 )
 
 
@@ -214,14 +214,14 @@ def _records(strategy, entries):
                     evidence=evidence,
                 )
             reason = (
-                "Reproduced from actual GBP cash ledger (no positions)."
+                "Reproduced from actual %s cash ledger (no positions)." % strategy.account.currency
                 if accepted and not state["positions"] else
                 "Reproduced from dated owner holdings plus captured Yahoo raw GBX/GBP quote evidence."
                 if accepted else RETURN_HOLD
             )
         points.append(HistoryPoint(
             record.as_of, record.total_value, record.net_contributed,
-            ("Source-checked GBP portfolio close"
+            ("Source-checked portfolio close"
              if accepted and state["positions"] else "Recorded portfolio snapshot"),
             bool(accepted), reason, accepted.observation_ids if accepted else ()))
     # A real current cash-only balance is independently derivable even when
@@ -237,7 +237,7 @@ def _records(strategy, entries):
             if approved and not any(p.as_of == day for p in points):
                 points.append(HistoryPoint(
                     day, state["cash"], state["net_contributed"],
-                    "Replayed GBP ledger cash", True,
+                    "Replayed ledger cash", True,
                     "Cash only; no securities or market quotes assumed",
                     approved.observation_ids,
                 ))
@@ -266,7 +266,7 @@ def build_history(strategy, *, span="all"):
     reason = _blocked(strategy)
     if reason:
         return {
-            "status": "blocked", "reason": reason,
+            "status": "blocked", "reason": reason, "currency": strategy.account.currency,
             "points": (), "all_points": (), "last_point": None,
             "latest_certified": None, "inception": None, "period": None,
             "actual_net_funding": None, "ledger_cash": None,
@@ -315,14 +315,15 @@ def build_history(strategy, *, span="all"):
             period = evaluate_period(PortfolioPeriod(opening, closing, in_period))
     status = (
         "no_history" if not points else
-        "verified_market" if certified and certified.origin == "Source-checked GBP portfolio close" else
+        "verified_market" if certified and certified.origin == "Source-checked portfolio close" else
         "verified_cash" if certified else "recorded_only"
     )
     return {
         "status": status,
+        "currency": strategy.account.currency,
         "reason": (
             "No verified valuation dates are recorded." if not points else
-            "Exact-date Yahoo raw quote units and dated GBP holdings independently reproduce the saved valuation."
+            "Exact-date Yahoo raw quote units and dated holdings independently reproduce the saved %s valuation." % strategy.account.currency
             if certified and status == "verified_market" else
             "Ledger-backed cash-only endpoint; market investment values remain separately gated."
             if certified else RETURN_HOLD
@@ -490,6 +491,13 @@ def _open_action(strategy, summary, today):
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE")).order_by("-as_of", "-pk").first()
     if signal and proposed_actions(signal) and not RebalanceExecution.objects.filter(
             signal=signal).exists():
+        from .models import SignalFill
+        from .signal_status import changed_since_review
+        if (changed_since_review(strategy, signal)
+                and not SignalFill.objects.filter(signal=signal).exists()):
+            # Same rule as Today: never show quantities the ledger has overtaken.
+            return {"kind": "data", "title": "Review out of date",
+                    "detail": "The ledger changed after this review; wait for an updated one."}
         from .money import symbol_for
         trades = " · ".join("%s ≈ %s%s %s" % (
             a["side"].title(), symbol_for(strategy.account.currency), "{:,.0f}".format(Decimal(str(a.get("estimated_gbp") or 0))), a["symbol"])
@@ -514,7 +522,7 @@ def _overview_extras(request, items, rows, today):
     mode = dash.pick_mode(request)
     home = items[0].account.currency if items else "GBP"
     live = [s for s in items if not s.tracking_only and s.account.currency == home]
-    points = dash.combine_points(live)
+    points, chart_omitted = dash.combine_with_omitted(live)
     todos = []
     assets = {}
     for row in rows:
@@ -585,6 +593,7 @@ def _overview_extras(request, items, rows, today):
     change, change_pct = dash.day_change(points)
     return {
         "ov_chart": dash.chart(points, span=span, mode=mode, indexes=False),
+        "ov_chart_omitted": chart_omitted,
         "ov_ranges": dash.RANGES, "ov_todos": tuple(todos), "ov_assets": asset_rows,
         "ov_coming": tuple(coming), "ov_isa": isa,
         "ov_prices": tuple(p for p in prices if p), "ov_last_sync": last_sync,

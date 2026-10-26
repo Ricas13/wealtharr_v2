@@ -78,7 +78,7 @@ class V2HistoryTests(TestCase):
         self.assertLess(abs(report["inception"].xirr_annual), D("1e-12"))
         self.assertEqual(report["inception"].simple_cumulative_return, D("0"))
         self.assertEqual(len(report["points"]), 1)
-        self.assertEqual(report["points"][0].origin, "Replayed GBP ledger cash")
+        self.assertEqual(report["points"][0].origin, "Replayed ledger cash")
         self.assertTrue(report["points"][0].certified)
         self.assertContains(self.client.get(self._url()), "Ledger-backed cash endpoint")
         self.assertContains(self.client.get(self._url()), "£1,000.00")
