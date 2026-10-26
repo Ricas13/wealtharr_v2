@@ -102,7 +102,8 @@ class LiveContributionGuidanceTests(TestCase):
                 strategy=self.strategy, symbol=symbol, price=price,
                 as_of=self.day, source="yahoo")
             MarketObservation.objects.create(
-                symbol=symbol, as_of=self.day, price=price, currency="GBP")
+                symbol=symbol, as_of=self.day, price=price, currency="GBP",
+                source="yahoo", raw_unit_verified=True, raw_quote_unit="GBP", raw_close=price)
 
     def funded_strategy(self):
         self.record("DEPOSIT", amount="1000")
@@ -246,3 +247,82 @@ class LiveContributionGuidanceTests(TestCase):
         self.prices()
         got = new_money_guidance(self.strategy, ledger_summary(self.strategy), prices_ready=True)
         self.assertEqual(got["amount"], D("400"))
+
+
+class GuidanceEvidenceTests(TestCase):
+    """The helper enforces price evidence itself, whatever the caller says."""
+    setUp = LiveContributionGuidanceTests.setUp
+    record = LiveContributionGuidanceTests.record
+    prices = LiveContributionGuidanceTests.prices
+    funded_strategy = LiveContributionGuidanceTests.funded_strategy
+
+    def guidance(self):
+        return new_money_guidance(self.strategy, ledger_summary(self.strategy), prices_ready=True)
+
+    def test_verified_prices_give_rows_with_the_close_date_and_source(self):
+        self.funded_strategy()
+        result = self.guidance()
+        self.assertIsNotNone(result)
+        for row in result["rows"]:
+            self.assertEqual((row["price_date"], row["price_source"]), (self.day, "yahoo"))
+
+    def test_unverified_or_non_yahoo_observations_are_refused(self):
+        self.funded_strategy()
+        for change in ({"raw_unit_verified": False}, {"source": ""}, {"source": "stooq"}):
+            MarketObservation.objects.update(**change)
+            self.assertIsNone(self.guidance(), change)
+            MarketObservation.objects.update(source="yahoo", raw_unit_verified=True)
+        self.assertIsNotNone(self.guidance())
+
+    def test_an_observation_in_another_currency_is_refused(self):
+        self.funded_strategy()
+        MarketObservation.objects.update(currency="USD")
+        self.assertIsNone(self.guidance())
+
+    def test_a_held_price_is_refused(self):
+        from tracker.models import YahooSync
+        self.funded_strategy()
+        YahooSync.objects.create(symbol="ERNS.L", last_error="PRICE_HOLD:LARGE_MOVE")
+        self.assertIsNone(self.guidance())
+
+    def test_quotes_older_than_a_week_are_refused(self):
+        self.funded_strategy()
+        PriceMark.objects.update(as_of=self.day - timedelta(days=30))
+        self.assertIsNone(self.guidance())
+
+
+class DollarAccountGuidanceTests(TestCase):
+    def test_a_dollar_account_is_guided_in_dollars_from_its_own_closes(self):
+        from tracker.strategies.instruments import role_symbols
+        owner = get_user_model().objects.create_user("usd-guidance", password="test-only-wealtharr")
+        account = Account.objects.create(
+            owner=owner, name="Fidelity", kind="BROKERAGE", country="US", broker="FIDELITY", currency="USD")
+        key = "all-weather"
+        preset, _ = StrategyPreset.objects.get_or_create(slug=key, defaults={"name": "AW", "active": True})
+        strategy = StrategyInstance.objects.create(
+            owner=owner, account=account, preset=preset, strategy_key=key, name="AW USD",
+            strategy_version=describe_strategy(key).version, mapping_version=MAPPING_VERSION,
+            resolved_instruments=onboarding_manifest(key, "FIDELITY", "BROKERAGE"),
+            started_on=timezone.localdate() - timedelta(days=12),
+            owner_checked_on=timezone.localdate() - timedelta(days=12),
+            market_data_enabled=True, tracking_only=False)
+        day = timezone.localdate() - timedelta(days=2)
+        symbols = role_symbols(strategy)
+        validate_and_record(strategy, LedgerEntry(
+            occurred_on=day, kind="DEPOSIT", amount=D("1000")))
+        for symbol in symbols.values():
+            validate_and_record(strategy, LedgerEntry(
+                occurred_on=day, kind="BUY", symbol=symbol, quantity=D("1"), unit_price=D("10")))
+        validate_and_record(strategy, LedgerEntry(occurred_on=day, kind="DEPOSIT", amount=D("200")))
+        for symbol in symbols.values():
+            PriceMark.objects.create(strategy=strategy, symbol=symbol, price=D("10"),
+                                     as_of=day, source="yahoo")
+            MarketObservation.objects.create(
+                symbol=symbol, as_of=day, price=D("10"), currency="USD", source="yahoo",
+                raw_unit_verified=True, raw_quote_unit="USD", raw_close=D("10"))
+        result = new_money_guidance(strategy, ledger_summary(strategy), prices_ready=True)
+        self.assertIsNotNone(result)
+        self.assertEqual(sum(r["amount"] for r in result["rows"]), result["amount"])
+        # The same closes labelled as pounds are not this account's evidence.
+        MarketObservation.objects.update(currency="GBP")
+        self.assertIsNone(new_money_guidance(strategy, ledger_summary(strategy), prices_ready=True))

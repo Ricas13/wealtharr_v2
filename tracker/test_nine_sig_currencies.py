@@ -61,9 +61,9 @@ class DollarNineSigTests(TestCase):
             y, index = divmod(q - offset, 4)
             month = (index + 1) * 3
             close = date(y, month, monthrange(y, month)[1])
-            MarketObservation.objects.create(symbol="SPY", as_of=close, price=D("100"), currency="USD")
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="SPY", as_of=close, price=D("100"), currency="USD")
             if offset == 1:
-                MarketObservation.objects.create(symbol="TQQQ", as_of=close, price=D("80"), currency="USD")
+                MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="TQQQ", as_of=close, price=D("80"), currency="USD")
 
     def test_quarterly_review_in_dollars_with_v3(self):
         strategy = self.strategy
@@ -77,8 +77,8 @@ class DollarNineSigTests(TestCase):
                                                   unit_price=D("100"), occurred_on=first))
         cached = {}
         for symbol, price in (("TQQQ", D("50")), ("SPY", D("98")), ("AGG", D("100"))):
-            MarketObservation.objects.create(symbol=symbol, as_of=self.end, price=price, currency="USD")
-            cached[symbol] = MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol=symbol, as_of=self.end, price=price, currency="USD")
+            cached[symbol] = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol=symbol, as_of=timezone.localdate(), price=price, currency="USD")
         with patch("tracker.market_signals.sync_ticker", side_effect=lambda s: cached[s]), \
                 patch("tracker.market_signals.dispatch"):

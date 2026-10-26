@@ -187,9 +187,9 @@
       <section class="w2-card">
         <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='shield' %} ISA allowance</h2>{% if dash_isa %}<span class="w2-muted">{{ dash_isa.label }}</span>{% endif %}</div>
         {% if dash_isa %}
-          <p class="w2-stat-value" style="font-size:13px">{{ cur }}{{ dash_isa.used|floatformat:"0g" }} <span class="w2-muted" style="font-weight:400">of {{ cur }}{{ dash_isa.limit|floatformat:"0g" }}</span></p>
+          <p class="w2-stat-value" style="font-size:13px">£{{ dash_isa.used|floatformat:"0g" }} <span class="w2-muted" style="font-weight:400">of £{{ dash_isa.limit|floatformat:"0g" }}</span></p>
           <div class="w2-bar" style="margin-top:6px"><span class="w2-c1" style="width:{{ dash_isa.width|floatformat:1 }}%"></span></div>
-          <p class="w2-note">{{ cur }}{{ dash_isa.left|floatformat:"0g" }} left · resets {{ dash_isa.resets|date:"j M" }}. Advisory, from deposits recorded here.</p>
+          <p class="w2-note">£{{ dash_isa.left|floatformat:"0g" }} left · resets {{ dash_isa.resets|date:"j M" }}. Advisory, from deposits recorded here.</p>
         {% else %}<p class="w2-muted">Only for ISA accounts.</p>{% endif %}
       </section>
     </div>
@@ -200,7 +200,7 @@
         <span class="w2-chip {% if dash_alerts.email %}w2-ok{% endif %}">{% include 'partials/icon.html' with name='mail' %}Email {% if dash_alerts.email %}on{% else %}off{% endif %}</span>
         <span class="w2-chip {% if dash_alerts.discord %}w2-ok{% endif %}">{% include 'partials/icon.html' with name='chat' %}Discord {% if dash_alerts.discord %}on{% else %}off{% endif %}</span>
         <span class="w2-chip {% if dash_alerts.telegram %}w2-ok{% endif %}">{% include 'partials/icon.html' with name='send' %}Telegram {% if dash_alerts.telegram %}on{% else %}off{% endif %}</span>
-        <span class="w2-muted">{% if dash_alerts.last %}Last sent {{ dash_alerts.last.created_at|date:"j M" }}{% else %}Nothing sent yet{% endif %}</span>
+        <span class="w2-muted">{% if dash_alerts.last_sent %}Last sent {{ dash_alerts.last_sent.created_at|date:"j M" }}{% else %}Nothing sent yet{% endif %}</span>
       </div>
     </section>
   </aside>

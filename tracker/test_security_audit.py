@@ -76,9 +76,9 @@ class PeriodCloseTests(TestCase):
         from tracker.market_data import period_close
         from tracker.models import MarketObservation, YahooSync
         end = date(2026, 9, 30)  # a Wednesday
-        MarketObservation.objects.create(symbol="ABC.L", as_of=date(2026, 9, 29), price=D("10"), currency="GBP")
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="ABC.L", as_of=date(2026, 9, 29), price=D("10"), currency="GBP")
         self.assertIsNone(period_close("ABC.L", end))
-        MarketObservation.objects.create(symbol="ABC.L", as_of=end, price=D("11"), currency="GBP")
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="ABC.L", as_of=end, price=D("11"), currency="GBP")
         self.assertEqual(period_close("ABC.L", end).price, D("11"))
         YahooSync.objects.create(symbol="ABC.L", last_error="PRICE_HOLD:LARGE_MOVE")
         self.assertIsNone(period_close("ABC.L", end))
@@ -89,9 +89,12 @@ class PeriodCloseTests(TestCase):
         from tracker.market_data import period_close
         from tracker.models import MarketObservation
         end = date(2024, 3, 31)  # Sunday; Friday 29th was Good Friday
-        MarketObservation.objects.create(symbol="ABC.L", as_of=date(2024, 3, 28), price=D("10"), currency="GBP")
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="ABC.L", as_of=date(2024, 3, 28), price=D("10"), currency="GBP")
         self.assertIsNone(period_close("ABC.L", end))
-        MarketObservation.objects.create(symbol="ABC.L", as_of=date(2024, 4, 2), price=D("12"), currency="GBP")
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="ABC.L", as_of=date(2024, 4, 2), price=D("12"), currency="GBP")
+        # Its own later close isn't enough: nothing shows the venue was alive.
+        self.assertIsNone(period_close("ABC.L", end))
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="XYZ.L", as_of=date(2024, 4, 2), price=D("5"), currency="GBP")
         self.assertEqual(period_close("ABC.L", end).price, D("10"))
 
     def test_a_missing_close_on_a_trading_day_is_a_gap_not_a_holiday(self):
@@ -101,13 +104,15 @@ class PeriodCloseTests(TestCase):
         from tracker.models import MarketObservation
         end = date(2026, 9, 30)
         for day, price in ((date(2026, 9, 29), "100"), (date(2026, 10, 1), "108")):
-            MarketObservation.objects.create(symbol="ABC.L", as_of=day, price=D(price), currency="GBP")
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="ABC.L", as_of=day, price=D(price), currency="GBP")
         # Another London line traded on the 30th, so ABC.L's close is missing data.
-        MarketObservation.objects.create(symbol="XYZ.L", as_of=end, price=D("5"), currency="GBP")
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="XYZ.L", as_of=end, price=D("5"), currency="GBP")
         self.assertIsNone(period_close("ABC.L", end))
         # A US line trading that day says nothing about London.
         MarketObservation.objects.filter(symbol="XYZ.L").delete()
-        MarketObservation.objects.create(symbol="SPY", as_of=end, price=D("500"), currency="USD")
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="SPY", as_of=end, price=D("500"), currency="USD")
+        self.assertIsNone(period_close("ABC.L", end))  # no London line after the gap: can't tell
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="XYZ.L", as_of=date(2026, 10, 1), price=D("5"), currency="GBP")
         self.assertEqual(period_close("ABC.L", end).price, D("100"))
 
 
@@ -121,7 +126,7 @@ class ResetEvidenceCurrencyTests(TestCase):
         day = date(2026, 10, 2)
         marks = []
         for symbol in ("IJR", "AGG"):
-            MarketObservation.objects.create(symbol=symbol, as_of=day, price=D("100"), currency="USD")
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol=symbol, as_of=day, price=D("100"), currency="USD")
             marks.append(SimpleNamespace(symbol=symbol, as_of=day, price=D("100"), source="yahoo"))
         evidence = verified_quote_evidence(marks, "USD")
         self.assertEqual(evidence["growth"]["currency"], "USD")

@@ -76,7 +76,7 @@ def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
     if available < Decimal("1"):
         return None
 
-    prices = {}
+    prices, price_dates = {}, {}
     for role, symbol in roles.items():
         if YahooSync.objects.filter(symbol=symbol, last_error__startswith="PRICE_HOLD:").exists():
             return None
@@ -85,9 +85,11 @@ def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
                 quote.as_of > today or today - quote.as_of > timedelta(days=8) or
                 not MarketObservation.objects.filter(
                     symbol=symbol, as_of=quote.as_of,
-                    price=quote.price, currency=strategy.account.currency).exists()):
-            return None
+                    price=quote.price, currency=strategy.account.currency,
+                    source="yahoo", raw_unit_verified=True).exists()):
+            return None  # Never rely on the caller's prices_ready alone.
         prices[role] = quote.price
+        price_dates[role] = quote.as_of
     values = {r: report["positions"].get(symbol, ZERO) * prices[r]
               for r, symbol in roles.items()}
     chosen = None
@@ -106,7 +108,10 @@ def new_money_guidance(strategy, report, *, prices_ready=False, today=None):
         if role not in roles or amount < Decimal("1"):
             continue
         suggestions.append({"role": role, "symbol": roles[role],
-                            "amount": amount, "price_date": None})
+                            "amount": amount,
+                            # The verified close behind the allocation; the
+                            # broker's dealing price may differ.
+                            "price_date": price_dates[role], "price_source": "yahoo"})
     if not suggestions:
         return None
     return {

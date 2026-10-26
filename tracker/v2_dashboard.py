@@ -75,15 +75,24 @@ def certified_points(strategy, report=None):
 
 def combine_points(strategies):
     """Sum certified values across strategies on their common dates only."""
-    series = [dict((d, (v, n)) for d, v, n in certified_points(s)) for s in strategies]
-    # Never label a subset of strategies as the combined portfolio.
-    if any(not s for s in series):
-        return []
-    if not series:
-        return []
+    return combine_with_omitted(strategies)[0]
+
+
+def combine_with_omitted(strategies):
+    """(points, names of strategies left out for lack of certified history).
+
+    Never label a subset of strategies as the combined portfolio: when any
+    strategy lacks certified points there is no total, and the caller names
+    who is missing.
+    """
+    all_series = [(s, dict((d, (v, n)) for d, v, n in certified_points(s))) for s in strategies]
+    omitted = [getattr(s, "name", str(s)) for s, series in all_series if not series]
+    series = [series for _, series in all_series if series]
+    if omitted or not series:
+        return [], omitted
     common = sorted(set.intersection(*(set(s) for s in series)))
     return [(d, sum((s[d][0] for s in series), ZERO), sum((s[d][1] for s in series), ZERO))
-            for d in common]
+            for d in common], omitted
 
 
 def external_cash_flow_days(strategy):
@@ -217,7 +226,7 @@ def chart(points, *, span, mode, indexes=True, cash_flow_days=()):
 
 
 def period_returns(points, today=None, *, cash_flow_days=()):
-    """Time-weighted returns from recorded values, and the indexes' own change."""
+    """Close-to-close returns from recorded values (only periods without transfers), and the indexes' own change."""
     today = today or timezone.localdate()
     if not points:
         return ()
@@ -428,7 +437,8 @@ def recent_entries(strategy, count=4):
 def isa_allowance(strategies):
     from .core.isa_allowance import OVERALL_LIMIT_2026_GBP, estimate_allowance, tax_year_bounds
     from .v2_onboarding import OPENING_NOTE
-    isa = [s for s in strategies if s.account.kind == "ISA"]
+    # The allowance is a statutory pound amount: only pound ISA accounts count.
+    isa = [s for s in strategies if s.account.kind == "ISA" and s.account.currency == "GBP"]
     if not isa:
         return None
     today = timezone.localdate()
@@ -456,9 +466,11 @@ def alerts_summary(owner, strategy=None):
     if strategy is not None:
         deliveries = deliveries.filter(strategy=strategy)
     last = deliveries.order_by("-created_at", "-pk").first()
+    sent = deliveries.filter(status="SENT").order_by("-created_at", "-pk").first()
     return {
         "email": bool(pref and pref.email_enabled and pref.destination_email),
         "discord": bool(pref and (pref.discord_enabled or pref.discord_webhook_enabled)),
         "telegram": bool(pref and pref.telegram_enabled and pref.telegram_chat_id),
         "last": last,
+        "last_sent": sent,
     }

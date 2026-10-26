@@ -223,6 +223,11 @@ def sync_ticker(symbol, *, force=False):
         from .models import DividendEvent
         if not DividendEvent.objects.filter(symbol=symbol).exists():
             since = date(2010, 1, 1)
+    # Rows saved before quote units were captured can't be trusted for
+    # instructions; one full fetch below upgrades every row Yahoo still confirms.
+    if not first and MarketObservation.objects.filter(
+            symbol=symbol, raw_unit_verified=False).exists():
+        since = date(2010, 1, 1)
     state.last_attempt = now
     state.save(update_fields=["last_attempt"])
     try:
@@ -308,6 +313,19 @@ def sync_ticker(symbol, *, force=False):
         MarketObservation.objects.bulk_create(
             observations, batch_size=250, ignore_conflicts=True,
         )
+        # An older unverified row is upgraded only where the unit-checked close
+        # equals the price it already holds (a different price goes through the
+        # revision log above, never a silent overwrite).
+        proven = {o.as_of: o for o in observations if o.raw_unit_verified}
+        if proven:
+            stale = MarketObservation.objects.filter(
+                symbol=symbol, raw_unit_verified=False, as_of__in=list(proven))
+            for row in stale:
+                good = proven[row.as_of]
+                if row.price == good.price and row.currency == good.currency:
+                    MarketObservation.objects.filter(pk=row.pk, raw_unit_verified=False).update(
+                        source="yahoo", raw_quote_unit=good.raw_quote_unit,
+                        raw_close=good.raw_close, raw_unit_verified=True)
         # Cash paid per share (Dual Momentum's 12-month total returns need it).
         # Only for lines kept in their own currency: a converted USD line's
         # dividends would need their own exchange rate, so they're left out.
@@ -331,10 +349,15 @@ def sync_ticker(symbol, *, force=False):
 
 
 
+# A close may drive an instruction or certify evidence only when it was captured
+# from a Yahoo response whose quote unit matched the pinned catalogue unit.
+VERIFIED_QUOTE = {"source": "yahoo", "raw_unit_verified": True}
+
+
 def settlement_close(symbol, quarter_end, *, days=6):
     """Use last verified daily close on/before quarter end, never later data."""
     return MarketObservation.objects.filter(
-        symbol=symbol, as_of__lte=quarter_end,
+        symbol=symbol, as_of__lte=quarter_end, **VERIFIED_QUOTE,
         as_of__gte=quarter_end - timedelta(days=days),
     ).order_by("-as_of").first()
 
@@ -351,8 +374,9 @@ def period_close(symbol, period_end):
     because the period end's own close hasn't been fetched (or Yahoo skipped
     it). The close counts when it is from the last weekday on or before the
     period end. An earlier close counts only when a later close exists and
-    no other line on the same exchange traded on the missing days (so the
-    market was shut, e.g. a holiday, rather than the data having a gap).
+    no other line on the same exchange traded on the missing days, while one
+    did trade afterwards (so the market was shut, e.g. a holiday, rather than
+    the data having a gap).
     A held ticker never counts.
     """
     hold = YahooSync.objects.filter(symbol=symbol, last_error__startswith="PRICE_HOLD").exists()
@@ -370,4 +394,11 @@ def period_close(symbol, period_end):
         symbol__contains="=").values_list("symbol", flat=True)
     if any(_exchange(other) == venue for other in missing):
         return None  # the exchange traded that day: our close is missing, not a holiday
+    # Silence alone proves nothing: another line on the same exchange must have
+    # traded after the gap, showing that venue's feed was alive and skipped it.
+    alive = MarketObservation.objects.filter(
+        as_of__gt=period_end, **VERIFIED_QUOTE).exclude(symbol=symbol).exclude(
+        symbol__contains="=").values_list("symbol", flat=True).distinct()
+    if not any(_exchange(other) == venue for other in alive):
+        return None
     return close

@@ -66,7 +66,7 @@ class DollarAccountEndToEndTests(TestCase):
     def observe(self, day, prices, currency):
         for symbol, price in prices.items():
             MarketObservation.objects.update_or_create(
-                symbol=symbol, as_of=day, defaults={"price": D(price), "currency": currency})
+                symbol=symbol, as_of=day, defaults={"source": "yahoo", "raw_unit_verified": True, "price": D(price), "currency": currency})
 
     def latest(self, symbol, **kwargs):
         return MarketObservation.objects.filter(symbol=symbol).order_by("-as_of").first()

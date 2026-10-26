@@ -134,7 +134,7 @@ class RebuildValueHistoryTests(TestCase):
         self.strategy.ledger.create(kind="DEPOSIT", amount=D("1000"), occurred_on=self.d1)
         self.buy = self.strategy.ledger.create(kind="BUY", symbol="LQQ3.L", quantity=D("5"),
                                                unit_price=D("100"), occurred_on=self.d1)
-        MarketObservation.objects.create(symbol="LQQ3.L", as_of=self.d2, price=D("110"), currency="GBP")
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="LQQ3.L", as_of=self.d2, price=D("110"), currency="GBP")
         StrategyValueSnapshot.objects.create(strategy=self.strategy, as_of=self.d2,
                                              total_value=D("1050"), net_contributed=D("1000"))
 

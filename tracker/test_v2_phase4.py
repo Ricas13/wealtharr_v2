@@ -74,7 +74,7 @@ class TodayPhase4Tests(TestCase):
             )
             MarketObservation.objects.update_or_create(
                 symbol=ticker, as_of=asof,
-                defaults={"price": D(p), "currency": "GBP"},
+                defaults={"source": "yahoo", "raw_unit_verified": True, "price": D(p), "currency": "GBP"},
             )
 
     def _proposal(self, *, kind="QUARTERLY", action=True):

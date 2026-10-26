@@ -56,7 +56,7 @@ class Phase4TodayBrowserTests(BrowserHarness):
             ))
         quote_day = timezone.localdate() - timedelta(days=2)
         for symbol, price in (("LQQ3.L", D("101")), ("ERNS.L", D("51"))):
-            MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol=symbol, as_of=quote_day, price=price, currency="GBP"
             )
             PriceMark.objects.create(

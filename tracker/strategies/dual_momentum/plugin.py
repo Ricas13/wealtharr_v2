@@ -23,22 +23,44 @@ def cash_symbol(instance):
     return CASH_SYMBOLS.get(instance.account.currency, CASH_SYMBOL)
 
 
+# The longest gap between payments of any distributing fund used here (ACWX pays
+# twice a year). A window whose recorded payments leave a longer hole, or stop
+# short of either end, is missing events: no switch is issued on it.
+MAX_PAYMENT_GAP_DAYS = 200
+
+
+def _income_complete(dates, begin, end):
+    if not dates:
+        return False
+    if (dates[0] - begin).days > MAX_PAYMENT_GAP_DAYS or (end - dates[-1]).days > MAX_PAYMENT_GAP_DAYS:
+        return False
+    return all((b - a).days <= MAX_PAYMENT_GAP_DAYS for a, b in zip(dates, dates[1:]))
+
+
 def _with_income(end, begin, currency):
-    """The window's end price plus cash paid per share inside the window.
+    """The window's end price as a total return: each payment reinvested at the
+    fund's own close on its ex-date.
 
     The published rule compares 12-month total returns. Distributing funds
-    (BIL, SPY, ACWX) pay income out instead of growing the price, so it is
-    added back (not reinvested: a small difference over 12 months).
+    (BIL, SPY, ACWX) pay income out instead of growing the price. A window with
+    missing or unpriceable payments returns None (on hold), never a guess.
     """
+    from tracker.market_data import settlement_close
     from tracker.models import DividendEvent
-    payments = list(DividendEvent.objects.filter(
+    events = list(DividendEvent.objects.filter(
         symbol=end.symbol, currency=currency,
         ex_date__gt=begin.as_of, ex_date__lte=end.as_of,
-    ).values_list("amount", flat=True))
-    if currency == "USD" and end.symbol in DISTRIBUTING_USD and not payments:
-        return None  # No verified income events in a 12-month distributing fund window.
-    paid = sum(payments, Decimal("0"))
-    return v1.Quote(end.symbol, end.price_gbp + paid, end.as_of) if paid else end
+    ).order_by("ex_date").values_list("ex_date", "amount"))
+    if currency == "USD" and end.symbol in DISTRIBUTING_USD and not _income_complete(
+            [day for day, _ in events], begin.as_of, end.as_of):
+        return None  # Income history doesn't reach across the whole 12-month window.
+    growth = Decimal("1")
+    for day, amount in events:
+        close = settlement_close(end.symbol, day, days=7)
+        if close is None or close.currency != currency or close.price <= 0:
+            return None  # Can't price the reinvestment: hold rather than approximate.
+        growth *= 1 + Decimal(amount) / Decimal(close.price)
+    return v1.Quote(end.symbol, end.price_gbp * growth, end.as_of) if events else end
 
 
 def decide(instance, as_of, *, positions=None, cash=None):

@@ -56,14 +56,14 @@ def _price_status(strategy, report):
     if any(s not in funds for s in held):
         return False, 'An unmodelled holding exists. Reconcile the broker portfolio first.', []
     if report['missing']:
-        return False, 'A held instrument has no price. Fetch verified GBP closes.', []
+        return False, 'A held instrument has no price. Fetch verified closing prices.', []
     if not held and not (plugin and plugin.allows_cash_only and report['cash'] > ZERO):
         return False, 'Record your purchases in the Ledger.', []
     # Every fund needs a verified quote, even one held at zero shares,
     # because a BUY instruction may require its price.
     marks = [report['marks'].get(s) for s in funds]
     if any(m is None for m in marks):
-        return False, "Every one of the strategy's funds needs a verified GBP close.", marks
+        return False, "Every one of the strategy's funds needs a verified close.", marks
     if any(m.source != 'yahoo' or m.price <= ZERO or m.as_of > today or
            m.as_of < today - timedelta(days=8) for m in marks):
         return False, 'Prices are stale or not Yahoo-verified. Refresh market data.', marks
@@ -71,7 +71,8 @@ def _price_status(strategy, report):
         return False, "The funds' prices have mismatched closing dates.", marks
     for m in marks:
         if not MarketObservation.objects.filter(symbol=m.symbol, as_of=m.as_of,
-                                                currency=strategy.account.currency, price=m.price).exists():
+                                                currency=strategy.account.currency, price=m.price,
+                                                source='yahoo', raw_unit_verified=True).exists():
             return False, 'Price currency or source cannot be verified against market observations.', marks
     if strategy.ledger.filter(occurred_on__gt=min(m.as_of for m in marks)).exists():
         return False, 'Your newest transaction is later than the verified closing prices.', marks

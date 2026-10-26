@@ -5,7 +5,7 @@ dividend-adjusted closes included. Stored in StudyPrice only, so nothing here
 can value real holdings or change an instruction.
 """
 import json
-from datetime import date, datetime, timezone as utc_timezone
+from datetime import date, datetime, timedelta, timezone as utc_timezone
 from decimal import Decimal
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -80,6 +80,8 @@ STUDY_SYMBOLS = {
 FIRST_DAY = date(2000, 1, 1)
 EIGHT = Decimal("0.00000001")
 # Bounds for one day's close relative to the previous one (see _check_jumps).
+MIN_KEPT_SHARE = Decimal("0.95")  # a re-download must keep this share of stored days
+MAX_START_SHIFT_DAYS = 31
 MIN_DAY_RATIO = Decimal("0.25")
 MAX_DAY_RATIO = Decimal("4")
 
@@ -126,7 +128,7 @@ def fetch_study_chart(symbol, since):
         # falls back to the raw close before the unit conversion.
         close = (Decimal(str(raw_close)) / divisor).quantize(EIGHT)
         adj = (Decimal(str(raw_adj if raw_adj is not None else raw_close)) / divisor).quantize(EIGHT)
-        if close > 0 and adj > 0 and day <= timezone.localdate():
+        if close > 0 and adj > 0 and day < timezone.localdate():  # today's bar may still be forming
             rows[day] = (close, adj)
     if not rows:
         raise ValueError("No usable daily closes for %s" % symbol)
@@ -175,6 +177,14 @@ def sync_study_prices(*, fetch=fetch_study_chart, force=False):
             rows = fetch(symbol, FIRST_DAY)
         except Exception as exc:  # A study download never blocks anything else.
             results[symbol] = "failed: %s" % type(exc).__name__
+            continue
+        # A truncated download must never replace years of good history.
+        stored = StudyPrice.objects.filter(symbol=symbol)
+        count, first_day = stored.count(), stored.order_by("as_of").values_list("as_of", flat=True).first()
+        if count and (len(rows) < count * MIN_KEPT_SHARE
+                      or rows[0][0] > first_day + timedelta(days=MAX_START_SHIFT_DAYS)
+                      or rows[-1][0] < latest.as_of - timedelta(days=7)):
+            results[symbol] = "rejected: partial download (%d of %d days)" % (len(rows), count)
             continue
         with transaction.atomic():
             StudyPrice.objects.filter(symbol=symbol).delete()

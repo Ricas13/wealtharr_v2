@@ -58,7 +58,7 @@ class ManualReserveResetChoiceTests(TestCase):
             for when in (self.quarter, self.quote_day):
                 MarketObservation.objects.update_or_create(
                     symbol=symbol, as_of=when,
-                    defaults=dict(price=D(price), currency="GBP"))
+                    defaults=dict(price=D(price), currency="GBP", source="yahoo", raw_unit_verified=True))
             PriceMark.objects.create(
                 strategy=self.strategy, symbol=symbol, as_of=self.quote_day,
                 price=D(price), source="yahoo")

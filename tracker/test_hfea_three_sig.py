@@ -187,7 +187,7 @@ class ThreeSigLiveReviewTests(TestCase):
         self.strategy = StrategyInstance.objects.get(owner=owner)
         q = quarter_number(self.end)
         for offset in range(1, 9):
-            MarketObservation.objects.create(symbol="SPY", as_of=_quarter_close(q - offset),
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="SPY", as_of=_quarter_close(q - offset),
                                              price=D("100"), currency="USD")
 
     def test_quarterly_review_without_tqqq(self):
@@ -202,8 +202,8 @@ class ThreeSigLiveReviewTests(TestCase):
                                                   unit_price=D("100"), occurred_on=first))
         cached = {}
         for symbol, price in (("IJR", D("95")), ("SPY", D("98")), ("AGG", D("100"))):
-            MarketObservation.objects.create(symbol=symbol, as_of=self.end, price=price, currency="USD")
-            cached[symbol] = MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol=symbol, as_of=self.end, price=price, currency="USD")
+            cached[symbol] = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol=symbol, as_of=timezone.localdate(), price=price, currency="USD")
         # No TQQQ is fetched or required.
         with patch("tracker.market_signals.sync_ticker", side_effect=lambda s: cached[s]), \

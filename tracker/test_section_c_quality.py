@@ -90,7 +90,7 @@ class PersistedMarketPriceHoldTests(TestCase):
     def test_suspicious_batch_is_not_saved_or_used(self, fetch):
         today = timezone.localdate()
         previous = today - timedelta(days=1)
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="ERNS.L", as_of=previous, price=D("100"), currency="GBP")
         fetch.return_value = ("GBP", [(today, D("10000"))])
         self.assertIsNone(sync_ticker("ERNS.L", force=True))
@@ -123,7 +123,7 @@ class PersistedMarketPriceHoldTests(TestCase):
         # A big change (split or unit error) holds; owner decision 22 Oct 2026:
         # changes within 20% are accepted automatically and logged.
         today = timezone.localdate()
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="ERNS.L", as_of=today, price=D("100"), currency="GBP")
         fetch.return_value = ("GBP", [(today, D("150"))])
         self.assertIsNone(sync_ticker("ERNS.L", force=True))

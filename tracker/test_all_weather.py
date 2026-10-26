@@ -109,7 +109,7 @@ class AllWeatherEndToEndTests(TestCase):
         from tracker.models import MarketObservation
         for symbol, price in prices.items():
             MarketObservation.objects.update_or_create(
-                symbol=symbol, as_of=day, defaults={"price": D(price), "currency": "GBP"})
+                symbol=symbol, as_of=day, defaults={"source": "yahoo", "raw_unit_verified": True, "price": D(price), "currency": "GBP"})
 
     def latest(self, symbol, **kwargs):
         from tracker.models import MarketObservation

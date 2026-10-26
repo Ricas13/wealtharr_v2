@@ -99,7 +99,7 @@ class UsabilityFixesTests(TestCase):
     def test_cash_start_shows_opening_buys_at_target_weights(self):
         s = self.strategy()
         validate_and_record(s, LedgerEntry(kind="DEPOSIT", amount=D("1000"), occurred_on=date(2026, 3, 2)))
-        MarketObservation.objects.create(symbol="ERNS.L", as_of=timezone.localdate(), price=D("5"), currency="GBP")
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="ERNS.L", as_of=timezone.localdate(), price=D("5"), currency="GBP")
         page = self.client.get(reverse("v2_instance_page", args=[s.pk, "today"]))
         self.assertContains(page, "Buy your opening position")
         self.assertContains(page, "Buy £600.00 of LQQ3.L")

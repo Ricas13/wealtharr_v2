@@ -59,7 +59,7 @@ class ReviewFixture(TestCase):
         for symbol, price in (("LQQ3.L", "100"), ("ERNS.L", "50")):
             MarketObservation.objects.update_or_create(
                 symbol=symbol, as_of=self.quote_day,
-                defaults={"price": D(price), "currency": "GBP"})
+                defaults={"source": "yahoo", "raw_unit_verified": True, "price": D(price), "currency": "GBP"})
             PriceMark.objects.create(
                 strategy=self.strategy, symbol=symbol,
                 as_of=self.quote_day, price=D(price), source="yahoo")
@@ -140,7 +140,7 @@ class ConfirmedSingleFillTests(ReviewFixture):
             mark.save(update_fields=["as_of"])
             MarketObservation.objects.update_or_create(
                 symbol=mark.symbol, as_of=self.trade_day,
-                defaults={"price": mark.price, "currency": "GBP"})
+                defaults={"source": "yahoo", "raw_unit_verified": True, "price": mark.price, "currency": "GBP"})
         self.assertEqual(self.client.post(self.url, {"intent": "finalize"}).status_code, 200)
         self.assertEqual(SignalFill.objects.filter(signal=self.signal).count(), 2)
         self.assertFalse(RebalanceExecution.objects.filter(signal=self.signal).exists())

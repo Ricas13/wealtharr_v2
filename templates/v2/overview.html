@@ -14,7 +14,7 @@
   <div class="w2-kpi"><p class="w2-label">Today</p>
     <p class="w2-stat-value {{ ov_day_change|tone }}">{% if ov_day_change is not None %}{{ ov_day_change|signed_money }}{% if ov_day_pct is not None %} <small>{{ ov_day_pct|signed_pct }}</small>{% endif %}{% else %}—{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">ISA used {% if ov_isa %}{{ ov_isa.label }}{% endif %}</p>
-    <p class="w2-stat-value">{% if ov_isa %}{{ cur }}{{ ov_isa.used|floatformat:"0g" }} <small class="w2-muted">/ {{ ov_isa.limit|floatformat:"0g" }}</small>{% else %}—{% endif %}</p></div>
+    <p class="w2-stat-value">{% if ov_isa %}£{{ ov_isa.used|floatformat:"0g" }} <small class="w2-muted">/ {{ ov_isa.limit|floatformat:"0g" }}</small>{% else %}—{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">To do</p>
     <p class="w2-stat-value {% if ov_todos %}w2-warn{% endif %}">{% if ov_todos %}{{ ov_todos|length }} action{{ ov_todos|length|pluralize }}{% else %}Nothing{% endif %}</p></div>
 </section>
@@ -23,6 +23,7 @@
   <div class="w2-grid2">
     <section class="w2-card w2-span2" aria-label="Combined value chart">
       {% include 'v2/_chart.html' with c=ov_chart ranges=ov_ranges label="Combined value vs money in" height=160 %}
+      {% if ov_chart_omitted %}<p class="w2-note">Not included in this total (no verified value history yet): {{ ov_chart_omitted|join:", " }}.</p>{% endif %}
     </section>
 
     <section class="w2-card w2-span2">
@@ -57,6 +58,7 @@
         <div class="w2-bar" role="img" aria-label="{% for a in ov_assets %}{{ a.label }} {{ a.pct }}%{% if not forloop.last %}, {% endif %}{% endfor %}">{% for a in ov_assets %}<span class="{{ a.css }}" style="width:{{ a.width|floatformat:1 }}%"></span>{% endfor %}</div>
         {% for a in ov_assets %}<div class="w2-kv" style="margin-top:4px"><span><span class="w2-dotsw {{ a.css }}"></span>{{ a.label }}</span><span>{{ a.pct }}% · {{ cur }}{{ a.value|floatformat:"2g" }}</span></div>{% endfor %}
       {% else %}<p class="w2-muted">Needs live prices and holdings.</p>{% endif %}
+      {% if ov_assets_omitted %}<p class="w2-note">Not included (prices not verified right now): {{ ov_assets_omitted|join:", " }}.</p>{% endif %}
     </section>
 
     <section class="w2-card w2-span2">
@@ -105,7 +107,7 @@
       <section class="w2-card">
         <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='shield' %} UK ISA contributions</h2></div>
         {% if ov_isa %}
-          <p class="w2-stat-value" style="font-size:13px">{{ cur }}{{ ov_isa.left|floatformat:"0g" }} <span class="w2-muted" style="font-weight:400">left</span></p>
+          <p class="w2-stat-value" style="font-size:13px">£{{ ov_isa.left|floatformat:"0g" }} <span class="w2-muted" style="font-weight:400">left</span></p>
           <div class="w2-bar" style="margin-top:6px"><span class="w2-c1" style="width:{{ ov_isa.width|floatformat:1 }}%"></span></div>
           <p class="w2-note">Advisory · resets {{ ov_isa.resets|date:"j M" }}</p>
         {% elif overview_has_isa %}<p class="w2-muted">Lifetime net funding recorded: {{ cur }}{{ overview_isa_contributed|floatformat:"2g" }}.</p>
@@ -116,7 +118,7 @@
         <div class="w2-kv"><span>Email</span><span class="{% if ov_alerts.email %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.email %}On{% else %}Off{% endif %}</span></div>
         <div class="w2-kv"><span>Discord</span><span class="{% if ov_alerts.discord %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.discord %}On{% else %}Off{% endif %}</span></div>
         <div class="w2-kv"><span>Telegram</span><span class="{% if ov_alerts.telegram %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.telegram %}On{% else %}Off{% endif %}</span></div>
-        <div class="w2-kv"><span>Last sent</span><span>{% if ov_alerts.last %}{{ ov_alerts.last.created_at|date:"j M" }}{% else %}—{% endif %}</span></div>
+        <div class="w2-kv"><span>Last sent</span><span>{% if ov_alerts.last_sent %}{{ ov_alerts.last_sent.created_at|date:"j M" }}{% else %}—{% endif %}</span></div>
       </section>
     </div>
   </aside>
