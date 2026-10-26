@@ -75,17 +75,31 @@ def certified_points(strategy, report=None):
 
 def combine_points(strategies):
     """Sum certified values across strategies on their common dates only."""
-    series = [dict((d, (v, n)) for d, v, n in certified_points(s)) for s in strategies]
-    series = [s for s in series if s]
+    return combine_with_omitted(strategies)[0]
+
+
+def combine_with_omitted(strategies):
+    """(points, names of strategies left out for lack of certified history).
+
+    A strategy with no certified points can't be part of a total; the caller
+    must say so rather than let the line pass for the whole portfolio.
+    """
+    all_series = [(s, dict((d, (v, n)) for d, v, n in certified_points(s))) for s in strategies]
+    omitted = [s.name for s, series in all_series if not series]
+    series = [series for _, series in all_series if series]
     if not series:
-        return []
+        return [], omitted
     common = sorted(set.intersection(*(set(s) for s in series)))
     return [(d, sum((s[d][0] for s in series), ZERO), sum((s[d][1] for s in series), ZERO))
-            for d in common]
+            for d in common], omitted
 
 
 def growth_index(points):
-    """Chain-linked daily growth of £1 with deposits removed (time-weighted)."""
+    """Chain-linked daily growth of 1 with each day's net flow removed.
+
+    An approximation, not a certified time-weighted return: it assumes every
+    flow arrives at the end of its day, which daily values can't confirm.
+    """
     result = []
     level = Decimal("1")
     for i, (day, value, net) in enumerate(points):
@@ -183,7 +197,7 @@ def chart(points, *, span, mode, indexes=True):
 
 
 def period_returns(points, today=None):
-    """Time-weighted returns from recorded values, and the indexes' own change."""
+    """Approximate chain-linked returns from recorded values, and the indexes' own change."""
     today = today or timezone.localdate()
     if not points:
         return ()
@@ -413,9 +427,11 @@ def alerts_summary(owner, strategy=None):
     if strategy is not None:
         deliveries = deliveries.filter(strategy=strategy)
     last = deliveries.order_by("-created_at", "-pk").first()
+    sent = deliveries.filter(status="SENT").order_by("-created_at", "-pk").first()
     return {
         "email": bool(pref and pref.email_enabled and pref.destination_email),
         "discord": bool(pref and (pref.discord_enabled or pref.discord_webhook_enabled)),
         "telegram": bool(pref and pref.telegram_enabled and pref.telegram_chat_id),
         "last": last,
+        "last_sent": sent,
     }

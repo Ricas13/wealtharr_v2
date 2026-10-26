@@ -23,6 +23,7 @@
   <div class="w2-grid2">
     <section class="w2-card w2-span2" aria-label="Combined value chart">
       {% include 'v2/_chart.html' with c=ov_chart ranges=ov_ranges label="Combined value vs money in" height=160 %}
+      {% if ov_chart_omitted %}<p class="w2-note">Not included in this total (no verified value history yet): {{ ov_chart_omitted|join:", " }}.</p>{% endif %}
     </section>
 
     <section class="w2-card w2-span2">
@@ -116,7 +117,7 @@
         <div class="w2-kv"><span>Email</span><span class="{% if ov_alerts.email %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.email %}On{% else %}Off{% endif %}</span></div>
         <div class="w2-kv"><span>Discord</span><span class="{% if ov_alerts.discord %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.discord %}On{% else %}Off{% endif %}</span></div>
         <div class="w2-kv"><span>Telegram</span><span class="{% if ov_alerts.telegram %}w2-pos{% else %}w2-muted{% endif %}">{% if ov_alerts.telegram %}On{% else %}Off{% endif %}</span></div>
-        <div class="w2-kv"><span>Last sent</span><span>{% if ov_alerts.last %}{{ ov_alerts.last.created_at|date:"j M" }}{% else %}—{% endif %}</span></div>
+        <div class="w2-kv"><span>Last sent</span><span>{% if ov_alerts.last_sent %}{{ ov_alerts.last_sent.created_at|date:"j M" }}{% else %}—{% endif %}</span></div>
       </section>
     </div>
   </aside>

@@ -54,7 +54,7 @@
   <section class="w2-card w2-span2">
     <div class="w2-ch"><h2 class="w2-ct">Period returns</h2><span class="w2-muted">"—" means not enough history</span></div>
     <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th>Measure</th>{% for row in perf_returns %}<th class="w2-r">{{ row.label }}</th>{% endfor %}</tr></thead><tbody>
-      <tr><td>You · time-weighted, from recorded daily values</td>{% for row in perf_returns %}<td class="w2-r {{ row.you|tone }}">{% if row.you is not None %}{{ row.you|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>
+      <tr><td>You · approximate daily chain-linked return (recorded daily values; each deposit is assumed to arrive at the end of its day)</td>{% for row in perf_returns %}<td class="w2-r {{ row.you|tone }}">{% if row.you is not None %}{{ row.you|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>
       {% for index in perf_index_rows %}<tr><td>{{ index.name }} · USD price</td>{% for value in index.values %}<td class="w2-r">{% if value is not None %}{{ value|signed_pct }}{% else %}—{% endif %}</td>{% endfor %}</tr>{% endfor %}
     </tbody></table></div>
     <p class="w2-note">Money-weighted (XIRR, annualised since your first deposit): {% if perf_xirr is not None %}{{ perf_xirr }}%{% else %}needs 30+ days{% endif %}.</p>
@@ -63,13 +63,13 @@
   <section class="w2-card w2-span2" aria-labelledby="w2-history-heading">
     <details {% if history.points|length <= 20 %}open{% endif %}>
       <summary><h2 class="w2-ct" id="w2-history-heading" style="display:inline">Recorded investment history</h2> <span class="w2-muted">· {{ history.points|length }} daily value{{ history.points|length|pluralize }}</span></summary>
-      <p class="w2-note"><strong>{% if history.status == 'blocked' %}History blocked{% elif history.status == 'verified_market' %}Source-verified GBP valuation{% elif history.status == 'verified_cash' %}Ledger-backed cash endpoint{% elif history.status == 'recorded_only' %}Recorded values — uncertified investment returns{% else %}No recorded values{% endif %}.</strong> {{ history.reason }}</p>
+      <p class="w2-note"><strong>{% if history.status == 'blocked' %}History blocked{% elif history.status == 'verified_market' %}Source-verified {{ history.currency }} valuation{% elif history.status == 'verified_cash' %}Ledger-backed cash endpoint{% elif history.status == 'recorded_only' %}Recorded values — uncertified investment returns{% else %}No recorded values{% endif %}.</strong> {{ history.reason }}</p>
       <h3 class="w2-ct w2-space-top">Source-labelled observation log</h3>
       <div class="w2-table-wrap w2-space-top"><table class="w2-table w2-history-table">
-        <thead><tr><th>Date</th><th class="w2-r">GBP value</th><th class="w2-r">Net funded</th><th>Origin</th><th>Check</th></tr></thead>
+        <thead><tr><th>Date</th><th class="w2-r">Value ({{ history.currency }})</th><th class="w2-r">Net funded</th><th>Origin</th><th>Check</th></tr></thead>
         <tbody>{% for point in history.points reversed %}
         <tr><td>{{ point.as_of|date:"j M Y" }}</td><td class="w2-r">{{ cur }}{{ point.value_gbp|floatformat:"2g" }}</td><td class="w2-r">{{ cur }}{{ point.net_contributed_gbp|floatformat:"2g" }}</td><td>{{ point.origin }}</td>
-          <td><span class="w2-chip {% if point.certified %}w2-ok{% endif %}">{% if point.certified %}{% if point.origin == 'Source-checked GBP portfolio close' %}Source-verified GBP{% else %}Ledger-verified cash{% endif %}{% else %}Not certified{% endif %}</span></td></tr>
+          <td><span class="w2-chip {% if point.certified %}w2-ok{% endif %}">{% if point.certified %}{% if point.origin == 'Source-checked portfolio close' %}Source-verified {{ history.currency }}{% else %}Ledger-verified cash{% endif %}{% else %}Not certified{% endif %}</span></td></tr>
         {% empty %}<tr><td colspan="5"><div class="w2-empty">No recorded values yet.</div></td></tr>{% endfor %}
         </tbody></table></div>
     </details>
