@@ -92,18 +92,41 @@ class YahooDatesAndDividendsTests(TestCase):
 
 
 class DualMomentumIncomeTests(TestCase):
-    def test_income_paid_in_the_window_counts_in_the_total_return(self):
+    def setUp(self):
         from datetime import date
-        from types import SimpleNamespace
-        from tracker.models import DividendEvent
+        from tracker.models import DividendEvent, MarketObservation
+        self.begin_day, self.end_day = date(2025, 9, 30), date(2026, 9, 30)
+        for day, amount in ((date(2026, 3, 2), "2.00"), (date(2026, 9, 1), "2.00"),
+                            (date(2025, 9, 1), "9.99")):  # the last is before the window
+            DividendEvent.objects.create(symbol="BIL", ex_date=day, amount=D(amount), currency="USD")
+            MarketObservation.objects.create(
+                symbol="BIL", as_of=day, price=D("100"), currency="USD", source="yahoo",
+                raw_unit_verified=True, raw_quote_unit="USD", raw_close=D("100"))
+
+    def quotes(self):
+        from tracker.strategies.dual_momentum import v1
+        return (v1.Quote("BIL", D("91.50"), self.begin_day), v1.Quote("BIL", D("91.60"), self.end_day))
+
+    def test_income_is_reinvested_at_each_ex_date_close(self):
         from tracker.strategies.dual_momentum import v1
         from tracker.strategies.dual_momentum.plugin import _with_income
-        begin = v1.Quote("BIL", D("91.50"), date(2025, 9, 30))
-        end = v1.Quote("BIL", D("91.60"), date(2026, 9, 30))
-        DividendEvent.objects.create(symbol="BIL", ex_date=date(2026, 3, 2), amount=D("4.00"), currency="USD")
-        DividendEvent.objects.create(symbol="BIL", ex_date=date(2025, 9, 1), amount=D("9.99"), currency="USD")
+        begin, end = self.quotes()
         total = v1.Lookback(begin, _with_income(end, begin, "USD")).total_return
-        self.assertAlmostEqual(float(total), (91.60 + 4.00) / 91.50 - 1, places=6)
+        self.assertAlmostEqual(float(total), 91.60 * 1.02 * 1.02 / 91.50 - 1, places=6)
+
+    def test_a_hole_in_the_payment_history_holds_the_decision(self):
+        from tracker.models import DividendEvent
+        from tracker.strategies.dual_momentum.plugin import _with_income
+        begin, end = self.quotes()
+        DividendEvent.objects.filter(ex_date__year=2026, ex_date__month=9).delete()
+        self.assertIsNone(_with_income(end, begin, "USD"))  # last payment too far from the end
+
+    def test_a_payment_without_a_verified_close_holds_the_decision(self):
+        from tracker.models import MarketObservation
+        from tracker.strategies.dual_momentum.plugin import _with_income
+        begin, end = self.quotes()
+        MarketObservation.objects.filter(as_of=self.end_day.replace(month=9, day=1)).update(raw_unit_verified=False)
+        self.assertIsNone(_with_income(end, begin, "USD"))
 
 
 class StudyNextDayFillTests(TestCase):

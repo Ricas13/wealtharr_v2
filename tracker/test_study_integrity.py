@@ -33,6 +33,11 @@ class DownloadUnitTests(SimpleTestCase):
         self.assertEqual([r[2] for r in rows], [D("50"), D("51"), D("52")])
         self.assertEqual([r[1] for r in rows], [D("50"), D("51"), D("52")])
 
+    def test_todays_bar_is_not_stored_as_a_close(self):
+        days = [TODAY - timedelta(days=2), TODAY - timedelta(days=1), TODAY]
+        rows = _fetch("SPY", _payload("USD", [100, 101, 102], [100, 101, 102], days=days))
+        self.assertEqual([r[0] for r in rows], days[:2])
+
     def test_mismatched_lengths_are_refused(self):
         payload = _payload("USD", [10, 11, 12], [10, 11, 12])
         payload["chart"]["result"][0]["indicators"]["adjclose"][0]["adjclose"] = [10, 11]
