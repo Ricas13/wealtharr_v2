@@ -212,29 +212,29 @@ class MarketWorkflowTests(TestCase):
             year, q_index = divmod(review_q - offset, 4)
             month = (q_index + 1) * 3
             prior = date(year, month, monthrange(year, month)[1])
-            MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol="SPY", as_of=prior, price=D("100"), currency="USD")
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="SPY", as_of=previous_end, price=D("100"), currency="USD")
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="SPY", as_of=end, price=D("65"), currency="USD")
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="TQQQ", as_of=previous_end, price=D("100"), currency="USD")
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="TQQQ", as_of=start, price=D("100"), currency="USD")
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="TQQQ", as_of=end, price=D("65"), currency="USD")
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="LQQ3.L", as_of=end, price=D("48"), currency="GBP")
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="ERNS.L", as_of=end, price=D("81"), currency="GBP")
-        reference = MarketObservation.objects.create(
+        reference = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="TQQQ", as_of=now, price=D("65"), currency="USD")
-        spy = MarketObservation.objects.create(
+        spy = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="SPY", as_of=now, price=D("65"), currency="USD")
-        equity = MarketObservation.objects.create(
+        equity = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="LQQ3.L", as_of=now, price=D("48"), currency="GBP")
-        safe = MarketObservation.objects.create(
+        safe = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="ERNS.L", as_of=now, price=D("81"), currency="GBP")
         mapped = {"TQQQ": reference, "SPY": spy,
                   "LQQ3.L": equity, "ERNS.L": safe}

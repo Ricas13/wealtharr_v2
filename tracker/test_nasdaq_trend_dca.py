@@ -263,7 +263,7 @@ class NasdaqCashRegimeIntegrationTests(TestCase):
         day = timezone.localdate() - timedelta(days=1)
         marks = {}
         for symbol in ("LQQ3.L", "EQQQ.L"):
-            MarketObservation.objects.create(symbol=symbol, as_of=day,
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol=symbol, as_of=day,
                                              currency="GBP", price=D("10"))
             marks[symbol] = PriceMark.objects.create(
                 strategy=instance, symbol=symbol, as_of=day, source="yahoo",

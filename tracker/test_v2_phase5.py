@@ -119,7 +119,7 @@ class ReviewCalculationTests(TestCase):
                     date(2024, 9, 30), date(2024, 12, 31),
                     date(2025, 3, 31), date(2025, 6, 30),
                     date(2025, 9, 30)):
-            MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol="SPY", as_of=day,
                 price=D("65") if day.year == 2025 and day.month == 9 else D("100"),
                 currency="USD",
@@ -137,7 +137,7 @@ class ReviewCalculationTests(TestCase):
                   date(2024, 9, 30), date(2024, 12, 31),
                   date(2025, 3, 31), date(2025, 6, 30),
                   date(2025, 9, 30)):
-            MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol="SPY", as_of=d, price=D("100"), currency="USD",
             )
         YahooSync.objects.create(
@@ -216,11 +216,11 @@ class ReviewCalculationTests(TestCase):
         self.assertContains(response, "previous 60/40 reset")
 
     def test_growth_drawdown_never_substitutes_for_spy(self):
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="LQQ3.L", as_of=date(2025, 4, 30),
             price=D("100"), currency="GBP"
         )
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="LQQ3.L", as_of=date(2025, 9, 30),
             price=D("40"), currency="GBP"
         )

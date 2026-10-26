@@ -112,7 +112,7 @@ class YearlyCheckEndToEndTests(TestCase):
         from tracker.models import MarketObservation
         for symbol, price in prices.items():
             MarketObservation.objects.update_or_create(
-                symbol=symbol, as_of=day, defaults={"price": D(price), "currency": "GBP"})
+                symbol=symbol, as_of=day, defaults={"source": "yahoo", "raw_unit_verified": True, "price": D(price), "currency": "GBP"})
 
     def latest(self, symbol, **kwargs):
         from tracker.models import MarketObservation
@@ -193,17 +193,18 @@ class YearlyCheckEndToEndTests(TestCase):
 class PermanentStudyTests(TestCase):
     def test_yearly_band_replay_in_dollars(self):
         from tracker.strategies.registry import module_for_key
-        from tracker.test_study import TODAY, seed
+        from tracker.test_study import seed
         cache.clear()
-        start = TODAY - timedelta(days=800)
-        seed("SPY", start, lambda d, i: 400.0)
-        seed("VTI", start, lambda d, i: 200 * (1.01 ** i))  # shares run away from the others
-        seed("TLT", start, lambda d, i: 90.0)
-        seed("BIL", start, lambda d, i: 91.0)
-        seed("GLD", start, lambda d, i: 250.0)
+        # Fixed dates: the run must span a year end whatever day the suite runs.
+        start, end = date(2023, 1, 2), date(2025, 9, 30)
+        seed("SPY", start, lambda d, i: 400.0, end=end)
+        seed("VTI", start, lambda d, i: 200 * (1.01 ** i), end=end)  # shares run away from the others
+        seed("TLT", start, lambda d, i: 90.0, end=end)
+        seed("BIL", start, lambda d, i: 91.0, end=end)
+        seed("GLD", start, lambda d, i: 250.0, end=end)
         study = module_for_key("permanent-portfolio").study["USD"]
         data = study.load_data()
-        result = study.run(data, "1y", 1000, 0)
+        result = study.run(data, "max", 1000, 0)
         # Opening 4 buys plus at least one band rebalance.
         self.assertGreater(result["series"]["strategy"]["trades"], 4)
         self.assertIn("US dollars", " ".join(study.how_it_works(data)))

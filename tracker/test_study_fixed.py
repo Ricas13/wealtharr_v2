@@ -37,6 +37,8 @@ class FixedWeightStudyEngineTests(TestCase):
 
     def test_stand_ins_join_the_real_fund_and_are_flagged(self):
         start = TODAY - timedelta(days=800)
+        while start.weekday() > 4:  # series only have weekday closes
+            start -= timedelta(days=1)
         seed_all_weather(start, TODAY - timedelta(days=200))
         data = self.study.load_data()
         self.assertTrue(data.ready)

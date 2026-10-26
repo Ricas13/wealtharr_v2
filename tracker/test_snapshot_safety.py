@@ -34,7 +34,7 @@ class SnapshotSafetyTests(TestCase):
     def verify_yahoo_mark(self):
         self.mark.source = 'yahoo'
         self.mark.save(update_fields=['source'])
-        MarketObservation.objects.create(symbol=self.mark.symbol, as_of=self.quoted_day,
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol=self.mark.symbol, as_of=self.quoted_day,
             price=self.mark.price, currency='GBP')
 
     def run_scheduler(self):

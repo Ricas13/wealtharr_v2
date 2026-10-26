@@ -53,7 +53,7 @@ def _signal(as_of):
     for symbol in ("SPY", "QQQ"):
         series[symbol] = list(MarketObservation.objects.filter(
             symbol=symbol, currency="USD", as_of__lte=as_of,
-            price__gt=0).order_by("as_of").values_list("as_of", "price"))
+            price__gt=0, source="yahoo", raw_unit_verified=True).order_by("as_of").values_list("as_of", "price"))
     shared = sorted({d for d, _ in series["SPY"]} & {d for d, _ in series["QQQ"]})
     window = shared[-v1.WINDOW:]
     if len(window) < v1.WINDOW:

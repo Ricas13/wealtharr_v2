@@ -163,7 +163,7 @@ class CompactPagesTests(TestCase):
                 strategy=self.s, as_of=start + timedelta(days=30 * i),
                 total_value=value, net_contributed=D("1000"))
         for i, price in enumerate((D("400"), D("440"))):
-            MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol="QQQ", as_of=start + timedelta(days=30 * i), price=price, currency="USD")
         result = dash.chart(dash.recorded_points(self.s), span="all", mode="pct")
         self.assertIn("Nasdaq-100", [line["label"] for line in result["lines"]])

@@ -121,7 +121,7 @@ class V2HistoryTests(TestCase):
                      symbol="LQQ3.L", qty="2", price="100")
         sample_day = self.day-timedelta(days=1)
         self._snapshot(self.account, sample_day, "1100", "1000")
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="LQQ3.L", as_of=sample_day,
             price=D("150"), currency="GBP",
         )

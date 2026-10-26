@@ -22,7 +22,7 @@
   {% elif review_blocked %}
     <div class="w2-notice">Recording against this proposal is unavailable. Verify pinned instrument access, actual opening holdings and any historical corrections first. Manual ledger entries remain separate from advice.</div>
   {% endif %}
-  <p class="w2-note">The proposed share quantities are a stored advisory result, not current broker quotes. Check the actual execution confirmation from your broker. Each fill is independently recorded and a reset cannot be certified without post-fill GBP closing evidence.</p>
+  <p class="w2-note">The proposed share quantities are a stored advisory result, not current broker quotes. Check the actual execution confirmation from your broker. Each fill is independently recorded and a reset cannot be certified without post-fill closing-price evidence.</p>
   {% for action in review_rows %}
   <article class="w2-review-action">
     <div class="w2-section-heading">
@@ -32,7 +32,7 @@
     </div>
     {% if action.fills %}
       <div class="w2-table-wrap"><table class="w2-table">
-        <thead><tr><th>Actual date</th><th>Shares</th><th>GBP price</th><th>GBP fees</th></tr></thead>
+        <thead><tr><th>Actual date</th><th>Shares</th><th>Price ({{ cur }})</th><th>Fees ({{ cur }})</th></tr></thead>
         <tbody>{% for fill in action.fills %}
           <tr><td>{{ fill.ledger_entry.occurred_on|date:"j M Y" }}</td>
               <td>{{ fill.ledger_entry.quantity }}</td>
@@ -51,9 +51,9 @@
           <input class="w2-input" type="date" name="executed_on" max="{% now 'Y-m-d' %}" required></label>
         <label class="w2-field">Shares actually filled
           <input class="w2-input" type="number" name="quantity" step="0.00000001" min="0.00000001" max="{{ action.max_more }}" required></label>
-        <label class="w2-field">Actual GBP execution price per share
+        <label class="w2-field">Actual execution price per share ({{ cur }})
           <input class="w2-input" type="number" name="unit_price" step="0.00000001" min="0.00000001" required></label>
-        <label class="w2-field">Actual GBP transaction fees
+        <label class="w2-field">Actual transaction fees ({{ cur }})
           <input class="w2-input" type="number" name="fee" step="0.01" min="0" value="0" required></label>
       </div>
       <label class="w2-check"><input type="checkbox" name="actual_confirmation" value="yes" required>
