@@ -74,7 +74,7 @@ class GuidedRebalanceTests(TestCase):
         for symbol, price in [('LQQ3.L', D('100')), ('ERNS.L', D('50'))]:
             for day in (self.qend, self.mark_day):
                 MarketObservation.objects.update_or_create(symbol=symbol, as_of=day,
-                    defaults={'currency':'GBP', 'price':price})
+                    defaults={"source": "yahoo", "raw_unit_verified": True, 'currency':'GBP', 'price':price})
             PriceMark.objects.create(strategy=self.strategy, symbol=symbol,
                                      price=price, as_of=self.mark_day, source='yahoo')
         self.sig = StrategySignal.objects.create(strategy=self.strategy,
@@ -130,7 +130,7 @@ class GuidedRebalanceTests(TestCase):
         safe_mark.as_of = self.mark_day - timedelta(days=1)
         safe_mark.save(update_fields=['as_of'])
         MarketObservation.objects.update_or_create(symbol='ERNS.L', as_of=safe_mark.as_of,
-            defaults={'currency': 'GBP', 'price': safe_mark.price})
+            defaults={"source": "yahoo", "raw_unit_verified": True, 'currency': 'GBP', 'price': safe_mark.price})
         self.assertIsNone(save_verified_strategy_snapshot(self.strategy))
         self.assertEqual(self.strategy.value_snapshots.count(), 0)
 

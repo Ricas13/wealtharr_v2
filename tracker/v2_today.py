@@ -404,7 +404,7 @@ def guided_review(request, instance_id, signal_id):
                 form = SingleSignalFillForm(request.POST)
                 if not form.is_valid():
                     raise ValidationError(
-                        "Enter actual executed date, share quantity, GBP price "
+                        "Enter actual executed date, share quantity, price "
                         "and fees with a valid confirmation token."
                     )
                 if request.POST.get("actual_confirmation") != "yes":
@@ -450,7 +450,7 @@ def guided_review(request, instance_id, signal_id):
                 messages.success(
                     request,
                     "Review completed against actual fills and verified "
-                    "post-fill GBP closes. No broker order was placed."
+                    "post-fill closing prices. No broker order was placed."
                 )
                 return redirect(
                     "v2_instance_page", instance_id=strategy.pk, section="today",

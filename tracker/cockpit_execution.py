@@ -36,9 +36,10 @@ def verified_quote_evidence(marks, currency="GBP"):
     for role, mark in zip(("growth", "safe"), marks):
         observation = MarketObservation.objects.filter(
             symbol=mark.symbol, as_of=mark.as_of, currency=currency,
-            price=mark.price).values_list("pk", flat=True).first()
+            price=mark.price, source="yahoo", raw_unit_verified=True,
+        ).values_list("pk", flat=True).first()
         if observation is None:
-            raise ValidationError("Missing persisted %s price observation for the reset." % currency)
+            raise ValidationError("Missing persisted, unit-verified %s price observation for the reset." % currency)
         result[role] = {
             "observation_id": observation, "symbol": mark.symbol,
             "as_of": mark.as_of.isoformat(), "price_gbp": str(mark.price),
@@ -199,7 +200,7 @@ def record_single_fill(*, owner, strategy_id, signal_id, action_index,
             not isinstance(executed_on, type(timezone.localdate())) or
             any(not isinstance(x, D) or not x.is_finite() for x in (quantity, unit_price, fee)) or
             quantity <= ZERO or unit_price <= ZERO or fee < ZERO):
-        raise ValidationError("Enter an actual date, positive units and price, and nonnegative GBP fees.")
+        raise ValidationError("Enter an actual date, positive units and price, and nonnegative fees.")
     if executed_on > timezone.localdate():
         raise ValidationError("A future broker execution cannot be recorded.")
     with transaction.atomic():
@@ -290,9 +291,9 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
         first_day = min(f.ledger_entry.occurred_on for f in fills)
         last_day = max(f.ledger_entry.occurred_on for f in fills)
         if any(m is None or m.as_of <= last_day for m in marks):
-            raise ValidationError("Wait for a verified GBP close AFTER the latest real fill.")
+            raise ValidationError("Wait for a verified closing price AFTER the latest real fill.")
         if len({m.as_of for m in marks}) != 1:
-            raise ValidationError("Every held instrument needs the same dated GBP close.")
+            raise ValidationError("Every held instrument needs the same dated closing price.")
         if before["value"] is None or before["value"] <= ZERO or before["cash"] < ZERO:
             raise ValidationError("Portfolio valuation or cash is incomplete.")
         if any(s not in symbols(locked) for s in before["positions"]):

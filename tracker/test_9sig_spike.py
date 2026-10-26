@@ -37,10 +37,10 @@ class IntraperiodSpikeTests(TestCase):
             kind=LedgerEntry.BUY, symbol="LQQ3.L",
             occurred_on=self.start,
             quantity=D("6"), unit_price=D("100"))
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="TQQQ", as_of=self.prev_end,
             price=D("50"), currency="USD")
-        self.latest = MarketObservation.objects.create(
+        self.latest = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="TQQQ", as_of=self.cross,
             price=D("101"), currency="USD")
 
@@ -111,7 +111,7 @@ class IntraperiodSpikeTests(TestCase):
         self.trigger(baseline=baseline).assert_not_called()
 
     def test_stale_quote_and_past_cross_cannot_invent_urgent_action(self):
-        old = MarketObservation.objects.create(
+        old = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="TQQQ", as_of=self.prev_end - timedelta(days=5),
             price=D("120"), currency="USD")
         self.trigger(tqqq_latest=old).assert_not_called()

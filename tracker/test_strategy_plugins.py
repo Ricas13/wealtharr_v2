@@ -114,7 +114,7 @@ class SecondStrategyEndToEndTests(TestStrategyMixin, TestCase):
 
     def close(self, prices):
         for (_, ticker, _), price in zip(FUNDS, prices):
-            MarketObservation.objects.create(symbol=ticker, as_of=self.close_day,
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol=ticker, as_of=self.close_day,
                                              price=D(price), currency="GBP")
 
     def test_setup_review_alert_fills_and_finish(self):

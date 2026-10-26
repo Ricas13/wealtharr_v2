@@ -36,7 +36,7 @@ class RealQuarterlySignalTests(TestCase):
         self.older = quarter_end_before(self.begin)
         for symbol, price, currency in [
             ("TQQQ", D("80"), "USD"), ("SPY", D("100"), "USD")]:
-            MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol=symbol, as_of=self.older,
                 price=price, currency=currency)
         # The live adapter now requires the SAME eight complete historical
@@ -47,7 +47,7 @@ class RealQuarterlySignalTests(TestCase):
             y, index = divmod(q - offset, 4)
             month = (index + 1) * 3
             close = date(y, month, monthrange(y, month)[1])
-            MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol="SPY", as_of=close,
                 price=D("100"), currency="USD")
 
@@ -63,13 +63,13 @@ class RealQuarterlySignalTests(TestCase):
             ("ERNS.L", D("100"), "GBP"),
         ]
         for symbol, price, currency in rows:
-            MarketObservation.objects.create(
+            MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol=symbol, as_of=self.end, price=price, currency=currency)
         # Cached latest quote is fresh even though quarterly advice is
         # calculated from the completed-quarter observation.
         fresh = {}
         for symbol, price, currency in rows:
-            fresh[symbol] = MarketObservation.objects.create(
+            fresh[symbol] = MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
                 symbol=symbol, as_of=timezone.localdate(),
                 price=price, currency=currency)
         return fresh
@@ -166,7 +166,7 @@ class RealQuarterlySignalTests(TestCase):
         self.assertFalse(StrategySignal.objects.exists())
         # Even if the SPY history is restored, the TQQQ previous close is
         # mandatory; two arbitrary price points must not count as parity.
-        MarketObservation.objects.create(
+        MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, 
             symbol="SPY", as_of=historical_spy.as_of,
             price=D("100"), currency="USD")
         MarketObservation.objects.filter(
