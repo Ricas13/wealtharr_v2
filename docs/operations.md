@@ -53,6 +53,7 @@ For tests, run python manage.py test tracker and python manage.py makemigrations
 ## Production with Docker and Traefik
 
 1. Create a **private** .env.production with DEBUG=0, a long stable SECRET_KEY, ALLOWED_HOSTS=app.example.com, CSRF_TRUSTED_ORIGINS=https://app.example.com, TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY from Cloudflare. When DEBUG=0, Turnstile is required for login and fails closed without valid keys.
+   Optional `TRUSTED_PROXY_HOPS=N`: how many proxies sit in front of the app (Cloudflare then Traefik is 2). It lets sign-in lockouts and the public comparison cap work per visitor, so a stranger can't lock the owner out. Leave it unset (0) if unsure; setting it too high or low only changes how visitors are told apart.
 2. Create a separate private .env holding POSTGRES_PASSWORD. The initial Compose configuration interpolates this into DATABASE_URL; avoid URL-reserved characters in this password, or update to an appropriately encoded URL/secrets mechanism before deployment.
 3. Run docker compose up -d --build. The app binds to **127.0.0.1:8088** by default. Route your existing Traefik HTTPS proxy to that port and **do not expose Gunicorn directly on the internet**. Check https://app.example.com/health/ after configuring DNS/proxy.
 4. Create the owner with docker compose exec web python manage.py createsuperuser.

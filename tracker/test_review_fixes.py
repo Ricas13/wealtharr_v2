@@ -131,3 +131,84 @@ class IsaAndAllocationHonestyTests(TestCase):
         usd.account.refresh_from_db()
         with patch.object(dash, "effective_entries", create=True, return_value=[]):
             self.assertIsNone(dash.isa_allowance([usd]))
+
+
+class ClientAddressTests(TestCase):
+    def request(self, forwarded="", remote="10.0.0.1", **extra):
+        from django.test import RequestFactory
+        meta = {"REMOTE_ADDR": remote}
+        if forwarded:
+            meta["HTTP_X_FORWARDED_FOR"] = forwarded
+        return RequestFactory().post("/", extra, **meta)
+
+    def test_no_trusted_hops_means_no_per_visitor_identity(self):
+        from tracker.client_ip import client_ip
+        with self.settings(TRUSTED_PROXY_HOPS=0):
+            self.assertEqual(client_ip(self.request("1.2.3.4")), "")
+
+    def test_the_address_is_counted_from_the_trusted_end(self):
+        from tracker.client_ip import client_ip
+        with self.settings(TRUSTED_PROXY_HOPS=2):
+            # A visitor may prepend anything; the last two entries are the proxies'.
+            self.assertEqual(client_ip(self.request("6.6.6.6, 1.2.3.4, 172.16.0.1")), "1.2.3.4")
+            self.assertEqual(client_ip(self.request("172.16.0.1")), "")  # chain too short
+
+    def test_a_stranger_cannot_lock_the_owner_out_from_another_address(self):
+        from tracker.v2_auth import LOGIN_FAILURE_LIMIT
+        make_instance("owner-lock")
+        with self.settings(TRUSTED_PROXY_HOPS=1), \
+                patch("tracker.v2_auth._turnstile_verified", return_value=True):
+            for _ in range(LOGIN_FAILURE_LIMIT):
+                self.client.post(reverse("login"), {"username": "owner-lock", "password": "x"},
+                                 HTTP_X_FORWARDED_FOR="9.9.9.9")
+            blocked = self.client.post(reverse("login"), {"username": "owner-lock", "password": "x"},
+                                       HTTP_X_FORWARDED_FOR="9.9.9.9")
+            self.assertContains(blocked, "Too many failed sign-ins")
+            ok = self.client.post(reverse("login"), {"username": "owner-lock", "password": "test-strong-1"},
+                                  HTTP_X_FORWARDED_FOR="8.8.8.8")
+            self.assertEqual(ok.status_code, 302)
+
+    def test_without_trusted_hops_the_username_bucket_still_applies(self):
+        from tracker.v2_auth import LOGIN_FAILURE_LIMIT
+        make_instance("owner-lock2")
+        with self.settings(TRUSTED_PROXY_HOPS=0), \
+                patch("tracker.v2_auth._turnstile_verified", return_value=True):
+            for _ in range(LOGIN_FAILURE_LIMIT):
+                self.client.post(reverse("login"), {"username": "owner-lock2", "password": "x"})
+            blocked = self.client.post(reverse("login"), {"username": "owner-lock2", "password": "test-strong-1"})
+            self.assertContains(blocked, "Too many failed sign-ins")
+
+    def test_one_visitor_cannot_use_up_the_shared_comparison_budget(self):
+        from tracker import v2_home
+        for _ in range(v2_home.PUBLIC_FRESH_PER_VISITOR):
+            v2_home._public_budget("1.1.1.1")
+        with self.assertRaises(v2_home.Busy):
+            v2_home._public_budget("1.1.1.1")
+        v2_home._public_budget("2.2.2.2")  # another visitor still has budget
+
+
+class DeliveryRecordFailureTests(TestCase):
+    def test_a_failure_saving_the_result_does_not_abort_dispatch(self):
+        from tracker.models import NotificationPreference
+        from tracker.services import dispatch
+        strategy = make_instance("dispatch-fail")
+        NotificationPreference.objects.update_or_create(
+            owner=strategy.owner, defaults={"email_enabled": True, "destination_email": "a@example.com"})
+        real_save = NotificationDelivery.save
+
+        def flaky(self, *args, **kwargs):
+            if kwargs.get("update_fields") == ["status", "error", "next_retry_at"]:
+                raise RuntimeError("connection dropped")
+            return real_save(self, *args, **kwargs)
+
+        with patch("tracker.services._send_message"), \
+                patch.object(NotificationDelivery, "save", flaky), \
+                self.assertLogs("tracker.services", level="ERROR"):
+            outcomes = dispatch(strategy.owner, "k1", "s", "m", strategy=strategy)
+        self.assertEqual(outcomes["email"], "pending")
+
+
+class ColourTests(TestCase):
+    def test_colour_does_not_fail_without_a_preset(self):
+        from tracker.strategies.registry import DEFAULT_COLOUR, colour_for
+        self.assertEqual(colour_for(SimpleNamespace(strategy_key="", preset=None)), DEFAULT_COLOUR)
