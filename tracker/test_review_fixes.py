@@ -122,3 +122,12 @@ class OverviewSupersededTests(TestCase):
                 occurred_on=as_of + timedelta(days=1))
             action = _open_action(strategy, summary, today)
         self.assertEqual((action["kind"], action["title"]), ("data", "Review out of date"))
+
+
+class IsaAndAllocationHonestyTests(TestCase):
+    def test_isa_allowance_counts_only_pound_isa_accounts(self):
+        usd = make_instance("isa-usd")
+        Account.objects.filter(pk=usd.account_id).update(currency="USD")
+        usd.account.refresh_from_db()
+        with patch.object(dash, "effective_entries", create=True, return_value=[]):
+            self.assertIsNone(dash.isa_allowance([usd]))

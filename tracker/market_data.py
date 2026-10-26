@@ -374,8 +374,9 @@ def period_close(symbol, period_end):
     because the period end's own close hasn't been fetched (or Yahoo skipped
     it). The close counts when it is from the last weekday on or before the
     period end. An earlier close counts only when a later close exists and
-    no other line on the same exchange traded on the missing days (so the
-    market was shut, e.g. a holiday, rather than the data having a gap).
+    no other line on the same exchange traded on the missing days, while one
+    did trade afterwards (so the market was shut, e.g. a holiday, rather than
+    the data having a gap).
     A held ticker never counts.
     """
     hold = YahooSync.objects.filter(symbol=symbol, last_error__startswith="PRICE_HOLD").exists()
@@ -393,4 +394,11 @@ def period_close(symbol, period_end):
         symbol__contains="=").values_list("symbol", flat=True)
     if any(_exchange(other) == venue for other in missing):
         return None  # the exchange traded that day: our close is missing, not a holiday
+    # Silence alone proves nothing: another line on the same exchange must have
+    # traded after the gap, showing that venue's feed was alive and skipped it.
+    alive = MarketObservation.objects.filter(
+        as_of__gt=period_end, **VERIFIED_QUOTE).exclude(symbol=symbol).exclude(
+        symbol__contains="=").values_list("symbol", flat=True).distinct()
+    if not any(_exchange(other) == venue for other in alive):
+        return None
     return close

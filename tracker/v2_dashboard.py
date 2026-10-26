@@ -399,7 +399,8 @@ def recent_entries(strategy, count=4):
 def isa_allowance(strategies):
     from .core.isa_allowance import OVERALL_LIMIT_2026_GBP, estimate_allowance, tax_year_bounds
     from .v2_onboarding import OPENING_NOTE
-    isa = [s for s in strategies if s.account.kind == "ISA"]
+    # The allowance is a statutory pound amount: only pound ISA accounts count.
+    isa = [s for s in strategies if s.account.kind == "ISA" and s.account.currency == "GBP"]
     if not isa:
         return None
     today = timezone.localdate()

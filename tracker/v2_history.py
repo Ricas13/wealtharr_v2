@@ -525,6 +525,7 @@ def _overview_extras(request, items, rows, today):
     points, chart_omitted = dash.combine_with_omitted(live)
     todos = []
     assets = {}
+    assets_omitted = []
     for row in rows:
         strategy = row["strategy"]
         try:
@@ -548,6 +549,9 @@ def _overview_extras(request, items, rows, today):
         if row["action"]:
             todos.append({"strategy": strategy, **row["action"]})
         if (summary and summary["value"] is not None and not strategy.tracking_only
+                and strategy.account.currency == home and not health["ready"]):
+            assets_omitted.append(strategy.name)  # stale or held prices: no allocation shown
+        elif (summary and summary["value"] is not None and not strategy.tracking_only
                 and strategy.account.currency == home):
             for symbol, qty in summary["positions"].items():
                 mark = summary["marks"].get(symbol)
@@ -594,6 +598,7 @@ def _overview_extras(request, items, rows, today):
     return {
         "ov_chart": dash.chart(points, span=span, mode=mode, indexes=False),
         "ov_chart_omitted": chart_omitted,
+        "ov_assets_omitted": assets_omitted,
         "ov_ranges": dash.RANGES, "ov_todos": tuple(todos), "ov_assets": asset_rows,
         "ov_coming": tuple(coming), "ov_isa": isa,
         "ov_prices": tuple(p for p in prices if p), "ov_last_sync": last_sync,

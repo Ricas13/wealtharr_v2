@@ -128,7 +128,7 @@ def fetch_study_chart(symbol, since):
         # falls back to the raw close before the unit conversion.
         close = (Decimal(str(raw_close)) / divisor).quantize(EIGHT)
         adj = (Decimal(str(raw_adj if raw_adj is not None else raw_close)) / divisor).quantize(EIGHT)
-        if close > 0 and adj > 0 and day <= timezone.localdate():
+        if close > 0 and adj > 0 and day < timezone.localdate():  # today's bar may still be forming
             rows[day] = (close, adj)
     if not rows:
         raise ValueError("No usable daily closes for %s" % symbol)
