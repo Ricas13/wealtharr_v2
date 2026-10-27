@@ -1,7 +1,7 @@
-"""The features an access level can include, declared in code.
+"""The features a plan can include, declared in code.
 
 Adding a feature is one declaration here (or anywhere that is imported at start-up) plus one
-``can()`` check where it is enforced. Levels are configured in the admin from this list, so
+``can()`` check where it is enforced. Plans are configured in the admin from this list, so
 nothing can be granted that the code does not know about.
 """
 import re

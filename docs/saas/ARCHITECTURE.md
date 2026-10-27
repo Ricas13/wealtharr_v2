@@ -2,7 +2,7 @@
 
 Status: living plan. **Revision 2 (owner decision): the tenant is the user.** There is no Organization or
 Membership. Wherever the sections below say "organization" or "membership", read "the owning user";
-"roles" are replaced by configurable **access levels** (section 11). Each user's records are theirs alone,
+"roles" are replaced by configurable **plans** (section 11). Each user's records are theirs alone,
 the owner stays the platform admin, and sharing between users is not a goal. Sections 3.1 to 3.3 and 4
 describe the original organization design and are kept for the reasoning; section 11 and the updated
 ladder in section 10 are what is built.
@@ -300,21 +300,24 @@ PR ladder (revision 2)
    each with two-tenant isolation tests.
 5. Write paths and background jobs run inside a tenant context.
 6. Enforce: row-level security keyed on the owner id, on a second database role.
-7. Access levels: features defined in code, levels configured in the admin, one `can()` check
+7. Plans: features defined in code, plans and users configured in the admin, one `can()` check
    (section 11).
 8. Platform admin split from ordinary users, with audited support access.
 9. Auth lifecycle (registration, verification, reset, sessions, deletion and export) behind the flag.
-10. Plans and billing (Stripe) mapped onto access levels.
+10. Stripe webhooks that assign plans automatically, and a user-facing plans page.
 11. Security hardening, operations and compliance scaffolding, partly in parallel from step 4.
 
-## 11. Access levels (replaces organization roles)
+## 11. Plans (replaces organization roles)
 
 - **Features** are keys declared in code (`tenancy.features.register(...)`), each with a label and a
   description. Adding one is one declaration plus one `can()` call where it is enforced.
-- **Access levels** are created in the admin by the owner: a name, which features it includes, optional
-  numeric limits, and whether it is the default. A built-in level "Full" grants every feature, including
-  ones added later, so existing users see no change.
-- **Per user**: one level, plus optional grant/deny overrides.
+- **Plans** are created in the admin by the owner (Admin → Plans): name, description, price text, Stripe
+  and PayPal links (https only), which features it includes, optional numeric limits, whether it is public,
+  and whether it is the default. A built-in plan "Full" grants every feature, including ones added later,
+  so existing users see no change. The links are plain links; the app does not learn from them that
+  someone paid, so plans are assigned by hand until a Stripe webhook is added.
+- **Per user** (Admin → Users): the owner edits users by hand and sets one plan plus optional feature
+  grant/deny overrides on the same page, or assigns a plan to several users at once.
 - **One check** (`tenancy.access.can(user, key)`, `limit(user, key)`) and a view decorator. Platform
-  admins (superusers) always pass. An unknown feature or an unresolvable level denies (fail closed).
-- Changes to levels and to a user's access are written to the audit log.
+  admins (superusers) always pass. An unknown feature or an unresolvable plan denies (fail closed).
+- Changes to plans, to users and to their plans are written to the audit log.

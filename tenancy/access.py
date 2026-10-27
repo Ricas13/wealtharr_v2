@@ -1,23 +1,23 @@
 """One place that answers "may this user use this feature?". Fail closed.
 
 Order of precedence: platform admin (always yes) > the user's deny list > the user's grant
-list > their access level. Anything that cannot be resolved (unknown feature, no level, no
-default level) is a no.
+list > their plan. Anything that cannot be resolved (unknown feature, no plan, no
+default plan) is a no.
 """
 import logging
 
 from . import features
-from .models import AccessLevel, UserAccess
+from .models import Plan, UserAccess
 
 LOG = logging.getLogger(__name__)
 
 
 def _resolve(user):
-    """(level, access_row) for the user; the level is None if neither the user nor the default has one."""
-    access = UserAccess.objects.select_related("level").filter(user=user).first()
+    """(plan, access_row) for the user; the plan is None if neither the user nor the default has one."""
+    access = UserAccess.objects.select_related("plan").filter(user=user).first()
     if access is not None:
-        return access.level, access
-    return AccessLevel.objects.filter(is_default=True).first(), None
+        return access.plan, access
+    return Plan.objects.filter(is_default=True).first(), None
 
 
 def can(user, key):
@@ -28,15 +28,15 @@ def can(user, key):
         return False
     if user.is_superuser:
         return True
-    level, access = _resolve(user)
+    plan, access = _resolve(user)
     if access is not None:
         if key in access.deny:
             return False
         if key in access.grant:
             return True
-    if level is None:
+    if plan is None:
         return False
-    return level.all_features or key in level.features
+    return plan.all_features or key in plan.features
 
 
 def limit(user, key):
@@ -49,7 +49,7 @@ def limit(user, key):
         return 0
     if user.is_superuser:
         return None
-    level, _ = _resolve(user)
-    if level is None:
+    plan, _ = _resolve(user)
+    if plan is None:
         return 0
-    return level.limits.get(key)  # absent in the level: unlimited, as for "Full"
+    return plan.limits.get(key)  # absent in the plan: unlimited, as for "Full"
