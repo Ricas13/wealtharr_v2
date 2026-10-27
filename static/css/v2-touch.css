@@ -157,3 +157,13 @@
 @media (prefers-reduced-motion: reduce) {
   .w2-button.is-busy { opacity: .6; pointer-events: none; }
 }
+
+/* How-to steps and the not-advice line on action cards. */
+.w2-howto { margin: 10px 0 0; padding-left: 1.3em; color: var(--w2-muted); }
+.w2-howto li { margin: 3px 0; }
+.w2-howto strong { color: var(--w2-text); }
+.w2-rules-notice { margin-top: 12px !important; padding-top: 10px; border-top: 1px solid var(--w2-stroke-soft); }
+.w2-about h2:first-child { margin-top: 0; }
+.w2-about ul, .w2-about ol { margin: 6px 0 0; padding-left: 1.3em; }
+.w2-about li { margin: 4px 0; }
+.w2-about p { margin-top: 6px; line-height: 1.55; }

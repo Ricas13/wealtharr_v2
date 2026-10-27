@@ -1,0 +1,5 @@
+<ol class="w2-howto" aria-label="What to do with this">
+  <li>Compare the amounts with live prices at {{ selected_instance.account.broker_label|default:"your broker" }}.</li>
+  <li>Decide for yourself. If you trade, place the order in your broker.</li>
+  <li>Press <strong>{% if today_status == 'new_money' or today_status == 'start' %}Record what I bought{% else %}I did this{% endif %}</strong> and enter what your broker actually gave you.</li>
+</ol>

@@ -342,7 +342,7 @@ class NasdaqDailyOwnerJourneyTests(TestCase):
         page = self.client.get(reverse("v2_instance_page",
                                        args=(strategy.pk, "today")))
         self.assertEqual(page.status_code, 200)
-        self.assertContains(page, "Review the verified daily proposal")
+        self.assertContains(page, "Daily rules output")
 
 
 class NasdaqCurrentReviewWindowTests(TestCase):

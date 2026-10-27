@@ -83,6 +83,9 @@
               aria-controls="v2-palette" title="Quick search (press /)">
         {% include 'partials/icon.html' with name='search' %}<span class="w2-nav-label">Search <kbd class="w2-kbd">/</kbd></span>
       </button>
+      <a class="w2-nav-link" href="{% url 'v2_about' %}" title="What this tool is and is not">
+        {% include 'partials/icon.html' with name='info' %}<span class="w2-nav-label">How this works</span>
+      </a>
       <button type="button" id="v2-collapse" class="w2-nav-link" aria-pressed="false"
               aria-label="Collapse sidebar" title="Collapse sidebar">
         {% include 'partials/icon.html' with name='menu' %}<span class="w2-nav-label">Collapse</span>

@@ -39,7 +39,7 @@ def _readiness(strategy, report):
     if strategy.tracking_only:
         return False, (
             "This strategy isn't live yet. Confirm the instruments in your "
-            "account to switch on live prices and instructions."
+            "account to switch on live prices and the rules output."
         ), ()
     fresh, why, marks = _price_status(strategy, report)
     if not fresh:
@@ -182,7 +182,7 @@ def today_page(request, instance_id):
             "A real trade is already recorded for this quarter. Record the rest; "
             "the review then finishes by itself after the next closing prices"
             + (" (a reset review needs you to press Finish)." if notice.reset_reason else ".")
-            + " These are not fresh instructions to trade."
+            + " This is not a new rules output."
         )
     elif notice and notice.kind in ("THIRTY_DOWN", "SPIKE_WATCH"):
         status = "review"
@@ -191,9 +191,9 @@ def today_page(request, instance_id):
     elif (not strategy.tracking_only and not notice and not report["positions"]
           and report["cash"] > ZERO and _opening_allocation_available(strategy, plugin)):
         status = "start"
-        headline = "Buy your opening position"
+        headline = "Opening position from the rules"
         explanation = (
-            "Buy what the strategy holds today with your cash, place the buys in "
+            "The rules split your cash as below. If you go ahead, place the buys yourself in "
             f"{strategy.account.broker_label}, "
             "then record what you actually bought.")
     elif not strategy.tracking_only and setup_missing(strategy):
@@ -207,23 +207,24 @@ def today_page(request, instance_id):
         headline = "Add your first deposit"
         explanation = ("Record the money you've put into your "
                        f"{strategy.account.kind} with Add money. You'll then see "
-                       "exactly what to buy.")
+                       "the rules output for it.")
     elif not ready:
         status = "blocked"
         headline = ("Not live yet" if strategy.tracking_only
-                    else "Cannot compute a reliable instruction")
+                    else "Cannot compute a reliable rules output")
         explanation = reason
     elif ready and notice and notice.kind == "QUARTERLY" and progress and not executed:
         status = "trade"
-        headline = "Review the verified %s proposal" % (plugin.cadence_word if plugin else "quarterly")
+        headline = "%s rules output" % (plugin.cadence_word if plugin else "quarterly").capitalize()
         explanation = (
-            "Check the dated proposal against your broker and decide yourself. "
+            "The rules calculated these amounts from your records and verified closes. "
+            "Check them against your broker and decide yourself. "
             "Nothing is executed by Wealtharr. Record only fills you actually made."
         )
     else:
         status = "idle"
         headline = "Nothing to do right now"
-        explanation = "No currently outstanding verified %s instruction." % (
+        explanation = "No outstanding %s rules output." % (
             plugin.cadence_word if plugin else "quarterly")
     # New confirmed cash can be invested between reviews without forcing an
     # early periodic rebalance. Never compete with an existing trade, a data
@@ -233,7 +234,7 @@ def today_page(request, instance_id):
                  if status == "idle" else None)
     if new_money:
         status = "new_money"
-        headline = "Invest your new deposit"
+        headline = "Rules output for your new deposit"
         explanation = new_money["note"]
     next_end = next_review(strategy, timezone.localdate())
     previous_end = last_review_before(strategy, timezone.localdate())

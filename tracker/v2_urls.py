@@ -1,7 +1,7 @@
 """Stable URLs for the phased, server-rendered Wealtharr v2 design."""
 from django.urls import path
 
-from . import v2_views, v2_ledger_views, v2_review, v2_settings, v2_go_live, v2_strategy, v2_home, v2_study
+from . import v2_views, v2_ledger_views, v2_review, v2_settings, v2_go_live, v2_strategy, v2_home, v2_study, v2_about
 
 urlpatterns = [
     path("overview/", v2_views.overview, name="v2_overview"),
@@ -25,6 +25,7 @@ urlpatterns = [
          v2_review.guided_review, name="v2_guided_review"),
     path("s/<int:instance_id>/notice/<int:signal_id>/feedback/",
          v2_review.notice_feedback, name="v2_notice_feedback"),
+    path("about/", v2_about.about_page, name="v2_about"),
     path("settings/", v2_views.settings, name="v2_settings"),
     path("settings/discord/connect/", v2_settings.discord_connect, name="discord_connect"),
     path("settings/discord/callback/", v2_settings.discord_callback, name="discord_callback"),

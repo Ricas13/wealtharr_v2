@@ -99,7 +99,7 @@ class TodayPhase4Tests(TestCase):
         self.assertContains(page, "ERNS.L")
         self.assertContains(page, "outside the permitted 8-day window")
         self.assertNotContains(page, "Prices verified")
-        self.assertNotContains(page, "Review the verified quarterly proposal")
+        self.assertNotContains(page, "Quarterly rules output")
         self.assertNotContains(page, "I did this")
         self.assertContains(page, "next scheduled market-data check")
 
@@ -136,7 +136,7 @@ class TodayPhase4Tests(TestCase):
         self._proposal()
         good = self.client.get(self._url())
         self.assertContains(good, "Prices verified")
-        self.assertContains(good, "Review the verified quarterly proposal")
+        self.assertContains(good, "Quarterly rules output")
         # An obsolete stored signal is not shown as a tradeable Overview action
         # once any required market-price evidence goes stale.
         PriceMark.objects.filter(strategy=self.strategy, symbol="ERNS.L").update(
@@ -161,7 +161,7 @@ class TodayPhase4Tests(TestCase):
         html = self.client.get(self._url())
         self.assertContains(html, "£500.00")
         # Cash only, nothing bought yet: the next step is the opening position.
-        self.assertContains(html, "Buy your opening position")
+        self.assertContains(html, "Opening position from the rules")
         self.assertContains(html, "Buy £300.00 of LQQ3.L")
         self.assertContains(html, "Recorded cash only")
         self.assertNotContains(html, "£14,820")
@@ -176,7 +176,11 @@ class TodayPhase4Tests(TestCase):
         notice = self._proposal()
         page = self.client.get(self._url())
         self.assertEqual(page.status_code, 200)
-        self.assertContains(page, "Review the verified quarterly proposal")
+        self.assertContains(page, "Quarterly rules output")
+        self.assertContains(page, "Rules output ready")
+        self.assertContains(page, 'aria-label="What to do with this"')
+        self.assertContains(page, "Not financial advice")
+        self.assertNotContains(page, "Action needed")
         self.assertContains(page, "I did this")
         self.assertContains(page, "LQQ3.L")
         self.assertContains(page, "£1,003.00")  # £750 cash + £202 equity + £51 safe
@@ -199,7 +203,7 @@ class TodayPhase4Tests(TestCase):
     def test_saved_signal_without_evidenced_prices_never_shows_advice(self):
         self._proposal()
         p = self.client.get(self._url())
-        self.assertContains(p, "Cannot compute a reliable instruction")
+        self.assertContains(p, "Cannot compute a reliable rules output")
         self.assertNotContains(p, "Review proposal / I did this")
 
     def test_manual_warning_does_not_show_trade_execution_link(self):

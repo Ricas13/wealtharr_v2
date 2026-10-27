@@ -66,7 +66,7 @@
       <div class="w2-ch">
         <h2 class="w2-ct w2-big"><span class="w2-action-icon">{% if today_status == 'trade' %}{% include 'partials/icon.html' with name='trend' %}{% elif today_status == 'record' %}{% include 'partials/icon.html' with name='edit' %}{% elif today_status == 'start' or today_status == 'new_money' %}{% include 'partials/icon.html' with name='coins' %}{% elif today_status == 'setup' %}{% include 'partials/icon.html' with name='settings' %}{% elif today_status == 'empty' %}{% include 'partials/icon.html' with name='wallet' %}{% elif today_status == 'blocked' %}{% include 'partials/icon.html' with name='pause' %}{% elif today_status == 'review' %}{% include 'partials/icon.html' with name='alert' %}{% else %}{% include 'partials/icon.html' with name='check' %}{% endif %}</span>{{ today_headline }}</h2>
         <span class="w2-chip {% if today_status == 'trade' or today_status == 'record' or today_status == 'start' or today_status == 'new_money' or today_status == 'setup' or today_status == 'empty' %}w2-wait{% elif today_status == 'idle' %}w2-ok{% endif %}">
-          {% if selected_instance.tracking_only %}Not live{% elif today_status == 'setup' %}Setup needed{% elif today_status == 'empty' %}Action needed{% elif today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Part recorded{% elif today_status == 'trade' or today_status == 'start' or today_status == 'new_money' %}Action needed{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}</span>
+          {% if selected_instance.tracking_only %}Not live{% elif today_status == 'setup' %}Setup needed{% elif today_status == 'empty' %}Add a deposit{% elif today_status == 'blocked' %}Cannot compute{% elif today_status == 'record' %}Part recorded{% elif today_status == 'trade' or today_status == 'start' or today_status == 'new_money' %}Rules output ready{% elif today_status == 'review' %}Manual review{% else %}No action due{% endif %}</span>
       </div>
       {% if selected_instance.onboarding_mode == 'hold' %}<p><span class="w2-chip" title="Your starting position was entered by you. Correct it in the Ledger if needed.">Based on holdings you entered</span></p>{% endif %}
       {% if today_status == 'trade' or today_status == 'record' %}
@@ -78,11 +78,12 @@
           <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='review' %}">How it was calculated</a>
         </div>
         <p class="w2-note">{{ today_explanation }}</p>
+        {% if today_status == 'trade' %}{% include 'v2/_howto.html' %}{% endif %}
       {% elif today_status == 'new_money' %}
         <p class="w2-muted">{{ today_explanation }}</p>
         <div class="w2-table-wrap w2-space-top">
           <table class="w2-table" aria-label="New money purchase guidance">
-            <thead><tr><th>Consider buying</th><th class="w2-r">Amount</th></tr></thead>
+            <thead><tr><th>Rules budget</th><th class="w2-r">Amount</th></tr></thead>
             <tbody>{% for row in today_new_money.rows %}
               <tr><td><strong>{{ row.symbol }}</strong></td><td class="w2-r">{{ cur }}{{ row.amount|floatformat:"2g" }}</td></tr>
             {% endfor %}</tbody>
@@ -126,11 +127,11 @@
             {% elif today_price_health.action == 'admin' and request.user.is_staff %}
               <a class="w2-button" href="{% url 'control' %}#price-revisions">Review held prices</a>
             {% elif today_price_health.action == 'admin' %}
-              <p class="w2-note">The held or unverified price needs site-owner review before instructions can resume.</p>
+              <p class="w2-note">The held or unverified price needs site-owner review before the rules output can resume.</p>
             {% elif today_price_health.action == 'ledger' %}
               <a class="w2-button" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='ledger' %}">Reconcile the ledger</a>
             {% else %}
-              <p class="w2-note">Wealtharr will retry on its next scheduled market-data check. Do not act on an older instruction.</p>
+              <p class="w2-note">Wealtharr will retry on its next scheduled market-data check. Do not act on an older rules output.</p>
             {% endif %}
           </div>
         </div>
@@ -149,6 +150,7 @@
         <p class="w2-note">Skipping keeps it in history and stops reminders.</p>
       </details>
       {% endif %}
+      {% if today_status == 'trade' or today_status == 'record' or today_status == 'start' or today_status == 'new_money' or today_status == 'review' %}{% include 'partials/rules_notice.html' %}{% endif %}
     </section>
 
     <div class="w2-mini">
