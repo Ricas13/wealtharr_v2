@@ -16,6 +16,7 @@ from .models import (
 from .services import dispatch, ledger_summary
 from .notification_routing import route_notice, newly_delivered
 from .signal_status import _price_status, changed_since_review
+from .core.presentation import NOT_ADVICE
 from .strategies.base import DAILY_SUPERSEDED_NOTE
 from .strategies.registry import current_review_range, plugin_keys
 
@@ -69,6 +70,8 @@ def _record_link(strategy, signal):
 
 
 def _send(strategy, owner, category, key, subject, message):
+    # The same plain sentence ends every alert, so none reads as a personal recommendation.
+    message = "%s\n\n%s" % (message, NOT_ADVICE)
     return newly_delivered(route_notice(
         owner, category, key, subject, message,
         sender=dispatch, strategy=strategy))
@@ -95,8 +98,8 @@ def _notify_strategy(strategy, today, remind_after_days):
         count += _send(strategy, owner, "data", key,
             "Wealtharr — review market data",
             "%s: an accurate review is currently unavailable. %s "
-            "Open Today to see the data status. Do not trade from old "
-            "recommendations." % (strategy.name, why))
+            "Open Today to see the data status. Do not trade from older "
+            "alerts." % (strategy.name, why))
 
     recent = StrategySignal.objects.filter(
         strategy=strategy, kind="QUARTERLY",
@@ -162,10 +165,10 @@ def _notify_strategy(strategy, today, remind_after_days):
             continue  # Same orders re-issued with fresh numbers: its own alert covers it.
         count += _send(strategy, owner, "quarterly",
             "withdrawn:%s:%s" % (strategy.pk, old.pk),
-            "Wealtharr — earlier instruction withdrawn (%s)" % old.as_of,
+            "Wealtharr — earlier rules output withdrawn (%s)" % old.as_of,
             "%s: the review of %s is no longer current because the rules now "
             "say something different. Do not act on that alert. Open Today "
-            "for the current instruction, if any. No orders were placed." % (
+            "for the current rules output, if any. No orders were placed." % (
                 strategy.name, old.as_of))
 
     # A confirmed new deposit should not sit unnoticed until the next

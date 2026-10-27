@@ -29,6 +29,11 @@ class HoldingRow:
     as_of: object | None
 
 
+# One sentence, used on action cards, the About page and the footer of every alert.
+NOT_ADVICE = ("Output of the fixed rules you chose, applied to your own records. "
+              "Not financial advice: you decide whether to trade, and Wealtharr never places orders.")
+
+
 def select_next_step(*, signal_kind: str, signal_title: str,
                      signal_message: str, proposed_actions: tuple,
                      price_ready: bool, unavailable_reason: str,
@@ -39,7 +44,7 @@ def select_next_step(*, signal_kind: str, signal_title: str,
                         signal_message or "Check the recorded alert before acting.",
                         unavailable_reason)
     if not price_ready:
-        return NextStep("blocked", "An instruction is unavailable",
+        return NextStep("blocked", "No rules output available",
                         unavailable_reason or "The required verified information is missing.")
     if (signal_kind == "QUARTERLY" and
             "Your reserve is now empty" in signal_message and
@@ -48,8 +53,8 @@ def select_next_step(*, signal_kind: str, signal_title: str,
                         signal_message)
     if signal_kind == "QUARTERLY" and any(
             row.get("side") in ("BUY", "SELL") for row in proposed_actions):
-        return NextStep("trade", "Review the proposed transactions",
-                        "Check the suggested quantities and live broker prices. "
+        return NextStep("trade", "Check the rules output",
+                        "Compare the amounts with live prices at your broker. "
                         "Only you can trade and record actual fills.")
     return NextStep("idle", "Nothing to do right now",
                     "Next planned review: %s. You can record a contribution at any time."

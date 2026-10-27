@@ -20,7 +20,7 @@
       {% elif review_late and review_can_finalize %}
         <div class="w2-notice w2-space-top">From an earlier quarter, but every trade is recorded, so it can still be finished.</div>
       {% elif not review_is_current %}
-        <div class="w2-notice w2-space-top">Historical review: read-only. Old advice can't be used to record a new trade.</div>
+        <div class="w2-notice w2-space-top">Historical review: read-only. An old rules output can't be used to record a new trade.</div>
       {% elif review_blocked %}
         <div class="w2-notice w2-space-top">Recording against this review is unavailable right now. Check the strategy is live and its setup on Strategy &amp; alerts.</div>
       {% endif %}
@@ -115,7 +115,7 @@
             <td>{% if e.found %}{{ e.source|default:"unknown" }}{% else %}not found{% endif %}</td>
             <td>{% if e.verified %}<span class="w2-chip w2-ok">Verified{% if e.unit %} · {{ e.unit }}{% endif %}</span>{% elif e.matches is False %}<span class="w2-chip w2-wait">Stored close differs</span>{% else %}<span class="w2-chip w2-wait">Not verified</span>{% endif %}</td>
           </tr>{% endfor %}</tbody></table></div>
-        <p class="w2-note">These are the stored closes the proposal was built from. Your broker's actual dealing price may differ, so always record what you really got.</p>
+        <p class="w2-note">These are the stored closes the rules output was built from. Your broker's actual dealing price may differ, so always record what you really got.</p>
       </details>
     </section>
     {% endif %}

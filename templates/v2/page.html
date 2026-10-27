@@ -46,6 +46,7 @@
       {% if page_key == 'overview' %}All strategies · reporting in {{ overview_reporting_currency }}
       {% elif page_key == 'settings' %}Applies to all strategies
       {% elif page_key == 'admin' %}Site owner only · not visible to other users
+      {% elif page_key == 'about' %}Worth reading once
       {% else %}Fixed, code-defined strategies{% endif %}
     </p>
   </div>
@@ -59,6 +60,7 @@
 {% if page_key == 'overview' %}{% include 'v2/overview.html' %}
 {% elif page_key == 'settings' %}{% include 'v2/settings.html' %}
 {% elif page_key == 'admin' %}{% include 'v2/admin.html' %}
+{% elif page_key == 'about' %}{% include 'v2/about.html' %}
 {% else %}{% include 'v2/onboarding.html' %}{% endif %}
 {% endif %}
 {% endblock %}

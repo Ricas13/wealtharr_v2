@@ -117,7 +117,7 @@ class LiveContributionGuidanceTests(TestCase):
         self.client.force_login(self.owner)
         today = self.client.get(reverse("v2_instance_page", args=[self.strategy.pk, "today"]))
         overview = self.client.get(reverse("v2_overview"))
-        self.assertContains(today, "Invest your new deposit")
+        self.assertContains(today, "Rules output for your new deposit")
         self.assertContains(overview, "Invest new deposit")
         self.assertContains(overview, "500")
 
@@ -219,7 +219,7 @@ class LiveContributionGuidanceTests(TestCase):
         response = self.client.get(reverse("v2_instance_page", args=[
             self.strategy.pk, "today"]))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Invest your new deposit")
+        self.assertContains(response, "Rules output for your new deposit")
         self.assertContains(response, "ERNS.L")
         self.assertContains(response, "500.00")
         self.assertContains(response, "Record what I bought")
@@ -437,3 +437,33 @@ class StudyNewMoneyFillTests(TestCase):
         # The same rules, filled a day later, cannot give the identical path.
         self.assertNotEqual(same["series"]["strategy"]["final"], later["series"]["strategy"]["final"])
         self.assertEqual(len(same["series"]["strategy"]["values"]), len(later["series"]["strategy"]["values"]))
+
+
+class WordingAndGuidanceTests(TestCase):
+    """The tool states what it is, plainly, wherever it asks the owner to act."""
+
+    def test_about_page_requires_login_and_states_the_limits(self):
+        response = self.client.get(reverse("v2_about"))
+        self.assertEqual(response.status_code, 302)
+        user = get_user_model().objects.create_user("about-owner", password="x" * 12)
+        self.client.force_login(user)
+        page = self.client.get(reverse("v2_about"))
+        self.assertContains(page, "never connects to a broker")
+        self.assertContains(page, "Not financial advice")
+        self.assertContains(page, "not affiliated")
+
+    def test_every_alert_ends_with_the_same_not_advice_line(self):
+        from tracker.core.presentation import NOT_ADVICE
+        from tracker.cockpit_notifications import _send
+        sent = {}
+
+        def fake_route(owner, category, key, subject, message, **kwargs):
+            sent["message"] = message
+            return []
+
+        with patch("tracker.cockpit_notifications.route_notice", fake_route), \
+                patch("tracker.cockpit_notifications.newly_delivered", lambda rows: 0):
+            _send(NS(pk=1), NS(pk=1), "quarterly", "k", "s", "Body text")
+        self.assertTrue(sent["message"].startswith("Body text"))
+        self.assertTrue(sent["message"].endswith(NOT_ADVICE))
+        self.assertIn("Not financial advice", NOT_ADVICE)
