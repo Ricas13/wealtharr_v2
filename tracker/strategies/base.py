@@ -53,6 +53,11 @@ class StrategyModule:
     # Hypothetical Study support: None, or an object with the Study API.
     study: object | None = None
     # "How this was calculated" for a saved review, and its CSV. (instance, signal) -> ...
+    # Hypothetical what-if on the Study tab: (params dict) -> result dict, or raises
+    # ValueError for parameters outside the allowed ranges. Never touches real data.
+    simulate: Callable | None = None
+    # Its adjustable inputs: ({"name", "label", "min", "max", "step", "value"}, ...)
+    simulate_fields: tuple = ()
     review_detail: Callable | None = None
     review_export: Callable | None = None
     # Plug-ins for older rule versions an instance may still be pinned to:

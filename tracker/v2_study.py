@@ -197,6 +197,23 @@ def study_window_json(request, instance_id):
 
 @login_required
 @require_GET
+def study_simulate_json(request, instance_id):
+    """Owner-only what-if on stored Study prices. Hypothetical; never an instruction."""
+    strategy = get_object_or_404(
+        StrategyInstance.objects.select_related("account", "preset").filter(
+            owner=request.user, account__owner=request.user
+        ).exclude(account__kind="PAPER"), pk=instance_id)
+    plugin = module_for(strategy)
+    if plugin is None or plugin.simulate is None:
+        return HttpResponseBadRequest("No what-if for this strategy")
+    try:
+        return JsonResponse(plugin.simulate(request.GET))
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+
+@login_required
+@require_GET
 def study_page(request, instance_id):
     strategy = get_object_or_404(
         StrategyInstance.objects.select_related("account", "preset").filter(
@@ -250,4 +267,6 @@ def study_page(request, instance_id):
         study_first_day=data.days[0] if data.ready else None,
         study_last_day=data.days[-1] if data.ready else None,
         study_zoom_data=_study_payload(study, selected) if selected else None,
+        study_can_simulate=bool(plugin and plugin.simulate and data.ready),
+        study_sim_fields=plugin.simulate_fields if plugin and plugin.simulate else (),
     )
