@@ -271,3 +271,32 @@ Q7 Existing production data: is the owner's account the only one, so the backfil
 organization?
 Q8 Data residency: any region requirement for the database and backups?
 Q9 Do all strategies appear on every plan, or are some gated?
+
+## 10. Going slowly: ground rules and the PR ladder
+
+Ground rules (owner's brief: "exactly how it is today, but multi-tenant", owner stays admin)
+- **The product does not change.** Every step leaves the owner's pages, URLs, wording and numbers as they
+  are. Each PR is checked with the full Python and browser suites, and the ledger digests printed by
+  `manage.py tenancy_check --digest` must be identical before and after.
+- **The owner stays the platform admin** (superuser) throughout, with the same login and authenticator.
+  Existing data becomes the owner's personal organization; nothing is re-entered.
+- **No door opens early.** Self-serve registration stays off (`SELF_SERVE_SIGNUP`, default off) until the
+  isolation work, audit log and admin separation are done. Until then new accounts are still created by
+  hand, now with a role.
+- **Two kinds of permission.** Platform: the owner only (admin site, support grants, plans). Tenant:
+  `owner`, `admin`, `member`, `viewer` per organization; a viewer can look but not record anything.
+- **Small, revertible PRs**, each independently safe to stop at.
+
+PR ladder
+1. This plan and the `CLAUDE.md` amendment (docs only).
+2. Tenancy tables, nullable `organization` columns, backfill, `tenancy_check` (invisible to users).
+3. Audit log table and its single recorder (invisible).
+4. Read paths move to tenant managers one slice at a time (overview, today, ledger, review, history,
+   study, settings), each with two-tenant isolation tests.
+5. Write paths and background jobs run inside a tenant context.
+6. Enforce: NOT NULL and tenant-keyed constraints, then row-level security on a second database role.
+7. Roles on write views (viewer is read-only) and a members page for tenant owners.
+8. Platform admin split from tenant admin, with support grants.
+9. Auth lifecycle (registration, verification, reset, sessions, deletion and export) behind the flag.
+10. Entitlements with manual plans, then Stripe.
+11. Security hardening, operations and compliance scaffolding, partly in parallel from step 4.
