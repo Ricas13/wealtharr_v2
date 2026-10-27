@@ -8,7 +8,6 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
@@ -16,7 +15,8 @@ from .market_data import QUOTE_MAX_AGE
 from .signal_status import _last_action, _price_status, changed_since_review
 from .cockpit_execution import completion_rows, proposed_actions
 from .core.presentation import account_value, holding_rows
-from .models import RebalanceExecution, SignalFill, StrategyInstance
+from .tenant_scope import get_strategy_or_404
+from .models import RebalanceExecution, SignalFill
 from .services import ledger_summary
 from .strategies.instruments import symbol_labels, symbols
 from .strategies.registry import last_review_before, module_for, next_review
@@ -28,11 +28,7 @@ ZERO = Decimal("0")
 
 
 def _owned(request, instance_id):
-    return get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset").filter(
-            owner=request.user, account__owner=request.user
-        ).exclude(account__kind="PAPER"), pk=instance_id,
-    )
+    return get_strategy_or_404(request, instance_id)
 
 
 def _readiness(strategy, report):

@@ -4,12 +4,12 @@ This page never changes strategy identity, prices, executions or rules; the
 only thing edited here is the planned monthly top-up used by reminders.
 """
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from .core.catalogue import rows_for, MappingNotAvailable
 from .models import StrategyGoLive, StrategyInstance
+from .tenant_scope import get_strategy_or_404
 from .v2_go_live import attestation_text, first_entry_date
 from .strategies.registry import describe_strategy
 from .v2_views import _render
@@ -18,11 +18,7 @@ from .v2_views import _render
 @login_required
 @require_GET
 def strategy_page(request, instance_id):
-    instance = get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset")
-        .filter(owner=request.user, account__owner=request.user)
-        .exclude(account__kind="PAPER"), pk=instance_id,
-    )
+    instance = get_strategy_or_404(request, instance_id)
     key = instance.strategy_key or instance.preset.slug
     description = describe_strategy(key)
     try:
@@ -86,9 +82,7 @@ def plan_view(request, instance_id):
     from django.shortcuts import redirect
     from django.urls import reverse
     from .v2_onboarding import _decimal
-    instance = get_object_or_404(
-        StrategyInstance.objects.filter(owner=request.user, account__owner=request.user)
-        .exclude(account__kind="PAPER"), pk=instance_id)
+    instance = get_strategy_or_404(request, instance_id)
     try:
         amount = _decimal(request.POST.get("monthly_target", ""), "Monthly plan")
     except ValidationError as exc:

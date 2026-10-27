@@ -7,13 +7,13 @@ from decimal import Decimal as D
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from .tenant_scope import get_strategy_or_404
 from .models import (
     LedgerRevision, RebalanceExecution,
-    SignalFill, StrategyInstance, StrategySignal)
+    SignalFill, StrategySignal)
 from .services import ledger_summary
 from .strategies.instruments import symbols as fund_symbols
 from .v2_ledger_core import (
@@ -36,12 +36,7 @@ FILTER_GROUPS = {
 
 
 def _get(request, instance_id, *, locked=False):
-    qs = StrategyInstance.objects.select_related("account", "preset").filter(
-        pk=instance_id, owner=request.user, account__owner=request.user
-    ).exclude(account__kind="PAPER")
-    if locked:
-        qs = qs.select_for_update()
-    return get_object_or_404(qs)
+    return get_strategy_or_404(request, instance_id, locked=locked)
 
 
 def _editable(strategy):

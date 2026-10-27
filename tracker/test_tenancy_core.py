@@ -177,7 +177,9 @@ class BackfillAndCheckTests(TenancyBase):
         self.assertEqual(Membership.objects.filter(user=self.alice).count(), 1)
 
     def test_backfill_creates_an_organization_for_a_user_who_has_none(self):
-        dave = get_user_model().objects.create_user("dave", password="x" * 12)
+        User = get_user_model()
+        User.objects.bulk_create([User(username="dave")])  # bulk_create sends no post_save signal
+        dave = User.objects.get(username="dave")
         self.assertFalse(Organization.objects.filter(personal_owner=dave).exists())
         self._backfill()
         self.assertTrue(Organization.objects.filter(personal_owner=dave).exists())

@@ -2,10 +2,12 @@
 import logging
 
 from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
+from django.conf import settings
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from . import audit
-from .services import default_membership
+from .services import default_membership, personal_org_for
 
 LOG = logging.getLogger(__name__)
 
@@ -36,3 +38,11 @@ def _logged_out(sender, request, user, **kwargs):
 def _login_failed(sender, credentials, request=None, **kwargs):
     # No username or password is stored: only that a sign-in failed, and from where.
     _safely("auth.login_failed", request=request)
+
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def _new_user_gets_a_personal_organization(sender, instance, created, raw=False, **kwargs):
+    # Every account starts with an organization of its own, so no page ever meets a user
+    # without one. (Migrations use historical models and are handled by the backfill.)
+    if created and not raw:
+        personal_org_for(instance)

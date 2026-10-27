@@ -6,9 +6,9 @@ fabricated by these placeholder views.
 """
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import render
 
-from .models import StrategyInstance
+from .tenant_scope import get_strategy_or_404, strategy_queryset
 
 
 SECTIONS = ("today", "review", "history", "study", "ledger", "strategy")
@@ -23,13 +23,7 @@ LABELS = {
 
 
 def _instances(request):
-    return list(
-        StrategyInstance.objects.filter(
-            owner=request.user, account__owner=request.user
-        ).exclude(account__kind="PAPER").select_related(
-            "account", "preset"
-        ).order_by("created_at", "pk")
-    )
+    return list(strategy_queryset(request).order_by("created_at", "pk"))
 
 
 def _price_freshness(instance):
@@ -98,14 +92,7 @@ def instance_page(request, instance_id, section):
     if section == "strategy":
         from .v2_strategy import strategy_page
         return strategy_page(request, instance_id)
-    instance = get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset"),
-        pk=instance_id,
-        owner=request.user,
-        account__owner=request.user,
-    )
-    if instance.account.kind == "PAPER":
-        raise Http404("Unsupported account type")
+    instance = get_strategy_or_404(request, instance_id)
     return _render(
         request, page_key="instance", page_title=LABELS[section],
         instance=instance, section=section,

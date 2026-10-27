@@ -9,11 +9,12 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import NotificationForm
+from .tenant_scope import get_strategy_or_404
 from .models import (
     NotificationDelivery, NotificationPreference,
     OwnerTOTP, StrategyInstance, SystemIntegration,
@@ -107,13 +108,7 @@ def settings_page(request):
                 strategy_id = int(request.POST.get("strategy_id", ""))
             except (TypeError, ValueError):
                 raise Http404("Unknown strategy")
-            strategy = get_object_or_404(
-                StrategyInstance.objects.select_related("account"),
-                owner=request.user, account__owner=request.user,
-                pk=strategy_id,
-            )
-            if strategy.account.kind == "PAPER":
-                raise Http404("Unsupported account type")
+            strategy = get_strategy_or_404(request, strategy_id)
             # Explicit full, fixed-size choices. No user-provided category,
             # ticker, webhook or strategy identifier is stored as a new key.
             strategy.alert_routes = {

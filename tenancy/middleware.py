@@ -1,6 +1,10 @@
 """Resolve the active organization for each request, validated against membership."""
+from django.http import HttpResponseForbidden
+from django.urls import reverse
+
 from .context import tenant_context
-from .services import default_membership, membership_for
+from .models import Membership
+from .services import default_membership, membership_for, personal_org_for
 
 SESSION_KEY = "wealtharr_active_org"
 
@@ -29,6 +33,15 @@ class TenantMiddleware:
         if user is not None and user.is_authenticated:
             membership = (membership_for(user, request.session.get(SESSION_KEY))
                           or default_membership(user))
+            if membership is None:
+                if Membership.objects.filter(user=user).exists():
+                    # Every organization the user belongs to is suspended or closing.
+                    if request.path_info != reverse("logout"):
+                        return HttpResponseForbidden("This account is not active. Contact support.")
+                else:
+                    # A user created before they ever had data still needs somewhere to put it.
+                    personal_org_for(user)
+                    membership = default_membership(user)
         request.membership = membership
         request.organization = membership.organization if membership else None
         with tenant_context(request.organization):
