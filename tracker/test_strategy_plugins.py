@@ -131,7 +131,7 @@ class SecondStrategyEndToEndTests(TestStrategyMixin, TestCase):
         self.close(("100", "10", "100"))
         today_url = reverse("v2_instance_page", args=[strategy.pk, "today"])
         page = self.client.get(today_url)
-        self.assertContains(page, "Buy your opening position")
+        self.assertContains(page, "Opening position from the rules")
         for ticker in ("TSTA.L", "TSTB.L", "TSTC.L"):
             self.assertContains(page, ticker)
         # Opening buys through the normal ledger form.

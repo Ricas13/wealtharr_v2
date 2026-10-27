@@ -74,6 +74,6 @@ class V2OnboardingBrowserTests(BrowserHarness):
                     self.page.get_by_role("button", name="Create strategy").click()
                     self.page.get_by_role("link", name="Dashboard").wait_for()
                     # "Go live now" is ticked by default, so a cash start asks for the opening buys.
-                    self.page.get_by_text("Buy your opening position", exact=False).first.wait_for()
+                    self.page.get_by_text("Opening position from the rules", exact=False).first.wait_for()
                     self.assertNotIn("OTHER_PERSON_PRIVATE_STRATEGY", self.page.content())
                     self.assertEqual(self.browser_errors, [])

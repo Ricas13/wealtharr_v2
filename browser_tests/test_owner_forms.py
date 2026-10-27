@@ -50,7 +50,7 @@ class OwnerFormsBrowserTests(BrowserHarness):
         self.submit(money)
         self.assertTrue(self.page.get_by_text("Saved.").is_visible())
         self.assertTrue(strategy.ledger.filter(kind="DEPOSIT", amount=D("1000")).exists())
-        self.assertTrue(self.page.get_by_text("Buy your opening position").is_visible())
+        self.assertTrue(self.page.get_by_text("Opening position from the rules").is_visible())
         # Record a trade on the Dashboard.
         trade = self.page.locator("section[aria-labelledby=w2-add-trade] form")
         trade.locator("input[name=quantity]").fill("10")

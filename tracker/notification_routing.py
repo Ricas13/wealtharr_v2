@@ -8,7 +8,7 @@ from .models import NotificationDelivery, NotificationPreference
 from .services import dispatch
 
 CATEGORIES = (
-    ("quarterly", "Quarterly instruction"),
+    ("quarterly", "Quarterly rules output"),
     ("urgent", "Big market drop"),
     ("data", "Price problem"),
     ("followup", "Review reminder"),
