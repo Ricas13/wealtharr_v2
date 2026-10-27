@@ -1,33 +1,37 @@
-"""The active tenant for the current request or job. Fail closed: no context, no data."""
+"""The signed-in user whose data this request or job may touch. Fail closed: none, no data.
+
+The tenant is the user: every user's records are theirs alone. There is no shared
+organization, so the context is just the user's id.
+"""
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-_organization_id = ContextVar("wealtharr_organization_id", default=None)
+_tenant_id = ContextVar("wealtharr_tenant_id", default=None)
 
 
 class NoTenantContext(RuntimeError):
     """Tenant-owned data was asked for without saying whose."""
 
 
-def current_organization_id():
-    return _organization_id.get()
+def current_tenant_id():
+    return _tenant_id.get()
 
 
-def require_organization_id():
-    value = _organization_id.get()
+def require_tenant_id():
+    value = _tenant_id.get()
     if value is None:
         raise NoTenantContext(
-            "No active organization. Wrap the work in tenancy.context.tenant_context(...) "
-            "or use all_tenants from platform code.")
+            "No active user. Wrap the work in tenancy.context.tenant_context(user) "
+            "or use the plain manager from platform code.")
     return value
 
 
 @contextmanager
-def tenant_context(organization):
-    """Run a block as one organization (an Organization, an id, or None for none)."""
-    value = getattr(organization, "pk", organization)
-    token = _organization_id.set(value)
+def tenant_context(tenant):
+    """Run a block as one user (a user, an id, or None for nobody)."""
+    value = getattr(tenant, "pk", tenant)
+    token = _tenant_id.set(value)
     try:
         yield value
     finally:
-        _organization_id.reset(token)
+        _tenant_id.reset(token)

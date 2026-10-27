@@ -10,8 +10,7 @@ from django.test import TestCase
 from django.urls import get_resolver, reverse
 from django.utils import timezone
 
-from tenancy.models import Membership, Organization
-from tenancy.services import personal_org_for
+from tenancy.context import tenant_context
 from tracker import v2_urls
 from tracker.models import LedgerEntry, StrategySignal
 from tracker.services import validate_and_record
@@ -87,38 +86,9 @@ class RouteIsolationTests(TwoTenantBase):
             for secret in ("BOB_PRIVATE_STRATEGY", "BOB_SIGNAL", "987,654"):
                 self.assertNotIn(secret, body, (url, secret))
 
-    def test_organization_scope_holds_even_when_the_owner_matches(self):
-        """Not just the owner filter: a strategy outside the active organization is invisible."""
-        other = Organization.objects.create(name="Elsewhere")
-        type(self.a_strategy).objects.filter(pk=self.a_strategy.pk).update(organization=other)
-        url = reverse("v2_instance_page", args=[self.a_strategy.pk, "today"])
-        self.assertEqual(self.client.get(url).status_code, 404)
-        self.assertNotContains(self.client.get(reverse("v2_overview")), "ALICE_STRATEGY")
-
-
-class MembershipLifecycleTests(TwoTenantBase):
-    def test_a_user_created_without_data_can_open_every_main_page(self):
-        carol = get_user_model().objects.create_user("carol", password=PASSWORD)
-        self.assertTrue(Organization.objects.filter(personal_owner=carol).exists())
-        self.client.force_login(carol)
-        for name in ("v2_overview", "v2_settings", "v2_add_strategy"):
-            self.assertEqual(self.client.get(reverse(name)).status_code, 200, name)
-
-    def test_a_user_whose_organization_is_missing_gets_one_on_first_request(self):
-        User = get_user_model()
-        User.objects.bulk_create([User(username="erin")])
-        erin = User.objects.get(username="erin")
-        erin.set_password(PASSWORD)
-        erin.save()
-        self.assertFalse(Organization.objects.filter(personal_owner=erin).exists())
-        self.client.force_login(erin)
-        self.assertEqual(self.client.get(reverse("v2_overview")).status_code, 200)
-        self.assertTrue(Membership.objects.filter(user=erin, role=Membership.OWNER).exists())
-
-    def test_a_suspended_organization_is_shut_out_but_can_still_sign_out(self):
-        org = personal_org_for(self.alice)
-        org.status = Organization.SUSPENDED
-        org.save()
-        response = self.client.get(reverse("v2_overview"))
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(self.client.post(reverse("logout")).status_code, 302)
+    def test_the_tenant_manager_scopes_by_user_on_its_own(self):
+        """The manager is a second wall: it hides B's rows even without the explicit owner filter."""
+        with tenant_context(self.alice):
+            self.assertFalse(type(self.b_strategy).tenant_objects.filter(pk=self.b_strategy.pk).exists())
+            self.assertFalse(LedgerEntry.tenant_objects.filter(pk=self.b_entry.pk).exists())
+            self.assertTrue(type(self.a_strategy).tenant_objects.filter(pk=self.a_strategy.pk).exists())

@@ -10,8 +10,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from tenancy import audit
-from tenancy.models import AuditChain, AuditEvent, AuditImmutable, Organization
-from tenancy.services import personal_org_for
+from tenancy.models import AuditChain, AuditEvent, AuditImmutable
 
 
 class AuditBase(TestCase):
@@ -19,21 +18,19 @@ class AuditBase(TestCase):
         User = get_user_model()
         self.alice = User.objects.create_user("alice", password="correct-horse-battery-1")
         self.bob = User.objects.create_user("bob", password="correct-horse-battery-2")
-        self.a_org = personal_org_for(self.alice)
-        self.b_org = personal_org_for(self.bob)
 
 
 class RecorderTests(AuditBase):
-    def test_events_chain_per_organization_and_platform(self):
-        first = audit.record("org.test", actor=self.alice, organization=self.a_org, metadata={"n": 1})
-        second = audit.record("org.test", actor=self.alice, organization=self.a_org, metadata={"n": 2})
-        other = audit.record("org.test", actor=self.bob, organization=self.b_org)
+    def test_events_chain_per_user_and_platform(self):
+        first = audit.record("org.test", actor=self.alice, subject=self.alice, metadata={"n": 1})
+        second = audit.record("org.test", actor=self.alice, subject=self.alice, metadata={"n": 2})
+        other = audit.record("org.test", actor=self.bob, subject=self.bob)
         platform = audit.record("platform.test")
         self.assertEqual(first.prev_hash, audit.GENESIS)
         self.assertEqual(second.prev_hash, first.hash)
-        self.assertEqual(other.prev_hash, audit.GENESIS, "organizations have separate chains")
+        self.assertEqual(other.prev_hash, audit.GENESIS, "users have separate chains")
         self.assertEqual(platform.chain, "platform")
-        self.assertEqual(AuditChain.objects.get(key="org:%d" % self.a_org.pk).last_hash, second.hash)
+        self.assertEqual(AuditChain.objects.get(key="user:%d" % self.alice.pk).last_hash, second.hash)
         self.assertEqual(first.actor_label, "alice")
 
     def test_target_and_request_details_are_captured(self):
@@ -41,9 +38,9 @@ class RecorderTests(AuditBase):
         request = self.client.get(reverse("v2_overview"), HTTP_X_REQUEST_ID="req-123",
                                   HTTP_X_FORWARDED_FOR="203.0.113.9").wsgi_request
         with override_settings(TRUSTED_PROXY_HOPS=1):
-            event = audit.record("account.viewed", request=request, target=self.a_org)
-        self.assertEqual((event.actor_id, event.organization_id), (self.alice.pk, self.a_org.pk))
-        self.assertEqual((event.target_type, event.target_id), ("Organization", str(self.a_org.pk)))
+            event = audit.record("account.viewed", request=request, target=self.alice)
+        self.assertEqual((event.actor_id, event.subject_id), (self.alice.pk, self.alice.pk))
+        self.assertEqual((event.target_type, event.target_id), ("User", str(self.alice.pk)))
         self.assertEqual((event.request_id, event.ip), ("req-123", "203.0.113.9"))
 
     def test_metadata_must_be_plain_and_free_of_secrets(self):
@@ -63,7 +60,7 @@ class RecorderTests(AuditBase):
 class AppendOnlyTests(AuditBase):
     def setUp(self):
         super().setUp()
-        self.event = audit.record("org.test", organization=self.a_org)
+        self.event = audit.record("org.test", subject=self.alice)
 
     def test_orm_refuses_changes_and_removal(self):
         self.event.action = "edited"
@@ -78,11 +75,8 @@ class AppendOnlyTests(AuditBase):
         with self.assertRaises(AuditImmutable):
             AuditEvent.objects.bulk_create([AuditEvent()])
 
-    def test_deleting_the_user_or_organization_keeps_history(self):
-        audit.record("auth.login", actor=self.bob, organization=self.b_org)
-        self.b_org.memberships.all().delete()
-        Organization.objects.filter(pk=self.b_org.pk).update(personal_owner=None)
-        self.b_org.delete()
+    def test_deleting_the_user_keeps_history(self):
+        audit.record("auth.login", actor=self.bob, subject=self.bob)
         self.bob.delete()
         kept = AuditEvent.objects.get(action="auth.login")
         self.assertEqual(kept.actor_label, "bob")
@@ -99,14 +93,14 @@ class AppendOnlyTests(AuditBase):
 class VerifyTests(AuditBase):
     def test_clean_log_verifies_and_tampering_is_found(self):
         for n in range(3):
-            audit.record("org.test", organization=self.a_org, metadata={"n": n})
+            audit.record("org.test", subject=self.alice, metadata={"n": n})
         audit.record("platform.test")
         out = StringIO()
         call_command("verify_audit_chain", stdout=out)
         self.assertIn("4 events across 2 chains", out.getvalue())
         if connection.vendor == "postgresql":
             self.skipTest("on PostgreSQL the trigger stops tampering before it can be detected")
-        second = AuditEvent.objects.filter(chain="org:%d" % self.a_org.pk).order_by("id")[1]
+        second = AuditEvent.objects.filter(chain="user:%d" % self.alice.pk).order_by("id")[1]
         with connection.cursor() as cursor:
             cursor.execute("UPDATE tenancy_auditevent SET action = 'edited' WHERE id = %s", [second.pk])
         with self.assertRaises(CommandError) as raised:
@@ -117,8 +111,8 @@ class VerifyTests(AuditBase):
         if connection.vendor == "postgresql":
             self.skipTest("on PostgreSQL the trigger stops removal")
         for n in range(3):
-            audit.record("org.test", organization=self.a_org, metadata={"n": n})
-        last = AuditEvent.objects.filter(chain="org:%d" % self.a_org.pk).order_by("-id").first()
+            audit.record("org.test", subject=self.alice, metadata={"n": n})
+        last = AuditEvent.objects.filter(chain="user:%d" % self.alice.pk).order_by("-id").first()
         with connection.cursor() as cursor:
             cursor.execute("DELETE FROM tenancy_auditevent WHERE id = %s", [last.pk])
         with self.assertRaises(CommandError) as raised:
@@ -135,9 +129,9 @@ class SignInEventTests(AuditBase):
         self.client.force_login(self.alice)
         self.client.post(reverse("logout"))
         self.assertTrue(AuditEvent.objects.filter(action="auth.logout", actor_id=self.alice.pk,
-                                                 organization_id=self.a_org.pk).exists())
+                                                 subject_id=self.alice.pk).exists())
 
-    def test_login_success_is_recorded_with_the_users_organization(self):
+    def test_login_success_is_recorded_for_the_user(self):
         from django.contrib.auth import login
         from django.test import RequestFactory
         from django.contrib.sessions.backends.db import SessionStore
@@ -145,7 +139,7 @@ class SignInEventTests(AuditBase):
         request.session = SessionStore()
         login(request, self.alice, backend="django.contrib.auth.backends.ModelBackend")
         event = AuditEvent.objects.get(action="auth.login")
-        self.assertEqual((event.actor_id, event.organization_id), (self.alice.pk, self.a_org.pk))
+        self.assertEqual((event.actor_id, event.subject_id), (self.alice.pk, self.alice.pk))
 
     def test_an_audit_failure_never_blocks_signing_in(self):
         from django.contrib.auth import login
@@ -157,3 +151,20 @@ class SignInEventTests(AuditBase):
             with self.assertLogs("tenancy.signals", level="ERROR"):
                 login(request, self.alice, backend="django.contrib.auth.backends.ModelBackend")
         self.assertEqual(request.session["_auth_user_id"], str(self.alice.pk))
+
+
+class LegacyEventTests(AuditBase):
+    def test_an_event_written_before_subjects_existed_still_verifies(self):
+        """Events from the organization era hash exactly as they did, so history stays valid."""
+        from django.utils import timezone
+        chain_key = "org:7"
+        event = AuditEvent(chain=chain_key, actor_id=self.alice.pk, actor_label="alice", organization_id=7,
+                           action="auth.login", metadata={}, prev_hash=audit.GENESIS,
+                           occurred_at=timezone.now())
+        event.hash = audit.compute_hash(audit.GENESIS, event)
+        event.save()
+        AuditChain.objects.create(key=chain_key, last_hash=event.hash, last_event_id=event.pk)
+        audit.record("auth.login", actor=self.alice)
+        out = StringIO()
+        call_command("verify_audit_chain", stdout=out)
+        self.assertIn("2 events across 2 chains", out.getvalue())

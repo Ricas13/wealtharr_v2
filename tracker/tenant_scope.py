@@ -1,8 +1,8 @@
 """The one place a request's strategies are looked up.
 
 Every page that needs "the signed-in user's strategy" goes through here, so the rule is
-written once: inside the active organization (fail closed without one) and, during the
-migration, also owned by the user. Dropping the owner condition later is a one-line change.
+written once: through the tenant manager (the signed-in user's rows; fail closed with nobody
+active) and, explicitly, owned by that user and their account.
 """
 from django.shortcuts import get_object_or_404
 
@@ -10,7 +10,7 @@ from .models import StrategyInstance
 
 
 def strategy_queryset(request, *, include_paper=False):
-    """Strategies the request may see: this organization, this owner, no paper accounts."""
+    """Strategies the request may see: this user's own, no paper accounts."""
     rows = StrategyInstance.tenant_objects.filter(
         owner=request.user, account__owner=request.user,
     ).select_related("account", "preset")
