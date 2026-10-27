@@ -7,6 +7,33 @@
   {% if edit_error %}<p class="w2-form-error" role="alert">{{ edit_error }}</p>{% endif %}
   {% if edit_entry and edit_entry.linked_fill %}
     <p class="w2-notice">This entry is a quarterly-review fill and can't be edited here.</p>
+  {% elif buy_rows %}
+    <form method="post" class="w2-wizard-form" id="w2-buys-form">
+      {% csrf_token %}
+      <input type="hidden" name="intent" value="save_buys">
+      <input type="hidden" name="return_to" value="today">
+      <p class="w2-notice" role="note">Enter what your broker actually gave you for each fund you bought. Nothing here is filled in for you. A fund you have not bought yet can stay empty; it will be suggested again.</p>
+      <label class="w2-field">Actual transaction date
+        <input type="date" name="occurred_on" class="w2-input" value="{{ buy_date }}" max="{% now 'Y-m-d' %}" required></label>
+      {% for row in buy_rows %}
+      <fieldset class="w2-buy-row">
+        <legend>Buy <strong>{{ row.symbol }}</strong>{% if row.budget %} · about {{ cur }}{{ row.budget }} to spend{% endif %}</legend>
+        <input type="hidden" name="buy_symbol" value="{{ row.symbol }}"><input type="hidden" name="buy_budget" value="{{ row.budget|default:'' }}">
+        <div class="w2-fill-form">
+          <div class="w2-fill-field"><label for="buy-qty-{{ row.index }}">Shares got</label>
+            <input id="buy-qty-{{ row.index }}" class="w2-input" name="quantity_{{ row.index }}" type="number" min="0.00000001" step="0.00000001" value="{{ row.quantity|default:'' }}"></div>
+          <div class="w2-fill-field"><label for="buy-price-{{ row.index }}">Price per share ({{ cur }})</label>
+            <input id="buy-price-{{ row.index }}" class="w2-input" name="unit_price_{{ row.index }}" type="number" min="0.00000001" step="0.00000001" value="{{ row.unit_price|default:'' }}"></div>
+          <div class="w2-fill-field"><label for="buy-fee-{{ row.index }}">Fee ({{ cur }})</label>
+            <input id="buy-fee-{{ row.index }}" class="w2-input" name="fee_{{ row.index }}" type="number" min="0" step="0.01" value="{{ row.fee|default:'0' }}"></div>
+        </div>
+      </fieldset>
+      {% endfor %}
+      <div class="w2-row w2-space-top">
+        <button type="submit" class="w2-button w2-button-primary">Save purchases</button>
+        <a class="w2-button" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">Enter one transaction instead</a>
+      </div>
+    </form>
   {% elif not edit_preview %}
     <form method="post" class="w2-wizard-form" id="w2-transaction-form">
       {% csrf_token %}

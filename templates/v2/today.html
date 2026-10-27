@@ -84,19 +84,19 @@
           <table class="w2-table" aria-label="New money purchase guidance">
             <thead><tr><th>Consider buying</th><th class="w2-r">Amount</th></tr></thead>
             <tbody>{% for row in today_new_money.rows %}
-              <tr><td><strong>{{ row.symbol }}</strong></td><td class="w2-r">{{ cur }}{{ row.amount|floatformat:"2g" }}{% if today_new_money.rows|length > 1 %} <a class="w2-linklike" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}?kind=BUY&amp;symbol={{ row.symbol|urlencode }}&amp;budget={{ row.amount|floatformat:2 }}">Record</a>{% endif %}</td></tr>
+              <tr><td><strong>{{ row.symbol }}</strong></td><td class="w2-r">{{ cur }}{{ row.amount|floatformat:"2g" }}</td></tr>
             {% endfor %}</tbody>
           </table>
         </div>
         <p class="w2-note">Based on confirmed deposits not followed by a recorded trade. Check your broker's current prices and fees; the figures are cash budgets, not live share quotes. No orders were placed.</p>
-        {% with first=today_new_money.rows|first %}<a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}{% if first %}?kind=BUY&amp;symbol={{ first.symbol|urlencode }}&amp;budget={{ first.amount|floatformat:2 }}{% endif %}">Record what I bought</a>{% endwith %}
+        <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}?kind=BUY{% for row in today_new_money.rows %}&amp;symbol={{ row.symbol|urlencode }}&amp;budget={{ row.amount|floatformat:2 }}{% endfor %}">Record what I bought</a>
       {% elif today_status == 'start' %}
         <p class="w2-muted">{{ today_explanation }}</p>
         <div class="w2-table-wrap w2-space-top"><table class="w2-table"><tbody>
           {% for line in today_opening %}<tr><td class="w2-side-cell w2-pos">{% include 'partials/icon.html' with name='arrow-up' %}<strong>Buy {{ cur }}{{ line.amount|floatformat:"2g" }} of {{ line.symbol }}</strong></td><td class="w2-r w2-muted">{{ line.pct|floatformat:0 }}%{% if line.shares %} · ≈ {{ line.shares }} shares at {{ cur }}{{ line.price|floatformat:"2g" }}{% endif %}</td></tr>{% endfor %}
         </tbody></table></div>
         {% if not today_opening %}<p class="w2-note">The rules can't pick a fund yet: they need 12 months of verified prices for every series. This updates after the next hourly price check.</p>{% endif %}
-        {% with first=today_opening|first %}<a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}{% if first %}?kind=BUY&amp;symbol={{ first.symbol|urlencode }}&amp;budget={{ first.amount|floatformat:2 }}{% endif %}">Record what I bought</a>{% endwith %}
+        <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}{% if today_opening %}?kind=BUY{% for line in today_opening %}&amp;symbol={{ line.symbol|urlencode }}&amp;budget={{ line.amount|floatformat:2 }}{% endfor %}{% endif %}">Record what I bought</a>
       {% elif today_status == 'setup' %}
         <p class="w2-muted">{{ today_explanation }}</p>
         <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Finish setup</a>
