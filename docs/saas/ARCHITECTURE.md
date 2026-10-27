@@ -252,18 +252,19 @@ now"). Those lines would be replaced with: multi-tenant by `Organization`; every
 tenant managers; billing and signup allowed only through the entitlement and auth modules described here;
 the strategy, quote-evidence and append-only rules unchanged.
 
-## 9. Open questions
+## 9. Decisions and open questions
 
-Q1 Tenant shape: personal organization per signup with invite-a-member later (proposed), or multi-user
-organizations from day one?
-Q2 Auth stack: build on Django primitives plus the existing hardened login (proposed), or adopt
-django-allauth (more features, a migration of the TOTP secrets, a larger dependency)?
-Q3 Hosting: stay on single-host Docker compose for beta, or move to managed Postgres and a secrets/KMS
-service? RLS needs two database roles either way; managed KMS changes the key plan.
+Decided by the owner:
+- Q1 Personal Organization per signup; invite-a-member comes later.
+- Q2 Django primitives plus the existing hardened login (no django-allauth).
+- Q3 Single-host Docker compose for the first public cohort: second DB role for RLS, file-based
+  secrets, WAL-based backups; the key provider stays pluggable so a KMS can replace the file later.
+- Q5 Keep the current price feed for the beta; the `PriceProvider` seam is built so it can be replaced.
+
+Still open:
+
 Q4 Plans: which capabilities differ between Free and paid tiers, what are the prices and currencies, and
 is Stripe Tax wanted?
-Q5 Price data for the first public cohort: keep the current feed, a licensed feed, or customer-supplied
-keys? This only decides which adapter to build first.
 Q6 Notification channels: keep the shared platform Discord/Telegram bots and SMTP (proposed), with
 per-tenant webhooks staying tenant-owned?
 Q7 Existing production data: is the owner's account the only one, so the backfill creates exactly one
