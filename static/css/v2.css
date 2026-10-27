@@ -805,3 +805,13 @@ body.v2 {
 .w2-admin-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px;align-items:end}
 .w2-admin-form>:not(.w2-field),.w2-admin-form>label.w2-field:last-of-type:nth-of-type(odd){grid-column:1/-1}
 @media (max-width:760px){.w2-admin-form{grid-template-columns:minmax(0,1fr)}}
+
+/* Fill form helpers */
+.w2-linklike { align-self: flex-start; padding: 2px 0; background: none; border: 0; color: var(--w2-accent);
+  font-size: 11px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.w2-paste { margin: var(--w2-space-3) 0; padding: var(--w2-space-2) var(--w2-space-3);
+  border: 1px dashed var(--w2-stroke); border-radius: var(--w2-radius); }
+.w2-paste textarea { width: 100%; margin: var(--w2-space-2) 0; resize: vertical; }
+.w2-pasted { box-shadow: 0 0 0 2px color-mix(in srgb, var(--w2-warning) 55%, transparent); }
+.w2-review-action:target { outline: 2px solid var(--w2-accent); outline-offset: 4px; border-radius: var(--w2-radius); }
+.w2-field-group { display: flex; flex-direction: column; gap: 2px; }
