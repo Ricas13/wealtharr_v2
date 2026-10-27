@@ -182,6 +182,25 @@ def _add_entry(locked, actor, payload, report):
     return instance
 
 
+def _suggested_buy(strategy, query, values):
+    """Pre-select a buy of a recommended fund from a "Record what I bought" link.
+
+    Only the instrument and the kind are filled in, and only for a fund this
+    strategy holds. Shares, price, fee and date are what the broker actually did,
+    so they stay empty; the cash budget is shown as a hint, never entered.
+    """
+    symbol = query.get("symbol", "")
+    if query.get("kind") != "BUY" or symbol not in fund_symbols(strategy):
+        return None
+    try:
+        budget = D(query.get("budget", ""))
+        budget = budget.quantize(D("0.01")) if budget.is_finite() and budget > 0 else None
+    except InvalidOperation:
+        budget = None
+    values.update(kind="BUY", symbol=symbol)
+    return {"symbol": symbol, "budget": budget}
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def edit_entry(request, instance_id, operation, entry_id=None):
@@ -203,6 +222,8 @@ def edit_entry(request, instance_id, operation, entry_id=None):
         "note": "",
     }
     view = {"preview": None, "form_values": default, "isa_warning": ""}
+    if operation == "new" and request.method == "GET":
+        view["suggested_buy"] = _suggested_buy(strategy, request.GET, default)
     error = ""
     if request.method == "POST":
         try:
@@ -301,4 +322,5 @@ def edit_entry(request, instance_id, operation, entry_id=None):
         edit_symbols=tuple(symbol_labels(strategy).items()),
         edit_values=view["form_values"], edit_preview=view["preview"],
         edit_isa_warning=view["isa_warning"], edit_error=error,
+        suggested_buy=view.get("suggested_buy"),
     )

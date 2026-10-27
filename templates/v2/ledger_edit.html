@@ -12,6 +12,7 @@
       {% csrf_token %}
       <input type="hidden" name="intent" value="{% if edit_operation == 'new' %}save{% else %}preview{% endif %}">
       {% if edit_operation == 'new' or edit_operation == 'edit' %}
+        {% if suggested_buy %}<input type="hidden" name="return_to" value="today"><p class="w2-notice" role="note">Buying <strong>{{ suggested_buy.symbol }}</strong>{% if suggested_buy.budget %} with about {{ cur }}{{ suggested_buy.budget }} to spend{% endif %}. Enter the shares, price and fee your broker actually gave you: nothing here is filled in for you.</p>{% endif %}
         <div class="w2-form-grid">
           <label class="w2-field">Actual transaction date
             <input type="date" name="occurred_on" class="w2-input" value="{{ edit_values.occurred_on }}" max="{% now 'Y-m-d' %}" required></label>
