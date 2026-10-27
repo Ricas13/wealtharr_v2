@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
-from tracker import guides, seo, totp_views, v2_auth, v2_home
+from tracker import guides, pwa, seo, totp_views, v2_auth, v2_home
 
 urlpatterns = [
     path("", v2_home.landing, name="home"),
@@ -14,6 +14,8 @@ urlpatterns = [
     path("robots.txt", seo.robots_txt, name="robots_txt"),
     path("sitemap.xml", seo.sitemap_xml, name="sitemap_xml"),
     path("site.webmanifest", seo.web_manifest, name="web_manifest"),
+    path("sw.js", pwa.service_worker, name="service_worker"),
+    path("offline/", pwa.offline, name="offline"),
     path("login/", v2_auth.sign_in, name="login"),
     path("logout/", v2_auth.sign_out, name="logout"),
     path("security/authenticator/", totp_views.configure, name="totp_setup"),
