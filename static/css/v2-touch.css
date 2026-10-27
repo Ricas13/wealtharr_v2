@@ -1,0 +1,155 @@
+/* Clarity and feel, loaded last: what is pressable, what is information, and how it responds.
+   Hierarchy: filled blue = the one next step; outlined = secondary; underlined/chevron text = a link;
+   flat tinted pill with no border = a read-only status (never pressable). */
+:root {
+  --w2-spring: cubic-bezier(.34, 1.4, .64, 1);
+  --w2-tap: 44px;
+}
+
+/* Buttons and links */
+.w2-button { background: transparent; border-color: #3a424e; }
+.w2-button:hover { background: #1c222b; border-color: #4a5463; }
+.w2-button-primary { background: var(--w2-primary); border-color: var(--w2-primary); }
+.w2-button-primary:hover { background: #3a7ce3; border-color: #3a7ce3; }
+.w2-ch > a {
+  display: inline-flex; align-items: center; gap: 2px; padding: 6px 0;
+  font-weight: 600; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+}
+.w2-ch > a::after { content: "\203A"; content: "\203A" / ""; font-size: 1.25em; line-height: 1; }
+.w2-ch > a:hover { text-decoration-color: currentColor; }
+
+/* Read-only status: tinted, borderless, never looks pressable. */
+.w2-chip, .w2-chip.w2-ok, .w2-chip.w2-wait, .w2-chip.w2-info { border-color: transparent; }
+.w2-chip { background: rgba(163, 172, 183, .12); cursor: default; user-select: none; }
+.w2-chip.w2-ok { background: rgba(79, 196, 138, .13); }
+.w2-chip.w2-wait { background: rgba(240, 178, 90, .14); }
+.w2-chip.w2-info { background: rgba(127, 176, 247, .14); }
+
+/* The one card that asks for something stands out from the information cards. */
+.w2-card-action { box-shadow: 0 0 0 1px rgba(47, 111, 214, .35), 0 10px 28px rgba(47, 111, 214, .12); }
+.w2-card-action.w2-state-blocked { box-shadow: none; }
+.w2-card-action.w2-state-idle { box-shadow: none; }
+
+/* Fill form: labelled fields in a grid, one submit. */
+.w2-fill-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 10px 12px; align-items: start; }
+.w2-fill-field { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.w2-fill-field label { color: var(--w2-muted); font-size: 11px; font-weight: 600; }
+.w2-fill-field .w2-fill-input { width: 100%; min-height: 34px !important; padding: 4px 8px !important; }
+.w2-fill-field .w2-linklike { padding: 4px 0; }
+.w2-fill-confirm, .w2-fill-submit { grid-column: 1 / -1; }
+.w2-fill-confirm { display: flex; gap: 8px; align-items: center; font-size: 12px; min-height: 28px; }
+.w2-fill-confirm input { width: 18px; height: 18px; accent-color: var(--w2-primary); }
+
+/* A scrolling table says so: soft edge shadows appear only where there is more to see. */
+.w2-table-wrap {
+  background:
+    linear-gradient(to right, var(--w2-panel) 30%, transparent) 0 0 / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--w2-panel) 30%, transparent) 100% 0 / 28px 100% no-repeat local,
+    linear-gradient(to right, rgba(0, 0, 0, .45), transparent) 0 0 / 12px 100% no-repeat scroll,
+    linear-gradient(to left, rgba(0, 0, 0, .45), transparent) 100% 0 / 12px 100% no-repeat scroll;
+}
+
+/* Disclosures: a chevron says "opens", and it turns when open. */
+.v2 summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; }
+.v2 summary::-webkit-details-marker { display: none; }
+.v2 summary::before { content: ""; flex: 0 0 7px; width: 7px; height: 7px; margin: 0 3px 0 1px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); opacity: .7; }
+.v2 details[open] > summary::before { transform: rotate(45deg); }
+.v2 .w2-sidebar summary::before { display: none; }
+
+/* Phones and touch: real tap targets, readable type, no iOS focus zoom (16px inputs). */
+@media (max-width: 760px), (pointer: coarse) {
+  body.v2 { font-size: 14px; }
+  .v2 .w2-button, .v2 .w2-icon-button { min-height: var(--w2-tap); padding: 0 16px; font-size: 15px; border-radius: 10px; }
+  .v2 .w2-icon-button { min-width: var(--w2-tap); padding: 0; }
+  .v2 :is(.w2-input, input.field, select, textarea, .w2-card .w2-input, .w2-card input.field) {
+    min-height: var(--w2-tap); font-size: 16px; border-radius: 10px; padding-left: 12px; padding-right: 12px;
+  }
+  .v2 .w2-fill-field .w2-fill-input { min-height: var(--w2-tap) !important; padding: 6px 12px !important; }
+  .v2 textarea { min-height: 88px; padding-top: 10px; }
+  .v2 .w2-card form .w2-field, .v2 .w2-field { font-size: 13px; }
+  .v2 .w2-chip { font-size: 12px; padding: 3px 10px; }
+  .v2 .w2-note, .v2 .w2-muted { font-size: 12.5px; }
+  .v2 .w2-ct { font-size: 14px; }
+  .v2 .w2-card .w2-ct.w2-big { font-size: 15px; }
+  .v2 .w2-card { padding: 14px; }
+  .v2 .w2-table { font-size: 13px; }
+  .v2 .w2-tabs a, .v2 .w2-subnav a, .v2 .w2-nav-link, .v2 .w2-group-heading { min-height: var(--w2-tap); display: flex; align-items: center; }
+  .v2 .w2-tabs a { padding: 0 12px; }
+  .v2 .w2-linklike { min-height: 32px; font-size: 13px; }
+  .v2 summary { min-height: var(--w2-tap); }
+  .v2 .w2-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .v2 .w2-seg :is(a, button) { display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; font-size: 13px; flex: 0 0 auto; }
+  .v2 .w2-check input, .v2 input[type=checkbox] { width: 20px; height: 20px; }
+  .v2 .w2-ch > a { min-height: var(--w2-tap); }
+
+  /* The next step is the widest thing on the card. */
+  .v2 .w2-card-action .w2-row > .w2-button-primary { flex: 1 1 100%; }
+  .v2 .w2-card-action .w2-row > .w2-button:not(.w2-button-primary) { flex: 1 1 100%; }
+  .v2 .w2-fill-submit { min-height: 48px; }
+
+  /* The review table becomes one card per trade: nothing clipped, every value labelled. */
+  .w2-fill-table, .w2-fill-table tbody, .w2-fill-table tr, .w2-fill-table td { display: block; width: 100%; }
+  .w2-fill-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .w2-fill-table tbody tr { padding: 12px 0; border-bottom: 1px solid var(--w2-stroke); }
+  .w2-fill-table td[data-label] { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border: 0; text-align: right; }
+  .w2-fill-table td[data-label]::before { content: attr(data-label); color: var(--w2-muted); font-weight: 600; text-align: left; }
+  .w2-fill-table td[colspan] { padding: 10px 0 0; }
+  .w2-fill-table td:empty { display: none; }
+  .w2-fill-form { grid-template-columns: 1fr 1fr; }
+
+  /* Empty states take a line, not a screen. */
+  .w2-empty { min-height: 0; padding: 12px 0; grid-auto-flow: column; justify-content: start; justify-items: start; gap: 10px; text-align: left; font-size: 13px; }
+  .w2-chart-empty { min-height: 96px; }
+}
+@media (max-width: 380px) { .w2-fill-form { grid-template-columns: 1fr; } }
+
+/* Motion: quick, springy, and never in the way. */
+@media (prefers-reduced-motion: no-preference) {
+  .w2-button, .w2-icon-button, .w2-tabs a, .w2-subnav a, .w2-nav-link, .w2-linklike, .w2-chip, .w2-input, .w2-target-bar > span {
+    transition: transform .28s var(--w2-spring), background-color var(--w2-dur-fast) var(--w2-ease),
+      border-color var(--w2-dur-fast) var(--w2-ease), box-shadow var(--w2-dur) var(--w2-ease), color var(--w2-dur-fast) var(--w2-ease);
+  }
+  .w2-button:active, .w2-icon-button:active, .w2-tabs a:active, .w2-linklike:active { transform: scale(.96); transition-duration: 60ms; }
+  .w2-input:focus-visible { box-shadow: 0 0 0 4px rgba(127, 176, 247, .22); }
+
+  /* Cards arrive in a short cascade instead of all at once. */
+  .w2-card:nth-child(2) { animation-delay: 40ms; }
+  .w2-card:nth-child(3) { animation-delay: 80ms; }
+  .w2-card:nth-child(4) { animation-delay: 120ms; }
+  .w2-card:nth-child(n+5) { animation-delay: 150ms; }
+
+  /* Disclosures glide open where the browser can animate to auto height. */
+  @supports (interpolate-size: allow-keywords) {
+    :root { interpolate-size: allow-keywords; }
+    details::details-content { block-size: 0; overflow: clip; transition: block-size .26s var(--w2-ease), content-visibility .26s allow-discrete; }
+    details[open]::details-content { block-size: auto; }
+  }
+  details > summary { transition: color var(--w2-dur-fast) var(--w2-ease); }
+  details > summary::before { transition: transform .22s var(--w2-spring); }
+
+  /* Drawer: slide with ease, scrim fades. */
+  @media (max-width: 900px) {
+    .w2-sidebar { transition: transform .32s var(--w2-ease), box-shadow .32s var(--w2-ease); }
+    .v2.w2-drawer-open .w2-nav-shade { animation: w2-fade .24s var(--w2-ease) both; }
+  }
+  @keyframes w2-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Saved / done confirmations drop in and settle. */
+  .w2-messages { animation: w2-drop .38s var(--w2-spring) both; }
+  .w2-messages p::before { content: "\2713"; content: "\2713" / ""; display: inline-block; margin-right: 8px; color: var(--w2-positive); font-weight: 700; animation: w2-pop .5s var(--w2-spring) .12s both; }
+  .w2-chip.w2-ok { animation: w2-pop .4s var(--w2-spring) both; }
+  @keyframes w2-drop { from { opacity: 0; transform: translateY(-10px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes w2-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+
+  /* A form that has been sent: spinner on the button, no second tap. */
+  .w2-button.is-busy { position: relative; color: transparent !important; pointer-events: none; }
+  .w2-button.is-busy::after {
+    content: ""; position: absolute; inset: 0; margin: auto; width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: w2-spin .7s linear infinite;
+  }
+  @keyframes w2-spin { to { transform: rotate(360deg); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .w2-button.is-busy { opacity: .6; pointer-events: none; }
+}
