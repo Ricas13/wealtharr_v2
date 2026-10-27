@@ -3,6 +3,9 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from tenancy.managers import TenantManager
+from tenancy.mixins import OrganizationOwned
+
 ACCOUNT_TYPES = [
     ("ISA", "Stocks & Shares ISA"), ("GIA", "General investment account"),
     ("SIPP", "SIPP / pension"), ("OTHER", "Other account"),
@@ -11,7 +14,7 @@ ACCOUNT_TYPES = [
 ]
 RISK_TYPES = [("LOW", "Low"), ("MEDIUM", "Medium"), ("HIGH", "High")]
 
-class Account(models.Model):
+class Account(OrganizationOwned, models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="investment_accounts")
     name = models.CharField(max_length=90)
     kind = models.CharField(max_length=12, choices=ACCOUNT_TYPES, default="ISA")
@@ -60,7 +63,7 @@ class StrategyPreset(models.Model):
     def __str__(self):
         return self.name
 
-class StrategyInstance(models.Model):
+class StrategyInstance(OrganizationOwned, models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="strategies")
     account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="strategies")
     preset = models.ForeignKey(StrategyPreset, on_delete=models.PROTECT)
@@ -117,6 +120,17 @@ class StrategyInstance(models.Model):
         if self.strategy_key:
             self.clean()
         return super().save(*args, **kwargs)
+
+    def _default_organization(self):
+        # A strategy belongs to the organization of the account it tracks.
+        if self.account_id and self.account.organization_id:
+            return self.account.organization
+        return super()._default_organization()
+
+    def _check_organization(self):
+        if (self.account_id and self.organization_id and self.account.organization_id
+                and self.account.organization_id != self.organization_id):
+            raise ValidationError("This account belongs to a different organization.")
 
     def __str__(self):
         return self.name
@@ -281,7 +295,7 @@ class PriceMark(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "symbol"], name="unique_strategy_mark")]
 
-class WealthSnapshot(models.Model):
+class WealthSnapshot(OrganizationOwned, models.Model):
     # Retired: no longer read or written. Kept so existing rows aren't dropped.
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="wealth_snapshots")
     as_of = models.DateField()
@@ -367,7 +381,7 @@ class SystemIntegration(models.Model):
         instance, _ = cls.objects.get_or_create(pk=1)
         return instance
 
-class NotificationDelivery(models.Model):
+class NotificationDelivery(OrganizationOwned, models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     # Persist immutable original strategy provenance for opt-out-safe retries.
     strategy = models.ForeignKey(
@@ -640,3 +654,14 @@ class RateLimitBucket(models.Model):
     key = models.CharField(max_length=180, unique=True)
     count = models.PositiveIntegerField(default=0)
     expires_at = models.DateTimeField(db_index=True)
+
+
+# Tenant-scoped managers, added beside the default ``objects`` (which is unchanged while the
+# migration is in its dual-scope stage). ``tenant_objects`` raises without an active tenant.
+for _model in (Account, StrategyInstance, WealthSnapshot, NotificationDelivery):
+    _model.add_to_class("tenant_objects", TenantManager("organization"))
+for _model in (StrategyGoLive, InstanceOpeningSnapshot, LedgerEntry, LedgerRevision, PriceMark,
+               StrategySignal, StrategyBaseline, StrategyValueSnapshot, RebalanceExecution,
+               SignalFill, BrokerImportRow):
+    _model.add_to_class("tenant_objects", TenantManager("strategy__organization"))
+OpeningReconciliation.add_to_class("tenant_objects", TenantManager("opening__strategy__organization"))
