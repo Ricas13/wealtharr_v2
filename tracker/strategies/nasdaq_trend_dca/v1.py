@@ -56,11 +56,13 @@ def elapsed_months(start, end):
     return min(INSTALMENTS, max(0, count))
 
 
-def trend_series(spy, qqq):
+def trend_series(spy, qqq, *, enter=ENTER, exit_=EXIT, reduce=REDUCE, cash_guard=CASH_GUARD):
     """Daily state over the full shared history, in O(n).
 
     The average uses the 200 closes ending on the day itself (so a day never
     sees a later close). Days before the first SPY band crossing have no state.
+    The thresholds default to the released rules; only the hypothetical Study
+    simulator passes others.
     """
     sp = {d: Decimal(str(p)) for d, p in spy if Decimal(str(p)) > ZERO}
     qp = {d: Decimal(str(p)) for d, p in qqq if Decimal(str(p)) > ZERO}
@@ -76,20 +78,20 @@ def trend_series(spy, qqq):
             q_sum += qp[days[i]] - qp[days[i - WINDOW]]
         spy_ratio = sp[days[i]] * WINDOW / sp_sum
         qqq_ratio = qp[days[i]] * WINDOW / q_sum
-        if spy_ratio > ENTER:
+        if spy_ratio > enter:
             if regime != "on":
                 guard = "none"
             regime, exit_on = "on", None
-        elif spy_ratio < EXIT:
+        elif spy_ratio < exit_:
             if regime != "off":
                 exit_on = days[i]
             regime, guard = "off", "none"
         if regime is None:
             continue
         if regime == "on":
-            if qqq_ratio >= CASH_GUARD:
+            if qqq_ratio >= cash_guard:
                 guard = "cash"
-            elif qqq_ratio >= REDUCE and guard == "none":
+            elif qqq_ratio >= reduce and guard == "none":
                 guard = "unleveraged"
             mode = {"none": "leveraged", "unleveraged": "unleveraged", "cash": "cash"}[guard]
         else:

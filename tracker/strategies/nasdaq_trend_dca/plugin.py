@@ -42,19 +42,28 @@ def next_review(day):
     return at
 
 
-def _signal(as_of):
-    """(signal, problem): the trend state on ``as_of`` from the full SPY/QQQ
-    history, or why it can't be trusted."""
+def _load(as_of):
+    """Verified SPY and QQQ closes up to ``as_of``, or (None, None, why)."""
     from tracker.models import MarketObservation, YahooSync
     if YahooSync.objects.filter(symbol__in=("SPY", "QQQ"),
                                 last_error__startswith="PRICE_HOLD:").exists():
-        return None, "SPY or QQQ prices are on hold."
+        return None, None, "SPY or QQQ prices are on hold."
     series = {}
     for symbol in ("SPY", "QQQ"):
         series[symbol] = list(MarketObservation.objects.filter(
             symbol=symbol, currency="USD", as_of__lte=as_of,
-            price__gt=0, source="yahoo", raw_unit_verified=True).order_by("as_of").values_list("as_of", "price"))
-    shared = sorted({d for d, _ in series["SPY"]} & {d for d, _ in series["QQQ"]})
+            price__gt=0, source="yahoo", raw_unit_verified=True,
+        ).order_by("as_of").values_list("as_of", "price"))
+    return series["SPY"], series["QQQ"], ""
+
+
+def _signal(as_of):
+    """(signal, problem): the trend state on ``as_of`` from the full SPY/QQQ
+    history, or why it can't be trusted."""
+    spy, qqq, why = _load(as_of)
+    if spy is None:
+        return None, why
+    shared = sorted({d for d, _ in spy} & {d for d, _ in qqq})
     window = shared[-v1.WINDOW:]
     if len(window) < v1.WINDOW:
         return None, "Fewer than 200 shared SPY and QQQ closes are stored."
@@ -62,10 +71,100 @@ def _signal(as_of):
         return None, "SPY and QQQ do not have a matching completed close."
     if any((b - a).days > MAX_GAP_DAYS for a, b in zip(window, window[1:])):
         return None, "The last 200 SPY/QQQ closes have gaps; the average can't be trusted."
-    signal = v1.trend_at(series["SPY"], series["QQQ"], as_of)
+    signal = v1.trend_at(spy, qqq, as_of)
     if signal is None:
         return None, "SPY has not yet crossed either band, so the state is unknown."
     return signal, ""
+
+
+MODE_WORDS = {"leveraged": "3x Nasdaq", "unleveraged": "1x Nasdaq (QQQ guard)",
+              "cash": "Cash (QQQ guard)", "dca": "Out of the market, buying 1x in instalments"}
+
+
+def review_detail(instance, signal):
+    """Why this review says what it says, from the same numbers the rules used."""
+    spy, qqq, why = _load(signal.as_of)
+    state, problem = _signal(signal.as_of) if spy is not None else (None, why)
+    if state is None:
+        return {"as_of": signal.as_of, "sections": [], "trace": None,
+                "trace_error": problem or "The trend state can't be reproduced for this date."}
+    closes = {"SPY": dict(spy), "QQQ": dict(qqq)}
+    pct = lambda ratio: "%.1f%%" % (ratio * 100)
+    rows = [
+        ("SPY close", "%s (%s of its 200-day average)" % (closes["SPY"][state.as_of], pct(state.spy_ratio))),
+        ("Enter 3x above / leave below", "%s / %s" % (pct(v1.ENTER), pct(v1.EXIT))),
+        ("SPY regime", "On" if state.regime == "on" else "Off since %s" % state.exit_on),
+        ("QQQ close", "%s (%s of its 200-day average)" % (closes["QQQ"][state.as_of], pct(state.qqq_ratio))),
+        ("QQQ guard (1x at / cash at)", "%s / %s · now %s" % (
+            pct(v1.REDUCE), pct(v1.CASH_GUARD),
+            {"none": "not triggered", "unleveraged": "holding 1x until SPY re-enters",
+             "cash": "holding cash until SPY re-enters"}.get(state.guard, state.guard))),
+        ("Allocation", MODE_WORDS.get(state.mode, state.mode)),
+    ]
+    changes = []
+    previous = None
+    series = v1.trend_series(spy, qqq)
+    for day in sorted(series):
+        if previous is not None and series[day].mode != previous:
+            changes.append((day, previous, series[day].mode))
+        previous = series[day].mode
+    history = [("%s" % day, "%s → %s" % (MODE_WORDS.get(a, a), MODE_WORDS.get(b, b)))
+               for day, a, b in changes[-6:] if day <= signal.as_of]
+    sections = [{"title": "Why this allocation", "rows": rows}]
+    if history:
+        sections.append({"title": "Recent changes of allocation", "rows": list(reversed(history))})
+    return {"as_of": signal.as_of, "sections": sections, "trace": None, "trace_error": ""}
+
+
+# Study-only what-if: the band edges can be moved to see how often the
+# allocation would have switched. It replays stored Study prices and feeds no
+# instruction, alert or real figure.
+SIM_RANGES = {"enter": (Decimal("1.00"), Decimal("1.15")), "exit": (Decimal("0.85"), Decimal("1.00")),
+              "reduce": (Decimal("1.10"), Decimal("1.60")), "cash_guard": (Decimal("1.20"), Decimal("2.00"))}
+
+
+SIM_DEFAULTS = {"enter": v1.ENTER, "exit": v1.EXIT, "reduce": v1.REDUCE, "cash_guard": v1.CASH_GUARD}
+
+
+def simulate(params):
+    from tracker.models import StudyPrice
+    values = {}
+    for key, (low, high) in SIM_RANGES.items():
+        try:
+            value = Decimal(str(params.get(key, SIM_DEFAULTS[key])))
+        except Exception:
+            raise ValueError("%s must be a number" % key)
+        if not value.is_finite() or not low <= value <= high:
+            raise ValueError("%s must be between %s and %s" % (key, low, high))
+        values[key] = value
+    if values["cash_guard"] <= values["reduce"]:
+        raise ValueError("cash_guard must be above reduce")
+    data = {s: list(StudyPrice.objects.filter(symbol=s).order_by("as_of").values_list("as_of", "close"))
+            for s in ("SPY", "QQQ")}
+    if not data["SPY"] or not data["QQQ"]:
+        raise ValueError("Study history for SPY and QQQ isn't downloaded yet")
+    series = v1.trend_series(data["SPY"], data["QQQ"], enter=values["enter"], exit_=values["exit"],
+                             reduce=values["reduce"], cash_guard=values["cash_guard"])
+    if not series:
+        raise ValueError("Not enough history for a 200-day average")
+    days = sorted(series)
+    share, changes, previous = {}, [], None
+    for day in days:
+        mode = series[day].mode
+        share[mode] = share.get(mode, 0) + 1
+        if previous is not None and mode != previous:
+            changes.append((day, previous, mode))
+        previous = mode
+    years = max((days[-1] - days[0]).days / 365.25, 0.01)
+    return {
+        "from": days[0].isoformat(), "to": days[-1].isoformat(),
+        "current": MODE_WORDS.get(series[days[-1]].mode, series[days[-1]].mode),
+        "changes": len(changes), "changes_per_year": round(len(changes) / years, 1),
+        "share": {MODE_WORDS.get(k, k): round(v / len(days) * 100, 1) for k, v in sorted(share.items())},
+        "recent": [{"date": d.isoformat(), "from": MODE_WORDS.get(a, a), "to": MODE_WORDS.get(b, b)}
+                   for d, a, b in changes[-8:]][::-1],
+        "note": "Hypothetical: stored Study prices only. Not an instruction, alert or your results.",
+    }
 
 
 def _cash_flows(instance, signal, funds, entries):
@@ -233,5 +332,10 @@ NASDAQ_TREND_DCA = StrategyModule(
     reference_symbols=("SPY", "QQQ"),
     cadence_word="daily", allocation_label="Trend allocation",
     current_weights=current_weights, study=STUDY,
-    allows_cash_only=True,
+    allows_cash_only=True, review_detail=review_detail, simulate=simulate,
+    simulate_fields=tuple(
+        {"name": name, "label": label, "min": str(SIM_RANGES[name][0]), "max": str(SIM_RANGES[name][1]),
+         "step": "0.01", "value": str(SIM_DEFAULTS[name])}
+        for name, label in (("enter", "Enter 3x above SPY average ×"), ("exit", "Leave 3x below SPY average ×"),
+                            ("reduce", "QQQ guard: 1x at QQQ average ×"), ("cash_guard", "QQQ guard: cash at QQQ average ×"))),
 )
