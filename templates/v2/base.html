@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta name="description" content="Wealtharr private investment tracker">
+  <meta name="theme-color" content="#0d1014">
+  <link rel="manifest" href="{% url 'web_manifest' %}">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
   <title>{% block title %}Wealtharr{% endblock %} · Wealtharr</title>
   <link rel="stylesheet" href="{% static 'css/v2.css' %}">
   <script defer src="{% static 'js/v2.js' %}"></script>
@@ -74,6 +77,10 @@
     </nav>
     {% endif %}
     <div class="w2-sidebar-footer">
+      <button type="button" id="v2-palette-open" class="w2-nav-link" aria-haspopup="dialog"
+              aria-controls="v2-palette" title="Quick search (press /)">
+        {% include 'partials/icon.html' with name='search' %}<span class="w2-nav-label">Search <kbd class="w2-kbd">/</kbd></span>
+      </button>
       <button type="button" id="v2-collapse" class="w2-nav-link" aria-pressed="false"
               aria-label="Collapse sidebar" title="Collapse sidebar">
         {% include 'partials/icon.html' with name='menu' %}<span class="w2-nav-label">Collapse</span>
@@ -87,6 +94,27 @@
     </div>
   </aside>
   <div class="w2-nav-shade" id="v2-nav-shade" aria-hidden="true"></div>
+  <dialog id="v2-palette" class="w2-palette" aria-labelledby="v2-palette-title">
+    <h2 id="v2-palette-title" class="w2-sr">Quick search</h2>
+    <input id="v2-palette-input" class="w2-palette-input" type="search" autocomplete="off"
+           placeholder="Go to a page or strategy…" role="combobox" aria-expanded="true"
+           aria-controls="v2-palette-list" aria-autocomplete="list">
+    <ul id="v2-palette-list" class="w2-palette-list" role="listbox" aria-label="Pages"></ul>
+    <p class="w2-palette-hint" aria-hidden="true">↑ ↓ to move · Enter to open · Esc to close</p>
+    <nav id="v2-palette-data" hidden aria-hidden="true">
+      <a href="{% url 'v2_overview' %}">Overview</a>
+      <a href="{% url 'v2_add_strategy' %}">Add strategy</a>
+      <a href="{% url 'v2_settings' %}">Alerts &amp; settings</a>
+      {% for item in shell_instances %}
+      <a href="{% url 'v2_instance_page' instance_id=item.pk section='today' %}">{{ item.name }} · Today</a>
+      <a href="{% url 'v2_instance_page' instance_id=item.pk section='review' %}">{{ item.name }} · Review</a>
+      <a href="{% url 'v2_instance_page' instance_id=item.pk section='history' %}">{{ item.name }} · History</a>
+      <a href="{% url 'v2_instance_page' instance_id=item.pk section='study' %}">{{ item.name }} · Study</a>
+      <a href="{% url 'v2_instance_page' instance_id=item.pk section='ledger' %}">{{ item.name }} · Ledger</a>
+      <a href="{% url 'v2_instance_page' instance_id=item.pk section='strategy' %}">{{ item.name }} · Strategy rules</a>
+      {% endfor %}
+    </nav>
+  </dialog>
   <main id="v2-main" class="w2-content" tabindex="-1"{% if selected_instance %} style="--w2-strategy:{{ selected_instance|strategy_colour }}"{% endif %}>
     {% if messages %}<div class="w2-messages" role="status">
       {% for message in messages %}<p>{{ message }}</p>{% endfor %}
