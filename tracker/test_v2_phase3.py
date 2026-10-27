@@ -81,7 +81,8 @@ class LedgerVersioningTests(TestCase):
 
     def test_csv_headers_match_account_currency_without_changing_gbp_schema(self):
         from types import SimpleNamespace
-        from tracker.v2_ledger_views import _export, _input_payload
+        from tracker.v2_ledger_page import _export
+        from tracker.v2_ledger_views import _input_payload
         from django.core.exceptions import ValidationError
 
         for currency in ("GBP", "USD", "EUR"):

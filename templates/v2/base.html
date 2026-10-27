@@ -10,7 +10,7 @@
   <link rel="manifest" href="{% url 'web_manifest' %}">
   <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
   <title>{% block title %}Wealtharr{% endblock %} · Wealtharr</title>
-  <link rel="stylesheet" href="{% static 'css/v2.css' %}">
+  {% include 'v2/_css.html' %}
   <script defer src="{% static 'js/v2.js' %}"></script>
   <script defer src="{% static 'js/chart_probe.js' %}"></script>
   {% block extra_head %}{% endblock %}

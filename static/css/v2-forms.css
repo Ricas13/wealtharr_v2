@@ -1,0 +1,68 @@
+/* Phase 2: catalogue, fixed strategy options and the five-step wizard. */
+.w2-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.w2-section-heading h2{font-size:1rem;color:var(--w2-text);font-weight:620}
+.w2-filterbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.w2-filterbar label,.w2-field{display:grid;gap:5px;color:var(--w2-muted);font-size:.83rem;font-weight:600}
+.w2-input{min-height:28px;border-radius:5px;padding:3px 8px;border:1px solid #343b45;background:#0f1216;color:var(--w2-text);font-weight:450;width:100%;max-width:100%}
+.w2-input:focus-visible{outline:2px solid var(--w2-accent);outline-offset:2px}
+.w2-table .w2-wrap{white-space:normal;min-width:150px}
+.w2-table td{vertical-align:middle;white-space:nowrap}
+.w2-table td small{display:block}
+.w2-table td a{display:inline-block;margin:0 6px 0 0;color:var(--w2-accent);font-size:.84rem}
+.w2-number{font-variant-numeric:tabular-nums;text-align:right}
+.w2-wizard{max-width:800px}
+.w2-wizard h3{font-size:1.05rem;font-weight:620;margin:7px 0 14px}
+.w2-step-meter{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;list-style:none;margin:0 0 24px;padding:0}
+.w2-step-meter li{min-width:0;border-top:3px solid var(--w2-stroke);padding:8px 2px 0;color:var(--w2-subtle);font-size:.7rem;text-align:center}
+.w2-step-meter li.current{border-color:var(--w2-accent);color:var(--w2-text)}
+.w2-wizard-form{display:grid;gap:14px}
+.w2-option-list{display:grid;gap:10px}
+.w2-option{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid #343b45;border-radius:8px;background:transparent;cursor:pointer;font-size:.9rem;min-width:0}
+.w2-option:hover:not(.w2-disabled){border-color:var(--w2-accent)}
+.w2-option:has(input:checked){background:rgba(110,168,254,.055);border-color:var(--w2-accent)}
+.w2-option input{flex:0 0 auto;accent-color:var(--w2-accent);width:17px;height:17px;margin:3px 0 0}
+.w2-option strong,.w2-option small{display:block;overflow-wrap:anywhere}
+.w2-option small{color:var(--w2-muted);font-size:.8rem;line-height:1.4;margin-top:3px}
+.w2-disabled{opacity:.56;cursor:not-allowed}
+.w2-field-help{color:var(--w2-muted);font-size:.85rem}
+.w2-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.w2-mode-fieldset{margin:0;border:0;padding:0;min-width:0}
+.w2-mode-fieldset legend{color:var(--w2-muted);font-weight:600;font-size:.84rem;margin-bottom:8px}
+.w2-mode-fieldset .w2-form-grid{gap:10px}
+.w2-opening-role{border-top:1px solid var(--w2-stroke-soft);padding:12px 0;display:grid;gap:8px}
+.w2-check{display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:var(--w2-text);font-size:.86rem;font-weight:400}
+.w2-check input{accent-color:var(--w2-accent);width:17px;height:17px;flex:0 0 17px;margin:2px 0 0}
+.w2-notice{background:#121821;border:1px solid #354052;border-radius:7px;padding:12px 14px;color:var(--w2-muted);font-size:.85rem}
+.w2-notice strong{color:var(--w2-text)}
+.w2-form-error{border:1px solid #79373f;background:#281719;border-radius:7px;color:#ffb5b9;padding:12px 14px;font-size:.87rem}
+.w2-wizard-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;border-top:1px solid var(--w2-stroke-soft);padding-top:16px;margin-top:10px}
+/* Add strategy: the three choices side by side, then one action bar. */
+.w2-wizard-wide{max-width:none}
+.w2-wizard-intro{margin:0 0 12px}
+.w2-wizard-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:stretch}
+.w2-wizard-card{display:grid;gap:12px;min-width:0;align-content:start}
+.w2-wizard-card h3{margin:0 0 2px}
+.w2-wizard-card .w2-form-grid{grid-template-columns:minmax(0,1fr)}
+.w2-wizard-card .w2-note{margin:0}
+.w2-panel.w2-wizard-actions{justify-content:space-between;align-items:center;border-top:1px solid var(--w2-stroke-soft);margin-top:0;padding:14px 16px}
+.w2-panel.w2-wizard-actions .w2-check{flex:1 1 320px}
+.w2-fund-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.w2-fund-list li{border:1px solid var(--w2-stroke-soft);border-radius:8px;padding:10px 12px;display:grid;gap:4px;min-width:0}
+.w2-fund-head{display:flex;justify-content:space-between;gap:8px;color:var(--w2-muted);font-size:.84rem}
+.w2-fund-head strong{color:var(--w2-text)}
+.w2-fund-ticker{font-weight:600;color:var(--w2-text);font-variant-numeric:tabular-nums}
+.w2-fund-name{font-size:.9rem;overflow-wrap:anywhere}
+.w2-fund-name small{display:block}
+.w2-fund-links a{color:var(--w2-accent);font-size:.84rem;margin-right:8px}
+@media(max-width:1200px){.w2-wizard-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.w2-wizard-cards>:last-child{grid-column:1/-1}}
+@media(max-width:760px){.w2-wizard-cards{grid-template-columns:minmax(0,1fr)}}
+.w2-wizard-actions .w2-button{min-width:92px;cursor:pointer}
+.w2-alert-matrix th:not(:first-child),.w2-alert-matrix td:not(:first-child){text-align:center}
+.w2-alert-matrix .w2-check{justify-content:center}
+.w2-sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:600px){
+.w2-form-grid{grid-template-columns:minmax(0,1fr)}
+.w2-step-meter li{font-size:.58rem}
+.w2-filterbar{display:grid;grid-template-columns:1fr 1fr}
+.w2-filterbar button{grid-column:1/-1}
+}
