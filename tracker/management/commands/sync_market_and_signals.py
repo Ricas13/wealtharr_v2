@@ -1,7 +1,7 @@
 """Check Yahoo quotes and review every live strategy; safe for an hourly scheduler."""
-from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from tracker.market_data import QUOTE_MAX_AGE
 from tracker.models import MarketObservation, StrategyInstance, StrategyValueSnapshot
 from tracker.market_data import sync_ticker
 from tracker.services import ledger_summary
@@ -39,7 +39,7 @@ def save_verified_strategy_snapshot(strategy):
             continue
         mark = summary["marks"].get(symbol)
         if (mark is None or mark.source != "yahoo" or
-                mark.as_of < timezone.localdate() - timedelta(days=8) or
+                mark.as_of < timezone.localdate() - QUOTE_MAX_AGE or
                 not MarketObservation.objects.filter(symbol=symbol, as_of=mark.as_of,
                     currency=strategy.account.currency, price=mark.price).exists()):
             return None

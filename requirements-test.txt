@@ -1,0 +1,2 @@
+# Test-only. tblib lets Django's parallel runner report failures from worker processes.
+tblib==3.2.2

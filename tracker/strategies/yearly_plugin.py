@@ -1,4 +1,5 @@
 """Plug-in wiring for fixed-weight strategies reviewed after each year (or month) end."""
+from tracker.market_data import QUOTE_MAX_AGE
 from tracker.core.calendar import (
     month_end_before, month_end_on_or_after, quarter_end_before, quarter_end_on_or_after,
     year_end_before, year_end_on_or_after,
@@ -20,7 +21,6 @@ def yearly_review(instance, *, key, rules, cadence="yearly"):
     ``rules`` is the strategy's pure versioned module: VERSION, WEIGHTS, Fund,
     Quote and evaluate(funds=, positions=, cash=, quotes=, as_of=).
     """
-    from datetime import timedelta
     from decimal import Decimal
 
     from django.utils import timezone
@@ -42,7 +42,7 @@ def yearly_review(instance, *, key, rules, cadence="yearly"):
     for symbol in roles.values():
         close = sync_ticker(symbol)
         # Dashboard marks: the latest verified GBP close, never a guess.
-        if close and close.currency == instance.account.currency and close.as_of >= today - timedelta(days=8):
+        if close and close.currency == instance.account.currency and close.as_of >= today - QUOTE_MAX_AGE:
             previous = PriceMark.objects.filter(strategy=instance, symbol=symbol).first()
             if not previous or previous.as_of <= close.as_of:
                 PriceMark.objects.update_or_create(

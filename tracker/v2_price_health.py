@@ -4,11 +4,11 @@ Use the *same* fail-closed guard as live review generation. A last successful
 download or a single recent price is never evidence that the whole strategy is
 ready to act on. No fetching, persistence, or broker connection.
 """
-from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from .market_data import QUOTE_MAX_AGE
 from .models import MarketObservation, YahooSync
 from .services import ledger_summary
 from .signal_status import _price_status
@@ -53,7 +53,7 @@ def strategy_price_health(strategy, report=None):
     today = timezone.localdate()
     observation_keys = set(MarketObservation.objects.filter(
         symbol__in=funds, currency=strategy.account.currency,
-        as_of__gte=today - timedelta(days=8), as_of__lte=today,
+        as_of__gte=today - QUOTE_MAX_AGE, as_of__lte=today,
     ).values_list("symbol", "as_of", "price"))
     details = []
     missing = stale = unverified = held = False
@@ -71,7 +71,7 @@ def strategy_price_health(strategy, report=None):
         elif mark.source != "yahoo" or mark.price <= 0:
             issue = "Price source or value cannot be verified"
             unverified = True
-        elif mark.as_of > today or mark.as_of < today - timedelta(days=8):
+        elif mark.as_of > today or mark.as_of < today - QUOTE_MAX_AGE:
             issue = "Accepted close is outside the permitted 8-day window"
             stale = True
         elif (symbol, mark.as_of, mark.price) not in observation_keys:

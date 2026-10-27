@@ -115,22 +115,27 @@ def find_entry(strategy, entry_id, *, include_deleted=True):
     ), None)
 
 
-def replay(entries, *, strict=True):
-    """Validate *every* historical intermediate cash/holding balance."""
+def _fold(rows, *, validate, check_balances):
+    """The one ledger fold: cash, money put in and holdings after ``rows``.
+
+    ``validate`` rejects malformed rows (strictly typed, non-future, consistent
+    cash/trade shapes). ``check_balances`` rejects any moment of negative cash or
+    holdings. Without ``validate`` rows are trusted (they were validated when
+    saved) and applied in the order given.
+    """
     cash = ZERO
     funded = ZERO
     holdings = {}
-    for row in sorted(
-        (e for e in entries if not e.deleted),
-        key=lambda e: (e.occurred_on, e.pk),
-    ):
-        if not isinstance(row.occurred_on, date) or row.occurred_on > timezone.localdate():
-            raise ValidationError("Ledger entries must have real, non-future dates.")
-        if any(not isinstance(v, D) or not v.is_finite() or v < ZERO
-               for v in (row.quantity, row.unit_price, row.amount, row.fee)):
-            raise ValidationError("Ledger contains an invalid amount, price, share quantity or fee.")
+    for row in rows:
+        if validate:
+            if not isinstance(row.occurred_on, date) or row.occurred_on > timezone.localdate():
+                raise ValidationError("Ledger entries must have real, non-future dates.")
+            if any(not isinstance(v, D) or not v.is_finite() or v < ZERO
+                   for v in (row.quantity, row.unit_price, row.amount, row.fee)):
+                raise ValidationError("Ledger contains an invalid amount, price, share quantity or fee.")
         if row.kind in MONEY_KINDS:
-            if row.amount <= ZERO or row.quantity != ZERO or row.unit_price != ZERO or row.fee != ZERO:
+            if validate and (row.amount <= ZERO or row.quantity != ZERO or row.unit_price != ZERO
+                             or row.fee != ZERO):
                 raise ValidationError("Cash entries require a positive amount in the account currency and no shares or price.")
             if row.kind == "DEPOSIT":
                 cash += row.amount
@@ -143,17 +148,17 @@ def replay(entries, *, strict=True):
             elif row.kind == "FEE":
                 cash -= row.amount
         elif row.kind == "SPLIT":
-            if (not row.symbol or row.quantity <= ZERO or row.quantity == 1 or row.unit_price != ZERO
-                    or row.amount != ZERO or row.fee != ZERO):
+            if validate and (not row.symbol or row.quantity <= ZERO or row.quantity == 1
+                             or row.unit_price != ZERO or row.amount != ZERO or row.fee != ZERO):
                 raise ValidationError("A split needs one fund and a ratio other than 1, with no cash or price.")
             previous = holdings.get(row.symbol, ZERO)
-            if previous <= ZERO:
+            if validate and previous <= ZERO:
                 raise ValidationError("A split needs shares of that fund held on its date.")
             from .services import split_quantity
             holdings[row.symbol] = split_quantity(previous, row.quantity)
         elif row.kind in TRADE_KINDS:
-            if (not row.symbol or row.quantity <= ZERO or row.unit_price <= ZERO or
-                    row.amount != ZERO):
+            if validate and (not row.symbol or row.quantity <= ZERO or row.unit_price <= ZERO
+                             or row.amount != ZERO):
                 raise ValidationError("Trades require mapped shares and a positive execution price.")
             gross = (row.quantity * row.unit_price).quantize(PENNY)
             previous = holdings.get(row.symbol, ZERO)
@@ -163,17 +168,33 @@ def replay(entries, *, strict=True):
             else:
                 cash += gross - row.fee
                 holdings[row.symbol] = previous - row.quantity
-        else:
+        elif validate:
             raise ValidationError("Unsupported ledger event type.")
-        if strict and cash < ZERO:
+        if check_balances and cash < ZERO:
             raise ValidationError("This change would make cash negative at an earlier transaction.")
-        if strict and any(v < ZERO for v in holdings.values()):
+        if check_balances and any(v < ZERO for v in holdings.values()):
             raise ValidationError("This change would sell more shares than were held at that date.")
+    return cash, funded, {k: v for k, v in sorted(holdings.items()) if v != ZERO}
+
+
+def replay(entries, *, strict=True):
+    """Validate *every* historical intermediate cash/holding balance."""
+    rows = sorted((e for e in entries if not getattr(e, "deleted", False)),
+                  key=lambda e: (e.occurred_on, e.pk))
+    cash, funded, positions = _fold(rows, validate=True, check_balances=strict)
     return {
         "cash": cash.quantize(PENNY),
         "net_contributed": funded.quantize(PENNY),
-        "positions": {k: v for k, v in sorted(holdings.items()) if v != ZERO},
+        "positions": positions,
     }
+
+
+def replay_trusted(entries):
+    """(cash, money put in, positions) of already-validated entries, in the order given.
+
+    No validation and no balance checks: for reading back a saved ledger.
+    """
+    return _fold(entries, validate=False, check_balances=False)
 
 
 def with_proposed_change(strategy, entry_id, replacement):

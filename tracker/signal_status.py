@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from .instrument_mapping import for_strategy
 from .models import MarketObservation, RebalanceExecution, YahooSync
+from .market_data import QUOTE_MAX_AGE, verified_observations
 
 ZERO = Decimal("0")
 
@@ -65,14 +66,13 @@ def _price_status(strategy, report):
     if any(m is None for m in marks):
         return False, "Every one of the strategy's funds needs a verified close.", marks
     if any(m.source != 'yahoo' or m.price <= ZERO or m.as_of > today or
-           m.as_of < today - timedelta(days=8) for m in marks):
+           m.as_of < today - QUOTE_MAX_AGE for m in marks):
         return False, 'Prices are stale or not Yahoo-verified. Refresh market data.', marks
     if (max(m.as_of for m in marks) - min(m.as_of for m in marks)).days > 1:
         return False, "The funds' prices have mismatched closing dates.", marks
     for m in marks:
-        if not MarketObservation.objects.filter(symbol=m.symbol, as_of=m.as_of,
-                                                currency=strategy.account.currency, price=m.price,
-                                                source='yahoo', raw_unit_verified=True).exists():
+        if not verified_observations(symbol=m.symbol, as_of=m.as_of,
+                                     currency=strategy.account.currency, price=m.price).exists():
             return False, 'Price currency or source cannot be verified against market observations.', marks
     if strategy.ledger.filter(occurred_on__gt=min(m.as_of for m in marks)).exists():
         return False, 'Your newest transaction is later than the verified closing prices.', marks

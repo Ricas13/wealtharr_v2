@@ -98,7 +98,7 @@ class WhatIfTests(TestCase):
 
 class ReviewExplanationTests(TestCase):
     def test_evidence_lists_each_close_and_flags_unverified_ones(self):
-        from tracker.v2_today import price_evidence
+        from tracker.v2_review import price_evidence
         strategy = make_instance("evidence-owner", "all-weather")
         day = timezone.localdate() - timedelta(days=2)
         MarketObservation.objects.create(symbol="VUAG.L", as_of=day, price=D("80"), currency="GBP",
@@ -118,7 +118,7 @@ class ReviewExplanationTests(TestCase):
         self.assertEqual([r["found"] for r in rows], [True, True, False])
 
     def test_a_stored_close_that_differs_from_the_price_used_is_not_verified(self):
-        from tracker.v2_today import price_evidence
+        from tracker.v2_review import price_evidence
         strategy = make_instance("evidence-diff", "all-weather")
         day = timezone.localdate() - timedelta(days=2)
         MarketObservation.objects.create(symbol="VUAG.L", as_of=day, price=D("80"), currency="GBP",
@@ -133,7 +133,7 @@ class ReviewExplanationTests(TestCase):
         self.assertFalse(row["verified"])
 
     def test_an_observation_in_another_currency_is_not_evidence(self):
-        from tracker.v2_today import price_evidence
+        from tracker.v2_review import price_evidence
         strategy = make_instance("evidence-cur", "all-weather")
         day = timezone.localdate() - timedelta(days=2)
         MarketObservation.objects.create(symbol="VUAG.L", as_of=day, price=D("80"), currency="USD",
@@ -146,7 +146,7 @@ class ReviewExplanationTests(TestCase):
         self.assertFalse(price_evidence(signal)[0]["found"])
 
     def test_without_a_price_in_the_action_the_stored_close_is_shown_and_labelled(self):
-        from tracker.v2_today import price_evidence
+        from tracker.v2_review import price_evidence
         strategy = make_instance("evidence-stored", "all-weather")
         day = timezone.localdate() - timedelta(days=2)
         MarketObservation.objects.create(symbol="VUAG.L", as_of=day, price=D("80"), currency="GBP",

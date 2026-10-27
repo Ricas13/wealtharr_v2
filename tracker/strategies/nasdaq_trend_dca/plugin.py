@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
+from tracker.market_data import QUOTE_MAX_AGE
 from tracker.strategies.base import DAILY_SUPERSEDED_NOTE, StrategyModule
 from tracker.strategies.nasdaq_trend_dca import v1
 from tracker.strategies.instruments import role_symbols
@@ -44,15 +45,15 @@ def next_review(day):
 
 def _load(as_of):
     """Verified SPY and QQQ closes up to ``as_of``, or (None, None, why)."""
-    from tracker.models import MarketObservation, YahooSync
+    from tracker.market_data import verified_observations
+    from tracker.models import YahooSync
     if YahooSync.objects.filter(symbol__in=("SPY", "QQQ"),
                                 last_error__startswith="PRICE_HOLD:").exists():
         return None, None, "SPY or QQQ prices are on hold."
     series = {}
     for symbol in ("SPY", "QQQ"):
-        series[symbol] = list(MarketObservation.objects.filter(
-            symbol=symbol, currency="USD", as_of__lte=as_of,
-            price__gt=0, source="yahoo", raw_unit_verified=True,
+        series[symbol] = list(verified_observations(
+            symbol=symbol, currency="USD", as_of__lte=as_of, price__gt=0,
         ).order_by("as_of").values_list("as_of", "price"))
     return series["SPY"], series["QQQ"], ""
 
@@ -250,7 +251,7 @@ def review(instance):
     today = timezone.localdate()
     for symbol in funds.values():
         close = sync_ticker(symbol)
-        if close and close.currency == instance.account.currency and close.as_of >= today - timedelta(days=8):
+        if close and close.currency == instance.account.currency and close.as_of >= today - QUOTE_MAX_AGE:
             previous = PriceMark.objects.filter(strategy=instance, symbol=symbol).first()
             if not previous or previous.as_of <= close.as_of:
                 PriceMark.objects.update_or_create(
@@ -259,7 +260,7 @@ def review(instance):
     as_of = last_review_before(today)
     if instance.started_on and as_of < instance.started_on:
         return {"status": "waiting for the first session"}
-    if as_of < today - timedelta(days=8):
+    if as_of < today - QUOTE_MAX_AGE:
         return {"status": "cannot_compute", "reason": "No fresh settled 200-session signal."}
     signal, problem = _signal(as_of)
     if signal is None:
@@ -300,7 +301,7 @@ def current_weights(instance):
     from tracker.models import MarketObservation
     funds = role_symbols(instance)
     recent = MarketObservation.objects.filter(symbol="SPY", currency="USD").order_by("-as_of").first()
-    if not recent or recent.as_of < timezone.localdate() - timedelta(days=8):
+    if not recent or recent.as_of < timezone.localdate() - QUOTE_MAX_AGE:
         return None
     signal, _ = _signal(recent.as_of)
     if signal is None:

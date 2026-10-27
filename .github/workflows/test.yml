@@ -1,9 +1,16 @@
 name: Application checks
 on:
+  # Pull requests are checked as they change; main is checked after a merge.
+  # (Running on every push as well doubled every pull-request run.)
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   python:
     runs-on: ubuntu-latest
@@ -33,7 +40,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt -r requirements-test.txt
       - name: Verify app configuration
         run: python manage.py check
       - name: Verify migrations match models
@@ -41,7 +48,7 @@ jobs:
       - name: Apply schema migrations
         run: python manage.py migrate --noinput
       - name: Run tests
-        run: python manage.py test tracker --verbosity 2
+        run: python manage.py test tracker --parallel 4 --verbosity 2
       - name: Compile assets
         run: python manage.py collectstatic --noinput
       - name: Production-mode public page smoke (real manifest and HTTPS)
