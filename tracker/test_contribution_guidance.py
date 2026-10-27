@@ -326,3 +326,27 @@ class DollarAccountGuidanceTests(TestCase):
         # The same closes labelled as pounds are not this account's evidence.
         MarketObservation.objects.update(currency="GBP")
         self.assertIsNone(new_money_guidance(strategy, ledger_summary(strategy), prices_ready=True))
+
+
+class StudyNewMoneyFillTests(TestCase):
+    def test_new_money_purchases_follow_the_next_close_setting(self):
+        from django.core.cache import cache
+        from tracker.strategies.registry import module_for_key
+        from tracker.test_study import TODAY, seed
+        from tracker.test_study_fixed import seed_all_weather
+        cache.clear()
+        start = TODAY - timedelta(days=800)
+        while start.weekday() > 4:
+            start -= timedelta(days=1)
+        seed_all_weather(start, start, gold=lambda d, i: 50 + (i % 7) * 3.0)
+        study = module_for_key("all-weather").study["GBP"]
+        data = study.load_data()
+        same = study.run(data, "1y", 1000, 200)
+        later = study.run(data, "1y", 1000, 200, "next")
+        for result in (same, later):
+            s = result["series"]["strategy"]
+            self.assertGreater(s["trades"], 0)
+            self.assertEqual(s["put_in"], same["series"]["strategy"]["put_in"])
+        # The same rules, filled a day later, cannot give the identical path.
+        self.assertNotEqual(same["series"]["strategy"]["final"], later["series"]["strategy"]["final"])
+        self.assertEqual(len(same["series"]["strategy"]["values"]), len(later["series"]["strategy"]["values"]))

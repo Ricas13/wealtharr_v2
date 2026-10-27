@@ -246,9 +246,14 @@ class FixedWeightStudy:
                     price = prices[role].price_gbp
                     qty = (budget / price).quantize(D("0.0001"), rounding=ROUND_DOWN)
                     if qty > 0 and qty * price >= D("1"):
-                        positions[role] += qty
-                        cash -= qty * price
-                        trades += 1
+                        if fill == "next" and i + 1 < len(days):
+                            # Same rule as every other order: decided on this
+                            # close, filled at the next one.
+                            pending = pending + [(role, "BUY", qty)]
+                        else:
+                            positions[role] += qty
+                            cash -= qty * price
+                            trades += 1
             if self.review_word == "monthly":
                 due = i + 1 < len(days) and days[i + 1].month != days[i].month
                 review_day = month_end_on_or_after(days[i])

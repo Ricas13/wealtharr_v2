@@ -91,9 +91,12 @@ class MomentumStudy(FixedWeightStudy):
                 for role, budget in buys.items():
                     qty = (budget / price(role, i)).quantize(D("0.0001"), rounding=ROUND_DOWN)
                     if qty > 0 and qty * price(role, i) >= D("1"):
-                        positions[role] += qty
-                        cash -= qty * price(role, i)
-                        trades += 1
+                        if fill == "next" and i + 1 < len(days):
+                            pending = pending + [(role, "BUY", qty)]
+                        else:
+                            positions[role] += qty
+                            cash -= qty * price(role, i)
+                            trades += 1
             month_end = i + 1 < len(days) and days[i + 1].month != days[i].month
             if i > s and month_end:
                 from calendar import monthrange
