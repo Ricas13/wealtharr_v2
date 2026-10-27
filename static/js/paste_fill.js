@@ -8,13 +8,28 @@
   var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8,
                  sep: 9, oct: 10, nov: 11, dec: 12 };
 
-  function number(text) {
-    // "1,234.56" -> 1234.56. A lone decimal comma ("12,34") is ambiguous: skip it.
-    var raw = String(text).replace(/\s/g, "");
-    if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) raw = raw.replace(/,/g, "");
+  var SYMBOLS = { "£": "GBP", "$": "USD", "€": "EUR" };
+
+  /* "1,234.56" -> 1234.56; with decimalComma (euro accounts) "1.234,56" -> 1234.56.
+   * Anything that could be read two ways ("1.234" on a euro account) is skipped. */
+  function number(text, decimalComma) {
+    var raw = String(text).replace(/\s/g, "").replace(/[.,]+$/, "");
+    if (decimalComma) {
+      if (/^\d{1,3}(\.\d{3})*,\d+$/.test(raw)) raw = raw.replace(/\./g, "").replace(",", ".");
+      else if (/^\d+,\d+$/.test(raw)) raw = raw.replace(",", ".");
+      else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) return null;
+    } else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) {
+      raw = raw.replace(/,/g, "");
+    }
     if (!/^\d+(\.\d+)?$/.test(raw)) return null;
     var value = parseFloat(raw);
     return isFinite(value) ? value : null;
+  }
+  function currenciesIn(text) {
+    var found = {};
+    (text.match(/[£$€]/g) || []).forEach(function (s) { found[SYMBOLS[s]] = true; });
+    (text.match(/\b(GBP|USD|EUR)\b/g) || []).forEach(function (c) { found[c] = true; });
+    return Object.keys(found);
   }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   function iso(y, m, d) {
@@ -36,7 +51,9 @@
     return null;
   }
 
-  function parse(text, today) {
+  function parse(text, today, currency) {
+    currency = currency || "GBP";
+    var comma = currency === "EUR";
     var out = { date: null, quantity: null, price: null, fee: null, notes: [] };
     var t = String(text || "").replace(/ /g, " ");
 
@@ -46,30 +63,41 @@
       else { out.date = d.value; if (d.note) out.notes.push(d.note); }
     }
 
-    var q = t.match(/(?:quantity|shares?|units?|filled|executed)\s*[:\-]?\s*([\d.,]+)/i) ||
+    var q = t.match(/(?:quantity|shares?|units?|filled|executed|st[uü]ck|anzahl)\s*[:\-]?\s*([\d.,]+)/i) ||
             t.match(/\b([\d.,]*\d)\s+(?:shares?|units?)\b/i);
-    if (q) { var qn = number(q[1]); if (qn && qn > 0) out.quantity = qn; }
+    if (q) { var qn = number(q[1], comma); if (qn && qn > 0) out.quantity = qn; }
 
-    var p = t.match(/(?:average\s+(?:fill\s+)?price|execution\s+price|fill\s+price|filled\s+at|price(?:\s+per\s+share)?|@)\s*[:\-]?\s*[£$€]?\s*([\d.,]+)\s*(p\b|pence\b|gbx\b)?/i);
+    var p = t.match(/(?:average\s+(?:fill\s+)?price|execution\s+price|fill\s+price|filled\s+at|price(?:\s+per\s+share)?|ausf[uü]hrungskurs|kurs|preis|@)\s*[:\-]?\s*[£$€]?\s*([\d.,]+)\s*(p\b|pence\b|gbx\b)?/i);
     if (p) {
-      var pn = number(p[1]);
+      var pn = number(p[1], comma);
       if (pn && pn > 0) {
-        if (p[2]) { pn = pn / 100; out.notes.push("Price was in pence; converted to pounds."); }
-        out.price = Math.round(pn * 1e8) / 1e8;
+        if (p[2] && currency === "GBP") { pn = pn / 100; out.notes.push("Price was in pence; converted to pounds."); }
+        else if (p[2]) { pn = null; out.notes.push("The price looks like it is in pence, which doesn't fit a " + currency + " account: not filled."); }
+        if (pn) out.price = Math.round(pn * 1e8) / 1e8;
       }
     }
 
-    var total = t.match(/total\s+(?:fees?|charges?|costs?)\s*[:\-]?\s*[£$€]?\s*([\d.,]+)/i);
+    var total = t.match(/(?:total\s+(?:fees?|charges?|costs?)|gesamtkosten|gesamtgeb[uü]hr(?:en)?)\s*[:\-]?\s*[£$€]?\s*([\d.,]+)/i);
     if (total) {
-      var tn = number(total[1]);
+      var tn = number(total[1], comma);
       if (tn !== null) out.fee = tn;
     } else {
-      var re = /(?:fees?|commission|stamp\s+duty|ptm\s+levy|charges?)\s*[:\-]?\s*[£$€]?\s*([\d.,]+)/gi, m, sum = 0, n = 0;
-      while ((m = re.exec(t))) { var fn = number(m[1]); if (fn !== null) { sum += fn; n += 1; } }
+      var re = /(?:fees?|commission|stamp\s+duty|ptm\s+levy|charges?|geb[uü]hr(?:en)?|entgelt|provision)\s*[:\-]?\s*[£$€]?\s*([\d.,]+)/gi, m, sum = 0, n = 0;
+      while ((m = re.exec(t))) { var fn = number(m[1], comma); if (fn !== null) { sum += fn; n += 1; } }
       if (n) {
         out.fee = Math.round(sum * 100) / 100;
         if (n > 1) out.notes.push("Added " + n + " fee lines together.");
       }
+    }
+    var seen = currenciesIn(t);
+    var foreign = seen.filter(function (c) { return c !== currency; });
+    if (foreign.length && seen.indexOf(currency) === -1) {
+      out.price = null;
+      out.fee = null;
+      out.notes.push("This looks like a " + foreign.join("/") + " confirmation but the account is in " +
+                     currency + ": price and fees were not filled.");
+    } else if (foreign.length) {
+      out.notes.push("The text mentions " + seen.join(" and ") + ": check the price is in " + currency + ".");
     }
     return out;
   }
@@ -92,7 +120,7 @@
     if (!form || !source || !button) return;
     button.addEventListener("click", function () {
       var today = new Date().toISOString().slice(0, 10);
-      var got = parse(source.value, today);
+      var got = parse(source.value, today, box.getAttribute("data-currency") || "GBP");
       var filled = [];
       if (setValue(form.elements.executed_on, got.date)) filled.push("date");
       if (setValue(form.elements.quantity, got.quantity)) filled.push("shares");

@@ -51,7 +51,7 @@
                   <label class="w2-check" style="white-space:nowrap;font-size:11px"><input type="checkbox" name="actual_confirmation" value="yes" required> Done in {{ selected_instance.account.broker_label }}</label>
                   <button type="submit" class="w2-button w2-button-primary">I did this</button>
                 </form>
-                <details class="w2-paste" data-paste-form>
+                <details class="w2-paste" data-paste-form data-currency="{{ selected_instance.account.currency }}">
                   <summary>Paste your broker's confirmation to fill these in</summary>
                   <textarea class="w2-input" rows="3" data-paste-source aria-label="Broker confirmation text"
                             placeholder="Paste the order confirmation. It is read in your browser and sent nowhere."></textarea>

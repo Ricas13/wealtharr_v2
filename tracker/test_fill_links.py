@@ -24,3 +24,12 @@ class RecordLinkTests(TestCase):
         self.assertNotIn("250", text)
         with override_settings(SITE_URL=""):
             self.assertEqual(_record_link(strategy, signal), "")
+
+
+class PasteBoxCurrencyTests(TestCase):
+    def test_the_paste_box_is_told_the_accounts_currency(self):
+        # The parser itself is tested per currency in browser_tests/test_paste_fill.py;
+        # this guards that the page hands it the account's currency.
+        from django.template.loader import get_template
+        source = get_template("v2/review.html").template.source
+        self.assertIn('data-currency="{{ selected_instance.account.currency }}"', source)
