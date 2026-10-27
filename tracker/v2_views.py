@@ -81,7 +81,7 @@ def instance_page(request, instance_id, section):
     if section not in SECTIONS:
         raise Http404("Unknown strategy page")
     if section == "ledger":
-        from .v2_ledger_views import ledger_page
+        from .v2_ledger_page import ledger_page
         return ledger_page(request, instance_id)
     if section == "today":
         from .v2_today import today_page
