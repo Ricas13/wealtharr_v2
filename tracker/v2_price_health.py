@@ -30,7 +30,7 @@ def strategy_price_health(strategy, report=None):
     }
     if strategy.tracking_only:
         return dict(empty, status="inactive", label="Tracking only",
-                    reason="Go live before using prices for instructions.",
+                    reason="Go live before using prices for the rules output.",
                     action="setup")
     if report is None:
         try:

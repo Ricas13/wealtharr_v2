@@ -101,7 +101,7 @@ class UsabilityFixesTests(TestCase):
         validate_and_record(s, LedgerEntry(kind="DEPOSIT", amount=D("1000"), occurred_on=date(2026, 3, 2)))
         MarketObservation.objects.create(source="yahoo", raw_unit_verified=True, symbol="ERNS.L", as_of=timezone.localdate(), price=D("5"), currency="GBP")
         page = self.client.get(reverse("v2_instance_page", args=[s.pk, "today"]))
-        self.assertContains(page, "Buy your opening position")
+        self.assertContains(page, "Opening position from the rules")
         self.assertContains(page, "Buy £600.00 of LQQ3.L")
         self.assertContains(page, "Buy £400.00 of ERNS.L")
         self.assertContains(page, "≈ 80.00 shares")

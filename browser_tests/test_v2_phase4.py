@@ -82,7 +82,7 @@ class Phase4TodayBrowserTests(BrowserHarness):
                     self.sign_in()
                     self.visit("v2_instance_page", self.strategy.pk, "today")
                     self.page.get_by_role(
-                        "heading", name="Review the verified quarterly proposal"
+                        "heading", name="Quarterly rules output"
                     ).wait_for()
                     self.assertNotIn("HIDDEN_OTHER_PERSON_ACCOUNT", self.page.content())
                     self.assertNotIn("£14,820", self.page.content())
@@ -113,7 +113,7 @@ class Phase4TodayBrowserTests(BrowserHarness):
         self.page.get_by_text("Show instrument price checks").click()
         self.assertTrue(self.page.get_by_text("No accepted closing price").is_visible())
         self.assertTrue(self.page.get_by_text("Wealtharr will retry", exact=False).is_visible())
-        self.assertNotIn("Review the verified quarterly proposal", self.page.content())
+        self.assertNotIn("Quarterly rules output", self.page.content())
         self.visit("v2_overview")
         self.page.get_by_text("Review blocked by data").first.wait_for()
         self.assertIn("Not a readiness check", self.page.content())
