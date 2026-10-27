@@ -45,9 +45,10 @@ class MomentumStudy(FixedWeightStudy):
         cash = D(str(amount))
         trades = 0
         pending = []
+        chosen_role = None
 
         def review(i, as_of, window_start, now=False):
-            nonlocal cash, trades, pending
+            nonlocal cash, trades, pending, chosen_role
             j = at_or_before(window_start)
             if j is None:
                 return
@@ -57,6 +58,9 @@ class MomentumStudy(FixedWeightStudy):
             quotes = {r: rules.Quote(r, price(r, i), days[i]) for r in roles}
             result = rules.evaluate(funds=funds, positions=positions, cash=cash, quotes=quotes,
                                     lookbacks=lookbacks, as_of=as_of, window_start=window_start)
+            if result.status == "cannot_compute":
+                return  # No verified selection; never guess the fund.
+            chosen_role = dict(result.audit).get("chosen")
             if fill == "next" and not now:
                 pending = [(t.role, t.side, t.quantity) for t in result.trades]
                 return
@@ -77,8 +81,22 @@ class MomentumStudy(FixedWeightStudy):
                 cash, filled = fill_orders(pending, positions, cash, {r: price(r, i) for r in roles})
                 trades, pending = trades + filled, []
             if i > s and _new_month(days, i) and monthly:
+                from decimal import ROUND_DOWN
+                from .strategies.contributions import allocation
                 cash += D(str(monthly))
                 flows.append((days[i], monthly))
+                # Invest new deposits in the previously confirmed month-end
+                # choice. Today's still-unknown monthly signal is not used.
+                buys = allocation("dual-momentum", D(str(monthly)), chosen=chosen_role)
+                for role, budget in buys.items():
+                    qty = (budget / price(role, i)).quantize(D("0.0001"), rounding=ROUND_DOWN)
+                    if qty > 0 and qty * price(role, i) >= D("1"):
+                        if fill == "next" and i + 1 < len(days):
+                            pending = pending + [(role, "BUY", qty)]
+                        else:
+                            positions[role] += qty
+                            cash -= qty * price(role, i)
+                            trades += 1
             month_end = i + 1 < len(days) and days[i + 1].month != days[i].month
             if i > s and month_end:
                 from calendar import monthrange
@@ -96,8 +114,9 @@ class MomentumStudy(FixedWeightStudy):
             "At each month end the live rule compares 12-month total returns: if US shares beat cash, "
             "hold whichever of US or world ex-US shares did better, otherwise hold bonds. 100% sits in "
             "the chosen fund; switches sell everything else.",
-            "Monthly top-ups arrive on the first trading day of each month and wait as cash for the "
-            "month-end review; SPY and VTI invest them that day.",
+            "Monthly top-ups are invested on the first trading day of the month into "
+            "the most recent verified month-end choice. The strategy only changes "
+            "its chosen fund at month-end; without a valid choice cash is held.",
             "All values are in %s with dividends reinvested.%s Trades fill at that day's close with no "
             "dealing costs or tax." % (money, fx),
             "The first 12 months of data are only used to measure momentum. Before a fund existed, its "

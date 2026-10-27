@@ -370,9 +370,10 @@ def history_page(request, instance_id):
 def _performance(request, strategy, report=None):
     from . import v2_dashboard as dash
     points = dash.certified_points(strategy, report)
-    monthly = dash.monthly_rows(points)
+    flow_days = dash.external_cash_flow_days(strategy)
+    monthly = dash.monthly_rows(points, cash_flow_days=flow_days)
     best, worst = dash.best_worst(monthly)
-    returns = dash.period_returns(points)
+    returns = dash.period_returns(points, cash_flow_days=flow_days)
     since = next((r for r in returns if r["label"] == "Since start"), None)
     # USD QQQ ETF price change (a Nasdaq-100 proxy) is NOT like-for-like with a
     # cash-flow-adjusted portfolio in its account currency. Show it separately,
@@ -382,10 +383,10 @@ def _performance(request, strategy, report=None):
     return {
         "perf_points": bool(points),
         "perf_chart": dash.chart(points, span=dash.pick_range(request),
-                                 mode=dash.pick_mode(request, "pct")),
+                                 mode=dash.pick_mode(request, "pct"), cash_flow_days=flow_days),
         "perf_ranges": dash.RANGES, "perf_indexes": dash.INDEXES,
         "perf_monthly": monthly, "perf_best": best, "perf_worst": worst,
-        "perf_drawdown": dash.drawdown(points),
+        "perf_drawdown": dash.drawdown(points, cash_flow_days=flow_days),
         "perf_money_in": dash.money_in_by_month([strategy]),
         "perf_returns": returns,
         "perf_index_rows": tuple({"name": name, "values": [r["indexes"][i] for r in returns]}
@@ -416,6 +417,7 @@ def overview_page(request):
     total = ZERO
     included_funding = ZERO
     included_funding_known = True
+    included_dates = set()
     excluded = []
     today = timezone.localdate()
     # Combined figures add up one currency only (no guessed exchange rates): the
@@ -440,6 +442,7 @@ def overview_page(request):
             pass
         elif latest and latest.as_of >= fresh_after:
             total += latest.value_gbp
+            included_dates.add(latest.as_of)
             if report["actual_net_funding"] is None:
                 included_funding_known = False
             else:
@@ -466,7 +469,10 @@ def overview_page(request):
         overview_rows=rows, overview_total=aggregate, overview_other_currency=other_currency,
         page_currency=home, overview_reporting_currency=home,
         overview_contributed=contributed if complete_funding and items else None,
-        overview_gain=gained, overview_same_date=bool(items) and not excluded,
+        overview_gain=gained,
+        overview_same_date=bool(items) and not excluded and not other_currency and len(included_dates) == 1,
+        overview_mixed_dates=len(included_dates) > 1,
+        overview_valuation_dates=tuple(sorted(included_dates)),
         overview_excluded=excluded,
         overview_isa_contributed=isa_total, overview_has_isa=any(
             row["strategy"].account.kind == "ISA" for row in rows
@@ -483,6 +489,11 @@ def _open_action(strategy, summary, today):
         return {"kind": "golive", "title": "Not live yet", "detail": "Check the ledger, then go live"}
     if setup_missing(strategy):
         return {"kind": "golive", "title": "Setup not finished", "detail": "Confirm the instruments to start recording"}
+    from .signal_status import _last_action, changed_since_review, _price_status
+    manual = _last_action(strategy)
+    if manual and manual.kind in ("SPIKE_WATCH", "THIRTY_DOWN"):
+        return {"kind": "alert", "title": "Manual market review",
+                "detail": manual.title or "Open Today to review the market warning"}
     if not summary["positions"] and summary["cash"] > ZERO:
         return {"kind": "start", "title": "Buy your opening position",
                 "detail": "Buy what the strategy holds today"}
@@ -492,12 +503,12 @@ def _open_action(strategy, summary, today):
     if signal and proposed_actions(signal) and not RebalanceExecution.objects.filter(
             signal=signal).exists():
         from .models import SignalFill
-        from .signal_status import changed_since_review
-        if (changed_since_review(strategy, signal)
-                and not SignalFill.objects.filter(signal=signal).exists()):
-            # Same rule as Today: never show quantities the ledger has overtaken.
-            return {"kind": "data", "title": "Review out of date",
-                    "detail": "The ledger changed after this review; wait for an updated one."}
+        if SignalFill.objects.filter(strategy=strategy, signal=signal).exists():
+            return {"kind": "pending", "title": "Reconcile partial fills",
+                    "detail": "Original orders are no longer current. Open Today to finish recording actual fills."}
+        if changed_since_review(strategy, signal):
+            return {"kind": "data", "title": "Review needs recalculation",
+                    "detail": "The ledger changed after the review; do not use the old quantities."}
         from .money import symbol_for
         trades = " · ".join("%s ≈ %s%s %s" % (
             a["side"].title(), symbol_for(strategy.account.currency), "{:,.0f}".format(Decimal(str(a.get("estimated_gbp") or 0))), a["symbol"])
@@ -510,6 +521,15 @@ def _open_action(strategy, summary, today):
                  "Q%d rebalance" % ((signal.as_of.month - 1) // 3 + 1))
         return {"kind": "review", "title": title, "detail": trades,
                 "signal": signal}
+    # Do not leave a verified new deposit hidden behind Overview\u2019s "Nothing due".
+    from .contribution_guidance import new_money_guidance
+    fresh, _, _ = _price_status(strategy, summary)
+    waiting = new_money_guidance(strategy, summary, prices_ready=fresh, today=today)
+    if waiting:
+        from .money import symbol_for
+        return {"kind": "new_money", "title": "Invest new deposit",
+                "detail": "%s%s of recorded cash awaits a strategy-specific purchase" % (
+                    symbol_for(strategy.account.currency), waiting["amount"])}
     return None
 
 
@@ -523,6 +543,8 @@ def _overview_extras(request, items, rows, today):
     home = items[0].account.currency if items else "GBP"
     live = [s for s in items if not s.tracking_only and s.account.currency == home]
     points, chart_omitted = dash.combine_with_omitted(live)
+    combined_flow_days = frozenset(day for s in live for day in dash.external_cash_flow_days(s))
+    missing_chart_evidence = bool(live) and any(not dash.certified_points(s) for s in live)
     todos = []
     assets = {}
     assets_omitted = []
@@ -594,9 +616,19 @@ def _overview_extras(request, items, rows, today):
     prices = [MarketObservation.objects.filter(symbol=x, currency=home).order_by("-as_of").first()
               for x in symbols]
     last_sync = YahooSync.objects.filter(symbol__in=symbols).order_by("-last_attempt").first()
-    change, change_pct = dash.day_change(points)
+    change, change_pct = dash.day_change(points, cash_flow_days=combined_flow_days)
+    combined_chart = dash.chart(points, span=span, mode=mode, indexes=False,
+                                cash_flow_days=combined_flow_days)
+    if missing_chart_evidence:
+        combined_chart["reason"] = (
+            "A combined chart needs certified valuations for every live strategy "
+            "in the reporting currency. No partial total is plotted.")
+    elif live and not points:
+        combined_chart["reason"] = (
+            "No common certified valuation dates exist for every live strategy "
+            "in the reporting currency. No partial total is plotted.")
     return {
-        "ov_chart": dash.chart(points, span=span, mode=mode, indexes=False),
+        "ov_chart": combined_chart,
         "ov_chart_omitted": chart_omitted,
         "ov_assets_omitted": assets_omitted,
         "ov_ranges": dash.RANGES, "ov_todos": tuple(todos), "ov_assets": asset_rows,

@@ -68,7 +68,7 @@ CATEGORY_WHEN = {
     "urgent": "Big market drop or a reset to review",
     "data": "Yahoo prices stale or missing",
     "unacted": "A review is still not done",
-    "contribution": "Monthly deposit reminder",
+    "contribution": "Missing monthly deposits or newly available money to invest",
 }
 
 

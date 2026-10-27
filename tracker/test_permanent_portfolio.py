@@ -198,7 +198,7 @@ class PermanentStudyTests(TestCase):
         # Fixed dates: the run must span a year end whatever day the suite runs.
         start, end = date(2023, 1, 2), date(2025, 9, 30)
         seed("SPY", start, lambda d, i: 400.0, end=end)
-        seed("VTI", start, lambda d, i: 200 * (1.01 ** i), end=end)  # shares run away from the others
+        seed("VTI", start, lambda d, i: 200 * (1.02 ** i), end=end)  # decisive >35% band breach at year-end
         seed("TLT", start, lambda d, i: 90.0, end=end)
         seed("BIL", start, lambda d, i: 91.0, end=end)
         seed("GLD", start, lambda d, i: 250.0, end=end)

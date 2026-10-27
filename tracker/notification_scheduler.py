@@ -48,6 +48,23 @@ def retry_due_deliveries(*, as_of=None):
             permitted = False
         else:
             permitted = bool(getattr(pref, row.channel + "_enabled", False))
+        if permitted and row.event_key.startswith("new-money:"):
+            # Cash may have been invested/withdrawn after the original send
+            # failed. Never retry a stale deposit prompt blindly.
+            from .contribution_guidance import new_money_guidance
+            from .services import ledger_summary
+            from .signal_status import _price_status
+            if (row.strategy is None or row.strategy.tracking_only or
+                    not row.strategy.contribution_alerts):
+                permitted = False
+            else:
+                report = ledger_summary(row.strategy)
+                fresh, _, _ = _price_status(row.strategy, report)
+                guidance = new_money_guidance(
+                    row.strategy, report, prices_ready=fresh)
+                if (not guidance or row.event_key !=
+                        "new-money:%s:%s" % (row.strategy_id, guidance["deposit_id"])):
+                    permitted = False
         if not permitted:
             # Audit remains, but opt-out permanently retires the old dated
             # notice rather than delivering it after preferences change again.

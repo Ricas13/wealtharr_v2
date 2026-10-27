@@ -285,6 +285,15 @@ def _nine_sig(data, s, amount, monthly, fill="close"):
             cash += D(monthly)
             contributions.append((day, D(monthly)))
             flows.append((day, monthly))
+            # Buy the reserve fund as new money arrives. This is separate
+            # from the quarterly LQQ3 target and never causes an early reset.
+            from .strategies.contributions import allocation
+            budget = allocation("nasdaq-quarterly-target", D(monthly)).get("safe", D("0"))
+            qty = _floor_qty(budget, sf)
+            if qty > 0:
+                reserve += qty
+                cash -= qty * sf
+                trades += 1
         last_of_quarter = i + 1 < len(days) and quarter_number(days[i + 1]) != quarter_number(day)
         if i > s and last_of_quarter and equity > 0:
             qend = _quarter_end(day)
@@ -442,8 +451,8 @@ def how_it_works(data):
         "Assumption: every 60/40 reset is treated as confirmed and filled at that quarter's close. In live "
         "tracking a 100%-up reset is only a review warning and every reset waits for you to confirm it, "
         "so real results can differ. The number of resets in each run is shown with its results.",
-        "Monthly top-ups arrive on the first trading day of each month. In 9Sig they wait as cash for "
-        "the next quarterly review; in the others they're invested that day.",
+        "Monthly top-ups arrive on the first trading day of each month. 9Sig buys the safe "
+        "reserve fund with new money that day; the 9% growth target is reviewed only quarterly.",
         ("All values are in %s. SPY, VTI and QQQ include reinvested dividends%s. Trades fill at that "
          "day's close with no dealing costs or tax." % (
              money, "" if lines.currency == "USD" else

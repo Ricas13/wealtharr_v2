@@ -58,6 +58,15 @@ class ThreeSigStudy(FixedWeightStudy):
                 cash += D(monthly)
                 contributions.append((day, D(monthly)))
                 flows.append((day, monthly))
+                # New contributions go to the reserve fund without altering
+                # the quarterly 3% target or forcing a mid-quarter reset.
+                from .strategies.contributions import allocation
+                budget = allocation("three-sig", D(monthly)).get("safe", D("0"))
+                qty = _floor_qty(budget, sf)
+                if qty > 0:
+                    reserve += qty
+                    cash -= qty * sf
+                    trades += 1
             last_of_quarter = (i + 1 < len(days) and
                                rules.quarter_number(days[i + 1]) != rules.quarter_number(day))
             if i > s and last_of_quarter and equity > 0:
@@ -124,8 +133,8 @@ class ThreeSigStudy(FixedWeightStudy):
             "Assumption: every 80/20 reset is treated as confirmed and filled at that quarter's close. In live "
             "tracking every reset waits for you to confirm it, so real results can differ. The number of "
             "resets in each run is shown with its results.",
-            "Monthly top-ups arrive on the first trading day of each month and wait as cash for the next "
-            "quarterly review; SPY and VTI invest them that day.",
+            "Monthly top-ups buy the safe reserve fund on the first trading day of the month. "
+            "The quarterly stock target and all reset decisions remain on their normal schedule.",
             "All values are in %s with dividends reinvested.%s Trades fill at that day's close with no "
             "dealing costs or tax." % (money, fx),
             "Before a fund existed, its role follows a stand-in, flagged on the page.",

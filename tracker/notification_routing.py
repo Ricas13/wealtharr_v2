@@ -12,7 +12,7 @@ CATEGORIES = (
     ("urgent", "Big market drop"),
     ("data", "Price problem"),
     ("followup", "Review reminder"),
-    ("contribution", "Monthly deposit reminder"),
+    ("contribution", "Deposits and new-cash guidance"),
 )
 CATEGORY_KEYS = {value for value, _ in CATEGORIES}
 # A glyph at the start of each alert's subject so it stands out in a chat or inbox.
@@ -92,6 +92,7 @@ def category_for_event_key(key):
         ("data:", "data"),
         ("rebalance-reminder:", "followup"),
         ("monthly:", "contribution"),
+        ("new-money:", "contribution"),
         ("contrib:", "contribution"),
     ):
         if key.startswith(prefix):
