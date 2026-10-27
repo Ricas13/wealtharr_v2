@@ -4,3 +4,6 @@ from django.apps import AppConfig
 class TenancyConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "tenancy"
+
+    def ready(self):
+        from . import signals  # noqa: F401  (connects the authentication receivers)
