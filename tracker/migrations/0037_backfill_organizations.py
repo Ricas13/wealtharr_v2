@@ -18,7 +18,8 @@ def backfill(apps, schema_editor):
         organization = Organization.objects.filter(personal_owner=user).first()
         if organization is None:
             organization = Organization.objects.create(
-                name=(user.get_username() or "Account")[:100], personal_owner=user)
+                name=(getattr(user, "username", "") or getattr(user, "email", "") or "Account")[:100],
+                personal_owner=user)
         Membership.objects.get_or_create(
             user=user, organization=organization, defaults={"role": "owner"})
         for name in TENANT_MODELS:
