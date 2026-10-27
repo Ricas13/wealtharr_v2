@@ -1,4 +1,5 @@
 """Live Django+Chromium smoke for v2 Today and manual actual-fill pages."""
+from django.urls import reverse
 from datetime import timedelta
 from decimal import Decimal as D
 from pathlib import Path
@@ -118,6 +119,31 @@ class Phase4TodayBrowserTests(BrowserHarness):
         self.assertIn("Not a readiness check", self.page.content())
         self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"), 391)
         self.assertEqual(self.browser_errors, [])
+
+    def test_fill_form_helpers_only_copy_values_when_pressed(self):
+        self.new_page(1024)
+        self.sign_in()
+        self.visit("v2_guided_review", self.strategy.pk, self.signal.pk)
+        date = self.page.locator('input[name="executed_on"]')
+        self.assertEqual(date.input_value(), "")
+        self.page.get_by_role("button", name="Today").click()
+        self.assertNotEqual(date.input_value(), "")
+        self.page.locator("details.w2-paste summary").click()
+        self.page.locator("[data-paste-source]").fill("Quantity: 1\nPrice: 100\nFee: 0.25")
+        self.page.get_by_role("button", name="Fill from text").click()
+        self.assertEqual(self.page.locator('input[name="unit_price"]').input_value(), "100")
+        self.assertEqual(self.page.locator('input[name="fee"]').input_value(), "0.25")
+        self.assertIn("Check every value", self.page.locator("[data-paste-status]").inner_text())
+        # Nothing was recorded by filling the form.
+        self.assertEqual(SignalFill.objects.filter(strategy=self.strategy).count(), 0)
+        self.assertEqual(self.browser_errors, [])
+
+    def test_alert_link_lands_on_the_action_and_focuses_the_date(self):
+        self.new_page(390)
+        self.sign_in()
+        self.page.goto(self.live_server_url + reverse("v2_guided_review", args=[
+            self.strategy.pk, self.signal.pk]) + "#w2-fill-0", wait_until="networkidle")
+        self.assertEqual(self.page.evaluate("document.activeElement.name"), "executed_on")
 
     def test_real_fill_requires_explicit_broker_confirmation(self):
         self.new_page(390)

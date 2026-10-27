@@ -28,7 +28,7 @@
         <thead><tr><th>#</th><th>Side</th><th>Ticker</th><th class="w2-r">Suggested</th><th class="w2-r">Recorded</th><th class="w2-r">Left</th>{% if review_can_submit %}<th>Date done</th><th>Shares got</th><th>Price {{ cur }}</th><th>Fee {{ cur }}</th><th></th>{% endif %}</tr></thead>
         <tbody>
         {% for action in review_rows %}
-          <tr>
+          <tr id="w2-fill-{{ action.index }}">
             <td class="w2-muted">{{ action.index|add:1 }}</td>
             <td class="{% if action.side == 'SELL' %}w2-neg{% else %}w2-pos{% endif %}">{{ action.side|title }}</td>
             <td>{{ action.symbol }}</td>
@@ -44,12 +44,20 @@
                   <input type="hidden" name="action_index" value="{{ action.index }}">
                   <input type="hidden" name="idempotency_key" value="{{ review_nonce }}">
                   <input class="w2-input w2-fill-input" style="width:120px" type="date" name="executed_on" max="{% now 'Y-m-d' %}" required aria-label="Date done">
+                  <button type="button" class="w2-linklike" data-fill-target="executed_on" data-fill-from="today" title="Fill in today's date">Today</button>
                   <input class="w2-input w2-fill-input" type="number" name="quantity" step="0.00000001" min="0.00000001" max="{{ action.max_more }}" value="{{ action.remaining }}" required aria-label="Shares got">
                   <input class="w2-input w2-fill-input" type="number" name="unit_price" step="0.00000001" min="0.00000001" required aria-label="Price per share in pounds">
                   <input class="w2-input w2-fill-input" style="width:64px" type="number" name="fee" step="0.01" min="0" value="0" required aria-label="Fee in pounds">
                   <label class="w2-check" style="white-space:nowrap;font-size:11px"><input type="checkbox" name="actual_confirmation" value="yes" required> Done in {{ selected_instance.account.broker_label }}</label>
                   <button type="submit" class="w2-button w2-button-primary">I did this</button>
                 </form>
+                <details class="w2-paste" data-paste-form data-currency="{{ selected_instance.account.currency }}">
+                  <summary>Paste your broker's confirmation to fill these in</summary>
+                  <textarea class="w2-input" rows="3" data-paste-source aria-label="Broker confirmation text"
+                            placeholder="Paste the order confirmation. It is read in your browser and sent nowhere."></textarea>
+                  <button type="button" class="w2-button" data-paste-apply>Fill from text</button>
+                  <p class="w2-note" role="status" data-paste-status></p>
+                </details>
                 {% include "partials/accept_action.html" %}
               </td>
               {% else %}<td colspan="5"></td>{% endif %}
@@ -149,3 +157,4 @@
     {% endif %}
   </aside>
 </div>
+{% load static %}<script defer src="{% static 'js/paste_fill.js' %}"></script>
