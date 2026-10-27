@@ -164,7 +164,7 @@ class DualMomentumEndToEndTests(TestCase):
         page = self.client.get(reverse("v2_add_strategy") + "?strategy=dual-momentum")
         self.assertContains(page, "By signal")
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": "dual-momentum", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "dual-momentum", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "DM", "start": start.isoformat(), "amount": "3000",
             "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=self.owner)

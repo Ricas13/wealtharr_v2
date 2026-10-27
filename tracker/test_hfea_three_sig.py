@@ -182,7 +182,7 @@ class ThreeSigLiveReviewTests(TestCase):
         self.begin = date(self.end.year, self.end.month - 2, 1)
         self.client.post(reverse("v2_add_strategy"), {
             "strategy": "three-sig", "platform": "FIDELITY", "account_type": "BROKERAGE",
-            "ack": "yes", "mode": "fresh", "name": "3Sig US", "start": self.begin.isoformat(),
+            "ack": "yes", "ack_choice": "yes", "mode": "fresh", "name": "3Sig US", "start": self.begin.isoformat(),
             "amount": "1000", "deposited": "yes", "go_live": "yes"})
         self.strategy = StrategyInstance.objects.get(owner=owner)
         q = quarter_number(self.end)
@@ -223,7 +223,7 @@ class ThreeSigLiveReviewTests(TestCase):
         self.client.force_login(owner)
         self.client.post(reverse("v2_add_strategy"), {
             "strategy": "three-sig", "platform": "TRADING212", "account_type": "ISA",
-            "ack": "yes", "mode": "fresh", "name": "3Sig UK",
+            "ack": "yes", "ack_choice": "yes", "mode": "fresh", "name": "3Sig UK",
             "start": (timezone.localdate() - timedelta(days=5)).isoformat(),
             "amount": "1000", "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=owner)

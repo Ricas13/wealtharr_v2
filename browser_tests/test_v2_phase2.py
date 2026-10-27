@@ -62,6 +62,7 @@ class V2OnboardingBrowserTests(BrowserHarness):
                     with self.page.expect_navigation():
                         self.page.locator('select[name="strategy"]').select_option("nasdaq-quarterly-target")
                     self.page.locator('input[name="ack"]').check()
+                    self.page.locator('input[name="ack_choice"]').check()
                     self.page.locator('input[name="mode"][value="hold"]').check()
                     self.assertFalse(
                         self.page.locator("#w2-hold-fields").evaluate("(el) => el.hidden"))

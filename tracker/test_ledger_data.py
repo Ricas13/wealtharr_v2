@@ -152,7 +152,7 @@ class StudyNextDayFillTests(TestCase):
         user = get_user_model().objects.create_user("study-fill", password="a-long-test-password-1")
         self.client.force_login(user)
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": "all-weather", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "all-weather", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "AW", "start": "2026-10-01", "amount": "1000", "deposited": "yes"})
         from tracker.models import StrategyInstance
         strategy = StrategyInstance.objects.get(owner=user)

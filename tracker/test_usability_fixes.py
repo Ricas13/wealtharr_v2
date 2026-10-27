@@ -63,7 +63,7 @@ class UsabilityFixesTests(TestCase):
 
 
     # 3 + 4. opening position from the wizard, and input kept on error
-    BASE = {"strategy": KEY, "platform": "TRADING212", "account_type": "ISA", "ack": "yes"}
+    BASE = {"strategy": KEY, "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes"}
 
     def wizard_to_step4(self):
         return reverse("v2_add_strategy")

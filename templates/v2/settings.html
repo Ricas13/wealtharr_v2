@@ -106,3 +106,9 @@
     </div>
   </section>
 </div>
+
+<section class="w2-card w2-space-top" aria-labelledby="w2-export-title">
+  <div class="w2-ch"><h2 class="w2-ct" id="w2-export-title">{% include 'partials/icon.html' with name='list' %} Your data</h2><span class="w2-muted">All strategies</span></div>
+  <p class="w2-muted">One download with everything you recorded, as plain CSV files you can open in any spreadsheet: ledger, saved reviews, fills, the fixed rules each strategy follows, and the stored prices.</p>
+  <a class="w2-button w2-space-top" href="{% url 'v2_export' %}">Download everything (ZIP)</a>
+</section>

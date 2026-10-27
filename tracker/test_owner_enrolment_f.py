@@ -35,7 +35,7 @@ class OwnerEnrollmentTests(TestCase):
         self.url = reverse("v2_add_strategy")
 
     BASE = {"strategy": "nasdaq-quarterly-target", "platform": "TRADING212",
-            "account_type": "ISA", "ack": "yes"}
+            "account_type": "ISA", "ack": "yes", "ack_choice": "yes"}
 
     def create(self, data):
         return self.client.post(self.url, dict(self.BASE, **data))

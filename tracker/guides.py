@@ -107,6 +107,13 @@ def guide(request, slug):
 
 
 @require_GET
+def terms(request):
+    """Plain terms of use and strategy credits for the public site."""
+    from django.conf import settings
+    return render(request, "public/terms.html", {"contact_email": settings.CONTACT_EMAIL})
+
+
+@require_GET
 def privacy(request):
     """Plain privacy notice for the public site (the invite form collects an email)."""
     from django.conf import settings

@@ -85,7 +85,7 @@ class Phase2WizardTests(TestCase):
         """The one-screen setup form, posted once."""
         return self.client.post(self.url, {
             "strategy": STRATEGY_9SIG, "platform": "TRADING212",
-            "account_type": account_type, "ack": "yes", **values})
+            "account_type": account_type, "ack": "yes", "ack_choice": "yes", **values})
 
     def test_anonymous_cannot_see_or_write_wizard_or_catalogue(self):
         self.client.logout()
@@ -110,7 +110,7 @@ class Phase2WizardTests(TestCase):
         fields = dict(mode="fresh", name="x", start=self.day.isoformat(),
                       amount="10", deposited="yes")
         error = self.client.post(self.url, {"strategy": "no-such-strategy", "platform": "TRADING212",
-                                            "account_type": "ISA", "ack": "yes", **fields})
+                                            "account_type": "ISA", "ack": "yes", "ack_choice": "yes", **fields})
         self.assertContains(error, "not available yet")
         refused = self.create(account_type="SIPP", **fields)
         self.assertContains(refused, "No reviewed instruments")
@@ -180,6 +180,10 @@ class Phase2WizardTests(TestCase):
         no_ack = self.create(ack="", mode="fresh", name="No ack", start=self.day.isoformat(),
                              amount="500", deposited="yes")
         self.assertContains(no_ack, "confirm you checked")
+        no_choice = self.create(ack_choice="", mode="fresh", name="No choice",
+                                start=self.day.isoformat(), amount="500", deposited="yes")
+        self.assertContains(no_choice, "chose this strategy yourself")
+        self.assertEqual(Account.objects.filter(owner=self.owner).count(), 0)
         error = self.create(mode="fresh", name="No fake deposits",
                             start=self.day.isoformat(), amount="500")
         self.assertContains(error, "actually deposited")

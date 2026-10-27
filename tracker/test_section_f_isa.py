@@ -164,7 +164,7 @@ class OneScreenOwnerEnrolmentTests(TestCase):
     def enroll(self, *, mode="fresh", name="9Sig ISA", amount="18000.00",
                cash="0"):
         step = {
-            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": mode, "name": name,
             "start": "2026-10-10",
         }

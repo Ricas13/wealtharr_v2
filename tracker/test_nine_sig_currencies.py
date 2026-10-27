@@ -53,7 +53,7 @@ class DollarNineSigTests(TestCase):
         start = self.begin
         self.client.post(reverse("v2_add_strategy"), {
             "strategy": "nasdaq-quarterly-target", "platform": "FIDELITY", "account_type": "BROKERAGE",
-            "ack": "yes", "mode": "fresh", "name": "9Sig US", "start": start.isoformat(),
+            "ack": "yes", "ack_choice": "yes", "mode": "fresh", "name": "9Sig US", "start": start.isoformat(),
             "amount": "1000", "deposited": "yes", "go_live": "yes"})
         self.strategy = StrategyInstance.objects.get(owner=owner)
         q = quarter_number(self.end)
@@ -100,7 +100,7 @@ class EuroNineSigTests(TestCase):
         self.client.force_login(owner)
         self.client.post(reverse("v2_add_strategy"), {
             "strategy": "nasdaq-quarterly-target", "platform": "TRADE_REPUBLIC", "account_type": "DEPOT",
-            "ack": "yes", "mode": "fresh", "name": "9Sig EU",
+            "ack": "yes", "ack_choice": "yes", "mode": "fresh", "name": "9Sig EU",
             "start": (timezone.localdate() - timedelta(days=5)).isoformat(),
             "amount": "1000", "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=owner)

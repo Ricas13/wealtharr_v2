@@ -26,7 +26,7 @@ class MonthlyPlanTests(TestCase):
 
     def test_setup_saves_monthly_plan_and_strategy_page_edits_it(self):
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": KEY, "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": KEY, "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "Planned", "start": timezone.localdate().isoformat(),
             "amount": "1000", "deposited": "yes", "monthly": "500"})
         strategy = StrategyInstance.objects.get(owner=self.owner)

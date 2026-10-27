@@ -130,7 +130,7 @@ class AllWeatherEndToEndTests(TestCase):
             self.assertContains(chosen, isin)
         self.assertNotContains(chosen, "IE00BLRPRL42")
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": "all-weather", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "all-weather", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "AW", "start": start.isoformat(), "amount": "10000",
             "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=self.owner)

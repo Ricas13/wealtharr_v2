@@ -249,6 +249,7 @@ def wizard(request):
     account_type = post.get("account_type", "ISA" if "ISA" in types else (types[0] if types else ""))
     state = {"owner_id": request.user.pk, "strategy": strategy, "platform": platform,
              "type": account_type, "ack": post.get("ack") == "yes",
+             "ack_choice": post.get("ack_choice") == "yes",
              "mode": post.get("mode", "fresh"), "name": "", "start": "",
              "amount": "", "cash": "", "holdings": {}, "routes": ROUTE_DEFAULTS}
     error = ""
@@ -263,6 +264,8 @@ def wizard(request):
             state["monthly"] = _decimal(post.get("monthly", ""), "your monthly top-up")
             if not state["ack"]:
                 raise ValidationError("Tick the box to confirm you checked these instruments in your own account.")
+            if not state["ack_choice"]:
+                raise ValidationError("Tick the box to confirm you chose this strategy yourself and understand what it shows.")
             instance = _enroll(request.user, state)
             if post.get("go_live") == "yes":
                 from .v2_go_live import go_live

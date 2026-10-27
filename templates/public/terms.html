@@ -1,0 +1,40 @@
+{% extends "public/base.html" %}
+{% block title %}Terms and credits | Wealtharr{% endblock %}
+{% block description %}Plain terms for using Wealtharr: a private tracker and rules calculator, not financial advice, and credit to the strategies' authors.{% endblock %}
+{% block og_title %}Wealtharr terms and credits{% endblock %}
+{% block og_description %}A private tracker and rules calculator. Not financial advice. You decide whether to trade.{% endblock %}
+{% block content %}
+<div class="wrap">
+  <section class="article">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> › <span aria-current="page">Terms and credits</span></nav>
+    <h1>Terms and credits</h1>
+    <p class="lead">Wealtharr is a private tracker and rules calculator. These terms say, plainly, what that means.</p>
+
+    <h2>What Wealtharr is</h2>
+    <p>You choose a published strategy. Wealtharr applies that strategy's fixed rules to the deposits, trades and prices you record, and shows the result with the working. It never connects to a broker, places an order or moves money.</p>
+
+    <h2>Not financial advice</h2>
+    <p>Nothing in Wealtharr is financial, investment, tax or legal advice, or a recommendation to buy or sell anything. It does not check that a strategy suits you. What it shows is the output of fixed rules applied to your own records. You decide whether to trade, and you are responsible for your own decisions.</p>
+
+    <h2>Past results</h2>
+    <p>Past results are not a guide to future results. Study pages and comparisons replay historical prices through the rules and are hypothetical, not your results. The value of investments can fall as well as rise, and you can get back less than you put in.</p>
+
+    <h2>Accuracy</h2>
+    <p>Prices come from a public feed, are checked before use, and can still be late, wrong or missing. Wealtharr shows nothing instead of guessing when it cannot check a price, but it is provided as is, without a promise that it is complete, accurate or always available. Check amounts against your broker before you act.</p>
+
+    <h2>Your records</h2>
+    <p>You enter what you actually deposited and traded. The results are only as good as that record. You can download everything you recorded at any time from Settings.</p>
+
+    <h2>Liability</h2>
+    <p>To the extent the law allows, Wealtharr and its owner are not liable for losses from trades you make or decisions you take using it. Nothing here limits any right you have under law that cannot be limited.</p>
+
+    <h2>Credits</h2>
+    <p>The strategies are published methods that belong to their authors. Wealtharr is not affiliated with, endorsed by or sponsored by them, and uses their names only to say which published method is followed. Where a fund differs from the original, the page says so.</p>
+
+    <h2>Contact</h2>
+    <p>{% if contact_email %}Write to <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% else %}Reply to any email you've had from Wealtharr.{% endif %}</p>
+
+    <p class="mut tiny">Last updated 27 October 2026.</p>
+  </section>
+</div>
+{% endblock %}

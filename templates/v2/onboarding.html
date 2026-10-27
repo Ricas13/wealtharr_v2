@@ -11,7 +11,8 @@
       <label class="w2-field">Strategy
         <select name="strategy" class="w2-input" data-w2-reload-with>
           {% for offer in wizard_offers %}<option value="{{ offer.key }}" {% if wizard.strategy == offer.key %}selected{% endif %} {% if not offer.enabled %}disabled{% endif %}>{{ offer.title }}{% if offer.enabled %} · {{ offer.cadence }} reviews{% else %} · coming later{% endif %}</option>{% endfor %}
-        </select></label>
+        </select>
+        <small class="w2-muted">Listed in the order they were added to Wealtharr, not by merit. Wealtharr does not recommend one over another.</small></label>
       <label class="w2-field">Platform
         <select name="platform" class="w2-input" data-w2-reload-with>
           {% for key, label, available in wizard_platforms %}<option value="{{ key }}" {% if wizard.platform == key %}selected{% endif %} {% if not available %}disabled{% endif %}>{{ label }}{% if not available %} · not mapped yet{% endif %}</option>{% endfor %}
@@ -39,6 +40,8 @@
     {% endfor %}</ul>
     <label class="w2-check w2-space-top"><input type="checkbox" name="ack" value="yes" {% if wizard.ack %}checked{% endif %} required>
       <span>I checked I can buy these exact funds in my own {{ wizard_lines.0.broker_name|default:"broker" }} account.</span></label>
+    <label class="w2-check w2-space-top"><input type="checkbox" name="ack_choice" value="yes" {% if wizard.ack_choice %}checked{% endif %} required>
+      <span>I chose this strategy myself. I understand it follows fixed published rules, that what Wealtharr shows is a calculation and not advice, and that past results do not predict future ones.</span></label>
     </div>
 
     <div class="w2-panel w2-wizard-card">
@@ -89,7 +92,7 @@
 
     <div class="w2-panel w2-wizard-actions">
       <label class="w2-check"><input type="checkbox" name="go_live" value="yes" {% if wizard_go_live %}checked{% endif %}>
-        <span><strong>Go live now</strong> · check prices hourly and tell me when to act. Alerts use your Alerts &amp; settings; change them per strategy later.</span></label>
+        <span><strong>Go live now</strong> · check prices hourly and show me the rules output when it is ready. Alerts use your Alerts &amp; settings; change them per strategy later.</span></label>
       <button type="submit" class="w2-button w2-button-primary">Create strategy</button>
     </div>
   </form>

@@ -122,7 +122,7 @@ class SecondStrategyEndToEndTests(TestStrategyMixin, TestCase):
         # Setup page offers it, and it pins all three funds.
         self.assertContains(self.client.get(reverse("v2_add_strategy")), "Fixed weights")
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": KEY, "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": KEY, "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "Fixed", "start": start.isoformat(),
             "amount": "1000", "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=self.owner)

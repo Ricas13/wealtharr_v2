@@ -79,7 +79,7 @@ class DollarAccountEndToEndTests(TestCase):
         self.assertContains(page, "US9229087690")
         self.assertNotContains(page, "Stocks &amp; Shares ISA")
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": "all-weather", "platform": "FIDELITY", "account_type": "ROTH_IRA", "ack": "yes",
+            "strategy": "all-weather", "platform": "FIDELITY", "account_type": "ROTH_IRA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "AW US", "start": start.isoformat(), "amount": "10000",
             "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=self.owner)
@@ -129,7 +129,7 @@ class EuroAccountTests(TestCase):
         self.client.force_login(owner)
         start = timezone.localdate() - timedelta(days=20)
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": "dual-momentum", "platform": "TRADE_REPUBLIC", "account_type": "DEPOT", "ack": "yes",
+            "strategy": "dual-momentum", "platform": "TRADE_REPUBLIC", "account_type": "DEPOT", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "DM EU", "start": start.isoformat(), "amount": "5000",
             "deposited": "yes"})
         strategy = StrategyInstance.objects.get(owner=owner)

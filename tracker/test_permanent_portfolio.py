@@ -123,7 +123,7 @@ class YearlyCheckEndToEndTests(TestCase):
         from tracker.review_autofinish import auto_finish_reviews
         start = self.month_end - timedelta(days=40)
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": "permanent-portfolio", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "permanent-portfolio", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "PP", "start": start.isoformat(), "amount": "4000",
             "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=self.owner)
@@ -166,7 +166,7 @@ class YearlyCheckEndToEndTests(TestCase):
             self.skipTest("Needs a few days after the month end.")
         start = month_end - timedelta(days=40)
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": "permanent-portfolio", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "permanent-portfolio", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "PP", "start": start.isoformat(), "amount": "4000",
             "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=self.owner)

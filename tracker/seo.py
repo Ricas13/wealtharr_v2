@@ -31,7 +31,7 @@ def site_url(request=None):
 
 def public_paths():
     return (["/", reverse("guides")] + [reverse("guide", args=[g["slug"]]) for g in GUIDES]
-            + [reverse("privacy")])
+            + [reverse("privacy"), reverse("terms")])
 
 
 def is_public(path):
@@ -70,7 +70,7 @@ def robots_txt(request):
 def sitemap_xml(request):
     base = site_url(request)
     updated = {"/": SITE_UPDATED, reverse("guides"): max(g["updated"] for g in GUIDES),
-               reverse("privacy"): SITE_UPDATED}
+               reverse("privacy"): SITE_UPDATED, reverse("terms"): SITE_UPDATED}
     for guide in GUIDES:
         updated[reverse("guide", args=[guide["slug"]])] = guide["updated"]
     rows = "".join(

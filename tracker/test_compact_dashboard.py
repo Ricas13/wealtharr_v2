@@ -163,7 +163,7 @@ class CompactPagesTests(TestCase):
     def test_wizard_can_go_live_at_creation(self):
         url = reverse("v2_add_strategy")
         self.client.post(url, {"strategy": KEY, "platform": "TRADING212", "account_type": "ISA",
-                               "ack": "yes", "mode": "fresh", "name": "Live at once",
+                               "ack": "yes", "ack_choice": "yes", "mode": "fresh", "name": "Live at once",
                                "start": timezone.localdate().isoformat(), "amount": "500",
                                "deposited": "yes", "go_live": "yes"})
         created = StrategyInstance.objects.get(owner=self.owner, name="Live at once")

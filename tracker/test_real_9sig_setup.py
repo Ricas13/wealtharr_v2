@@ -51,7 +51,7 @@ class LegacyEnrollmentRoutingTests(TestCase):
         day = timezone.localdate() - timedelta(days=4)
         url = self.modern_url
         response = self.client.post(url, {
-            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "My 9Sig ISA",
             "start": day.isoformat(), "amount": "1000",
             "deposited": "yes",

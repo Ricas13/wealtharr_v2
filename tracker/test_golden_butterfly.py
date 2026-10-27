@@ -127,7 +127,7 @@ class GoldenButterflyEndToEndTests(TestCase):
         for isin in ("IE00BFMXXD54", "IE00BSPLC413", "IE00B6YX5L24", "IE00B4WXJK79", "IE00B4ND3602"):
             self.assertContains(chosen, isin)
         self.client.post(reverse("v2_add_strategy"), {
-            "strategy": "golden-butterfly", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "golden-butterfly", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "GB", "start": start.isoformat(), "amount": "10000",
             "deposited": "yes", "go_live": "yes"})
         strategy = StrategyInstance.objects.get(owner=self.owner)

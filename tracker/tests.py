@@ -96,7 +96,7 @@ class SiteTests(TestCase):
         self.client.force_login(self.user)
         url = reverse("v2_add_strategy")
         response = self.client.post(url, {
-            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes",
+            "strategy": "nasdaq-quarterly-target", "platform": "TRADING212", "account_type": "ISA", "ack": "yes", "ack_choice": "yes",
             "mode": "fresh", "name": "9Sig",
             "start": timezone.localdate().isoformat(),
             "amount": "1000", "deposited": "yes",
