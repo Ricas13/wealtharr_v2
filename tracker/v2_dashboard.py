@@ -64,7 +64,7 @@ def certified_points(strategy, report=None):
     be certified; never leave a historical line looking current after a hold.
     """
     if report is None:
-        from .v2_history import build_history
+        from .history_data import build_history
         report = build_history(strategy)
     if report["latest_certified"] is None:
         return []
@@ -356,7 +356,7 @@ def xirr_pct(strategy, points=None):
     which needs a certified close for the latest value (not just a saved
     snapshot). ``points`` is unused and kept for older callers.
     """
-    from .v2_history import build_history
+    from .history_data import build_history
     report = build_history(strategy)
     latest, flows = report["latest_certified"], report["flows"]
     if report.get("xirr_pct") is None or latest is None or not flows:

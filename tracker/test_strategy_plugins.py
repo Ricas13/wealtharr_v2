@@ -179,7 +179,7 @@ class GenericCodeDoesNotImportStrategyRules(SimpleTestCase):
     """CLAUDE.md boundary 4: generic views never import a strategy's rules."""
 
     GENERIC = (
-        "v2_today.py", "v2_dashboard.py", "v2_views.py", "v2_history.py", "v2_ledger_views.py",
+        "v2_today.py", "v2_review.py", "v2_dashboard.py", "v2_views.py", "v2_history.py", "v2_overview.py", "history_data.py", "v2_ledger_views.py",
         "v2_ledger_core.py", "v2_onboarding.py", "v2_go_live.py", "v2_strategy.py",
         "v2_settings.py", "v2_study.py", "signal_status.py", "cockpit_execution.py",
         "cockpit_notifications.py", "review_autofinish.py", "v2_review_refresh.py",

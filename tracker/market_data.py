@@ -37,6 +37,30 @@ class FetchedChart:
         yield self.series
 
 
+# A close may drive an instruction or certify evidence only when it was captured
+# from a Yahoo response whose quote unit matched the pinned catalogue unit, and
+# only while it is recent enough. Every check goes through these three helpers
+# so the rules can't drift apart between screens.
+VERIFIED_QUOTE = {"source": "yahoo", "raw_unit_verified": True}
+QUOTE_MAX_AGE = timedelta(days=8)
+
+
+def verified_observations(**filters):
+    """Stored closes that are unit-verified Yahoo data, optionally filtered."""
+    return MarketObservation.objects.filter(**VERIFIED_QUOTE, **filters)
+
+
+def is_verified(observation):
+    return bool(observation is not None and all(
+        getattr(observation, field) == value for field, value in VERIFIED_QUOTE.items()))
+
+
+def quote_is_fresh(as_of, today=None):
+    """Not in the future and no older than QUOTE_MAX_AGE."""
+    today = today or timezone.localdate()
+    return as_of <= today and today - as_of <= QUOTE_MAX_AGE
+
+
 def fetch_chart(symbol, since):
     """Publicly accessible but unofficial Yahoo endpoint. No authentication bypass."""
     if not TICKER.fullmatch(symbol):
@@ -349,9 +373,6 @@ def sync_ticker(symbol, *, force=False):
 
 
 
-# A close may drive an instruction or certify evidence only when it was captured
-# from a Yahoo response whose quote unit matched the pinned catalogue unit.
-VERIFIED_QUOTE = {"source": "yahoo", "raw_unit_verified": True}
 
 
 def settlement_close(symbol, quarter_end, *, days=6):

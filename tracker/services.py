@@ -29,30 +29,13 @@ def split_quantity(held, ratio):
 
 
 def replay(entries):
-    """Cash, net contributions and positions after the given ledger entries."""
-    cash = ZERO
-    net_contributed = ZERO
-    positions = defaultdict(lambda: ZERO)
-    for e in entries:
-        if e.kind == LedgerEntry.DEPOSIT:
-            cash += e.amount
-            net_contributed += e.amount
-        elif e.kind == LedgerEntry.WITHDRAW:
-            cash -= e.amount
-            net_contributed -= e.amount
-        elif e.kind in (LedgerEntry.DIVIDEND, LedgerEntry.INTEREST):
-            cash += e.amount
-        elif e.kind == LedgerEntry.FEE:
-            cash -= e.amount
-        elif e.kind == LedgerEntry.BUY:
-            cash -= money(e.quantity * e.unit_price) + e.fee
-            positions[e.symbol] += e.quantity
-        elif e.kind == LedgerEntry.SELL:
-            cash += money(e.quantity * e.unit_price) - e.fee
-            positions[e.symbol] -= e.quantity
-        elif e.kind == LedgerEntry.SPLIT:
-            positions[e.symbol] = split_quantity(positions[e.symbol], e.quantity)
-    return cash, net_contributed, {symbol: qty for symbol, qty in positions.items() if qty != ZERO}
+    """Cash, net contributions and positions after the given ledger entries.
+
+    Reads back a saved ledger without re-validating it; the single fold lives in
+    v2_ledger_core (where the validating replay also uses it).
+    """
+    from .v2_ledger_core import replay_trusted
+    return replay_trusted(entries)
 
 
 def ledger_summary(strategy):

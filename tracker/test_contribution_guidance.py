@@ -179,8 +179,8 @@ class LiveContributionGuidanceTests(TestCase):
                     "last_point": None}
 
         self.client.force_login(self.owner)
-        with patch("tracker.v2_history.build_history", side_effect=history), patch(
-                "tracker.v2_history._overview_extras", return_value={
+        with patch("tracker.v2_overview.build_history", side_effect=history), patch(
+                "tracker.v2_overview._overview_extras", return_value={
                     "ov_chart": {"empty": True, "span": "all", "mode": "gbp"},
                     "ov_ranges": (), "ov_todos": (), "ov_assets": (),
                     "ov_coming": (), "ov_alerts": {}, "ov_today": timezone.localdate(),

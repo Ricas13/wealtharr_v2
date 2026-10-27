@@ -143,7 +143,7 @@
       <div class="w2-kv"><span>Quarter end</span><span>{{ review_signal.as_of|date:"j M Y" }}</span></div>
       <div class="w2-kv"><span>Calculated</span><span>{{ review_signal.created_at|date:"j M H:i" }}</span></div>
       <div class="w2-kv"><span>Rules</span><span>{{ review_signal.strategy_version|default:"—" }}</span></div>
-      <div class="w2-kv"><span>Type</span><span>{% if review_signal.reset_reason %}60/40 reset{% else %}Quarterly rebalance{% endif %}</span></div>
+      <div class="w2-kv"><span>Type</span><span>{% if review_signal.reset_reason %}60/40 reset{% else %}{{ review_signal.cadence|default:"quarterly"|capfirst }} rebalance{% endif %}</span></div>
       {% for a in review_trades %}<div class="w2-kv"><span>{{ a.side|title }} {{ a.symbol }}</span><span>≈ {{ a.quantity }} sh{% if a.estimated_gbp %} · {{ cur }}{{ a.estimated_gbp }}{% endif %}</span></div>{% endfor %}
     </section>
     {% if review_can_manual_reset %}

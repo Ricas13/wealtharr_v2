@@ -510,9 +510,23 @@ class StrategySignal(models.Model):
     # suggested: {"<action index>": {"recorded": "9.5", "at": iso, "by": user id, "note": ...}}.
     # Kept with the review so the deviation stays on record.
     accepted_actions = models.JSONField(default=dict, blank=True)
+    # How often the strategy that made this review reviews ("daily", "monthly",
+    # "quarterly", "yearly"). ``kind`` stays QUARTERLY for every scheduled review
+    # (its queries predate other cadences), so this records the honest label.
+    cadence = models.CharField(max_length=12, blank=True, default="")
+
     class Meta:
         constraints = [models.UniqueConstraint(fields=["strategy", "signal_key"], name="unique_strategy_signal")]
         ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.cadence and self.kind == "QUARTERLY" and self.strategy_id:
+            from .strategies.registry import module_for
+            plugin = module_for(self.strategy)
+            self.cadence = plugin.cadence_word if plugin else "quarterly"
+            if "update_fields" in kwargs and kwargs["update_fields"] is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "cadence"}
+        super().save(*args, **kwargs)
 
 
 class StrategyBaseline(models.Model):

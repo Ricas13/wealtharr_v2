@@ -17,7 +17,7 @@ from tracker.models import (
 )
 from tracker.v2_ledger_core import snapshot
 from tracker.services import validate_and_record
-from tracker.v2_history import build_history
+from tracker.history_data import build_history
 
 
 class V2HistoryTests(TestCase):

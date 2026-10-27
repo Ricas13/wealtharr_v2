@@ -1,6 +1,7 @@
 """Dual Momentum as a strategy plug-in: one review after each month end."""
 from decimal import Decimal
 
+from tracker.market_data import QUOTE_MAX_AGE
 from tracker.core.calendar import month_end_before, month_end_on_or_after, months_before
 from tracker.strategies.base import StrategyModule
 from tracker.strategies.dual_momentum import v1
@@ -97,7 +98,6 @@ def decide(instance, as_of, *, positions=None, cash=None):
 
 def review(instance):
     """Hourly: refresh prices; after a month end, save that month's review once."""
-    from datetime import timedelta
 
     from django.utils import timezone
 
@@ -117,7 +117,7 @@ def review(instance):
         close = sync_ticker(symbol)
         if symbol == cash_symbol(instance):
             continue
-        if close and close.currency == instance.account.currency and close.as_of >= today - timedelta(days=8):
+        if close and close.currency == instance.account.currency and close.as_of >= today - QUOTE_MAX_AGE:
             previous = PriceMark.objects.filter(strategy=instance, symbol=symbol).first()
             if not previous or previous.as_of <= close.as_of:
                 PriceMark.objects.update_or_create(

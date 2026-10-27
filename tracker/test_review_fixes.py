@@ -105,7 +105,7 @@ class ReturnLabelTests(TestCase):
 class OverviewSupersededTests(TestCase):
     def test_overview_does_not_show_quantities_the_ledger_has_overtaken(self):
         from tracker.models import LedgerEntry, StrategySignal
-        from tracker.v2_history import _open_action
+        from tracker.v2_overview import _open_action
         strategy = make_instance("ov-sup", "all-weather")
         today = timezone.localdate()
         # all-weather is yearly; use the plug-in's own last review date.
@@ -214,3 +214,34 @@ class ColourTests(TestCase):
     def test_colour_does_not_fail_without_a_preset(self):
         from tracker.strategies.registry import DEFAULT_COLOUR, colour_for
         self.assertEqual(colour_for(SimpleNamespace(strategy_key="", preset=None)), DEFAULT_COLOUR)
+
+
+class SignalCadenceTests(TestCase):
+    def signal(self, strategy, **extra):
+        from tracker.models import StrategySignal
+        return StrategySignal.objects.create(
+            strategy=strategy, signal_key=extra.pop("key", "c:1"), kind=extra.pop("kind", "QUARTERLY"),
+            as_of=timezone.localdate(), title="t", message="m", **extra)
+
+    def test_scheduled_reviews_record_their_strategys_cadence(self):
+        for slug, word in (("all-weather", "yearly"), ("nasdaq-trend-dca", "daily"),
+                           ("nine-sig-quarterly", "quarterly"), ("dual-momentum", "monthly")):
+            strategy = make_instance("cad-" + slug, slug)
+            self.assertEqual(self.signal(strategy).cadence, word, slug)
+
+    def test_other_kinds_and_explicit_values_are_left_alone(self):
+        strategy = make_instance("cad-other", "all-weather")
+        self.assertEqual(self.signal(strategy, kind="THIRTY_DOWN").cadence, "")
+        self.assertEqual(self.signal(strategy, key="c:2", cadence="monthly").cadence, "monthly")
+
+    def test_existing_reviews_are_backfilled(self):
+        import importlib
+        from django.apps import apps
+        from tracker.models import StrategySignal
+        migration = importlib.import_module("tracker.migrations.0035_signal_cadence")
+        strategy = make_instance("cad-backfill", "nasdaq-trend-dca")
+        signal = self.signal(strategy)
+        StrategySignal.objects.filter(pk=signal.pk).update(cadence="")
+        migration.backfill(apps, None)
+        signal.refresh_from_db()
+        self.assertEqual(signal.cadence, "daily")

@@ -72,7 +72,7 @@ def _render(request, *, page_key, page_title, instance=None, section=None, **ext
 
 @login_required
 def overview(request):
-    from .v2_history import overview_page
+    from .v2_overview import overview_page
     return overview_page(request)
 
 
@@ -87,7 +87,7 @@ def instance_page(request, instance_id, section):
         from .v2_today import today_page
         return today_page(request, instance_id)
     if section == "review":
-        from .v2_today import review_page
+        from .v2_review import review_page
         return review_page(request, instance_id)
     if section == "study":
         from .v2_study import study_page

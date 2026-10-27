@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
+from .market_data import QUOTE_MAX_AGE
 from .models import (
     LedgerEntry, MarketObservation, PriceMark, StrategySignal, YahooSync,
 )
@@ -180,7 +181,7 @@ def review_strategy(strategy):
     # quarter's signal. A failed Yahoo lookup cannot invent a new valuation.
     for symbol in (strategy.equity_symbol, strategy.safe_symbol):
         close = data.get(symbol)
-        if close and close.currency == currency and close.as_of >= now - timedelta(days=8):
+        if close and close.currency == currency and close.as_of >= now - QUOTE_MAX_AGE:
             previous = PriceMark.objects.filter(strategy=strategy, symbol=symbol).first()
             if not previous or previous.as_of <= close.as_of:
                 PriceMark.objects.update_or_create(

@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .instrument_mapping import for_strategy
+from .market_data import verified_observations
 from .models import (
     LedgerEntry, MarketObservation, RebalanceExecution, SignalFill,
     StrategyBaseline, StrategyInstance, StrategySignal,
@@ -34,9 +35,8 @@ def verified_quote_evidence(marks, currency="GBP"):
     """
     result = {}
     for role, mark in zip(("growth", "safe"), marks):
-        observation = MarketObservation.objects.filter(
-            symbol=mark.symbol, as_of=mark.as_of, currency=currency,
-            price=mark.price, source="yahoo", raw_unit_verified=True,
+        observation = verified_observations(
+            symbol=mark.symbol, as_of=mark.as_of, currency=currency, price=mark.price,
         ).values_list("pk", flat=True).first()
         if observation is None:
             raise ValidationError("Missing persisted, unit-verified %s price observation for the reset." % currency)

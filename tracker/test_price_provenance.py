@@ -85,3 +85,23 @@ class LegacyRowsHealTests(TestCase):
         self.assertEqual(call.call_args.args[1], date(2010, 1, 1))
         call = self.sync("100")  # now healed: back to the short top-up window
         self.assertGreater(call.call_args.args[1], date(2010, 1, 1))
+
+
+class SharedQuoteHelpersTests(TestCase):
+    """The one place that decides what counts as a usable close."""
+
+    def test_verified_observations_and_is_verified_agree(self):
+        from tracker.market_data import is_verified, verified_observations
+        good, bad = obs("A.L", price="1"), obs("B.L", price="1", verified=False)
+        self.assertEqual(list(verified_observations()), [good])
+        self.assertTrue(is_verified(good))
+        self.assertFalse(is_verified(bad))
+        self.assertFalse(is_verified(None))
+
+    def test_freshness_window_is_shared(self):
+        from tracker.market_data import QUOTE_MAX_AGE, quote_is_fresh
+        today = timezone.localdate()
+        self.assertTrue(quote_is_fresh(today, today))
+        self.assertTrue(quote_is_fresh(today - QUOTE_MAX_AGE, today))
+        self.assertFalse(quote_is_fresh(today - QUOTE_MAX_AGE - timedelta(days=1), today))
+        self.assertFalse(quote_is_fresh(today + timedelta(days=1), today))
