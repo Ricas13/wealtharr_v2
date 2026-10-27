@@ -54,6 +54,20 @@ def _cadence(strategy):
     return plugin.cadence_word if plugin else "quarterly"
 
 
+def _record_link(strategy, signal):
+    """After you trade: a link straight to this review's fill form.
+
+    Absolute only when SITE_URL is set. It carries no figures, so the alert
+    stays frozen while the page always shows what is current.
+    """
+    from django.conf import settings
+    from django.urls import reverse
+    if not settings.SITE_URL:
+        return ""
+    return "\n\nAfter you have traded, record your actual fills: %s%s#w2-fill-0" % (
+        settings.SITE_URL, reverse("v2_guided_review", args=[strategy.pk, signal.pk]))
+
+
 def _send(strategy, owner, category, key, subject, message):
     return newly_delivered(route_notice(
         owner, category, key, subject, message,
@@ -110,8 +124,8 @@ def _notify_strategy(strategy, today, remind_after_days):
                 "Wealtharr — %s review (%s)" % (_cadence(strategy), recent.as_of),
                 "Recorded review %s\n\n%s\n\n"
                 "Open Wealtharr → Today. Check broker availability, actual "
-                "prices, quantities and fees. No orders have been placed." % (
-                    recent.as_of, "\n".join(actions)))
+                "prices, quantities and fees. No orders have been placed.%s" % (
+                    recent.as_of, "\n".join(actions), _record_link(strategy, recent)))
         if (actions and recent.created_at.date() <= today - timedelta(
                 days=delay) and (partial or reconciled)):
             week = today.isocalendar()
