@@ -39,6 +39,15 @@ class ChartReadoutTests(SimpleTestCase):
         self.assertTrue(any(t.startswith("Net deposits ") for t in readout[0]["t"]))
         self.assertTrue(result["underwater"])
 
+    def test_a_deposit_that_pushes_money_in_above_the_value_does_not_invert_the_shading(self):
+        today = timezone.localdate()
+        # Day 0 is below its money in (95 < 100). On day 1 a 30 deposit lifts money in to 130
+        # while the value (105) is still above the earlier 100: that stretch must not be shaded.
+        pts = [(today - timedelta(days=3), D("95"), D("100")), (today - timedelta(days=2), D("105"), D("130")),
+               (today - timedelta(days=1), D("110"), D("130")), (today, D("112"), D("130"))]
+        result = dash.chart(pts, span="all", mode="gbp")
+        self.assertEqual(len(result["underwater"]), 2)  # not 3: the first stretch is skipped
+
     def test_no_shading_when_value_is_above_money_in(self):
         pts = [(d, v + 50, n) for d, v, n in self.points()]
         self.assertEqual(dash.chart(pts, span="all", mode="gbp")["underwater"], [])
@@ -107,6 +116,47 @@ class ReviewExplanationTests(TestCase):
         rows = price_evidence(signal)
         self.assertEqual([r["verified"] for r in rows], [True, False, False])
         self.assertEqual([r["found"] for r in rows], [True, True, False])
+
+    def test_a_stored_close_that_differs_from_the_price_used_is_not_verified(self):
+        from tracker.v2_today import price_evidence
+        strategy = make_instance("evidence-diff", "all-weather")
+        day = timezone.localdate() - timedelta(days=2)
+        MarketObservation.objects.create(symbol="VUAG.L", as_of=day, price=D("80"), currency="GBP",
+                                         source="yahoo", raw_unit_verified=True, raw_quote_unit="GBP",
+                                         raw_close=D("80"))
+        signal = StrategySignal.objects.create(
+            strategy=strategy, signal_key="ev:2", kind="QUARTERLY", as_of=day, title="t", message="m",
+            actions=[{"side": "BUY", "symbol": "VUAG.L", "quantity": "1", "estimated_gbp": "90",
+                      "price_gbp": "90", "price_date": day.isoformat()}])
+        row = price_evidence(signal)[0]
+        self.assertIs(row["matches"], False)
+        self.assertFalse(row["verified"])
+
+    def test_an_observation_in_another_currency_is_not_evidence(self):
+        from tracker.v2_today import price_evidence
+        strategy = make_instance("evidence-cur", "all-weather")
+        day = timezone.localdate() - timedelta(days=2)
+        MarketObservation.objects.create(symbol="VUAG.L", as_of=day, price=D("80"), currency="USD",
+                                         source="yahoo", raw_unit_verified=True, raw_quote_unit="USD",
+                                         raw_close=D("80"))
+        signal = StrategySignal.objects.create(
+            strategy=strategy, signal_key="ev:3", kind="QUARTERLY", as_of=day, title="t", message="m",
+            actions=[{"side": "BUY", "symbol": "VUAG.L", "quantity": "1", "price_gbp": "80",
+                      "price_date": day.isoformat()}])
+        self.assertFalse(price_evidence(signal)[0]["found"])
+
+    def test_without_a_price_in_the_action_the_stored_close_is_shown_and_labelled(self):
+        from tracker.v2_today import price_evidence
+        strategy = make_instance("evidence-stored", "all-weather")
+        day = timezone.localdate() - timedelta(days=2)
+        MarketObservation.objects.create(symbol="VUAG.L", as_of=day, price=D("80"), currency="GBP",
+                                         source="yahoo", raw_unit_verified=True, raw_quote_unit="GBP",
+                                         raw_close=D("80"))
+        signal = StrategySignal.objects.create(
+            strategy=strategy, signal_key="ev:4", kind="QUARTERLY", as_of=day, title="t", message="m",
+            actions=[{"side": "BUY", "symbol": "VUAG.L", "quantity": "1", "price_date": day.isoformat()}])
+        row = price_evidence(signal)[0]
+        self.assertEqual((row["price"], row["price_is_stored"], row["verified"]), (D("80"), True, True))
 
     def test_nasdaq_review_explains_itself_from_the_same_closes(self):
         strategy = make_instance("why-owner", "nasdaq-trend-dca", "Why")

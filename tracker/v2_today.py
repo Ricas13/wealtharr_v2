@@ -499,21 +499,32 @@ def _review_extras(strategy, notice):
 def price_evidence(signal):
     """Each close behind a proposal, with where it came from.
 
-    Looked up in the stored observations, so it shows what the evidence is now,
-    not just what the review text claims. The broker's dealing price may differ.
+    Looked up in the stored observations for the account's currency, so it shows
+    what the evidence is now, not just what the review text claims. A stored
+    close that differs from the price the proposal used is flagged. The broker's
+    dealing price may differ either way.
     """
     from .models import MarketObservation
+    currency = signal.strategy.account.currency
     rows = []
     for action in proposed_actions(signal):
         symbol, day = action.get("symbol"), action.get("price_date")
-        found = (MarketObservation.objects.filter(symbol=symbol, as_of=day).first()
+        found = (MarketObservation.objects.filter(symbol=symbol, as_of=day, currency=currency).first()
                  if symbol and day else None)
+        try:
+            used = Decimal(str(action["price_gbp"])) if action.get("price_gbp") else None
+        except Exception:
+            used = None
+        matches = None if (found is None or used is None) else found.price == used
         rows.append({
             "side": action.get("side", ""), "symbol": symbol, "date": day,
-            "price": action.get("price_gbp"),
+            "price": used if used is not None else (found.price if found else None),
+            "price_is_stored": used is None and found is not None,
             "source": found.source if found else "", "unit": found.raw_quote_unit if found else "",
             "raw_close": found.raw_close if found else None,
-            "verified": bool(found and found.source == "yahoo" and found.raw_unit_verified),
+            "matches": matches,
+            "verified": bool(found and found.source == "yahoo" and found.raw_unit_verified
+                             and matches is not False),
             "found": found is not None,
         })
     return tuple(rows)

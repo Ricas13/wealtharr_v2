@@ -99,9 +99,9 @@
           <tbody>{% for e in review_evidence %}<tr>
             <td>{{ e.side|title }} {{ e.symbol }}</td>
             <td>{{ e.date|default:"not recorded" }}</td>
-            <td class="w2-r">{% if e.price %}{{ cur }}{{ e.price }}{% else %}—{% endif %}</td>
+            <td class="w2-r">{% if e.price %}{{ cur }}{{ e.price }}{% if e.price_is_stored %} <span class="w2-muted">(stored close)</span>{% endif %}{% else %}—{% endif %}</td>
             <td>{% if e.found %}{{ e.source|default:"unknown" }}{% else %}not found{% endif %}</td>
-            <td>{% if e.verified %}<span class="w2-chip w2-ok">Verified{% if e.unit %} · {{ e.unit }}{% endif %}</span>{% else %}<span class="w2-chip w2-wait">Not verified</span>{% endif %}</td>
+            <td>{% if e.verified %}<span class="w2-chip w2-ok">Verified{% if e.unit %} · {{ e.unit }}{% endif %}</span>{% elif e.matches is False %}<span class="w2-chip w2-wait">Stored close differs</span>{% else %}<span class="w2-chip w2-wait">Not verified</span>{% endif %}</td>
           </tr>{% endfor %}</tbody></table></div>
         <p class="w2-note">These are the stored closes the proposal was built from. Your broker's actual dealing price may differ, so always record what you really got.</p>
       </details>

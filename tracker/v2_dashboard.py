@@ -202,7 +202,10 @@ def chart(points, *, span, mode, indexes=True):
         y_value, y_net = _scale([p[1] for p in shown], lo, hi), _scale([p[2] for p in shown], lo, hi)
         underwater = []
         for i in range(1, len(shown)):
-            if shown[i - 1][1] < shown[i - 1][2] and shown[i][1] < shown[i][2]:
+            # Money put in is a step: over this stretch it is the earlier day's
+            # figure (a deposit on day i only counts from day i). Shade only
+            # where the value stays below that level at both ends.
+            if shown[i - 1][1] < shown[i - 1][2] and shown[i][1] < shown[i - 1][2]:
                 underwater.append("%s,%.1f %s,%.1f %s,%.1f %s,%.1f" % (
                     x[i - 1], y_value[i - 1], x[i], y_value[i], x[i], y_net[i - 1], x[i - 1], y_net[i - 1]))
     ticks = [first + timedelta(days=round(days * i / 4)) for i in range(5)]
