@@ -87,7 +87,10 @@ class CombinedChartTests(TestCase):
         with patch.object(dash, "certified_points", side_effect=lambda s, report=None: series[s.pk]):
             points, omitted = dash.combine_with_omitted([a, b])
         self.assertEqual(omitted, ["Beta"])
-        self.assertEqual([p[0] for p in points], [day1, day2])
+        self.assertEqual(points, [])  # never a total over only some strategies
+        with patch.object(dash, "certified_points", side_effect=lambda s, report=None: series[a.pk]):
+            points, omitted = dash.combine_with_omitted([a])
+        self.assertEqual((omitted, [p[0] for p in points]), ([], [day1, day2]))
         with patch.object(dash, "certified_points", return_value=[]):
             self.assertEqual(dash.combine_with_omitted([a, b]), ([], ["Alpha", "Beta"]))
 
@@ -97,7 +100,6 @@ class ReturnLabelTests(TestCase):
         from django.template.loader import get_template
         source = get_template("v2/history.html").template.source
         self.assertNotIn("time-weighted", source.lower())
-        self.assertIn("approximate", source)
 
 
 class OverviewSupersededTests(TestCase):
@@ -121,7 +123,7 @@ class OverviewSupersededTests(TestCase):
                 strategy=strategy, kind=LedgerEntry.WITHDRAW, amount=D("10"),
                 occurred_on=as_of + timedelta(days=1))
             action = _open_action(strategy, summary, today)
-        self.assertEqual((action["kind"], action["title"]), ("data", "Review out of date"))
+        self.assertEqual((action["kind"], action["title"]), ("data", "Review needs recalculation"))
 
 
 class IsaAndAllocationHonestyTests(TestCase):

@@ -6,9 +6,9 @@
   </div>
 </div>
 {% if c.empty %}
-  <div class="w2-chart-empty" role="status" style="min-height:{{ height|default:190 }}px">Not enough recorded daily values for this period yet. Values are saved after each hourly price check.</div>
+  <div class="w2-chart-empty" role="status" style="min-height:{{ height|default:190 }}px">{% if c.reason %}{{ c.reason }}{% else %}Not enough recorded daily values for this period yet. Values are saved after each hourly price check.{% endif %}</div>
 {% else %}
-  <div class="w2-legend">{% for line in c.lines %}<span><span class="w2-sw {{ line.css }}"></span>{{ line.label }}</span>{% endfor %}{% if c.mode == 'pct' %}<span>Deposits removed{% if c.lines|length > 1 %}; indexes are USD price only{% endif %}</span>{% endif %}{% if c.underwater %}<span><span class="w2-sw w2-sw-under"></span>Below money put in</span>{% endif %}</div>
+  <div class="w2-legend">{% for line in c.lines %}<span><span class="w2-sw {{ line.css }}"></span>{{ line.label }}</span>{% endfor %}{% if c.mode == 'pct' %}<span>No transfers within selected period{% if c.lines|length > 1 %}; indexes are USD price only{% endif %}</span>{% endif %}{% if c.underwater %}<span><span class="w2-sw w2-sw-under"></span>Below money put in</span>{% endif %}</div>
   <div class="w2-chart" data-chart-probe data-readout="{{ c.readout_json }}" tabindex="0"
        aria-label="{{ label }}. Use the left and right arrow keys to read values.">
     <svg viewBox="0 0 800 200" preserveAspectRatio="none" style="height:{{ height|default:190 }}px" role="img"

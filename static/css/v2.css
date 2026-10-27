@@ -792,7 +792,7 @@ body.v2 {
 .w2-card-action .w2-ct.w2-big{display:inline-flex;align-items:center}
 .w2-action-icon .ui-icon{width:15px;height:15px;color:inherit;margin:0}
 .w2-state-idle .w2-action-icon{color:#5fd39a}
-.w2-state-trade .w2-action-icon,.w2-state-start .w2-action-icon,.w2-state-record .w2-action-icon,
+.w2-state-trade .w2-action-icon,.w2-state-start .w2-action-icon,.w2-state-new_money .w2-action-icon,.w2-state-record .w2-action-icon,
 .w2-state-setup .w2-action-icon,.w2-state-empty .w2-action-icon{color:#f0b25a}
 .w2-state-blocked .w2-action-icon,.w2-state-review .w2-action-icon{color:#ff8a7a}
 .w2-side-cell{white-space:nowrap}

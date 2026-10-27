@@ -1,7 +1,7 @@
 {% load w2_format %}<section class="w2-kpis" aria-label="Owner portfolio summary">
   <div class="w2-kpi w2-kpi-hero"><p class="w2-label">Combined value</p>
     <p class="w2-stat-value">{% if overview_total is not None %}{{ cur }}{{ overview_total|floatformat:"2g" }}{% else %}—{% endif %}</p>
-    <p class="w2-muted">{% if overview_excluded %}Excludes {{ overview_excluded|join:", " }} (not valued yet){% else %}Latest closes{% endif %}{% if overview_other_currency %}. In another currency, not combined: {{ overview_other_currency|join:", " }}{% endif %}</p></div>
+    <p class="w2-muted">{% if overview_mixed_dates %}Indicative sum of different closing dates ({% for d in overview_valuation_dates %}{{ d|date:"j M Y" }}{% if not forloop.last %}, {% endif %}{% endfor %}); not one synchronised valuation{% elif overview_valuation_dates %}Latest certified close {{ overview_valuation_dates.0|date:"j M Y" }}{% else %}No certified portfolio close{% endif %}{% if overview_excluded %}. Excludes {{ overview_excluded|join:", " }} (not valued yet){% endif %}{% if overview_other_currency %}. In another currency, not combined: {{ overview_other_currency|join:", " }}{% endif %}</p></div>
   <div class="w2-kpi"><p class="w2-label">Recorded net contributions</p>
     <p class="w2-stat-value">{% if overview_contributed is not None %}{{ cur }}{{ overview_contributed|floatformat:"2g" }}{% else %}—{% endif %}</p>
     <p class="w2-muted">Deposits less withdrawals</p></div>
@@ -48,7 +48,7 @@
       <div class="w2-ch"><h2 class="w2-ct">{% include 'partials/icon.html' with name='pie' %} Split by strategy</h2></div>
       {% if overview_total %}<div class="w2-bar">{% for row in overview_rows %}{% if row.share %}<span style="width:{{ row.share|floatformat:1 }}%;background:{{ row.strategy|strategy_colour }}"></span>{% endif %}{% endfor %}</div>{% endif %}
       {% for row in overview_rows %}
-        <div class="w2-kv w2-setting-row"><span><span class="w2-dotsw" style="background:{{ row.strategy|strategy_colour }}"></span>{{ row.strategy.name }}</span><strong>{% if row.value is not None and row.strategy.name not in overview_excluded %}{{ row.cur }}{{ row.value|floatformat:"2g" }}{% else %}Not valued yet{% endif %}</strong></div>
+        <div class="w2-kv w2-setting-row"><span><span class="w2-dotsw" style="background:{{ row.strategy|strategy_colour }}"></span>{{ row.strategy.name }}</span><strong>{% if row.value is not None and row.combined and row.strategy.name not in overview_excluded %}{{ row.cur }}{{ row.value|floatformat:"2g" }}{% else %}Not valued yet{% endif %}</strong></div>
       {% empty %}<div class="w2-empty">No strategies yet.</div>{% endfor %}
     </section>
 

@@ -114,7 +114,7 @@ def _public_budget(client=""):
 def compare(amount, monthly, frame, real_names=False, public=False, client=""):
     """Chart-ready hypothetical comparison, cached until the next download."""
     latest = StudyPrice.objects.order_by("-fetched_at").values_list("fetched_at", flat=True).first()
-    key = "home-compare:v2:%s:%s:%s:%s:%s" % (latest.isoformat() if latest else "none", amount, monthly, frame,
+    key = "home-compare:v3:%s:%s:%s:%s:%s" % (latest.isoformat() if latest else "none", amount, monthly, frame,
                                          "real" if real_names else "generic")
     out = cache.get(key)
     if out is not None:

@@ -237,6 +237,16 @@ def today_page(request, instance_id):
         headline = "Nothing to do right now"
         explanation = "No currently outstanding verified %s instruction." % (
             plugin.cadence_word if plugin else "quarterly")
+    # New confirmed cash can be invested between reviews without forcing an
+    # early periodic rebalance. Never compete with an existing trade, a data
+    # hold, a tracking-only strategy, or the Nasdaq daily evaluator.
+    from .contribution_guidance import new_money_guidance
+    new_money = (new_money_guidance(strategy, report, prices_ready=ready)
+                 if status == "idle" else None)
+    if new_money:
+        status = "new_money"
+        headline = "Invest your new deposit"
+        explanation = new_money["note"]
     next_end = next_review(strategy, timezone.localdate())
     previous_end = last_review_before(strategy, timezone.localdate())
     span = (next_end - previous_end).days
@@ -258,6 +268,7 @@ def today_page(request, instance_id):
         instance=strategy, section="today",
         **_dashboard(request, strategy, report, ready, symbol_roles, next_end),
         head_prices=health, today_price_health=health,
+        today_new_money=new_money,
         today_status=status, today_headline=headline,
         today_explanation=explanation, today_blocking_reason=reason,
         today_ready=ready, today_signal=notice, today_partial=partial, today_executed=executed,
@@ -291,11 +302,12 @@ def _dashboard(request, strategy, report, ready, roles, next_end):
     points = dash.certified_points(strategy)
     span = dash.pick_range(request)
     mode = dash.pick_mode(request)
-    change, change_pct = dash.day_change(points) if ready else (None, None)
-    returns = dash.period_returns(points)
+    flow_days = dash.external_cash_flow_days(strategy)
+    change, change_pct = dash.day_change(points, cash_flow_days=flow_days) if ready else (None, None)
+    returns = dash.period_returns(points, cash_flow_days=flow_days)
     return {
         "dash_points": bool(points),
-        "dash_chart": dash.chart(points, span=span, mode=mode),
+        "dash_chart": dash.chart(points, span=span, mode=mode, cash_flow_days=flow_days),
         "dash_ranges": dash.RANGES, "dash_indexes": dash.INDEXES,
         "dash_day_change": change, "dash_day_pct": change_pct,
         "dash_gain_pct": (
