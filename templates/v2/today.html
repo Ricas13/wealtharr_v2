@@ -89,14 +89,14 @@
           </table>
         </div>
         <p class="w2-note">Based on confirmed deposits not followed by a recorded trade. Check your broker's current prices and fees; the figures are cash budgets, not live share quotes. No orders were placed.</p>
-        <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">Record what I bought</a>
+        <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}?kind=BUY{% for row in today_new_money.rows %}&amp;symbol={{ row.symbol|urlencode }}&amp;budget={{ row.amount|floatformat:2 }}{% endfor %}">Record what I bought</a>
       {% elif today_status == 'start' %}
         <p class="w2-muted">{{ today_explanation }}</p>
         <div class="w2-table-wrap w2-space-top"><table class="w2-table"><tbody>
           {% for line in today_opening %}<tr><td class="w2-side-cell w2-pos">{% include 'partials/icon.html' with name='arrow-up' %}<strong>Buy {{ cur }}{{ line.amount|floatformat:"2g" }} of {{ line.symbol }}</strong></td><td class="w2-r w2-muted">{{ line.pct|floatformat:0 }}%{% if line.shares %} · ≈ {{ line.shares }} shares at {{ cur }}{{ line.price|floatformat:"2g" }}{% endif %}</td></tr>{% endfor %}
         </tbody></table></div>
         {% if not today_opening %}<p class="w2-note">The rules can't pick a fund yet: they need 12 months of verified prices for every series. This updates after the next hourly price check.</p>{% endif %}
-        <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}">Record what I bought</a>
+        <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_ledger_add' instance_id=selected_instance.pk %}{% if today_opening %}?kind=BUY{% for line in today_opening %}&amp;symbol={{ line.symbol|urlencode }}&amp;budget={{ line.amount|floatformat:2 }}{% endfor %}{% endif %}">Record what I bought</a>
       {% elif today_status == 'setup' %}
         <p class="w2-muted">{{ today_explanation }}</p>
         <a class="w2-button w2-button-primary w2-space-top" href="{% url 'v2_instance_page' instance_id=selected_instance.pk section='strategy' %}#go-live">Finish setup</a>

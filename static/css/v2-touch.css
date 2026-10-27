@@ -40,6 +40,10 @@
 .w2-fill-confirm { display: flex; gap: 8px; align-items: center; font-size: 12px; min-height: 28px; }
 .w2-fill-confirm input { width: 18px; height: 18px; accent-color: var(--w2-primary); }
 
+/* One fund per box on the several-purchases form. */
+.w2-buy-row { margin: 14px 0; padding: 10px 12px 12px; border: 1px solid var(--w2-stroke); border-radius: 10px; min-width: 0; }
+.w2-buy-row legend { padding: 0 6px; font-weight: 600; }
+
 /* A scrolling table says so: soft edge shadows appear only where there is more to see. */
 .w2-table-wrap {
   background:

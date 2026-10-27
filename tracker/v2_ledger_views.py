@@ -182,6 +182,52 @@ def _add_entry(locked, actor, payload, report):
     return instance
 
 
+def _suggested_buys(strategy, query, values):
+    """Funds from a "Record what I bought" link, one dict each: symbol and budget.
+
+    Only the kind and the instrument are pre-selected, and only for funds this
+    strategy holds. Shares, price, fee and date are what the broker actually did,
+    so they stay empty; the cash budget is shown as a hint, never entered.
+    One fund pre-selects the ordinary form; several open one form for all of them.
+    """
+    if query.get("kind") != "BUY":
+        return []
+    allowed = fund_symbols(strategy)
+    budgets = query.getlist("budget")
+    found = []
+    for i, symbol in enumerate(query.getlist("symbol")):
+        if symbol not in allowed or any(row["symbol"] == symbol for row in found):
+            continue
+        try:
+            budget = D(budgets[i]) if i < len(budgets) else None
+            budget = budget.quantize(D("0.01")) if budget is not None and budget.is_finite() and budget > 0 else None
+        except InvalidOperation:
+            budget = None
+        found.append({"symbol": symbol, "budget": budget})
+    if len(found) == 1:
+        values.update(kind="BUY", symbol=found[0]["symbol"])
+    return found
+
+
+def _buy_rows(post):
+    """What was typed on the several-funds form, kept so a rejected save can show it again."""
+    symbols, budgets = post.getlist("buy_symbol"), post.getlist("buy_budget")
+    return [{"index": i, "symbol": symbol,
+             "budget": budgets[i] if i < len(budgets) else "",
+             "quantity": post.get("quantity_%d" % i, "").strip(),
+             "unit_price": post.get("unit_price_%d" % i, "").strip(),
+             "fee": post.get("fee_%d" % i, "").strip()} for i, symbol in enumerate(symbols)]
+
+
+def _buy_payloads(strategy, post, rows):
+    """One BUY payload per row that has shares or a price; an empty row was not bought."""
+    return [_input_payload({
+        "kind": "BUY", "occurred_on": post.get("occurred_on", ""), "symbol": row["symbol"],
+        "quantity": row["quantity"], "unit_price": row["unit_price"],
+        "fee": row["fee"] or "0", "note": post.get("note", ""),
+    }, strategy) for row in rows if row["quantity"] or row["unit_price"]]
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def edit_entry(request, instance_id, operation, entry_id=None):
@@ -203,6 +249,8 @@ def edit_entry(request, instance_id, operation, entry_id=None):
         "note": "",
     }
     view = {"preview": None, "form_values": default, "isa_warning": ""}
+    if operation == "new" and request.method == "GET":
+        view["suggested_buys"] = _suggested_buys(strategy, request.GET, default)
     error = ""
     if request.method == "POST":
         try:
@@ -221,6 +269,25 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                 messages.success(request, "Saved. You can edit or delete it from the Ledger.")
                 if advisory:
                     messages.warning(request, advisory)
+                back = request.POST.get("return_to")
+                return redirect("v2_instance_page", instance_id=instance_id,
+                                section=back if back in ("today", "ledger") else "ledger")
+            if request.POST.get("intent") == "save_buys" and operation == "new":
+                view["buy_rows"] = _buy_rows(request.POST)
+                payloads = _buy_payloads(strategy, request.POST, view["buy_rows"])
+                if not payloads:
+                    raise ValidationError("Enter the shares and price for at least one fund.")
+                # All of them or none: one bad row saves nothing.
+                with transaction.atomic():
+                    locked = _get(request, instance_id, locked=True)
+                    for payload in payloads:
+                        report = _validate_proposal(locked, operation, None, payload)
+                        _add_entry(locked, request.user, payload, report)
+                    earliest = min(date.fromisoformat(p["occurred_on"]) for p in payloads)
+                    retire_stale_reviews(locked, earliest)
+                    rebuild_value_history(locked, earliest)
+                messages.success(request, "Saved %d purchase%s. You can edit or delete them from the Ledger."
+                                 % (len(payloads), "" if len(payloads) == 1 else "s"))
                 back = request.POST.get("return_to")
                 return redirect("v2_instance_page", instance_id=instance_id,
                                 section=back if back in ("today", "ledger") else "ledger")
@@ -292,6 +359,9 @@ def edit_entry(request, instance_id, operation, entry_id=None):
                 "The ledger change could not be validated. Nothing was saved."
             )
             request.session.pop(_preview_key(strategy), None)
+    suggested = view.get("suggested_buys") or []
+    buy_rows = view.get("buy_rows") or (
+        [dict(row, index=i) for i, row in enumerate(suggested)] if len(suggested) > 1 else None)
     return _render(
         request, page_key="instance",
         page_title={"new": "Add ledger entry", "edit": "Edit ledger entry",
@@ -301,4 +371,6 @@ def edit_entry(request, instance_id, operation, entry_id=None):
         edit_symbols=tuple(symbol_labels(strategy).items()),
         edit_values=view["form_values"], edit_preview=view["preview"],
         edit_isa_warning=view["isa_warning"], edit_error=error,
+        suggested_buy=suggested[0] if len(suggested) == 1 else None, buy_rows=buy_rows,
+        buy_date=request.POST.get("occurred_on") or timezone.localdate().isoformat(),
     )

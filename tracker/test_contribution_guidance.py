@@ -224,6 +224,93 @@ class LiveContributionGuidanceTests(TestCase):
         self.assertContains(response, "500.00")
         self.assertContains(response, "Record what I bought")
 
+    def test_record_link_preselects_the_fund_and_never_invents_fill_values(self):
+        self.record("DEPOSIT", amount="1000")
+        self.record("BUY", symbol="LQQ3.L", quantity="6", price="100")
+        self.record("BUY", symbol="ERNS.L", quantity="8", price="50")
+        self.record("DEPOSIT", amount="500")
+        self.prices()
+        self.client.force_login(self.owner)
+        today = self.client.get(reverse("v2_instance_page", args=[self.strategy.pk, "today"]))
+        add = reverse("v2_ledger_add", args=[self.strategy.pk])
+        self.assertContains(today, "%s?kind=BUY&amp;symbol=ERNS.L&amp;budget=" % add)
+        page = self.client.get(add, {"kind": "BUY", "symbol": "ERNS.L", "budget": "24.38"})
+        self.assertContains(page, "Buying <strong>ERNS.L</strong>")
+        self.assertContains(page, "24.38 to spend")
+        self.assertContains(page, '<option value="BUY" selected>')
+        self.assertContains(page, '<option value="ERNS.L" selected>')
+        values = page.context["edit_values"]
+        for blank in ("quantity", "unit_price", "fee", "amount"):
+            self.assertEqual(values[blank], "")
+        self.assertContains(page, 'name="return_to" value="today"')
+
+    def test_record_link_ignores_unknown_funds_and_bad_budgets(self):
+        self.record("DEPOSIT", amount="1000")
+        self.client.force_login(self.owner)
+        add = reverse("v2_ledger_add", args=[self.strategy.pk])
+        page = self.client.get(add, {"kind": "BUY", "symbol": "NOTMINE", "budget": "5"})
+        self.assertNotContains(page, "Buying <strong>")
+        self.assertEqual(page.context["edit_values"]["kind"], "DEPOSIT")
+        for bad in ("abc", "-3", "nan", "inf"):
+            page = self.client.get(add, {"kind": "SELL", "symbol": "ERNS.L", "budget": bad})
+            self.assertNotContains(page, "Buying <strong>")
+        page = self.client.get(add, {"kind": "BUY", "symbol": "ERNS.L", "budget": "nan"})
+        self.assertContains(page, "Buying <strong>ERNS.L</strong>")
+        self.assertNotContains(page, "to spend")
+
+    def _buys_setup(self):
+        self.record("DEPOSIT", amount="1000")
+        self.record("BUY", symbol="LQQ3.L", quantity="6", price="100")
+        self.record("BUY", symbol="ERNS.L", quantity="8", price="50")
+        self.record("DEPOSIT", amount="500")
+        self.prices()
+        self.client.force_login(self.owner)
+        return reverse("v2_ledger_add", args=[self.strategy.pk])
+
+    def test_several_funds_open_one_form_with_no_invented_values(self):
+        add = self._buys_setup()
+        page = self.client.get(add + "?kind=BUY&symbol=LQQ3.L&budget=300.00&symbol=ERNS.L&budget=200.00")
+        self.assertContains(page, 'id="w2-buys-form"')
+        self.assertContains(page, "Buy <strong>LQQ3.L</strong>")
+        self.assertContains(page, "Buy <strong>ERNS.L</strong>")
+        for row in page.context["buy_rows"]:
+            self.assertEqual(row.get("quantity", ""), "")
+            self.assertEqual(row.get("unit_price", ""), "")
+        # An unknown fund in the link is dropped, leaving the ordinary single-fund form.
+        page = self.client.get(add + "?kind=BUY&symbol=LQQ3.L&symbol=NOTMINE")
+        self.assertNotContains(page, 'id="w2-buys-form"')
+        self.assertContains(page, "Buying <strong>LQQ3.L</strong>")
+
+    def test_saving_several_purchases_is_all_or_nothing(self):
+        add = self._buys_setup()
+        before = LedgerEntry.objects.filter(strategy=self.strategy).count()
+        day = timezone.localdate().isoformat()
+        base = {"intent": "save_buys", "occurred_on": day, "return_to": "today",
+                "buy_symbol": ["LQQ3.L", "ERNS.L"], "buy_budget": ["300.00", "200.00"],
+                "quantity_0": "3", "unit_price_0": "100", "fee_0": "0",
+                "quantity_1": "4", "unit_price_1": "50", "fee_1": "0"}
+        # A bad second row (price missing) saves neither purchase and keeps what was typed.
+        bad = dict(base, unit_price_1="")
+        response = self.client.post(add, bad)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(LedgerEntry.objects.filter(strategy=self.strategy).count(), before)
+        self.assertEqual(response.context["buy_rows"][0]["quantity"], "3")
+        # A row left empty is simply not bought; the other one saves.
+        one = dict(base, quantity_1="", unit_price_1="")
+        response = self.client.post(add, one)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(LedgerEntry.objects.filter(strategy=self.strategy).count(), before + 1)
+        # Nothing filled in at all is an error, not a silent no-op.
+        empty = dict(base, quantity_0="", unit_price_0="", quantity_1="", unit_price_1="")
+        self.assertEqual(self.client.post(add, empty).status_code, 200)
+        # More than the cash left is refused, and nothing is half-saved.
+        self.assertEqual(self.client.post(add, base).status_code, 200)
+        self.assertEqual(LedgerEntry.objects.filter(strategy=self.strategy).count(), before + 1)
+        # The other fund, bought later, saves with what is left.
+        rest = dict(base, quantity_0="", unit_price_0="")
+        self.assertEqual(self.client.post(add, rest).status_code, 302)
+        self.assertEqual(LedgerEntry.objects.filter(strategy=self.strategy).count(), before + 2)
+
     def test_blocks_for_missing_or_held_prices_and_tracking_only(self):
         self.record("DEPOSIT", amount="1000")
         self.record("BUY", symbol="LQQ3.L", quantity="6", price="100")
