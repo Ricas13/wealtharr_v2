@@ -23,6 +23,19 @@
   {% if study_input_error %}<p class="w2-note w2-warn">One amount wasn't valid, so the default was used.</p>{% endif %}
 </form>
 
+{% if study_can_simulate %}
+<section class="w2-card w2-space-top" data-sim data-sim-url="{% url 'v2_study_simulate_json' instance_id=selected_instance.pk %}" aria-labelledby="w2-sim-title">
+  <h2 class="w2-ct" id="w2-sim-title">{% include 'partials/icon.html' with name='flask' %} What if the rule edges were different?</h2>
+  <p class="w2-note"><strong>Hypothetical.</strong> Moves the rule's edges and replays stored Study prices to show how often the allocation would have switched. It changes nothing in your real strategy: its rules are fixed, and nothing here feeds instructions, alerts or your figures.</p>
+  <form class="w2-row w2-space-top" style="flex-wrap:wrap" data-sim-form>
+    {% for f in study_sim_fields %}<label class="w2-field">{{ f.label }} <output data-sim-out="{{ f.name }}">{{ f.value }}</output>
+      <input type="range" name="{{ f.name }}" min="{{ f.min }}" max="{{ f.max }}" step="{{ f.step }}" value="{{ f.value }}" data-default="{{ f.value }}"></label>{% endfor %}
+    <button type="button" class="w2-button" data-sim-reset>Back to the real rules</button>
+  </form>
+  <div class="w2-space-top" role="status" aria-live="polite" data-sim-result></div>
+</section>
+<script defer src="{% static 'js/study_simulate.js' %}"></script>
+{% endif %}
 {% if not study_selected %}
   <section class="w2-card w2-space-top"><p class="w2-muted">Price history doesn't reach back this far yet (data starts {{ study_first_day|date:"j M Y" }}).</p></section>
 {% else %}

@@ -66,6 +66,11 @@
     <section class="w2-card">
       <details {% if not review_completed %}open{% endif %}>
         <summary>How this was calculated</summary>
+        {% for section in review_detail.sections %}
+        <h3 class="w2-ct w2-space-top">{{ section.title }}</h3>
+        {% for label, value in section.rows %}<div class="w2-kv"><span>{{ label }}</span><span style="white-space:normal;text-align:right">{{ value }}</span></div>{% endfor %}
+        {% endfor %}
+        {% if not review_detail.sections %}
         {% with t=review_detail.trace %}
         {% if t %}
         <div class="w2-table-wrap w2-space-top"><table class="w2-table">
@@ -78,12 +83,30 @@
         {% endwith %}
         {% if review_detail.spy_result %}<div class="w2-kv"><span>30 Down rule</span><span>{% if review_detail.spy_result.triggered %}Triggered{% else %}Not active{% endif %} · S&amp;P (SPY) {{ review_detail.spy_result.current }} vs 8-quarter peak {{ review_detail.spy_result.peak }} ({{ review_detail.spy_result.decline_pct }}%; triggers at {{ review_detail.spy_result.threshold }})</span></div>
         {% else %}<div class="w2-kv"><span>30 Down rule</span><span class="w2-muted">Needs 9 quarters of SPY closes</span></div>{% endif %}
+        {% endif %}
         <div class="w2-kv"><span>Saved message</span><span style="white-space:normal;text-align:right">{{ review_signal.message }}</span></div>
         <div class="w2-row w2-space-top">
           <a class="w2-button" href="{% url 'v2_guided_review' instance_id=selected_instance.pk signal_id=review_signal.pk %}?export=csv">Download CSV</a>
         </div>
       </details>
     </section>
+    {% if review_evidence %}
+    <section class="w2-card" aria-labelledby="w2-evidence-title">
+      <details>
+        <summary id="w2-evidence-title">Price evidence</summary>
+        <div class="w2-table-wrap w2-space-top"><table class="w2-table">
+          <thead><tr><th>Order</th><th>Close date</th><th class="w2-r">Close used</th><th>Source</th><th>Unit check</th></tr></thead>
+          <tbody>{% for e in review_evidence %}<tr>
+            <td>{{ e.side|title }} {{ e.symbol }}</td>
+            <td>{{ e.date|default:"not recorded" }}</td>
+            <td class="w2-r">{% if e.price %}{{ cur }}{{ e.price }}{% else %}—{% endif %}</td>
+            <td>{% if e.found %}{{ e.source|default:"unknown" }}{% else %}not found{% endif %}</td>
+            <td>{% if e.verified %}<span class="w2-chip w2-ok">Verified{% if e.unit %} · {{ e.unit }}{% endif %}</span>{% else %}<span class="w2-chip w2-wait">Not verified</span>{% endif %}</td>
+          </tr>{% endfor %}</tbody></table></div>
+        <p class="w2-note">These are the stored closes the proposal was built from. Your broker's actual dealing price may differ, so always record what you really got.</p>
+      </details>
+    </section>
+    {% endif %}
     {% else %}
     <section class="w2-card"><h2 class="w2-ct">No quarterly review yet</h2>
       <p class="w2-muted">Reviews arrive after each quarter-end close, once the strategy is live with holdings. You'll get an alert.</p></section>

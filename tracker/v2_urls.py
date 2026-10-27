@@ -8,6 +8,8 @@ urlpatterns = [
     # Before the generic section route, which would otherwise capture it.
     path("s/<int:instance_id>/study-window.json", v2_study.study_window_json,
          name="v2_study_window_json"),
+    path("s/<int:instance_id>/study-simulate.json", v2_study.study_simulate_json,
+         name="v2_study_simulate_json"),
     path("s/<int:instance_id>/go-live/", v2_go_live.go_live_view, name="v2_go_live"),
     path("s/<int:instance_id>/plan/", v2_strategy.plan_view, name="v2_strategy_plan"),
     path(

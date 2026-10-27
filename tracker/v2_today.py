@@ -490,9 +490,33 @@ def _review_extras(strategy, notice):
               if notice and plugin and plugin.review_detail else None)
     return {
         "review_detail": detail,
+        "review_evidence": price_evidence(notice) if notice else (),
         "review_past": tuple(past),
         "review_trades": proposed_actions(notice) if notice else (),
     }
+
+
+def price_evidence(signal):
+    """Each close behind a proposal, with where it came from.
+
+    Looked up in the stored observations, so it shows what the evidence is now,
+    not just what the review text claims. The broker's dealing price may differ.
+    """
+    from .models import MarketObservation
+    rows = []
+    for action in proposed_actions(signal):
+        symbol, day = action.get("symbol"), action.get("price_date")
+        found = (MarketObservation.objects.filter(symbol=symbol, as_of=day).first()
+                 if symbol and day else None)
+        rows.append({
+            "side": action.get("side", ""), "symbol": symbol, "date": day,
+            "price": action.get("price_gbp"),
+            "source": found.source if found else "", "unit": found.raw_quote_unit if found else "",
+            "raw_close": found.raw_close if found else None,
+            "verified": bool(found and found.source == "yahoo" and found.raw_unit_verified),
+            "found": found is not None,
+        })
+    return tuple(rows)
 
 
 @login_required

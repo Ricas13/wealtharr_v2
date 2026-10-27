@@ -8,16 +8,22 @@
 {% if c.empty %}
   <div class="w2-chart-empty" role="status" style="min-height:{{ height|default:190 }}px">Not enough recorded daily values for this period yet. Values are saved after each hourly price check.</div>
 {% else %}
-  <div class="w2-legend">{% for line in c.lines %}<span><span class="w2-sw {{ line.css }}"></span>{{ line.label }}</span>{% endfor %}{% if c.mode == 'pct' %}<span>Deposits removed{% if c.lines|length > 1 %}; indexes are USD price only{% endif %}</span>{% endif %}</div>
-  <div class="w2-chart">
+  <div class="w2-legend">{% for line in c.lines %}<span><span class="w2-sw {{ line.css }}"></span>{{ line.label }}</span>{% endfor %}{% if c.mode == 'pct' %}<span>Deposits removed{% if c.lines|length > 1 %}; indexes are USD price only{% endif %}</span>{% endif %}{% if c.underwater %}<span><span class="w2-sw w2-sw-under"></span>Below money put in</span>{% endif %}</div>
+  <div class="w2-chart" data-chart-probe data-readout="{{ c.readout_json }}" tabindex="0"
+       aria-label="{{ label }}. Use the left and right arrow keys to read values.">
     <svg viewBox="0 0 800 200" preserveAspectRatio="none" style="height:{{ height|default:190 }}px" role="img"
          aria-label="{{ label }} from {{ c.first|date:'j M Y' }} to {{ c.last|date:'j M Y' }}">
       <line class="w2-grid-line" x1="0" y1="50" x2="800" y2="50"></line>
       <line class="w2-grid-line" x1="0" y1="100" x2="800" y2="100"></line>
       <line class="w2-grid-line" x1="0" y1="150" x2="800" y2="150"></line>
       {% if c.zero is not None %}<line class="w2-zero-line" x1="0" y1="{{ c.zero|floatformat:1 }}" x2="800" y2="{{ c.zero|floatformat:1 }}"></line>{% endif %}
+      {% for shape in c.underwater %}<polygon class="w2-underwater" points="{{ shape }}"></polygon>{% endfor %}
       {% for line in c.lines %}<polyline class="{{ line.css }}" points="{{ line.points }}"></polyline>{% endfor %}
     </svg>
+    <div class="w2-probe" hidden aria-hidden="true"><span class="w2-probe-line"></span><div class="w2-probe-tip"></div></div>
+    <div class="w2-zoom-box" hidden></div>
+    <button type="button" class="w2-linklike w2-zoom-reset" hidden>Reset zoom</button>
+    <p class="w2-sr" role="status" aria-live="polite" data-probe-live></p>
     <div class="w2-ylabels" aria-hidden="true">{% for y in c.y_labels %}<span>{{ y }}</span>{% endfor %}</div>
   </div>
   <div class="w2-axis" aria-hidden="true">{% for t in c.ticks %}<span>{{ t|date:"j M y" }}</span>{% endfor %}</div>

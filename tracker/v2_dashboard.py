@@ -5,6 +5,7 @@ hourly recorded daily values (StrategyValueSnapshot) and stored Yahoo closes.
 Nothing fetches prices, evaluates the strategy or writes to the database.
 Index lines are the index's own USD price change, never a simulated portfolio.
 """
+import json
 from collections import OrderedDict
 from datetime import date, timedelta
 from decimal import Decimal
@@ -165,6 +166,11 @@ def chart(points, *, span, mode, indexes=True):
                 "%s,%.1f" % (x, y) for x, y in zip(xs([d for d, _ in pts]), ys))})
         labels = ["%+.1f%%" % hi, "%+.1f%%" % ((hi + lo) / 2), "%+.1f%%" % lo]
         zero = _scale([ZERO], lo, hi)[0]
+        by_date = [{d: v for d, v in pts} for _, _, pts in series]
+        readout = [{"x": xi, "d": d.isoformat(), "t": [
+            "%s %+.1f%%" % (series[n][0], by_date[n][d]) for n in range(len(series)) if d in by_date[n]]}
+            for xi, (d, _) in zip(xs([d for d, _ in series[0][2]]), series[0][2])]
+        underwater = []
     else:
         values = [v for _, v, _ in shown] + [n for _, _, n in shown]
         lo, hi = min(values), max(values)
@@ -188,11 +194,23 @@ def chart(points, *, span, mode, indexes=True):
         cur = current_symbol()
         labels = [cur + "{:,.0f}".format(v) for v in (hi, (hi + lo) / 2, lo)]
         zero = None
+        readout = [{"x": xi, "d": p[0].isoformat(), "t": [
+            "Value " + cur + "{:,.0f}".format(p[1]), "Net deposits " + cur + "{:,.0f}".format(p[2])]}
+            for xi, p in zip(x, shown)]
+        # Shade where the value sits below the money put in (an honest "under
+        # water" mark, not a return figure).
+        y_value, y_net = _scale([p[1] for p in shown], lo, hi), _scale([p[2] for p in shown], lo, hi)
+        underwater = []
+        for i in range(1, len(shown)):
+            if shown[i - 1][1] < shown[i - 1][2] and shown[i][1] < shown[i][2]:
+                underwater.append("%s,%.1f %s,%.1f %s,%.1f %s,%.1f" % (
+                    x[i - 1], y_value[i - 1], x[i], y_value[i], x[i], y_net[i - 1], x[i - 1], y_net[i - 1]))
     ticks = [first + timedelta(days=round(days * i / 4)) for i in range(5)]
     return {
         "empty": False, "span": span, "mode": mode, "lines": lines,
         "y_labels": labels, "zero": zero, "ticks": ticks,
         "first": first, "last": last,
+        "readout_json": json.dumps(readout), "underwater": underwater,
     }
 
 

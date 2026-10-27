@@ -805,3 +805,17 @@ body.v2 {
 .w2-admin-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px;align-items:end}
 .w2-admin-form>:not(.w2-field),.w2-admin-form>label.w2-field:last-of-type:nth-of-type(odd){grid-column:1/-1}
 @media (max-width:760px){.w2-admin-form{grid-template-columns:minmax(0,1fr)}}
+
+/* Chart reading and zoom */
+.w2-chart { position: relative; touch-action: pan-y; }
+.w2-chart svg polyline { vector-effect: non-scaling-stroke; }
+.w2-underwater { fill: color-mix(in srgb, var(--w2-negative) 22%, transparent); stroke: none; }
+.w2-sw-under { background: color-mix(in srgb, var(--w2-negative) 45%, transparent); }
+.w2-probe { position: absolute; inset: 0 0 0 0; pointer-events: none; }
+.w2-probe-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--w2-muted); }
+.w2-probe-tip { position: absolute; top: 6px; padding: 6px 8px; font-size: 11px; line-height: 1.45; white-space: nowrap;
+  background: var(--w2-panel); border: 1px solid var(--w2-stroke); border-radius: 6px; box-shadow: var(--w2-shadow-pop); }
+.w2-zoom-box { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--w2-accent) 18%, transparent);
+  border-inline: 1px solid var(--w2-accent); pointer-events: none; }
+.w2-zoom-reset { position: absolute; top: 4px; right: 4px; z-index: 2; }
+.w2-chart:focus-visible { outline: 2px solid var(--w2-accent); outline-offset: 3px; }
