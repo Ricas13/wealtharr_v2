@@ -136,3 +136,19 @@ class BillingEvent(models.Model):
     class Meta:
         ordering = ["-received_at"]
         constraints = [models.UniqueConstraint(fields=["provider", "event_id"], name="one_billing_event")]
+
+
+class SupportGrant(models.Model):
+    """A user's time-boxed permission for the platform admin to look at their account's metadata."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="support_grants")
+    reason = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def is_active(self, now=None):
+        from django.utils import timezone
+        return self.revoked_at is None and self.expires_at > (now or timezone.now())

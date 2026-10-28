@@ -1,0 +1,14 @@
+{% extends 'v2/base.html' %}{% block title %}Support view{% endblock %}{% block content %}
+<header class="w2-page-heading"><div><h1>{{ subject.get_username }}</h1><p class="w2-overline">Metadata only · allowed until {{ grant.expires_at|date:"j M H:i" }} · this look is logged for them</p></div></header>
+<section class="w2-panel w2-space-top">
+  <div class="w2-kv"><span>Plan</span><span>{{ meta.plan }}</span></div>
+  <div class="w2-kv"><span>Joined</span><span>{{ meta.joined|date:"j M Y" }}</span></div>
+  <div class="w2-kv"><span>Last sign-in</span><span>{{ meta.last_login|date:"j M Y H:i"|default:"never" }}</span></div>
+  <div class="w2-kv"><span>Active</span><span>{{ meta.active|yesno:"yes,no" }}</span></div>
+  <div class="w2-kv"><span>Accounts / ledger entries / reviews</span><span>{{ meta.accounts }} / {{ meta.ledger_entries }} / {{ meta.reviews }}</span></div>
+  <div class="w2-kv"><span>Strategies</span><span>{{ meta.strategies|join:", "|default:"none" }}</span></div>
+  <div class="w2-kv"><span>Alert channels on</span><span>{% for name, on in meta.channels.items %}{{ name }}: {{ on|yesno:"on,off" }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></div>
+  <div class="w2-kv"><span>Alerts, last 30 days</span><span>{% for status, n in meta.deliveries_30d.items %}{{ status|lower }} {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}none{% endfor %}</span></div>
+  <h2 class="w2-subheading">Recent account events</h2>
+  <ul>{% for when, action in meta.recent_events %}<li>{{ when|date:"j M H:i" }} · {{ action }}</li>{% empty %}<li class="w2-muted">None.</li>{% endfor %}</ul>
+</section>{% endblock %}

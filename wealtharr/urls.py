@@ -4,7 +4,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 from tracker import guides, pwa, seo, totp_views, v2_auth, v2_home
 
-from tenancy import views as tenancy_views
+from tenancy import support, views as tenancy_views
 
 urlpatterns = [
     path("", v2_home.landing, name="home"),
@@ -35,4 +35,8 @@ urlpatterns = [
     path("health/", v2_auth.health, name="health"),
     path("webhooks/stripe/", tenancy_views.stripe_webhook, name="stripe_webhook"),
     path("plans/", tenancy_views.plans_page, name="plans"),
+    path("support-access/", support.my_support_access, name="support_access"),
+    path("support-access/off/", support.revoke_support_access, name="revoke_support_access"),
+    path("support/", support.support_index, name="support_index"),
+    path("support/<int:user_id>/", support.support_view, name="support_view"),
 ]
