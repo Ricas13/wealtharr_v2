@@ -16,13 +16,11 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import StrategyInstance
+from .tenant_scope import strategies_of
 
 
 def owner_instances(user):
-    return StrategyInstance.objects.filter(
-        owner=user, account__owner=user
-    ).exclude(account__kind="PAPER").order_by("created_at", "pk")
+    return strategies_of(user, include_paper=False).order_by("created_at", "pk")
 
 
 def preferred_url(user, section="today"):

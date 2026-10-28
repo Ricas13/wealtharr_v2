@@ -8,6 +8,7 @@ set a new baseline, so they still wait for the owner to finish them.
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from tenancy.context import per_tenant
 from .cockpit_execution import completion_rows, finalize_manual_review
 from .strategies.registry import last_review_before
 from .models import RebalanceExecution, SignalFill, StrategySignal
@@ -22,7 +23,7 @@ def auto_finish_reviews(today=None):
         kind="QUARTERLY", as_of__lt=today, reset_reason="",
         strategy__tracking_only=False,
     ).exclude(review_outcome__in=("FALSE_POSITIVE", "NOT_APPLICABLE", "CONFIRMED"))
-    for signal in signals:
+    for signal in per_tenant(signals, lambda s: s.strategy.owner_id):
         if signal.as_of > last_review_before(signal.strategy, today):
             continue
         if RebalanceExecution.objects.filter(signal=signal).exists():

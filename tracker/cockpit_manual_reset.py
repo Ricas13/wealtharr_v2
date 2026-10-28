@@ -19,6 +19,7 @@ from .models import (
 )
 from .services import ledger_summary
 from .strategies.nine_sig.v2 import _floor_qty, _order
+from .tenant_scope import strategies_of
 
 D = Decimal
 ZERO = D("0")
@@ -35,8 +36,8 @@ def choose_manual_reserve_reset(*, owner, strategy_id, signal_id):
     alone may request an alternative 60/40 plan, which is not a confirmed reset
     unless the existing later-dated single-fill workflow succeeds.
     """
-    strategy = StrategyInstance.objects.select_for_update().select_related(
-        "preset", "account").get(pk=strategy_id, owner=owner)
+    strategy = strategies_of(owner).select_for_update().select_related(
+        "preset", "account").get(pk=strategy_id)
     original = StrategySignal.objects.select_for_update().get(
         pk=signal_id, strategy=strategy)
     existing = StrategySignal.objects.filter(

@@ -9,6 +9,7 @@ from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
 
+from tenancy.context import per_tenant
 from .models import NotificationDelivery, NotificationSchedulerRun
 from .services import dispatch
 from .notification_routing import category_for_event_key, selected_channels, strategy_channels
@@ -30,7 +31,7 @@ def retry_due_deliveries(*, as_of=None):
     ).order_by("created_at", "pk")[:MAX_RETRY_ROWS]
     attempted = 0
     sent = 0
-    for row in rows:
+    for row in per_tenant(rows):
         category = row.category or category_for_event_key(row.event_key)
         pref, _ = NotificationPreference.objects.get_or_create(owner=row.owner)
         if row.strategy_id and row.strategy.owner_id != row.owner_id:

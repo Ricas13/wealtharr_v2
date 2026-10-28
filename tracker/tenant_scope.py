@@ -6,7 +6,9 @@ active) and, explicitly, owned by that user and their account.
 """
 from django.shortcuts import get_object_or_404
 
-from .models import StrategyInstance
+from tenancy.context import tenant_context
+
+from .models import Account, StrategyInstance
 
 
 def strategy_queryset(request, *, include_paper=False):
@@ -23,3 +25,19 @@ def get_strategy_or_404(request, instance_id, *, locked=False):
     if locked:
         rows = rows.select_for_update()
     return get_object_or_404(rows, pk=instance_id)
+
+
+def strategies_of(user, *, include_paper=True):
+    """A user's strategies, for code that has a user but no request (services, jobs, forms).
+
+    Still read through the tenant manager: the context is set for the moment the query is built.
+    """
+    with tenant_context(user):
+        rows = StrategyInstance.tenant_objects.filter(owner=user, account__owner=user)
+    return rows if include_paper else rows.exclude(account__kind="PAPER")
+
+
+def accounts_of(user):
+    """A user's accounts, through the tenant manager."""
+    with tenant_context(user):
+        return Account.tenant_objects.filter(owner=user)

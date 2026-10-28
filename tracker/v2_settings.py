@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import NotificationForm
-from .tenant_scope import get_strategy_or_404
+from .tenant_scope import get_strategy_or_404, strategies_of
 from .models import (
     NotificationDelivery, NotificationPreference,
     OwnerTOTP, StrategyInstance, SystemIntegration,
@@ -132,7 +132,7 @@ def settings_page(request):
                   for strategy in settings_instances]
     config = SystemIntegration.objects.filter(pk=1).first()
     last_receipts = list(
-        NotificationDelivery.objects.filter(owner=request.user)
+        NotificationDelivery.tenant_objects.filter(owner=request.user)
         .order_by("-created_at", "-pk")
         .values("channel", "category", "status", "created_at", "attempts")[:10]
     )
@@ -163,7 +163,7 @@ def _telegram_link(pref, config):
 
 def _copy_discord_routes_to_telegram(owner):
     """On first connect, strategies send to Telegram what they already send to Discord."""
-    for strategy in StrategyInstance.objects.filter(owner=owner):
+    for strategy in strategies_of(owner):
         routes = strategy.alert_routes if isinstance(strategy.alert_routes, dict) else {}
         changed = False
         for row in routes.values():

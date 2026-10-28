@@ -1,6 +1,7 @@
 """Check Yahoo quotes and review every live strategy; safe for an hourly scheduler."""
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from tenancy.context import per_tenant
 from tracker.market_data import QUOTE_MAX_AGE
 from tracker.models import MarketObservation, StrategyInstance, StrategyValueSnapshot
 from tracker.market_data import sync_ticker
@@ -66,9 +67,9 @@ class Command(BaseCommand):
         ok = 0
         fail = 0
         owners = set()
-        for strategy in StrategyInstance.objects.select_related("account", "preset", "owner").filter(
+        for strategy in per_tenant(StrategyInstance.objects.select_related("account", "preset", "owner").filter(
                 market_data_enabled=True, tracking_only=False,
-                preset__slug__in=plugin_keys(), preset__active=True):
+                preset__slug__in=plugin_keys(), preset__active=True)):
             owners.add(strategy.owner)
             try:
                 plugin = module_for(strategy)

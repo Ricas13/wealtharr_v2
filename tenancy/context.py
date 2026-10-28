@@ -35,3 +35,14 @@ def tenant_context(tenant):
         yield value
     finally:
         _tenant_id.reset(token)
+
+
+def per_tenant(items, user_id=lambda item: item.owner_id):
+    """Yield each item inside its owner's tenant context (for jobs that loop over everyone).
+
+    The context is set before each item is handed to the loop body and cleared afterwards, even
+    if the body continues, breaks or raises.
+    """
+    for item in items:
+        with tenant_context(user_id(item)):
+            yield item
