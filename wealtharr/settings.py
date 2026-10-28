@@ -143,6 +143,8 @@ X_FRAME_OPTIONS = "DENY"
 TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
 # The one public origin search engines should index, e.g. https://www.example.com.
 # When set, every other host 301-redirects to it; add both hosts to ALLOWED_HOSTS.
+# Ask each person to confirm they chose their strategy themselves when adding one (off: today's flow).
+REQUIRE_CHOICE_ACK = os.environ.get("REQUIRE_CHOICE_ACK", "0") == "1"
 SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/")
 # Shown on the privacy page for access and deletion requests; optional.
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "").strip()

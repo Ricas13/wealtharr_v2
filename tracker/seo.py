@@ -7,7 +7,7 @@ forms — is marked noindex and disallowed in robots.txt.
 from datetime import date
 
 from django.conf import settings
-from django.http import HttpResponse, HttpResponsePermanentRedirect
+from django.http import Http404, HttpResponse, HttpResponsePermanentRedirect
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_GET
@@ -19,7 +19,7 @@ PRIVATE_PREFIXES = (
     "/s/", "/overview/", "/settings/", "/add-strategy/", "/login/", "/logout/",
     "/security/", "/control/", "/django-admin/", "/invite/", "/compare.json", "/health/",
 )
-SITE_UPDATED = date(2026, 10, 21)
+SITE_UPDATED = date(2026, 10, 28)
 
 
 def site_url(request=None):
@@ -31,11 +31,11 @@ def site_url(request=None):
 
 def public_paths():
     return (["/", reverse("guides")] + [reverse("guide", args=[g["slug"]]) for g in GUIDES]
-            + [reverse("privacy")])
+            + [reverse("privacy"), reverse("terms")])
 
 
 def is_public(path):
-    return path in set(public_paths()) or path in ("/robots.txt", "/sitemap.xml", "/site.webmanifest")
+    return path in set(public_paths()) or path in ("/robots.txt", "/sitemap.xml", "/site.webmanifest", "/.well-known/security.txt")
 
 
 class SeoMiddleware:
@@ -66,11 +66,24 @@ def robots_txt(request):
 
 
 @require_GET
+def security_txt(request):
+    """RFC 9116 contact for people who find a vulnerability. Needs CONTACT_EMAIL; otherwise absent."""
+    if not settings.CONTACT_EMAIL:
+        raise Http404
+    from datetime import timedelta
+    lines = ["Contact: mailto:%s" % settings.CONTACT_EMAIL,
+             "Expires: %sT00:00:00Z" % (date.today() + timedelta(days=180)).isoformat(),
+             "Preferred-Languages: en",
+             "Canonical: %s/.well-known/security.txt" % site_url(request)]
+    return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")
+
+
+@require_GET
 @cache_page(3600)
 def sitemap_xml(request):
     base = site_url(request)
     updated = {"/": SITE_UPDATED, reverse("guides"): max(g["updated"] for g in GUIDES),
-               reverse("privacy"): SITE_UPDATED}
+               reverse("privacy"): SITE_UPDATED, reverse("terms"): SITE_UPDATED}
     for guide in GUIDES:
         updated[reverse("guide", args=[guide["slug"]])] = guide["updated"]
     rows = "".join(

@@ -25,10 +25,24 @@
       {% if contact_email %}Write to <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% else %}Reply to any email you've had from Wealtharr.{% endif %}
       If you're unhappy with how your data is handled, you can complain to the UK Information Commissioner's Office (ico.org.uk).</p>
 
-    <h2>The private app</h2>
-    <p>Signed-in accounts are created by hand for invited people. What you record there (deposits, trades and alert settings) is visible only to your own account, is used only to run your strategy and alerts, and never leaves Wealtharr except as the alerts you set up yourself. Wealtharr never connects to a broker.</p>
+    <h2>Your account</h2>
+    <p>An account holds what you record (deposits, trades, reviews you confirm), your alert settings and, if you connect them, destinations for alerts such as an email address, a Discord or Telegram chat, or a webhook (stored encrypted). This is used only to run your strategies and send the alerts you chose. Other users cannot see it. Wealtharr never connects to a broker.</p>
 
-    <p class="mut tiny">Last updated 21 October 2026.</p>
+    <h2>Who else handles data</h2>
+    <ul>
+      <li><strong>Email and chat delivery</strong>: alerts and account emails go through the mail server the operator configured, and through Discord or Telegram if you connect them.</li>
+      <li><strong>Prices</strong>: public price feeds are asked for market prices only; no personal data is sent.</li>
+      <li><strong>Payments</strong>, if a paid plan is offered: Stripe or PayPal handle card and payment details; Wealtharr does not see or store them, and keeps only a customer reference.</li>
+      <li><strong>Hosting</strong>: the operator's own servers and backups.</li>
+    </ul>
+
+    <h2>Support access</h2>
+    <p>The operator can look at counts and settings of your account (never amounts, ledger rows or messages) only for the time you allow it, and every look is listed for you.</p>
+
+    <h2>Closing your account</h2>
+    <p>You can download your data and close your account yourself. Closing removes your name, email, alert destinations, saved connections and authenticator, and makes the account unusable. Your recorded ledger and reviews are append-only financial records; they stay without your name for the retention period in the operator's retention policy unless you ask for them to be erased.</p>
+
+    <p class="mut tiny">Last updated 28 October 2026.</p>
   </section>
 </div>
 {% endblock %}
