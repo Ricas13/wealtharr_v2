@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 
 from . import audit, features
-from .models import AuditEvent, Plan, UserAccess
+from .models import AuditEvent, BillingEvent, Plan, UserAccess
 
 
 def _feature_choices(only_limits=False):
@@ -31,7 +31,7 @@ class PlanForm(forms.ModelForm):
 
     class Meta:
         model = Plan
-        fields = ["name", "slug", "description", "price_label", "stripe_link", "paypal_link", "is_public",
+        fields = ["name", "slug", "description", "price_label", "stripe_link", "stripe_payment_link_id", "paypal_link", "is_public",
                   "sort_order", "all_features", "features", "limits", "is_default"]
 
     def __init__(self, *args, **kwargs):
@@ -108,10 +108,11 @@ class PlanAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     fieldsets = (
         (None, {"fields": ("name", "slug", "description", "price_label", "is_public", "sort_order", "is_default")}),
-        ("Payment links", {"fields": ("stripe_link", "paypal_link"),
-                           "description": "Links to a payment page you made on Stripe or PayPal. The app does not "
-                                          "learn from them that someone paid: assign the plan to the user yourself "
-                                          "under Users."}),
+        ("Payment links", {"fields": ("stripe_link", "stripe_payment_link_id", "paypal_link"),
+                           "description": "Links to a payment page you made on Stripe or PayPal. With a Stripe "
+                                          "Payment Link id here and the webhook enabled (STRIPE_WEBHOOK_SECRET), a "
+                                          "paid checkout assigns this plan automatically. Otherwise (and always for "
+                                          "PayPal) assign the plan yourself under Users."}),
         ("What the plan includes", {"fields": ("all_features", "features", "limits")}),
     )
 
@@ -228,6 +229,29 @@ class AuditEventAdmin(admin.ModelAdmin):
     list_display = ("occurred_at", "action", "actor_label", "subject_id", "target_type", "target_id", "ip")
     list_filter = ("action",)
     search_fields = ("actor_label", "action", "request_id")
+    ordering = ("-id",)
+
+    def has_module_permission(self, request):
+        return _platform_admin(request)
+
+    def has_view_permission(self, request, obj=None):
+        return _platform_admin(request)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BillingEvent)
+class BillingEventAdmin(admin.ModelAdmin):
+    """Payment events the webhook has handled. Read-only."""
+    list_display = ("received_at", "provider", "event_type", "outcome", "event_id")
+    list_filter = ("provider", "event_type")
     ordering = ("-id",)
 
     def has_module_permission(self, request):
