@@ -59,6 +59,14 @@
          href="{% url 'v2_settings' %}" {% if page_key == 'settings' %}aria-current="page"{% endif %} title="Alerts &amp; settings">
         {% include 'partials/icon.html' with name='settings' %}<span class="w2-nav-label">Alerts &amp; settings</span>
       </a>
+      <a class="w2-nav-link {% if page_key == 'account' %}w2-active{% endif %}"
+         href="{% url 'account' %}" {% if page_key == 'account' %}aria-current="page"{% endif %} title="Sign-in, your data, close account">
+        {% include 'partials/icon.html' with name='shield' %}<span class="w2-nav-label">Account</span>
+      </a>
+      <a class="w2-nav-link {% if page_key == 'plans' %}w2-active{% endif %}"
+         href="{% url 'plans' %}" {% if page_key == 'plans' %}aria-current="page"{% endif %} title="Your plan">
+        {% include 'partials/icon.html' with name='coins' %}<span class="w2-nav-label">Your plan</span>
+      </a>
     </nav>
     {% if request.user.is_staff %}
     <nav class="w2-sidebar-admin" aria-label="Admin">
@@ -74,6 +82,9 @@
         {% include 'partials/icon.html' with name='wallet' %}<span class="w2-nav-label">Users</span>
       </a>
       {% if request.user.is_superuser %}
+      <a class="w2-nav-link {% if page_key == 'support_admin' %}w2-active{% endif %}" href="{% url 'support_index' %}" title="Users who allowed a look">
+        {% include 'partials/icon.html' with name='shield' %}<span class="w2-nav-label">Support</span>
+      </a>
       <a class="w2-nav-link" href="{% url 'admin:tenancy_plan_changelist' %}" title="Plans, prices and features">
         {% include 'partials/icon.html' with name='coins' %}<span class="w2-nav-label">Plans</span>
       </a>

@@ -32,3 +32,8 @@ def _login_failed(sender, credentials, request=None, **kwargs):
     # No username or password is stored: only that a sign-in failed, and from where.
     _safely("auth.login_failed", request=request)
 
+
+
+user_logged_in.connect(
+    __import__("tenancy.accounts", fromlist=["remember_session"]).remember_session,
+    dispatch_uid="tenancy.remember_session")

@@ -102,7 +102,7 @@ def fetch_study_chart(symbol, since):
             "Accept": "application/json",
         })
         try:
-            with urlopen(request, timeout=20) as response:
+            with urlopen(request, timeout=20) as response:  # nosec B310 - fixed https endpoint
                 payload = json.loads(response.read(8_000_000))
             chart = (payload.get("chart", {}).get("result") or [None])[0]
             if chart:

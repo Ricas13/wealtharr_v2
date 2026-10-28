@@ -1,0 +1,19 @@
+{% extends 'v2/base.html' %}{% block title %}Support access{% endblock %}{% block content %}
+<header class="w2-page-heading"><div><h1>Support access</h1><p class="w2-overline">You decide, and it switches itself off</p></div></header>
+<section class="w2-panel w2-space-top">
+  <p>If you ask the site owner for help, you can let them look at your account for a short time. They see <strong>counts and settings only</strong>: your plan, how many strategies and records you have, which alert channels are on, and recent account events. They never see amounts, prices, ledger rows or messages, and cannot change anything. Every look is listed below.</p>
+  {% if grant %}
+    <p><span class="w2-chip w2-ok">On</span> until {{ grant.expires_at|date:"j M H:i" }}{% if grant.reason %} · {{ grant.reason }}{% endif %}</p>
+    <form method="post" action="{% url 'revoke_support_access' %}">{% csrf_token %}<button class="w2-button" type="submit">Turn off now</button></form>
+  {% else %}
+    <form method="post" class="w2-auth-form">{% csrf_token %}
+      <label for="sup-hours">Allow access for</label>
+      <select id="sup-hours" name="hours"><option value="1">1 hour</option><option value="4">4 hours</option><option value="24" selected>24 hours</option><option value="72">3 days</option></select>
+      <label for="sup-reason">What do you need help with? (optional)</label><input id="sup-reason" name="reason" maxlength="200">
+      <button class="w2-button w2-button-primary" type="submit">Allow support access</button></form>
+  {% endif %}
+</section>
+<section class="w2-panel w2-space-top"><h2>Activity</h2>
+  <ul>{% for e in log %}<li>{{ e.occurred_at|date:"j M Y H:i" }} · {{ e.action }}{% if e.actor_label %} · {{ e.actor_label }}{% endif %}</li>{% empty %}<li class="w2-muted">Nothing yet.</li>{% endfor %}</ul>
+</section>
+{% endblock %}

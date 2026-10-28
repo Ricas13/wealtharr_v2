@@ -81,6 +81,9 @@ class Plan(models.Model):
     price_label = models.CharField(max_length=60, blank=True, help_text='Shown as written, e.g. "£5 / month".')
     stripe_link = models.URLField(blank=True, help_text="A Stripe Payment Link or Checkout link (https only).")
     paypal_link = models.URLField(blank=True, help_text="A PayPal payment or subscription link (https only).")
+    stripe_payment_link_id = models.CharField(
+        max_length=80, blank=True,
+        help_text='The Payment Link\'s id ("plink_..."). When set, a paid Stripe checkout for it assigns this plan automatically.')
     is_public = models.BooleanField(default=False, help_text="May be offered to users on a plans page.")
     sort_order = models.PositiveSmallIntegerField(default=0)
     all_features = models.BooleanField(
@@ -111,6 +114,7 @@ class UserAccess(models.Model):
     grant = models.JSONField(default=list, blank=True)
     deny = models.JSONField(default=list, blank=True)
     note = models.CharField(max_length=200, blank=True)
+    stripe_customer_id = models.CharField(max_length=80, blank=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -119,3 +123,32 @@ class UserAccess(models.Model):
 
     def __str__(self):
         return "%s: %s" % (self.user_id, self.plan)
+
+
+class BillingEvent(models.Model):
+    """One processed payment-provider event. The unique id makes redelivery harmless."""
+    provider = models.CharField(max_length=20, default="stripe")
+    event_id = models.CharField(max_length=120)
+    event_type = models.CharField(max_length=80)
+    outcome = models.CharField(max_length=200, blank=True)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-received_at"]
+        constraints = [models.UniqueConstraint(fields=["provider", "event_id"], name="one_billing_event")]
+
+
+class SupportGrant(models.Model):
+    """A user's time-boxed permission for the platform admin to look at their account's metadata."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="support_grants")
+    reason = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def is_active(self, now=None):
+        from django.utils import timezone
+        return self.revoked_at is None and self.expires_at > (now or timezone.now())

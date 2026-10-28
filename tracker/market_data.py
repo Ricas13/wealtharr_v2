@@ -79,7 +79,7 @@ def fetch_chart(symbol, since):
             "Accept": "application/json",
         })
         try:
-            with urlopen(req, timeout=14) as response:
+            with urlopen(req, timeout=14) as response:  # nosec B310 - fixed https endpoint
                 if response.status != 200:
                     raise ValueError("Yahoo chart returned a non-200 status")
                 payload = json.loads(response.read(4_000_000))
