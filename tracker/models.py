@@ -653,3 +653,44 @@ for _model in (StrategyGoLive, InstanceOpeningSnapshot, LedgerEntry, LedgerRevis
                SignalFill, BrokerImportRow):
     _model.add_to_class("tenant_objects", TenantManager("strategy__owner"))
 OpeningReconciliation.add_to_class("tenant_objects", TenantManager("opening__strategy__owner"))
+
+
+class PaymentProviderCredential(models.Model):
+    """One payment gateway's credentials (encrypted together) and switches, set on the admin page.
+    With no row the gateway uses environment settings, if any."""
+    provider = models.CharField(max_length=20, unique=True)
+    secrets_encrypted = models.TextField(blank=True)
+    options = models.JSONField(default=dict, blank=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.provider
+
+
+class PlanProviderMapping(models.Model):
+    """Which price (Stripe) or plan (PayPal) at the gateway a Wealtharr plan is sold as.
+    Checkout is offered only once the gateway confirmed it exists, is active and recurring."""
+    plan = models.ForeignKey("tenancy.Plan", on_delete=models.CASCADE, related_name="provider_mappings")
+    provider = models.CharField(max_length=20)
+    external_id = models.CharField(max_length=80)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verification_note = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["plan", "provider"], name="one_mapping_per_provider")]
+
+    def __str__(self):
+        return f"{self.plan} / {self.provider}"
+
+
+class ProviderSubscription(models.Model):
+    """A gateway subscription that belongs to a user, so a later cancel or expiry finds them."""
+    provider = models.CharField(max_length=20)
+    external_id = models.CharField(max_length=80)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["provider", "external_id"], name="one_provider_subscription")]

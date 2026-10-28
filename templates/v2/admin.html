@@ -44,6 +44,35 @@
     <form method="post" action="{% url 'v2_notification_test' channel='telegram' %}" class="w2-space-top">{% csrf_token %}<button type="submit" class="w2-button">Send Telegram test</button></form>
   </section>
 
+  {% for g in gateways %}
+  <section class="w2-card" aria-labelledby="w2-admin-{{ g.provider }}-title" id="{{ g.provider }}">
+    <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-{{ g.provider }}-title">{% include 'partials/icon.html' with name='coins' %} {{ g.label }}</h2>
+      <span class="w2-chip {% if g.checkout_ready %}w2-ok{% endif %}">{{ g.summary }}</span></div>
+    <p class="w2-note">Settings come from {% if g.source == 'database' %}this page{% else %}the server's environment{% endif %}. Prices, features and which {{ g.label }} {% if g.provider == 'stripe' %}price{% else %}plan{% endif %} each Wealtharr plan is sold as are set under <a href="{% url 'admin:tenancy_plan_changelist' %}">Plans</a>. Customers go to {{ g.label }}'s own page to pay; Wealtharr never sees card details.</p>
+    <details class="w2-note" id="{{ g.provider }}-setup">
+      <summary><strong>Set up {{ g.label }}</strong> (once)</summary>
+      <ol class="w2-setup-steps">
+      {% if g.provider == 'stripe' %}
+        <li>In Stripe, create a product with a <strong>recurring</strong> price for each paid plan. Copy each price id (<code>price_…</code>) into that plan under Plans.</li>
+        <li>Create a restricted API key that can write Checkout Sessions and read Prices (or use a secret key), paste it below and save, then press <strong>Test connection</strong>.</li>
+        <li>In Stripe → Developers → Webhooks add an endpoint at <code>{{ g.webhook_url }}</code> listening to <code>checkout.session.completed</code> and <code>customer.subscription.deleted</code>. Paste its signing secret below.</li>
+        <li>Do a test-mode checkout end to end before taking real payments.</li>
+      {% else %}
+        <li>In the PayPal developer dashboard create an app (Sandbox first) and copy its client ID and secret below. Choose the matching environment.</li>
+        <li>Create a subscription plan for each paid plan in PayPal and copy its id (<code>P-…</code>) into that plan under Plans.</li>
+        <li>Add a webhook at <code>{{ g.webhook_url }}</code> for <em>Billing subscription activated, cancelled, expired</em> and <em>suspended</em>. Paste its Webhook ID below.</li>
+        <li>Note: a PayPal cancellation moves the person back to the default plan straight away, even if they paid for the current period.</li>
+      {% endif %}
+      </ol>
+    </details>
+    {% include "partials/admin_form.html" with form=g.form kind=g.provider button="Save" %}
+    <div class="w2-row w2-space-top">
+      <form method="post" action="{% url 'gateway_test' g.provider %}">{% csrf_token %}<button type="submit" class="w2-button">Test connection</button></form>
+      {% if g.source == 'database' %}<form method="post" action="{% url 'gateway_use_environment' g.provider %}">{% csrf_token %}<button type="submit" class="w2-button">Forget these and use the server's settings</button></form>{% endif %}
+    </div>
+  </section>
+  {% endfor %}
+
   <section class="w2-card" aria-labelledby="w2-admin-test-title">
     <div class="w2-ch"><h2 class="w2-ct" id="w2-admin-test-title">{% include 'partials/icon.html' with name='activity' %} Status</h2></div>
     <p class="w2-note">Each test button sends to your own destinations from Alerts &amp; settings.</p>

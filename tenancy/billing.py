@@ -1,4 +1,4 @@
-"""Stripe webhook handling. Inactive unless STRIPE_WEBHOOK_SECRET is set.
+"""Stripe webhook handling. Inactive unless a webhook secret is saved on the admin Payments card (or set in the environment).
 
 Only two events matter: a completed checkout assigns the plan whose Payment Link was used to
 the user named in ``client_reference_id``; a deleted subscription puts that customer back on
@@ -9,7 +9,6 @@ import hmac
 import json
 import time
 
-from django.conf import settings
 from django.db import IntegrityError, transaction
 
 from . import audit
@@ -53,6 +52,17 @@ def _assign(user, plan, customer_id, event_type):
                  metadata={"plan": plan.slug, "from_plan_id": before, "via": event_type})
 
 
+def _plan_for_stripe_session(obj):
+    """The plan bought: the one our own checkout named (and that has a Stripe price), else by Payment Link."""
+    from tracker.models import PlanProviderMapping
+    slug = (obj.get("metadata") or {}).get("plan_slug")
+    if slug:
+        mapped = PlanProviderMapping.objects.filter(provider="stripe", plan__slug=slug).select_related("plan").first()
+        if mapped:
+            return mapped.plan
+    return Plan.objects.filter(stripe_payment_link_id=obj.get("payment_link") or "-").first()
+
+
 def apply_event(event):
     """Apply one verified event; returns a short outcome string."""
     kind = event.get("type", "")
@@ -61,7 +71,7 @@ def apply_event(event):
         if obj.get("payment_status") not in ("paid", "no_payment_required"):
             return "ignored: not paid"
         user = _user_for(obj.get("client_reference_id"))
-        plan = Plan.objects.filter(stripe_payment_link_id=obj.get("payment_link") or "-").first()
+        plan = _plan_for_stripe_session(obj)
         if user is None or plan is None:
             return "ignored: unknown user or payment link"
         _assign(user, plan, obj.get("customer") or "", kind)
@@ -76,23 +86,75 @@ def apply_event(event):
     return "ignored: event type"
 
 
+def _record_and_apply(provider, event, apply):
+    """Store the event id once and apply it, all or nothing. (status, text)."""
+    try:
+        event_id = str(event["id"])[:120]
+    except (KeyError, TypeError):
+        return 400, "bad payload"
+    try:
+        with transaction.atomic():
+            row = BillingEvent.objects.create(provider=provider, event_id=event_id,
+                                              event_type=str(event.get("event_type") or event.get("type", ""))[:80])
+            row.outcome = apply(event)[:200]
+            row.save(update_fields=["outcome"])
+    except IntegrityError:
+        return 200, "duplicate"
+    return 200, "ok"
+
+
 def process(payload, header, now=None):
-    """(http_status, text). Verifies, de-duplicates, applies; all-or-nothing."""
-    secret = getattr(settings, "STRIPE_WEBHOOK_SECRET", "")
+    """Stripe: (http_status, text). Verifies, de-duplicates, applies; all-or-nothing."""
+    from . import gateways
+    secret = gateways.effective("stripe").webhook_secret
     if not secret:
         return 404, "not enabled"
     if not verify_signature(payload, header, secret, now):
         return 400, "bad signature"
     try:
         event = json.loads(payload)
-        event_id = str(event["id"])[:120]
-    except (ValueError, KeyError, TypeError):
+    except ValueError:
         return 400, "bad payload"
+    return _record_and_apply("stripe", event, apply_event)
+
+
+PAYPAL_ENDED = ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED")
+
+
+def apply_paypal_event(event):
+    from tracker.models import PlanProviderMapping, ProviderSubscription
+    kind = event.get("event_type", "")
+    resource = event.get("resource") or {}
+    if kind == "BILLING.SUBSCRIPTION.ACTIVATED":
+        user = _user_for(resource.get("custom_id"))
+        mapped = PlanProviderMapping.objects.filter(
+            provider="paypal", external_id=resource.get("plan_id") or "-").select_related("plan").first()
+        if user is None or mapped is None or not resource.get("id"):
+            return "ignored: unknown user or plan"
+        ProviderSubscription.objects.get_or_create(
+            provider="paypal", external_id=str(resource["id"])[:80], defaults={"user": user})
+        _assign(user, mapped.plan, "", kind)
+        return f"assigned {mapped.plan.slug}"
+    if kind in PAYPAL_ENDED:
+        sub = ProviderSubscription.objects.filter(
+            provider="paypal", external_id=str(resource.get("id") or "-")).select_related("user").first()
+        default = Plan.objects.filter(is_default=True).first()
+        if sub is None or default is None:
+            return "ignored: unknown subscription"
+        _assign(sub.user, default, "", kind)
+        return f"reverted to {default.slug}"
+    return "ignored: event type"
+
+
+def process_paypal(headers, body_text):
+    """PayPal: the delivery is confirmed with PayPal itself before anything is applied."""
+    from . import gateways
+    if not gateways.status("paypal")["checkout_ready"]:
+        return 404, "not enabled"
+    if not gateways.verify_paypal_webhook(headers, body_text):
+        return 400, "bad signature"
     try:
-        with transaction.atomic():
-            row = BillingEvent.objects.create(event_id=event_id, event_type=str(event.get("type", ""))[:80])
-            row.outcome = apply_event(event)[:200]
-            row.save(update_fields=["outcome"])
-    except IntegrityError:
-        return 200, "duplicate"
-    return 200, "ok"
+        event = json.loads(body_text)
+    except ValueError:
+        return 400, "bad payload"
+    return _record_and_apply("paypal", event, apply_paypal_event)

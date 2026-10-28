@@ -133,10 +133,27 @@ def _isa_limit_status():
     return limit_check_status(timezone.localdate())
 
 
+def _gateway_cards(request, forms):
+    """Stripe and PayPal cards for the platform admin; nothing for other staff."""
+    if not request.user.is_superuser:
+        return []
+    from tenancy import gateways
+    base = settings.SITE_URL.rstrip("/") if settings.SITE_URL else request.build_absolute_uri("/").rstrip("/")
+    cards = []
+    for provider in gateways.PROVIDERS:
+        st = gateways.status(provider)
+        st["form"] = forms[provider]
+        st["webhook_url"] = base + reverse(provider + "_webhook")
+        st["summary"] = ("Ready for checkout" if st["checkout_ready"] else "Off" if not st["enabled"]
+                         else "Credentials set, webhook missing" if st["credentials"] else "Not set up")
+        cards.append(st)
+    return cards
+
+
 @staff_member_required
 def control(request):
     """Owner admin page, inside the normal app shell (staff only)."""
-    from .forms import DiscordIntegrationForm, EmailIntegrationForm, TelegramIntegrationForm
+    from .forms import DiscordIntegrationForm, EmailIntegrationForm, PayPalGatewayForm, StripeGatewayForm, TelegramIntegrationForm
     from .discord_dm import bot_invite_url, configured as discord_ready, redirect_uri
     from .models import (InviteRequest, NotificationPreference, NotificationSchedulerRun, PriceRevision,
                          SystemIntegration, YahooSync)
@@ -145,16 +162,21 @@ def control(request):
     kinds = {"email": (EmailIntegrationForm, "Mail server saved."),
              "discord": (DiscordIntegrationForm, "Discord settings saved."),
              "telegram": (TelegramIntegrationForm, "Telegram bot saved.")}
+    if request.user.is_superuser:  # payment credentials: platform admin only
+        kinds["stripe"] = (StripeGatewayForm, "Stripe settings saved.")
+        kinds["paypal"] = (PayPalGatewayForm, "PayPal settings saved.")
     posted = request.POST.get("form_kind") if request.method == "POST" else ""
     forms = {kind: form_class(request.POST if kind == posted else None, instance=cfg, prefix=kind)
              for kind, (form_class, _) in kinds.items()}
     if posted in forms and forms[posted].is_valid():
+        forms[posted].actor, forms[posted].request = request.user, request
         forms[posted].save()
         messages.success(request, kinds[posted][1])
         return redirect(reverse("control") + "#" + posted)
     return _render(
         request, page_key="admin", page_title="Admin",
         email_form=forms["email"], discord_form=forms["discord"], telegram_form=forms["telegram"],
+        gateways=_gateway_cards(request, forms),
         smtp_set=bool(cfg.smtp_host and cfg.smtp_sender),
         telegram_bot=cfg.telegram_bot_username,
         telegram_connected=NotificationPreference.objects.exclude(telegram_chat_id="").count(),
