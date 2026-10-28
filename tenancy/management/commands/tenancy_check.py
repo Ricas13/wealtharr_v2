@@ -23,6 +23,9 @@ class Command(BaseCommand):
             problems = ["StrategyInstance %s: owner differs from its account's owner" % s.pk
                         for s in StrategyInstance.objects.select_related("account")
                         if s.owner_id != s.account.owner_id]
+            from tenancy.models import Plan
+            if not Plan.objects.filter(is_default=True).exists():
+                problems.append("There is no default plan: users without a plan of their own get no features.")
             if problems:
                 raise CommandError("\n".join(problems))
             self.stdout.write("Ownership is consistent.")
