@@ -4,6 +4,7 @@ from django import forms
 from django.utils import timezone
 from .models import Account, StrategyInstance, StrategyPreset, LedgerEntry, NotificationPreference, SystemIntegration
 from .services import encrypt_secret
+from .tenant_scope import accounts_of
 
 ZERO = Decimal("0")
 
@@ -29,7 +30,7 @@ class StrategyForm(forms.ModelForm):
         help_texts = {"name": "e.g. 9Sig — ISA or 9Sig — Trading account"}
     def __init__(self, *args, owner, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["account"].queryset = Account.objects.filter(owner=owner)
+        self.fields["account"].queryset = accounts_of(owner)
         self.fields["preset"].queryset = StrategyPreset.objects.filter(active=True)
         self.fields["monthly_target"].min_value = ZERO
         if not self.is_bound:
@@ -358,8 +359,7 @@ class RealNineSigSetupForm(forms.Form):
         except InstrumentMappingUnavailable as exc:
             raise forms.ValidationError(str(exc))
         if values.get("account_name"):
-            existing = Account.objects.filter(
-                owner=self.owner, name=values["account_name"]).first()
+            existing = accounts_of(self.owner).filter(name=values["account_name"]).first()
             if existing and (existing.kind != values["account_kind"] or
                              existing.country != values["country"] or
                              existing.broker not in ("UNKNOWN", values["broker"])):

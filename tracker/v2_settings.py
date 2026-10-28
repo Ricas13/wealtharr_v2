@@ -14,7 +14,9 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import NotificationForm
-from .tenant_scope import get_strategy_or_404
+from tenancy import access
+
+from .tenant_scope import get_strategy_or_404, strategies_of
 from .models import (
     NotificationDelivery, NotificationPreference,
     OwnerTOTP, StrategyInstance, SystemIntegration,
@@ -73,6 +75,13 @@ CATEGORY_WHEN = {
 }
 
 
+# Which plan feature each switch on the alerts form needs.
+CHANNEL_FIELD_FEATURE = {
+    "email_enabled": "alerts.email", "discord_enabled": "alerts.discord",
+    "discord_webhook_enabled": "alerts.discord", "telegram_enabled": "alerts.telegram",
+}
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def settings_page(request):
@@ -86,6 +95,10 @@ def settings_page(request):
     )
     if request.method == "POST":
         if kind == "owner":
+            if form.is_valid():
+                for field, feature in CHANNEL_FIELD_FEATURE.items():
+                    if form.cleaned_data[field] and not access.can(request.user, feature):
+                        form.add_error(field, "Your plan does not include this alert channel.")
             if form.is_valid():
                 if (form.cleaned_data["email_enabled"] and
                         not form.cleaned_data["destination_email"]):
@@ -132,7 +145,7 @@ def settings_page(request):
                   for strategy in settings_instances]
     config = SystemIntegration.objects.filter(pk=1).first()
     last_receipts = list(
-        NotificationDelivery.objects.filter(owner=request.user)
+        NotificationDelivery.tenant_objects.filter(owner=request.user)
         .order_by("-created_at", "-pk")
         .values("channel", "category", "status", "created_at", "attempts")[:10]
     )
@@ -148,6 +161,9 @@ def settings_page(request):
         telegram_configured=bool(config and config.telegram_bot_username),
         telegram_link=_telegram_link(pref, config),
         has_authenticator=OwnerTOTP.objects.filter(owner=request.user).exists(),
+        plan_blocked_channels=[label for label, feature in (
+            ("Email", "alerts.email"), ("Discord", "alerts.discord"), ("Telegram", "alerts.telegram"))
+            if not access.can(request.user, feature)],
     )
 
 
@@ -163,7 +179,7 @@ def _telegram_link(pref, config):
 
 def _copy_discord_routes_to_telegram(owner):
     """On first connect, strategies send to Telegram what they already send to Discord."""
-    for strategy in StrategyInstance.objects.filter(owner=owner):
+    for strategy in strategies_of(owner):
         routes = strategy.alert_routes if isinstance(strategy.alert_routes, dict) else {}
         changed = False
         for row in routes.values():

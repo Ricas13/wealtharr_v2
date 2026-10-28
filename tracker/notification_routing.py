@@ -4,6 +4,8 @@ Category is deliberately fixed at code level. Preferences select a subset of
 enabled destinations. The underlying NotificationDelivery unique key,
 three-attempt retry budget and encrypted transport stay authoritative.
 """
+from tenancy import access
+
 from .models import NotificationDelivery, NotificationPreference
 from .services import dispatch
 
@@ -22,6 +24,10 @@ CHANNELS = ("email", "discord", "telegram")
 # goes to each Discord destination the person switched on: a DM from the
 # site's bot and/or a webhook into a channel on their own server.
 DELIVERY_CHANNELS = ("email", "discord", "discord_webhook", "telegram")
+# The plan feature each delivery channel needs (checked when an alert is sent, so a plan
+# change takes effect at once and fails closed).
+CHANNEL_FEATURE = {"email": "alerts.email", "discord": "alerts.discord",
+                   "discord_webhook": "alerts.discord", "telegram": "alerts.telegram"}
 ROUTE_FOR = {"email": "email", "discord": "discord", "discord_webhook": "discord", "telegram": "telegram"}
 
 
@@ -30,7 +36,8 @@ def selected_channels(pref, category):
     if category not in CATEGORY_KEYS:
         raise ValueError("Unknown notification category")
     return tuple(channel for channel in DELIVERY_CHANNELS
-                 if getattr(pref, channel + "_enabled", False))
+                 if getattr(pref, channel + "_enabled", False)
+                 and access.can(pref.owner, CHANNEL_FEATURE[channel]))
 
 
 def strategy_channels(pref, category, strategy=None):

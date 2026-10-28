@@ -9,6 +9,7 @@ from decimal import Decimal
 from hashlib import sha256
 
 from django.utils import timezone
+from tenancy.context import per_tenant
 from .models import (
     LedgerEntry, NotificationDelivery, NotificationPreference, RebalanceExecution,
     SignalFill, StrategyInstance, StrategySignal,
@@ -219,8 +220,8 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
     """
     today = today or timezone.localdate()
     count = 0
-    for strategy in StrategyInstance.objects.select_related("owner", "account").filter(
-            preset__slug__in=plugin_keys()).exclude(account__kind="PAPER"):
+    for strategy in per_tenant(StrategyInstance.objects.select_related("owner", "account").filter(
+            preset__slug__in=plugin_keys()).exclude(account__kind="PAPER")):
         # One strategy's failure (bad ledger, arithmetic) never stops the others.
         try:
             count += _notify_strategy(strategy, today, remind_after_days)

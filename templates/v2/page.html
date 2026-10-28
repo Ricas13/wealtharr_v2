@@ -47,6 +47,7 @@
       {% elif page_key == 'settings' %}Applies to all strategies
       {% elif page_key == 'admin' %}Site owner only · not visible to other users
       {% elif page_key == 'about' %}Worth reading once
+      {% elif page_key == 'plans' %}Your plan and what it includes
       {% else %}Fixed, code-defined strategies{% endif %}
     </p>
   </div>
@@ -61,6 +62,7 @@
 {% elif page_key == 'settings' %}{% include 'v2/settings.html' %}
 {% elif page_key == 'admin' %}{% include 'v2/admin.html' %}
 {% elif page_key == 'about' %}{% include 'v2/about.html' %}
+{% elif page_key == 'plans' %}{% include 'v2/plans.html' %}
 {% else %}{% include 'v2/onboarding.html' %}{% endif %}
 {% endif %}
 {% endblock %}

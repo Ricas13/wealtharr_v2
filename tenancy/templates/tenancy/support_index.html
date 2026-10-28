@@ -1,0 +1,5 @@
+{% extends 'v2/base.html' %}{% block title %}Support{% endblock %}{% block content %}
+<header class="w2-page-heading"><div><h1>Support</h1><p class="w2-overline">Only users who allowed it, only while it lasts</p></div></header>
+<section class="w2-panel w2-space-top"><ul>
+{% for g in grants %}<li><a href="{% url 'support_view' g.user_id %}">{{ g.user.get_username }}</a> · until {{ g.expires_at|date:"j M H:i" }}{% if g.reason %} · {{ g.reason }}{% endif %}</li>{% empty %}<li class="w2-muted">No one has allowed access right now.</li>{% endfor %}
+</ul></section>{% endblock %}

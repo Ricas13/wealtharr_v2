@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 
 from . import audit, features
-from .models import AuditEvent, Plan, UserAccess
+from .models import AuditEvent, BillingEvent, Plan, UserAccess
 
 
 def _feature_choices(only_limits=False):
@@ -31,7 +31,7 @@ class PlanForm(forms.ModelForm):
 
     class Meta:
         model = Plan
-        fields = ["name", "slug", "description", "price_label", "stripe_link", "paypal_link", "is_public",
+        fields = ["name", "slug", "description", "price_label", "stripe_link", "stripe_payment_link_id", "paypal_link", "is_public",
                   "sort_order", "all_features", "features", "limits", "is_default"]
 
     def __init__(self, *args, **kwargs):
@@ -42,6 +42,13 @@ class PlanForm(forms.ModelForm):
 
     def clean_features(self):
         return sorted(self.cleaned_data["features"])
+
+    def clean_is_default(self):
+        # Without a default plan every user without their own plan would lose all features.
+        if self.instance.pk and self.instance.is_default and not self.cleaned_data["is_default"]:
+            raise forms.ValidationError("There must always be a default plan. To change it, tick this on "
+                                        "another plan instead.")
+        return self.cleaned_data["is_default"]
 
     def clean_stripe_link(self):
         return _https_only(self.cleaned_data["stripe_link"], "The Stripe link")
@@ -108,10 +115,11 @@ class PlanAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     fieldsets = (
         (None, {"fields": ("name", "slug", "description", "price_label", "is_public", "sort_order", "is_default")}),
-        ("Payment links", {"fields": ("stripe_link", "paypal_link"),
-                           "description": "Links to a payment page you made on Stripe or PayPal. The app does not "
-                                          "learn from them that someone paid: assign the plan to the user yourself "
-                                          "under Users."}),
+        ("Payment links", {"fields": ("stripe_link", "stripe_payment_link_id", "paypal_link"),
+                           "description": "Links to a payment page you made on Stripe or PayPal. With a Stripe "
+                                          "Payment Link id here and the webhook enabled (STRIPE_WEBHOOK_SECRET), a "
+                                          "paid checkout assigns this plan automatically. Otherwise (and always for "
+                                          "PayPal) assign the plan yourself under Users."}),
         ("What the plan includes", {"fields": ("all_features", "features", "limits")}),
     )
 
@@ -124,7 +132,7 @@ class PlanAdmin(admin.ModelAdmin):
     has_add_permission = has_change_permission = has_view_permission
 
     def has_delete_permission(self, request, obj=None):
-        return _platform_admin(request) and (obj is None or not obj.users.exists())
+        return _platform_admin(request) and (obj is None or not (obj.is_default or obj.users.exists()))
 
     @admin.display(description="Features")
     def feature_count(self, obj):
@@ -228,6 +236,29 @@ class AuditEventAdmin(admin.ModelAdmin):
     list_display = ("occurred_at", "action", "actor_label", "subject_id", "target_type", "target_id", "ip")
     list_filter = ("action",)
     search_fields = ("actor_label", "action", "request_id")
+    ordering = ("-id",)
+
+    def has_module_permission(self, request):
+        return _platform_admin(request)
+
+    def has_view_permission(self, request, obj=None):
+        return _platform_admin(request)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BillingEvent)
+class BillingEventAdmin(admin.ModelAdmin):
+    """Payment events the webhook has handled. Read-only."""
+    list_display = ("received_at", "provider", "event_type", "outcome", "event_id")
+    list_filter = ("provider", "event_type")
     ordering = ("-id",)
 
     def has_module_permission(self, request):

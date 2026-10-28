@@ -1,0 +1,23 @@
+<section class="w2-panel w2-space-top">
+  <h2>Your plan</h2>
+  <p>You are on <strong>{{ current_plan.name|default:"no plan" }}</strong>{% if current_plan.price_label %} ({{ current_plan.price_label }}){% endif %}. {{ current_plan.description }}</p>
+  {% if offers %}
+  <h2 class="w2-subheading">Available plans</h2>
+  <ul class="w2-plans">
+    {% for o in offers %}
+    <li class="w2-panel">
+      <h3>{{ o.plan.name }}{% if o.current %} <span class="w2-chip">Current</span>{% endif %}</h3>
+      {% if o.plan.price_label %}<p><strong>{{ o.plan.price_label }}</strong></p>{% endif %}
+      {% if o.plan.description %}<p>{{ o.plan.description }}</p>{% endif %}
+      {% if not o.current %}
+        {% if o.stripe %}<p><a class="w2-button w2-button-primary" href="{{ o.stripe }}" rel="noopener">Pay with card (Stripe)</a></p>{% endif %}
+        {% if o.paypal %}<p><a class="w2-button" href="{{ o.paypal }}" rel="noopener">Pay with PayPal</a></p>{% endif %}
+        {% if not o.stripe and not o.paypal %}<p class="w2-note">Ask the site owner to switch you to this plan.</p>{% elif not o.automatic %}<p class="w2-note">After paying, the site owner switches your plan by hand.</p>{% endif %}
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="w2-note">No other plans are on offer right now.</p>
+  {% endif %}
+</section>
