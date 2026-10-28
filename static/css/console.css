@@ -1,0 +1,16 @@
+/* Users and Plans pages in the app shell: filters, bulk bar, forms, pager. */
+.w2-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.w2-filters .w2-input { min-width: 0; flex: 1 1 150px; }
+.w2-bulk { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.w2-bulk .w2-input { max-width: 260px; }
+.w2-pager { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 12px; }
+.w2-console-form { display: grid; gap: 14px; }
+.w2-console-form .w2-field { display: grid; gap: 4px; }
+.w2-console-form .w2-note { margin: 0; }
+.w2-checklist { border: 0; padding: 0; margin: 0; }
+.w2-checklist legend { font-weight: 600; margin-bottom: 4px; }
+.w2-checklist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.w2-checklist li label { display: flex; gap: 8px; align-items: flex-start; }
+.w2-form-error { color: var(--w2-negative); margin: 0; }
+.w2-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.w2-ok { color: var(--w2-positive); }

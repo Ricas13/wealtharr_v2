@@ -1,0 +1,38 @@
+{% extends 'v2/base.html' %}{% block title %}{{ page_title }}{% endblock %}
+{% block extra_head %}{% include 'tenancy/_console_head.html' %}{% endblock %}
+{% block content %}
+<header class="w2-page-heading"><div><h1>{{ page_title }}</h1><p class="w2-overline"><a href="{% url 'console_plans' %}">← Plans</a>{% if plan %} · {{ plan.users.count }} user{{ plan.users.count|pluralize }}{% endif %}</p></div>
+  <a class="w2-button" href="{{ admin_url }}">Advanced (Django admin) ↗</a></header>
+<form method="post" class="w2-console-form">{% csrf_token %}
+{{ form.non_field_errors }}
+<div class="w2-grid w2-space-top">
+  <section class="w2-card"><div class="w2-ch"><h2 class="w2-ct">Basics</h2></div>
+    {% include 'tenancy/_field.html' with field=form.name %}{% include 'tenancy/_field.html' with field=form.slug %}
+    {% include 'tenancy/_field.html' with field=form.description %}{% include 'tenancy/_field.html' with field=form.price_label %}
+    {% include 'tenancy/_field.html' with field=form.sort_order %}{% include 'tenancy/_field.html' with field=form.is_public %}
+    {% include 'tenancy/_field.html' with field=form.is_default %}</section>
+
+  <section class="w2-card"><div class="w2-ch"><h2 class="w2-ct">What it includes</h2></div>
+    {% include 'tenancy/_field.html' with field=form.all_features %}
+    {% include 'tenancy/_field.html' with field=form.features %}
+    {% for field in form.limit_fields %}{% include 'tenancy/_field.html' %}{% endfor %}</section>
+
+  <section class="w2-card w2-span2"><div class="w2-ch"><h2 class="w2-ct">How it is sold</h2></div>
+    <p class="w2-note">With the gateway ready and a verified id, the Your plan page offers "Pay with …" and the plan is assigned automatically. Ids are checked with the gateway when you save.</p>
+    <div class="w2-grid">
+      <div>{% include 'tenancy/_field.html' with field=form.stripe_price_id %}
+        {% if mappings.stripe %}<p class="w2-note">{% if mappings.stripe.verified_at %}<span class="w2-chip w2-ok">verified</span>{% else %}<span class="w2-chip w2-wait">not verified</span> {{ mappings.stripe.verification_note }}{% endif %}</p>{% endif %}
+        {% if not ready.stripe %}<p class="w2-note">Stripe isn't ready for checkout yet: <a href="{% url 'control' %}#stripe">set it up</a>.</p>{% endif %}</div>
+      <div>{% include 'tenancy/_field.html' with field=form.paypal_plan_id %}
+        {% if mappings.paypal %}<p class="w2-note">{% if mappings.paypal.verified_at %}<span class="w2-chip w2-ok">verified</span>{% else %}<span class="w2-chip w2-wait">not verified</span> {{ mappings.paypal.verification_note }}{% endif %}</p>{% endif %}
+        {% if not ready.paypal %}<p class="w2-note">PayPal isn't ready for checkout yet: <a href="{% url 'control' %}#paypal">set it up</a>.</p>{% endif %}</div>
+    </div>
+    <details class="w2-note"><summary>Plain payment links (used when there is no verified id)</summary>
+      {% include 'tenancy/_field.html' with field=form.stripe_link %}{% include 'tenancy/_field.html' with field=form.stripe_payment_link_id %}{% include 'tenancy/_field.html' with field=form.paypal_link %}</details></section>
+</div>
+<div class="w2-row w2-space-top"><button class="w2-button w2-button-primary" type="submit">Save plan</button><a class="w2-button" href="{% url 'console_plans' %}">Cancel</a></div>
+</form>
+{% if plan %}<section class="w2-panel w2-space-top"><h2 class="w2-subheading">Delete</h2>
+  {% if can_delete %}<form method="post" action="{% url 'console_plan_delete' plan.pk %}" onsubmit="return confirm('Delete this plan?')">{% csrf_token %}<button class="w2-button" type="submit">Delete plan</button></form>
+  {% else %}<p class="w2-note">This plan can't be deleted while it is the default or has users. Move its users to another plan first.</p>{% endif %}</section>{% endif %}
+{% endblock %}

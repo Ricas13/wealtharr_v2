@@ -1,0 +1,39 @@
+{% extends 'v2/base.html' %}{% block title %}{{ subject.get_username }}{% endblock %}
+{% block extra_head %}{% include 'tenancy/_console_head.html' %}{% endblock %}
+{% block content %}
+<header class="w2-page-heading"><div><h1>{{ subject.get_username }}</h1>
+  <p class="w2-overline"><a href="{% url 'console_users' %}">← Users</a> · {{ plan.name|default:"no plan" }}{% if not access %} (default){% endif %} · <span class="{% if subject.is_active %}w2-ok{% endif %}">{% if subject.is_active %}active{% else %}inactive{% endif %}</span></p></div>
+  <a class="w2-button" href="{{ admin_url }}" title="Every field, including permissions and groups">Advanced (Django admin) ↗</a></header>
+<div class="w2-grid w2-space-top">
+  <section class="w2-card"><div class="w2-ch"><h2 class="w2-ct">Profile</h2></div>
+    <form method="post" class="w2-console-form">{% csrf_token %}<input type="hidden" name="form_kind" value="profile">
+      {{ profile.non_field_errors }}{% for field in profile %}{% include 'tenancy/_field.html' %}{% endfor %}
+      <button class="w2-button w2-button-primary" type="submit">Save profile</button></form>
+    <p class="w2-note">Joined {{ subject.date_joined|date:"j M Y" }} · last sign-in {{ subject.last_login|date:"j M Y H:i"|default:"never" }}</p></section>
+
+  <section class="w2-card"><div class="w2-ch"><h2 class="w2-ct">Plan and features</h2></div>
+    <form method="post" class="w2-console-form">{% csrf_token %}<input type="hidden" name="form_kind" value="access">
+      {{ access_form.non_field_errors }}{% for field in access_form %}{% include 'tenancy/_field.html' %}{% endfor %}
+      <button class="w2-button w2-button-primary" type="submit">Save plan and features</button></form>
+    <p class="w2-note">Extra features add to the plan; withheld features override it. {% if not access %}This user has no plan of their own, so they get the default plan.{% endif %}</p></section>
+
+  <section class="w2-card"><div class="w2-ch"><h2 class="w2-ct">Billing</h2></div>
+    {% if access.stripe_customer_id %}<div class="w2-kv"><span>Stripe customer</span><span>{{ access.stripe_customer_id }}</span></div>{% endif %}
+    {% for s in subscriptions %}<div class="w2-kv"><span>{{ s.provider|title }} subscription</span><span>{{ s.external_id }} · {% if s.ended_at %}ended {{ s.ended_at|date:"j M Y" }}{% elif s.ends_at %}ends {{ s.ends_at|date:"j M Y" }}{% else %}running{% endif %}</span></div>
+    {% empty %}<p class="w2-muted">No gateway subscriptions recorded.{% if not access.stripe_customer_id %} Plans are assigned by hand or after a payment.{% endif %}</p>{% endfor %}</section>
+
+  <section class="w2-card"><div class="w2-ch"><h2 class="w2-ct">Sign-in and security</h2></div>
+    <form method="post" class="w2-console-form">{% csrf_token %}<input type="hidden" name="form_kind" value="password">
+      {{ password.non_field_errors }}{% for field in password %}{% include 'tenancy/_field.html' %}{% endfor %}
+      <button class="w2-button" type="submit">Set password</button></form>
+    <div class="w2-row w2-space-top">
+      <form method="post">{% csrf_token %}<input type="hidden" name="form_kind" value="reset_email"><button class="w2-button" type="submit" {% if not subject.email or not subject.is_active %}disabled{% endif %}>Email a password-reset link</button></form>
+      <form method="post">{% csrf_token %}<input type="hidden" name="form_kind" value="signout"><button class="w2-button" type="submit">Sign out everywhere</button></form></div>
+    <p class="w2-note">Support access: {% if support_open %}<span class="w2-chip w2-ok">allowed right now</span> (<a href="{% url 'support_view' subject.pk %}">open the support view</a>){% else %}not allowed. The user decides.{% endif %}</p></section>
+
+  <section class="w2-card w2-span2"><div class="w2-ch"><h2 class="w2-ct">Recent activity about this user</h2><a href="{% url 'admin:tenancy_auditevent_changelist' %}?q={{ subject.get_username }}">Full audit log</a></div>
+    <div class="w2-table-wrap"><table class="w2-table"><thead><tr><th scope="col">When</th><th scope="col">What</th><th scope="col">By</th></tr></thead><tbody>
+    {% for e in events %}<tr><td>{{ e.occurred_at|date:"j M Y H:i" }}</td><td>{{ e.action }}</td><td>{{ e.actor_label|default:"system" }}</td></tr>
+    {% empty %}<tr><td colspan="3"><span class="w2-muted">Nothing yet.</span></td></tr>{% endfor %}</tbody></table></div></section>
+</div>
+{% endblock %}

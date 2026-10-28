@@ -1,0 +1,18 @@
+{% extends 'v2/base.html' %}{% block title %}Plans{% endblock %}
+{% block extra_head %}{% include 'tenancy/_console_head.html' %}{% endblock %}
+{% block content %}
+<header class="w2-page-heading"><div><h1>Plans</h1><p class="w2-overline">What each plan includes, what it costs, and how it is sold</p></div>
+  <div class="w2-row"><a class="w2-button w2-button-primary" href="{% url 'console_plan_new' %}">New plan</a>
+  <a class="w2-button" href="{{ admin_url }}">Advanced (Django admin) ↗</a></div></header>
+<section class="w2-panel w2-space-top"><div class="w2-table-wrap"><table class="w2-table">
+  <thead><tr><th scope="col">Plan</th><th scope="col">Price</th><th scope="col">Features</th><th scope="col">Users</th><th scope="col">Shown to users</th><th scope="col">Stripe</th><th scope="col">PayPal</th></tr></thead><tbody>
+  {% for p in plans %}<tr>
+    <td><a href="{% url 'console_plan' p.pk %}"><strong>{{ p.name }}</strong></a>{% if p.is_default %} <span class="w2-chip w2-info">default</span>{% endif %}<br><span class="w2-muted">{{ p.slug }}</span></td>
+    <td>{{ p.price_label|default:"—" }}</td><td>{{ p.feature_summary }}</td>
+    <td>{% if p.is_default %}{{ p.user_count|add:default_users }}{% else %}{{ p.user_count }}{% endif %}</td>
+    <td>{% if p.is_public %}<span class="w2-chip w2-ok">Yes</span>{% else %}<span class="w2-chip">No</span>{% endif %}</td>
+    <td>{% if p.stripe_state %}<span class="w2-chip w2-ok">verified</span>{% elif p.stripe_state is False %}<span class="w2-chip w2-wait">not verified</span>{% elif p.stripe_link %}link{% else %}—{% endif %}</td>
+    <td>{% if p.paypal_state %}<span class="w2-chip w2-ok">verified</span>{% elif p.paypal_state is False %}<span class="w2-chip w2-wait">not verified</span>{% elif p.paypal_link %}link{% else %}—{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7"><span class="w2-muted">No plans yet.</span></td></tr>{% endfor %}</tbody></table></div>
+  <p class="w2-note">Gateway keys, webhooks and tests are on <a href="{% url 'control' %}#stripe">Payments</a> in Admin.</p></section>
+{% endblock %}

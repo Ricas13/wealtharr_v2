@@ -1,0 +1,43 @@
+{% extends 'v2/base.html' %}{% block title %}Users{% endblock %}
+{% block extra_head %}{% include 'tenancy/_console_head.html' %}{% endblock %}
+{% block content %}
+<header class="w2-page-heading"><div><h1>Users</h1><p class="w2-overline">{{ total }} user{{ total|pluralize }} · default plan: {{ default_plan.name|default:"none" }}</p></div>
+  <div class="w2-row"><a class="w2-button w2-button-primary" href="{% url 'console_user_new' %}">Add user</a>
+  <a class="w2-button" href="{% url 'admin:auth_user_changelist' %}" title="Every field and bulk tool in the full Django admin">Advanced (Django admin) ↗</a></div></header>
+<section class="w2-panel w2-space-top">
+  <form method="get" class="w2-filters" role="search">
+    <label class="w2-sr" for="f-q">Search</label><input id="f-q" class="w2-input" name="q" value="{{ filters.q }}" placeholder="Search name, username or email" type="search">
+    <label class="w2-sr" for="f-plan">Plan</label>
+    <select id="f-plan" class="w2-input" name="plan"><option value="">Any plan</option><option value="default" {% if filters.plan == 'default' %}selected{% endif %}>Default (no plan of their own)</option>{% for p in plans %}<option value="{{ p.pk }}" {% if filters.plan == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
+    <label class="w2-sr" for="f-status">Status</label>
+    <select id="f-status" class="w2-input" name="status"><option value="">Any status</option><option value="active" {% if filters.status == 'active' %}selected{% endif %}>Active</option><option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactive</option></select>
+    <label class="w2-sr" for="f-role">Role</label>
+    <select id="f-role" class="w2-input" name="role"><option value="">Any role</option><option value="staff" {% if filters.role == 'staff' %}selected{% endif %}>Staff</option><option value="admin" {% if filters.role == 'admin' %}selected{% endif %}>Platform admins</option></select>
+    <button class="w2-button" type="submit">Filter</button>
+    {% if keep %}<a href="{% url 'console_users' %}">Clear</a>{% endif %}
+  </form>
+  <form method="post" action="{% url 'console_users_bulk' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <div class="w2-bulk">
+      <label class="w2-sr" for="bulk-action">Action for the selected users</label>
+      <select id="bulk-action" class="w2-input" name="action"><option value="">With selected…</option>{% for p in plans %}<option value="plan:{{ p.pk }}">Move to plan: {{ p.name }}</option>{% endfor %}<option value="activate">Activate</option><option value="deactivate">Deactivate</option></select>
+      <button class="w2-button" type="submit">Apply</button>
+    </div>
+    <div class="w2-table-wrap"><table class="w2-table">
+      <thead><tr><th scope="col"><input type="checkbox" aria-label="Select all on this page" data-w2-select-all></th><th scope="col">User</th><th scope="col">Plan</th><th scope="col">Status</th><th scope="col">Last sign-in</th><th scope="col">Joined</th></tr></thead>
+      <tbody>
+      {% for u in page %}
+        <tr><td><input type="checkbox" name="ids" value="{{ u.pk }}" aria-label="Select {{ u.username }}"></td>
+          <td><a href="{% url 'console_user' u.pk %}"><strong>{{ u.get_username }}</strong></a>{% if u.is_superuser %} <span class="w2-chip w2-info">admin</span>{% elif u.is_staff %} <span class="w2-chip">staff</span>{% endif %}<br><span class="w2-muted">{{ u.email|default:"no email" }}{% if u.get_full_name %} · {{ u.get_full_name }}{% endif %}</span></td>
+          <td>{% if u.access %}{{ u.access.plan.name }}{% else %}<span class="w2-muted">{{ default_plan.name|default:"—" }} (default)</span>{% endif %}</td>
+          <td><span class="w2-chip {% if u.is_active %}w2-ok{% else %}w2-wait{% endif %}">{% if u.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+          <td>{{ u.last_login|date:"j M Y H:i"|default:"never" }}</td><td>{{ u.date_joined|date:"j M Y" }}</td></tr>
+      {% empty %}<tr><td colspan="6"><span class="w2-muted">No users match.</span></td></tr>{% endfor %}
+      </tbody></table></div>
+  </form>
+  {% if page.paginator.num_pages > 1 %}<nav class="w2-pager" aria-label="Pages">
+    {% if page.has_previous %}<a class="w2-button" href="?page={{ page.previous_page_number }}{% if keep %}&{{ keep }}{% endif %}">← Previous</a>{% endif %}
+    <span class="w2-muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="w2-button" href="?page={{ page.next_page_number }}{% if keep %}&{{ keep }}{% endif %}">Next →</a>{% endif %}</nav>{% endif %}
+</section>
+<script>document.querySelectorAll('[data-w2-select-all]').forEach(function (box) { box.addEventListener('change', function () { document.querySelectorAll('input[name=ids]').forEach(function (c) { c.checked = box.checked; }); }); });</script>
+{% endblock %}
