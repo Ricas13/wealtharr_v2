@@ -26,6 +26,7 @@ urlpatterns = [
     path("offline/", pwa.offline, name="offline"),
     path("login/", v2_auth.sign_in, name="login"),
     path("signup/", accounts.signup, name="signup"),
+    path("signup/resend/", accounts.resend_verification, name="resend_verification"),
     path("signup/verify/<str:token>/", accounts.verify_email, name="verify_email"),
     path("password-reset/", accounts.RateLimitedResetView.as_view(), name="password_reset"),
     path("password-reset/sent/", auth_views.PasswordResetDoneView.as_view(

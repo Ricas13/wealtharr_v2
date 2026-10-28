@@ -221,7 +221,7 @@ def send_due_cockpit_notices(today=None, remind_after_days=None):
     today = today or timezone.localdate()
     count = 0
     for strategy in per_tenant(StrategyInstance.objects.select_related("owner", "account").filter(
-            preset__slug__in=plugin_keys()).exclude(account__kind="PAPER")):
+            preset__slug__in=plugin_keys(), owner__is_active=True).exclude(account__kind="PAPER")):
         # One strategy's failure (bad ledger, arithmetic) never stops the others.
         try:
             count += _notify_strategy(strategy, today, remind_after_days)

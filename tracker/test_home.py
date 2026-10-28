@@ -201,7 +201,7 @@ class FooterAndPrivacyTests(TestCase):
         self.assertNotContains(home, "A quarterly growth-target plan for a UK ISA is available now")
         privacy = self.client.get("/privacy/")
         self.assertEqual(privacy.status_code, 200)
-        self.assertContains(privacy, "your email address when you ask for an invite")
+        self.assertContains(privacy, "your email address if you ask for an invite")
         self.assertContains(privacy, "Reply to any email")
         self.assertNotIn("noindex", privacy.get("X-Robots-Tag", ""))
         self.assertContains(self.client.get("/sitemap.xml"), "/privacy/")

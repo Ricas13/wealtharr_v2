@@ -78,6 +78,17 @@ def _failure_keys(request):
             ("login-failures-ip:%s" % ip, ADDRESS_WIDE_LIMIT)]
 
 
+def _unconfirmed_hint(request):
+    """Tell someone who signed up but never confirmed their email why they cannot sign in.
+    Shown only when they typed the right password, so it reveals nothing to a guesser."""
+    from django.contrib.auth import get_user_model
+    user = get_user_model().objects.filter(username__iexact=(request.POST.get("username") or "").strip()).first()
+    if (user is not None and not user.is_active and user.last_login is None and user.has_usable_password()
+            and user.check_password(request.POST.get("password") or "")):
+        return "Please confirm your email first: we sent you a link when you signed up."
+    return ""
+
+
 def sign_in(request):
     from .rate_limits import attempts, increment, clear
     if request.user.is_authenticated:
@@ -102,10 +113,10 @@ def sign_in(request):
         else:
             for key, _ in keys:
                 increment(key, LOGIN_PAUSE_SECONDS)
+            error = _unconfirmed_hint(request)
     return render(request, "v2/login.html", {
         "form": form, "login_error": error, "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
         "turnstile_required": settings.TURNSTILE_REQUIRED,
-        "signup_open": settings.SELF_SERVE_SIGNUP,
     })
 
 
