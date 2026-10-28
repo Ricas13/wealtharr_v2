@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -259,6 +260,7 @@ def wizard(request):
     account_type = post.get("account_type", "ISA" if "ISA" in types else (types[0] if types else ""))
     state = {"owner_id": request.user.pk, "strategy": strategy, "platform": platform,
              "type": account_type, "ack": post.get("ack") == "yes",
+             "ack_choice": post.get("ack_choice") == "yes",
              "mode": post.get("mode", "fresh"), "name": "", "start": "",
              "amount": "", "cash": "", "holdings": {}, "routes": ROUTE_DEFAULTS}
     error = ""
@@ -273,6 +275,8 @@ def wizard(request):
             state["monthly"] = _decimal(post.get("monthly", ""), "your monthly top-up")
             if not state["ack"]:
                 raise ValidationError("Tick the box to confirm you checked these instruments in your own account.")
+            if settings.REQUIRE_CHOICE_ACK and not state["ack_choice"]:
+                raise ValidationError("Tick the box to confirm you chose this strategy yourself and understand what it shows.")
             if strategy_cap_reached(request):
                 raise ValidationError(
                     "Your plan allows %d strateg%s and you already have that many. "
@@ -306,7 +310,7 @@ def wizard(request):
         request, page_key="add", page_title="Add strategy",
         # Hypothetical past performance of every strategy, before choosing one.
         compare=compare(1000, 100, "10y", real_names=True), compare_frames=FRAMES,
-        wizard=state, wizard_error=error, wizard_offers=offers,
+        wizard=state, wizard_error=error, wizard_offers=offers, wizard_require_choice=settings.REQUIRE_CHOICE_ACK,
         wizard_cap_reached=strategy_cap_reached(request),
         wizard_platforms=platforms(),
         wizard_account_options=[{"key": kind, "name": dict(ACCOUNT_TYPES)[kind], "enabled": kind in types}
