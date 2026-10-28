@@ -16,6 +16,8 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
+from tenancy.context import tenant_context
+
 from .tenant_scope import strategies_of
 
 
@@ -24,7 +26,9 @@ def owner_instances(user):
 
 
 def preferred_url(user, section="today"):
-    ids = list(owner_instances(user).values_list("pk", flat=True)[:2])
+    # Right after sign-in the request is not yet this user's, so say whose data this is.
+    with tenant_context(user):
+        ids = list(owner_instances(user).values_list("pk", flat=True)[:2])
     if len(ids) == 1:
         return reverse("v2_instance_page", args=[ids[0], section])
     return reverse("v2_overview")

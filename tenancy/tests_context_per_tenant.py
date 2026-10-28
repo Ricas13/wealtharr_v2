@@ -1,8 +1,9 @@
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from .context import NoTenantContext, per_tenant, require_tenant_id
 
 
+@override_settings(RLS_ENABLED=False)
 class PerTenantTests(SimpleTestCase):
     def test_each_item_runs_in_its_owners_context_and_resets(self):
         class Item:

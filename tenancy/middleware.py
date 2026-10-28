@@ -12,5 +12,7 @@ class TenantMiddleware:
         user = getattr(request, "user", None)
         tenant_id = user.pk if user is not None and user.is_authenticated else None
         request.tenant_id = tenant_id
-        with tenant_context(tenant_id):
+        # Platform admins work across users (admin, support, plans); everyone else is their own tenant.
+        platform_admin = bool(tenant_id is not None and user.is_superuser)
+        with tenant_context(tenant_id, bypass=platform_admin):
             return self.get_response(request)
