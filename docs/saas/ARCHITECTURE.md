@@ -1,6 +1,11 @@
 # Wealtharr multi-tenant architecture and migration plan
 
-Status: proposal for owner review. Nothing in this document is implemented yet.
+Status: living plan. **Revision 2 (owner decision): the tenant is the user.** There is no Organization or
+Membership. Wherever the sections below say "organization" or "membership", read "the owning user";
+"roles" are replaced by configurable **access levels** (section 11). Each user's records are theirs alone,
+the owner stays the platform admin, and sharing between users is not a goal. Sections 3.1 to 3.3 and 4
+describe the original organization design and are kept for the reasoning; section 11 and the updated
+ladder in section 10 are what is built.
 Scope: the seven workstreams in the owner's brief (tenancy, auth lifecycle, billing, admin separation,
 security, reliability, compliance scaffolding). Legal, regulatory, tax and privacy obligations are the
 operator's responsibility and are out of scope here; this document covers engineering only.
@@ -287,16 +292,29 @@ Ground rules (owner's brief: "exactly how it is today, but multi-tenant", owner 
   `owner`, `admin`, `member`, `viewer` per organization; a viewer can look but not record anything.
 - **Small, revertible PRs**, each independently safe to stop at.
 
-PR ladder
-1. This plan and the `CLAUDE.md` amendment (docs only).
-2. Tenancy tables, nullable `organization` columns, backfill, `tenancy_check` (invisible to users).
-3. Audit log table and its single recorder (invisible).
-4. Read paths move to tenant managers one slice at a time (overview, today, ledger, review, history,
-   study, settings), each with two-tenant isolation tests.
+PR ladder (revision 2)
+1. This plan and the `CLAUDE.md` amendment (done).
+2. Tenancy foundation (done, then simplified to per-user; the organization tables were removed).
+3. Audit log (done).
+4. Read paths move to tenant managers keyed on the user, one slice at a time (strategy lookups done),
+   each with two-tenant isolation tests.
 5. Write paths and background jobs run inside a tenant context.
-6. Enforce: NOT NULL and tenant-keyed constraints, then row-level security on a second database role.
-7. Roles on write views (viewer is read-only) and a members page for tenant owners.
-8. Platform admin split from tenant admin, with support grants.
+6. Enforce: row-level security keyed on the owner id, on a second database role.
+7. Access levels: features defined in code, levels configured in the admin, one `can()` check
+   (section 11).
+8. Platform admin split from ordinary users, with audited support access.
 9. Auth lifecycle (registration, verification, reset, sessions, deletion and export) behind the flag.
-10. Entitlements with manual plans, then Stripe.
+10. Plans and billing (Stripe) mapped onto access levels.
 11. Security hardening, operations and compliance scaffolding, partly in parallel from step 4.
+
+## 11. Access levels (replaces organization roles)
+
+- **Features** are keys declared in code (`tenancy.features.register(...)`), each with a label and a
+  description. Adding one is one declaration plus one `can()` call where it is enforced.
+- **Access levels** are created in the admin by the owner: a name, which features it includes, optional
+  numeric limits, and whether it is the default. A built-in level "Full" grants every feature, including
+  ones added later, so existing users see no change.
+- **Per user**: one level, plus optional grant/deny overrides.
+- **One check** (`tenancy.access.can(user, key)`, `limit(user, key)`) and a view decorator. Platform
+  admins (superusers) always pass. An unknown feature or an unresolvable level denies (fail closed).
+- Changes to levels and to a user's access are written to the audit log.

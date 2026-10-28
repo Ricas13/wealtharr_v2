@@ -9,7 +9,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -19,6 +19,7 @@ from .core.catalogue import (
 )
 from .instrument_mapping import for_strategy
 from .models import StrategyGoLive, StrategyInstance
+from .tenant_scope import get_strategy_or_404
 
 
 def attestation_text(strategy):
@@ -110,11 +111,7 @@ def go_live(strategy, user, started_on=None):
 @login_required
 @require_POST
 def go_live_view(request, instance_id):
-    strategy = get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset").filter(
-            owner=request.user, account__owner=request.user,
-        ).exclude(account__kind="PAPER"), pk=instance_id,
-    )
+    strategy = get_strategy_or_404(request, instance_id)
     if request.POST.get("confirm") != "yes":
         messages.error(request, "Tick the confirmation box to go live.")
         return redirect("v2_instance_page", instance_id=strategy.pk, section="strategy")

@@ -1,7 +1,7 @@
 """The one way to write the audit log.
 
-``record()`` appends an event to a hash chain (one chain per organization, one for the
-platform). Each event's hash covers the previous hash, so editing or removing any row
+``record()`` appends an event to a hash chain (one chain per user whose data the event is
+about, one for the platform). Each event's hash covers the previous hash, so editing or removing any row
 breaks every hash after it, which ``manage.py verify_audit_chain`` detects.
 
 It raises when the write fails: a privileged action that cannot be recorded must not
@@ -39,15 +39,19 @@ def _check_metadata(metadata):
     walk(metadata)
 
 
-def chain_key(organization_id):
-    return "org:%d" % organization_id if organization_id else "platform"
+_UNSET = object()
+
+
+def chain_key(subject_id):
+    return "user:%d" % subject_id if subject_id else "platform"
 
 
 def compute_hash(prev_hash, event):
-    payload = json.dumps(
-        [prev_hash, event.occurred_at.isoformat(), event.chain, event.actor_id, event.organization_id,
-         event.action, event.target_type, event.target_id, event.metadata, event.ip, event.request_id],
-        sort_keys=True, separators=(",", ":"), default=str)
+    fields = [prev_hash, event.occurred_at.isoformat(), event.chain, event.actor_id, event.organization_id,
+              event.action, event.target_type, event.target_id, event.metadata, event.ip, event.request_id]
+    if event.subject_id is not None:  # events written before subjects existed hash exactly as before
+        fields.append(event.subject_id)
+    payload = json.dumps(fields, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -56,9 +60,14 @@ def _request_details(request):
     return (client_ip(request) or None), request.META.get("HTTP_X_REQUEST_ID", "")[:64]
 
 
-def record(action, *, actor=None, organization=None, target=None, metadata=None, request=None,
+def record(action, *, actor=None, subject=_UNSET, target=None, metadata=None, request=None,
            ip=None, request_id=""):
-    """Append one event and return it. ``target`` is a model instance or a (type, id) pair."""
+    """Append one event and return it.
+
+    ``subject`` is the user the event is about; when omitted it is the actor (or the signed-in
+    user of ``request``). Pass ``subject=None`` for a platform-level event. ``target`` is a model
+    instance or a (type, id) pair.
+    """
     metadata = dict(metadata or {})
     _check_metadata(metadata)
     if request is not None:
@@ -67,16 +76,16 @@ def record(action, *, actor=None, organization=None, target=None, metadata=None,
         request_id = request_id or found_request_id
         if actor is None and getattr(request.user, "is_authenticated", False):
             actor = request.user
-        if organization is None:
-            organization = getattr(request, "organization", None)
     if isinstance(target, tuple):
         target_type, target_id = target
     elif target is not None:
         target_type, target_id = type(target).__name__, target.pk
     else:
         target_type, target_id = "", ""
-    organization_id = getattr(organization, "pk", organization)
-    key = chain_key(organization_id)
+    if subject is _UNSET:
+        subject = actor
+    subject_id = getattr(subject, "pk", subject)
+    key = chain_key(subject_id)
     with transaction.atomic():
         try:
             with transaction.atomic():
@@ -87,7 +96,7 @@ def record(action, *, actor=None, organization=None, target=None, metadata=None,
         event = AuditEvent(
             chain=key, actor_id=getattr(actor, "pk", None),
             actor_label=(getattr(actor, "get_username", lambda: "")() or "")[:150] if actor else "",
-            organization_id=organization_id, action=action[:80],
+            subject_id=subject_id, action=action[:80],
             target_type=str(target_type)[:60], target_id=str(target_id)[:64],
             metadata=metadata, ip=ip, request_id=request_id, prev_hash=chain.last_hash)
         event.hash = compute_hash(chain.last_hash, event)

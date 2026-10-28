@@ -7,12 +7,12 @@ from django.http import HttpResponseBadRequest, JsonResponse
 
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
 
 from .strategies.registry import module_for
 from .study import FILLS
-from .models import StrategyInstance, StudyPrice
+from .models import StudyPrice
+from .tenant_scope import get_strategy_or_404
 from .v2_views import _render
 
 CSS = {"nine_sig": "w2-c1", "strategy": "w2-c1", "hold": "w2-c2", "spy": "w2-c3", "vti": "w2-c5"}
@@ -153,10 +153,7 @@ def _cached_window_payload(strategy, study, data, frame, amount, monthly, fill):
 @require_GET
 def study_window_json(request, instance_id):
     """Owner-only selected-period metrics, never an execution recommendation."""
-    strategy = get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset").filter(
-            owner=request.user, account__owner=request.user
-        ).exclude(account__kind="PAPER"), pk=instance_id)
+    strategy = get_strategy_or_404(request, instance_id)
     study = study_for(module_for(strategy), strategy.account.currency)
     if study is None:
         return HttpResponseBadRequest("Study unavailable")
@@ -199,10 +196,7 @@ def study_window_json(request, instance_id):
 @require_GET
 def study_simulate_json(request, instance_id):
     """Owner-only what-if on stored Study prices. Hypothetical; never an instruction."""
-    strategy = get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset").filter(
-            owner=request.user, account__owner=request.user
-        ).exclude(account__kind="PAPER"), pk=instance_id)
+    strategy = get_strategy_or_404(request, instance_id)
     plugin = module_for(strategy)
     if plugin is None or plugin.simulate is None:
         return HttpResponseBadRequest("No what-if for this strategy")
@@ -215,11 +209,7 @@ def study_simulate_json(request, instance_id):
 @login_required
 @require_GET
 def study_page(request, instance_id):
-    strategy = get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset").filter(
-            owner=request.user, account__owner=request.user,
-        ).exclude(account__kind="PAPER"), pk=instance_id,
-    )
+    strategy = get_strategy_or_404(request, instance_id)
     amount, bad_amount = _number(request.GET.get("amount", ""), "1000", 1, 10_000_000)
     monthly, bad_monthly = _number(request.GET.get("monthly", ""), "0", 0, 1_000_000)
     plugin = module_for(strategy)

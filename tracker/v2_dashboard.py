@@ -483,7 +483,7 @@ def isa_allowance(strategies):
 
 def alerts_summary(owner, strategy=None):
     pref = NotificationPreference.objects.filter(owner=owner).first()
-    deliveries = NotificationDelivery.objects.filter(owner=owner)
+    deliveries = NotificationDelivery.tenant_objects.filter(owner=owner)
     if strategy is not None:
         deliveries = deliveries.filter(strategy=strategy)
     last = deliveries.order_by("-created_at", "-pk").first()

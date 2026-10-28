@@ -48,7 +48,9 @@ class LastSentTests(TestCase):
         sent = NotificationDelivery.objects.create(event_key="a", status="SENT", **base)
         NotificationDelivery.objects.create(event_key="b", status="FAILED", **base)
         NotificationDelivery.objects.create(event_key="c", status="PENDING", **base)
-        summary = dash.alerts_summary(strategy.owner)
+        from tenancy.context import tenant_context
+        with tenant_context(strategy.owner):
+            summary = dash.alerts_summary(strategy.owner)
         self.assertEqual(summary["last"].event_key, "c")
         self.assertEqual(summary["last_sent"].pk, sent.pk)
 

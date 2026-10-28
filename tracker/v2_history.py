@@ -5,11 +5,10 @@ GETs do not sync prices, recalculate trades, or write database records.
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from .models import StrategyInstance
+from .tenant_scope import get_strategy_or_404
 from .v2_views import _render
 
 ZERO = Decimal("0")
@@ -25,11 +24,7 @@ def _chart(points):
 
 
 def _owned(request, instance_id):
-    return get_object_or_404(
-        StrategyInstance.objects.select_related("account", "preset").filter(
-            owner=request.user, account__owner=request.user,
-        ).exclude(account__kind="PAPER"), pk=instance_id,
-    )
+    return get_strategy_or_404(request, instance_id)
 
 
 @login_required

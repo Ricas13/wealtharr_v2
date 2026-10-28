@@ -8,7 +8,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from .history_data import build_history
-from .models import MarketObservation, StrategyInstance, YahooSync
+from .models import MarketObservation, YahooSync
+from .tenant_scope import strategy_queryset
 from .v2_views import _render
 from .strategies.instruments import symbol_labels, symbols as fund_symbols
 from .strategies.registry import current_review_range
@@ -24,10 +25,7 @@ def _next_quarter(today):
 @login_required
 @require_GET
 def overview_page(request):
-    items = list(StrategyInstance.objects.filter(
-        owner=request.user, account__owner=request.user
-    ).exclude(account__kind="PAPER").select_related("account", "preset")
-                .order_by("created_at", "pk"))
+    items = list(strategy_queryset(request).order_by("created_at", "pk"))
     rows = []
     contributed = ZERO
     complete_funding = True
