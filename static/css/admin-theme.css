@@ -1,0 +1,73 @@
+/* Makes Django's admin (Users, Plans, audit log...) look like the app: same dark palette, type and buttons.
+   Django's admin is built on CSS variables, so this only re-points them; no admin template internals change. */
+:root:root, html[data-theme]:root {
+  --primary: #1b2a44;
+  --secondary: #2f6fd6;
+  --accent: #7fb0f7;
+  --primary-fg: #e4e7eb;
+
+  --body-fg: #e4e7eb;
+  --body-bg: #0d1014;
+  --body-quiet-color: #a3acb7;
+  --body-medium-color: #c3cad3;
+  --body-loud-color: #ffffff;
+
+  --header-color: #e4e7eb;
+  --header-branding-color: #e4e7eb;
+  --header-bg: #0a0c10;
+  --header-link-color: #a9cbfa;
+
+  --breadcrumbs-fg: #a3acb7;
+  --breadcrumbs-link-fg: #7fb0f7;
+  --breadcrumbs-bg: #12161c;
+
+  --link-fg: #7fb0f7;
+  --link-hover-color: #a9cbfa;
+  --link-selected-fg: #a9cbfa;
+
+  --hairline-color: #262c35;
+  --border-color: #262c35;
+
+  --error-fg: #f2777a;
+  --message-success-bg: #14301f;
+  --message-warning-bg: #3a2c10;
+  --message-error-bg: #3a1517;
+
+  --darkened-bg: #12161c;
+  --selected-bg: #1c2129;
+  --selected-row: #16202e;
+
+  --button-fg: #ffffff;
+  --button-bg: #2f6fd6;
+  --button-hover-bg: #3a7ce3;
+  --default-button-bg: #2f6fd6;
+  --default-button-hover-bg: #3a7ce3;
+  --close-button-bg: #3a424e;
+  --close-button-hover-bg: #4a5463;
+  --delete-button-bg: #b0393d;
+  --delete-button-hover-bg: #c84448;
+
+  --object-tools-fg: #ffffff;
+  --object-tools-bg: #3a424e;
+  --object-tools-hover-bg: #4a5463;
+
+  --font-family-primary: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+body { font-size: 13px; -webkit-font-smoothing: antialiased; }
+#header { border-bottom: 1px solid #262c35; }
+#header a:link, #header a:visited { text-decoration: none; }
+.theme-toggle { display: none; }            /* the app is dark only */
+.module, #changelist .paginator, fieldset.module { border-color: #262c35; border-radius: 8px; }
+.module h2, .module caption, .inline-group h2 { border-radius: 8px 8px 0 0; font-weight: 600; letter-spacing: .01em; }
+input[type=text], input[type=password], input[type=email], input[type=url], input[type=number], input[type=search],
+textarea, select, .vTextField { background: #0a0c10; color: #e4e7eb; border: 1px solid #3a424e; border-radius: 6px; }
+input:focus, textarea:focus, select:focus { border-color: #7fb0f7; outline: 2px solid rgba(127, 176, 247, .25); }
+.button, input[type=submit], input[type=button], .submit-row input, a.button { border-radius: 6px; }
+.w2-back { display: inline-block; margin-left: 16px; padding: 4px 10px; border: 1px solid #3a424e; border-radius: 6px;
+  color: #e4e7eb !important; font-weight: 600; }
+.w2-back:hover { background: #1c222b; }
+#header { flex-wrap: wrap; }
+@media (max-width: 767px) { .w2-back { margin: 6px 16px; } }
+#header #site-name a:link, #header #site-name a:visited { color: #e4e7eb; font-size: 17px; font-weight: 600; }
+#header { padding: 10px 20px; }
