@@ -30,7 +30,8 @@ class SignupTests(TestCase):
         self.addCleanup(lambda: setattr(accounts, "send_system_email", __import__("tenancy.mail", fromlist=["x"]).send_system_email))
 
     def sign_up(self, **over):
-        data = {"username": "newbie", "email": "new@example.test", "password1": STRONG, "password2": STRONG}
+        data = {"username": "newbie", "email": "new@example.test", "password1": STRONG, "password2": STRONG,
+                "accept_terms": "on"}
         data.update(over)
         return self.client.post(reverse("signup"), data)
 

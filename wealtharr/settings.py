@@ -66,6 +66,7 @@ TEMPLATES = [{
         "django.contrib.messages.context_processors.messages",
         "tracker.context_processors.chrome",
         "tracker.context_processors.public_site",
+        "tenancy.context_processors.signup",
     ]},
 }]
 WSGI_APPLICATION = "wealtharr.wsgi.application"

@@ -68,7 +68,7 @@ class Command(BaseCommand):
         fail = 0
         owners = set()
         for strategy in per_tenant(StrategyInstance.objects.select_related("account", "preset", "owner").filter(
-                market_data_enabled=True, tracking_only=False,
+                market_data_enabled=True, tracking_only=False, owner__is_active=True,
                 preset__slug__in=plugin_keys(), preset__active=True)):
             owners.add(strategy.owner)
             try:

@@ -38,7 +38,7 @@
   <nav class="nav" aria-label="Main">
     <a class="brand" href="/"><span class="logo">W</span>Wealtharr</a>
     <div class="links"><a href="/#compare">Compare</a><a href="{% url 'guides' %}">Guides</a><a href="/#invite">How it works</a></div>
-    <div class="row"><a class="btn g" href="{% url 'login' %}" rel="nofollow">Sign in</a><a class="btn" href="/#invite">Request an invite</a></div>
+    <div class="row"><a class="btn g" href="{% url 'login' %}" rel="nofollow">Sign in</a>{% if signup_open %}<a class="btn" href="{% url 'signup' %}">Create account</a>{% else %}<a class="btn" href="/#invite">Request an invite</a>{% endif %}</div>
   </nav>
 </div>
 <main id="main">

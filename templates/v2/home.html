@@ -15,7 +15,7 @@
       <span class="eyebrow">● Private beta · UK Stocks &amp; Shares ISA</span>
       <h1>Follow a proven strategy.<br><em>Skip the spreadsheet.</em></h1>
       <p class="lead">Pick a fixed investing strategy, record what you hold, and Wealtharr checks prices every hour and tells you exactly what to do, and when. Nothing connects to your broker; your money never leaves your account.</p>
-      <div class="row"><a class="btn lg" href="#invite">Request an invite</a><a class="btn g lg" href="#compare">Compare strategies</a></div>
+      <div class="row">{% if signup_open %}<a class="btn lg" href="{% url 'signup' %}">Create account</a>{% else %}<a class="btn lg" href="#invite">Request an invite</a>{% endif %}<a class="btn g lg" href="#compare">Compare strategies</a></div>
       <p class="mut small">Free while in beta · No card · You place every trade yourself</p>
     </div>
 

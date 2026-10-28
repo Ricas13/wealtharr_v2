@@ -32,8 +32,15 @@ SIGNUP_LIMIT = 5
 RESET_LIMIT = 5
 
 
+def mail_ready():
+    """Sign-up depends on email (verification, reset), so it is closed while mail is not set up."""
+    from tracker.models import SystemIntegration
+    cfg = SystemIntegration.current()
+    return bool(cfg.smtp_host and cfg.smtp_sender)
+
+
 def signup_enabled():
-    return bool(getattr(settings, "SELF_SERVE_SIGNUP", False))
+    return bool(getattr(settings, "SELF_SERVE_SIGNUP", False)) and mail_ready()
 
 
 def _site(request):
@@ -54,6 +61,9 @@ def _limited(request, name, limit):
 
 class SignupForm(UserCreationForm):
     email = forms.EmailField()
+    accept_terms = forms.BooleanField(
+        label="I have read and agree to the Terms and the Privacy notice (links below)",
+        error_messages={"required": "Please tick the box to agree to the Terms and Privacy notice."})
 
     class Meta(UserCreationForm.Meta):
         model = User
@@ -91,12 +101,28 @@ def signup(request):
                 user = form.save(commit=False)
                 user.email, user.is_active = email, False
                 user.save()
-                audit.record("account.signup", actor=None, subject=user.pk, target=user, request=request)
+                audit.record("account.signup", actor=None, subject=user.pk, target=user, request=request,
+                             metadata={"accepted_terms": True})
             _send_verification(request, user)
             return render(request, "tenancy/check_email.html")
     return render(request, "tenancy/signup.html", {
         "form": form, "turnstile_required": settings.TURNSTILE_REQUIRED,
         "turnstile_site_key": settings.TURNSTILE_SITE_KEY})
+
+
+@require_http_methods(["GET", "POST"])
+def resend_verification(request):
+    """Send the confirmation link again to someone who signed up but never confirmed. Same answer for anyone."""
+    if not signup_enabled():
+        raise Http404
+    if request.method == "POST":
+        if not _limited(request, "resend", RESET_LIMIT):
+            email = (request.POST.get("email") or "").strip()
+            user = User.objects.filter(email__iexact=email, is_active=False, last_login__isnull=True).first() if email else None
+            if user is not None and user.has_usable_password():
+                _send_verification(request, user)
+        return render(request, "tenancy/check_email.html")
+    return render(request, "tenancy/resend.html")
 
 
 @require_http_methods(["GET", "POST"])
