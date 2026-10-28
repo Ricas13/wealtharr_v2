@@ -73,6 +73,11 @@
       <a class="w2-nav-link" href="{% url 'admin:auth_user_changelist' %}" title="Users">
         {% include 'partials/icon.html' with name='wallet' %}<span class="w2-nav-label">Users</span>
       </a>
+      {% if request.user.is_superuser %}
+      <a class="w2-nav-link" href="{% url 'admin:tenancy_plan_changelist' %}" title="Plans, prices and features">
+        {% include 'partials/icon.html' with name='coins' %}<span class="w2-nav-label">Plans</span>
+      </a>
+      {% endif %}
       <a class="w2-nav-link" href="{% url 'admin:index' %}" title="Django admin">
         {% include 'partials/icon.html' with name='settings' %}<span class="w2-nav-label">Django admin</span>
       </a>

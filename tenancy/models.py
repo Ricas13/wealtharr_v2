@@ -1,4 +1,5 @@
 """The audit log. (The tenant is the user, so there are no organizations or memberships.)"""
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -66,3 +67,55 @@ class AuditEvent(models.Model):
 
     def __str__(self):
         return "%s %s" % (self.occurred_at.isoformat(), self.action)
+
+
+class Plan(models.Model):
+    """A named bundle of features, configured in the admin. "Full" grants everything.
+
+    The payment links are plain links to a page the owner made on Stripe or PayPal; the app
+    does not learn from them that someone paid, so plans are assigned to users by hand for now.
+    """
+    slug = models.SlugField(max_length=40, unique=True)
+    name = models.CharField(max_length=80)
+    description = models.TextField(blank=True)
+    price_label = models.CharField(max_length=60, blank=True, help_text='Shown as written, e.g. "£5 / month".')
+    stripe_link = models.URLField(blank=True, help_text="A Stripe Payment Link or Checkout link (https only).")
+    paypal_link = models.URLField(blank=True, help_text="A PayPal payment or subscription link (https only).")
+    is_public = models.BooleanField(default=False, help_text="May be offered to users on a plans page.")
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    all_features = models.BooleanField(
+        default=False, help_text="Grant every feature, including ones added later.")
+    features = models.JSONField(default=list, blank=True)
+    limits = models.JSONField(default=dict, blank=True, help_text="Numeric limits, e.g. {\"strategies.max\": 2}")
+    is_default = models.BooleanField(default=False, help_text="Given to users who have no plan of their own.")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        constraints = [models.UniqueConstraint(
+            fields=["is_default"], condition=models.Q(is_default=True), name="one_default_plan")]
+
+    def save(self, *args, **kwargs):
+        if self.is_default:  # at most one default
+            type(self).objects.exclude(pk=self.pk).filter(is_default=True).update(is_default=False)
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
+class UserAccess(models.Model):
+    """A user's plan, with optional per-user feature grants and denials."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="access")
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="users")
+    grant = models.JSONField(default=list, blank=True)
+    deny = models.JSONField(default=list, blank=True)
+    note = models.CharField(max_length=200, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "plan and features"
+        verbose_name_plural = "plan and features"
+
+    def __str__(self):
+        return "%s: %s" % (self.user_id, self.plan)
