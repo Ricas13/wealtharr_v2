@@ -64,6 +64,8 @@ class Command(BaseCommand):
     help = "Synchronise GBP Yahoo quotes, capture verified daily valuations and issue advisory notices"
 
     def handle(self, *args, **options):
+        from tenancy.billing import expire_due_subscriptions
+        expire_due_subscriptions()  # paid periods that have run out
         ok = 0
         fail = 0
         owners = set()

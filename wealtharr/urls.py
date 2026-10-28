@@ -60,6 +60,8 @@ urlpatterns = [
     path("control/payments/<str:provider>/test/", tenancy_views.gateway_test, name="gateway_test"),
     path("control/payments/<str:provider>/environment/", tenancy_views.gateway_use_environment,
          name="gateway_use_environment"),
+    path("plans/manage/stripe/", tenancy_views.manage_stripe, name="manage_stripe"),
+    path("plans/manage/paypal/cancel/", tenancy_views.cancel_paypal, name="cancel_paypal"),
     path("plans/return/", tenancy_views.plans_return, name="plans_return"),
     path("plans/<slug:slug>/buy/<str:provider>/", tenancy_views.checkout, name="plan_checkout"),
     path("support-access/", support.my_support_access, name="support_access"),

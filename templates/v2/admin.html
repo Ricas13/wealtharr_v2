@@ -55,13 +55,13 @@
       {% if g.provider == 'stripe' %}
         <li>In Stripe, create a product with a <strong>recurring</strong> price for each paid plan. Copy each price id (<code>price_…</code>) into that plan under Plans.</li>
         <li>Create a restricted API key that can write Checkout Sessions and read Prices (or use a secret key), paste it below and save, then press <strong>Test connection</strong>.</li>
-        <li>In Stripe → Developers → Webhooks add an endpoint at <code>{{ g.webhook_url }}</code> listening to <code>checkout.session.completed</code> and <code>customer.subscription.deleted</code>. Paste its signing secret below.</li>
+        <li>In Stripe → Developers → Webhooks add an endpoint at <code>{{ g.webhook_url }}</code> listening to <code>checkout.session.completed</code>, <code>customer.subscription.deleted</code> and <code>invoice.payment_failed</code>. Paste its signing secret below.</li>
         <li>Do a test-mode checkout end to end before taking real payments.</li>
       {% else %}
         <li>In the PayPal developer dashboard create an app (Sandbox first) and copy its client ID and secret below. Choose the matching environment.</li>
         <li>Create a subscription plan for each paid plan in PayPal and copy its id (<code>P-…</code>) into that plan under Plans.</li>
-        <li>Add a webhook at <code>{{ g.webhook_url }}</code> for <em>Billing subscription activated, cancelled, expired</em> and <em>suspended</em>. Paste its Webhook ID below.</li>
-        <li>Note: a PayPal cancellation moves the person back to the default plan straight away, even if they paid for the current period.</li>
+        <li>Add a webhook at <code>{{ g.webhook_url }}</code> for <em>Billing subscription activated, cancelled, expired, suspended</em> and <em>payment failed</em>. Paste its Webhook ID below.</li>
+        <li>Note: when someone cancels, they keep their plan until the period they paid for ends.</li>
       {% endif %}
       </ol>
     </details>

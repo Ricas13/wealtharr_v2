@@ -691,6 +691,10 @@ class ProviderSubscription(models.Model):
     external_id = models.CharField(max_length=80)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
+    # Cancelled with paid time left: when access should end. Null = not scheduled.
+    ends_at = models.DateTimeField(null=True, blank=True)
+    # Over: cancelled, expired or deleted at the gateway. Null = still running.
+    ended_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["provider", "external_id"], name="one_provider_subscription")]
