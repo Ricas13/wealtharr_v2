@@ -114,5 +114,6 @@ class TelegramDeliveryTests(TestCase):
         class Strategy:
             strategy_key = "all-weather"
             alert_routes = {"quarterly": {"email": False, "discord": False, "telegram": True}}
-        pref = NotificationPreference(telegram_enabled=True, email_enabled=True)
+        user = get_user_model().objects.create_user("tg-routes", password="a-long-test-password-1")
+        pref = NotificationPreference(owner=user, telegram_enabled=True, email_enabled=True)
         self.assertEqual(strategy_channels(pref, "quarterly", Strategy()), ("telegram",))

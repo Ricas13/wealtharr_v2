@@ -12,6 +12,9 @@ from django.views.decorators.http import require_GET
 from .strategies.registry import module_for
 from .study import FILLS
 from .models import StudyPrice
+from tenancy import access
+from tenancy.decorators import require_feature
+
 from .tenant_scope import get_strategy_or_404
 from .v2_views import _render
 
@@ -194,6 +197,7 @@ def study_window_json(request, instance_id):
 
 @login_required
 @require_GET
+@require_feature("study.simulate")
 def study_simulate_json(request, instance_id):
     """Owner-only what-if on stored Study prices. Hypothetical; never an instruction."""
     strategy = get_strategy_or_404(request, instance_id)
@@ -257,6 +261,7 @@ def study_page(request, instance_id):
         study_first_day=data.days[0] if data.ready else None,
         study_last_day=data.days[-1] if data.ready else None,
         study_zoom_data=_study_payload(study, selected) if selected else None,
-        study_can_simulate=bool(plugin and plugin.simulate and data.ready),
+        study_can_simulate=bool(plugin and plugin.simulate and data.ready
+                                and access.can(request.user, "study.simulate")),
         study_sim_fields=plugin.simulate_fields if plugin and plugin.simulate else (),
     )
