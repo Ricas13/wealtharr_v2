@@ -297,6 +297,63 @@ class TelegramIntegrationForm(forms.ModelForm):
         return obj
 
 
+class GatewayForm(forms.Form):
+    """Admin: one payment gateway. Blank secret = keep, a value = replace, a tick = clear."""
+    provider = ""
+    prefixes = {}
+
+    def __init__(self, data=None, instance=None, prefix=None):
+        from tenancy import gateways
+        super().__init__(data, prefix=prefix)
+        current = gateways.raw(self.provider)
+        self.fields["enabled"].initial = current["enabled"]
+        if "environment" in self.fields:
+            self.fields["environment"].initial = current.get("environment", "sandbox")
+        for name, field in self.fields.items():
+            if isinstance(field.widget, forms.PasswordInput):
+                field.widget.render_value = False
+            if current.get(name) and name in gateways.SECRET_FIELDS[self.provider]:
+                field.label = "%s (saved; leave blank to keep)" % field.label
+        style(self.fields)
+
+    def clean(self):
+        data = super().clean()
+        for name, prefix in self.prefixes.items():
+            value = (data.get(name) or "").strip()
+            if value and not value.startswith(prefix):
+                self.add_error(name, "That doesn't look right (it should start with %s)." % prefix)
+        return data
+
+    def save(self):
+        from tenancy import gateways
+        gateways.save(self.provider, self.cleaned_data, actor=getattr(self, "actor", None),
+                      request=getattr(self, "request", None))
+
+
+class StripeGatewayForm(GatewayForm):
+    provider = "stripe"
+    prefixes = {"restricted_key": "rk_", "secret_key": "sk_", "webhook_secret": "whsec_"}
+    enabled = forms.BooleanField(required=False, label="Take payments with Stripe")
+    restricted_key = forms.CharField(required=False, widget=forms.PasswordInput, label="Restricted API key (rk_…, recommended)")
+    secret_key = forms.CharField(required=False, widget=forms.PasswordInput, label="Secret API key (sk_…)")
+    webhook_secret = forms.CharField(required=False, widget=forms.PasswordInput, label="Webhook signing secret (whsec_…)")
+    clear_restricted_key = forms.BooleanField(required=False, label="Remove the restricted key")
+    clear_secret_key = forms.BooleanField(required=False, label="Remove the secret key")
+    clear_webhook_secret = forms.BooleanField(required=False, label="Remove the webhook secret")
+
+
+class PayPalGatewayForm(GatewayForm):
+    provider = "paypal"
+    enabled = forms.BooleanField(required=False, label="Take payments with PayPal")
+    environment = forms.ChoiceField(choices=[("sandbox", "Sandbox (testing)"), ("live", "Live")], label="Environment")
+    client_id = forms.CharField(required=False, widget=forms.PasswordInput, label="Client ID")
+    client_secret = forms.CharField(required=False, widget=forms.PasswordInput, label="Client secret")
+    webhook_id = forms.CharField(required=False, label="Webhook ID")
+    clear_client_id = forms.BooleanField(required=False, label="Remove the client ID")
+    clear_client_secret = forms.BooleanField(required=False, label="Remove the client secret")
+    clear_webhook_id = forms.BooleanField(required=False, label="Remove the webhook ID")
+
+
 class RealNineSigSetupForm(forms.Form):
     """Select a strategy and wrapper; the server resolves actual instruments."""
     strategy_slug = forms.ChoiceField(

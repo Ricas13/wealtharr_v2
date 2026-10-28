@@ -10,9 +10,10 @@
       {% if o.plan.price_label %}<p><strong>{{ o.plan.price_label }}</strong></p>{% endif %}
       {% if o.plan.description %}<p>{{ o.plan.description }}</p>{% endif %}
       {% if not o.current %}
-        {% if o.stripe %}<p><a class="w2-button w2-button-primary" href="{{ o.stripe }}" rel="noopener">Pay with card (Stripe)</a></p>{% endif %}
-        {% if o.paypal %}<p><a class="w2-button" href="{{ o.paypal }}" rel="noopener">Pay with PayPal</a></p>{% endif %}
-        {% if not o.stripe and not o.paypal %}<p class="w2-note">Ask the site owner to switch you to this plan.</p>{% elif not o.automatic %}<p class="w2-note">After paying, the site owner switches your plan by hand.</p>{% endif %}
+        {% for c in o.checkout %}<form method="post" action="{% url 'plan_checkout' o.plan.slug c.provider %}">{% csrf_token %}<button class="w2-button w2-button-primary" type="submit">Pay with {{ c.label }}</button></form>{% endfor %}
+        {% if not o.stripe_api and o.stripe %}<p><a class="w2-button w2-button-primary" href="{{ o.stripe }}" rel="noopener">Pay with card (Stripe)</a></p>{% endif %}
+        {% if not o.paypal_api and o.paypal %}<p><a class="w2-button" href="{{ o.paypal }}" rel="noopener">Pay with PayPal</a></p>{% endif %}
+        {% if not o.checkout and not o.stripe and not o.paypal %}<p class="w2-note">Ask the site owner to switch you to this plan.</p>{% elif not o.checkout and not o.automatic %}<p class="w2-note">After paying, the site owner switches your plan by hand.</p>{% endif %}
       {% endif %}
     </li>
     {% endfor %}

@@ -322,10 +322,12 @@ PR ladder (revision 2)
   admins (superusers) always pass. An unknown feature or an unresolvable plan denies (fail closed).
 - Changes to plans, to users and to their plans are written to the audit log.
 
-## 12. Plans page and Stripe webhook
+## 12. Plans page and payment gateways
 
-- `/plans/` (signed in) shows the user's plan and the plans marked public, with their Stripe and PayPal links. A Stripe link that has a *Payment Link id* set gets `?client_reference_id=<user id>` appended.
-- `POST /webhooks/stripe/` is **off** unless `STRIPE_WEBHOOK_SECRET` is set (then 404). Signatures are verified (HMAC-SHA256, 5-minute tolerance); every event id is stored once (`BillingEvent`), so redelivery changes nothing; each plan change is written to the audit log.
-- `checkout.session.completed` (paid) assigns the plan whose `stripe_payment_link_id` matches to the user in `client_reference_id`; `customer.subscription.deleted` returns that customer to the default plan. Nothing else is acted on.
-- PayPal has no automatic path: the owner assigns the plan under Admin → Users after seeing the payment.
-- Set up: in Stripe add a webhook to `https://<site>/webhooks/stripe/` for those two events, put its signing secret in `STRIPE_WEBHOOK_SECRET`, and put each Payment Link's id (`plink_…`) on its plan.
+Gateways are managed the way mail, Discord and Telegram are: a card each on Admin → "Mail, Discord & status" (platform admin only).
+
+- **Settings.** Stripe (restricted or secret key, webhook signing secret) and PayPal (client id and secret, webhook id, sandbox/live). Saved encrypted as one blob per gateway; a blank field keeps the saved value, a tick clears it, an "enabled" switch turns a gateway off without losing its credentials, "Test connection" asks the gateway (and says plainly what that does and does not prove), and with nothing saved the gateway uses environment settings (`STRIPE_RESTRICTED_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, `PAYPAL_ENV`). Saves and "use the server's settings" are audited without any secret.
+- **Plan mappings.** On each plan (Admin → Plans) you give the Stripe price id (`price_…`, recurring) and/or PayPal plan id (`P-…`). Saving the plan asks the gateway whether each exists, is active and recurring; only verified mappings are sold. The older payment-link fields still work as a fallback where no verified mapping exists.
+- **Checkout.** `/plans/` shows "Pay with Stripe / PayPal" for a plan when the gateway is ready (credentials and webhook) and the plan's mapping is verified. The button creates a Stripe Checkout Session or a PayPal subscription naming the user and plan, and sends the person to the gateway's own page. Wealtharr never sees card details.
+- **Webhooks.** `POST /webhooks/stripe/` (HMAC-verified, 5-minute tolerance) and `POST /webhooks/paypal/` (each delivery is confirmed with PayPal's verify-signature API). Each event id is stored once. Stripe: paid checkout assigns the plan; subscription deleted returns the customer to the default plan. PayPal: subscription activated assigns; cancelled, expired or suspended returns the user to the default plan **immediately** (PayPal cancellations do not wait for the end of the paid period). Every plan change is audited.
+- **Not built:** refunds, proration, plan changes between paid plans from inside the app, invoices and payment-failed emails.

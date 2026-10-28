@@ -105,6 +105,21 @@ def _platform_admin(request):
     return request.user.is_active and request.user.is_superuser
 
 
+class MappingInline(admin.TabularInline):
+    """Which Stripe price / PayPal plan this plan is sold as. Checked with the gateway on save."""
+    from tracker.models import PlanProviderMapping as model
+    model = model
+    extra = 0
+    fields = ("provider", "external_id", "verified_at", "verification_note")
+    readonly_fields = ("verified_at", "verification_note")
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        if db_field.name == "provider":
+            from . import gateways
+            kwargs["choices"] = [(p, gateways.LABELS[p]) for p in gateways.PROVIDERS]
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
+
+
 @admin.register(Plan)
 class PlanAdmin(admin.ModelAdmin):
     """Add and configure plans: what each includes, its price text and its Stripe/PayPal links."""
@@ -113,6 +128,7 @@ class PlanAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "price_label", "is_public", "is_default", "feature_count", "user_count",
                     "has_links")
     prepopulated_fields = {"slug": ("name",)}
+    inlines = [MappingInline]
     fieldsets = (
         (None, {"fields": ("name", "slug", "description", "price_label", "is_public", "sort_order", "is_default")}),
         ("Payment links", {"fields": ("stripe_link", "stripe_payment_link_id", "paypal_link"),
@@ -133,6 +149,15 @@ class PlanAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return _platform_admin(request) and (obj is None or not (obj.is_default or obj.users.exists()))
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        from . import gateways
+        for mapping in form.instance.provider_mappings.all():  # ask the gateway about every id on every save
+            if gateways.verify_mapping(mapping):
+                self.message_user(request, "%s: verified." % mapping)
+            else:
+                self.message_user(request, "%s: not verified (%s)" % (mapping, mapping.verification_note), level="warning")
 
     @admin.display(description="Features")
     def feature_count(self, obj):

@@ -26,6 +26,10 @@ def declared(*specs):
         features._registry.update(saved)
 
 
+MAPPING_FORMS = {"provider_mappings-TOTAL_FORMS": 0, "provider_mappings-INITIAL_FORMS": 0,
+                 "provider_mappings-MIN_NUM_FORMS": 0, "provider_mappings-MAX_NUM_FORMS": 1000}
+
+
 class AccessBase(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -144,13 +148,13 @@ class AdminTests(AccessBase):
         self.client.force_login(self.admin)
         url = reverse("admin:tenancy_plan_add")
         with declared(("demo.email", "Email"), ("demo.max", "Strategies", True)):
-            bad = self.client.post(url, {"name": "Basic", "slug": "basic", "features": ["nonsense"], "limits": "{}", "sort_order": 0})
+            bad = self.client.post(url, {**MAPPING_FORMS, "name": "Basic", "slug": "basic", "features": ["nonsense"], "limits": "{}", "sort_order": 0})
             self.assertEqual(bad.status_code, 200)
             self.assertFalse(Plan.objects.filter(slug="basic").exists())
-            bad_limit = self.client.post(url, {"name": "Basic", "slug": "basic", "features": [],
+            bad_limit = self.client.post(url, {**MAPPING_FORMS, "name": "Basic", "slug": "basic", "features": [],
                                                "limits": '{"demo.email": 3}', "sort_order": 0})
             self.assertFalse(Plan.objects.filter(slug="basic").exists(), bad_limit.content[:0])
-            ok = self.client.post(url, {"name": "Basic", "slug": "basic", "features": ["demo.email"],
+            ok = self.client.post(url, {**MAPPING_FORMS, "name": "Basic", "slug": "basic", "features": ["demo.email"],
                                         "limits": '{"demo.max": 2}', "sort_order": 0})
             self.assertEqual(ok.status_code, 302)
         plan = Plan.objects.get(slug="basic")
@@ -168,7 +172,7 @@ class PlanLinkTests(AccessBase):
     def test_payment_links_must_be_https_and_are_saved_with_the_plan(self):
         self.client.force_login(self.admin)
         url = reverse("admin:tenancy_plan_add")
-        base = {"name": "Plus", "slug": "plus", "description": "More", "price_label": "£5 / month",
+        base = {**MAPPING_FORMS, "name": "Plus", "slug": "plus", "description": "More", "price_label": "£5 / month",
                 "features": [], "limits": "{}", "sort_order": 1}
         bad = self.client.post(url, dict(base, stripe_link="http://buy.stripe.com/x"))
         self.assertEqual(bad.status_code, 200)
