@@ -129,7 +129,7 @@ def fetch_stooq_reference(symbol: str, since: date, through: date,
         "User-Agent": "Wealtharr/2 reference sanity-check", "Accept": "text/csv"
     })
     try:
-        with urlopen(request, timeout=12) as response:
+        with urlopen(request, timeout=12) as response:  # nosec B310 - fixed https endpoint
             if response.status != 200:
                 raise QuoteUnavailable("Independent quote provider unavailable")
             data = response.read(MAX_DOWNLOAD_BYTES + 1)

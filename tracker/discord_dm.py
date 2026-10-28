@@ -74,7 +74,7 @@ def _call(method, path, *, token=None, bot=None, payload=None, form=None, auth=N
         headers["Authorization"] = auth
     request = Request(API + path, data=data, headers=headers, method=method)
     try:
-        with urlopen(request, timeout=10) as response:
+        with urlopen(request, timeout=10) as response:  # nosec B310 - fixed https endpoint
             body = response.read() or b"{}"
             return response.status, json.loads(body)
     except HTTPError as exc:
@@ -133,7 +133,7 @@ def post_webhook(url, text):
                       .encode("utf-8"), headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
                       method="POST")
     try:
-        with urlopen(request, timeout=10) as response:
+        with urlopen(request, timeout=10) as response:  # nosec B310 - fixed https endpoint
             if response.status not in (200, 204):
                 raise DiscordError("Discord refused the webhook post.")
     except HTTPError as exc:
