@@ -4,6 +4,10 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 from tracker import guides, pwa, seo, totp_views, v2_auth, v2_home
 
+from django.contrib.auth import views as auth_views
+from django.urls import reverse_lazy
+from tenancy import accounts
+
 urlpatterns = [
     path("", v2_home.landing, name="home"),
     path("compare.json", v2_home.compare_json, name="home_compare"),
@@ -17,6 +21,20 @@ urlpatterns = [
     path("sw.js", pwa.service_worker, name="service_worker"),
     path("offline/", pwa.offline, name="offline"),
     path("login/", v2_auth.sign_in, name="login"),
+    path("signup/", accounts.signup, name="signup"),
+    path("signup/verify/<str:token>/", accounts.verify_email, name="verify_email"),
+    path("password-reset/", accounts.RateLimitedResetView.as_view(), name="password_reset"),
+    path("password-reset/sent/", auth_views.PasswordResetDoneView.as_view(
+        template_name="tenancy/reset_done.html"), name="password_reset_done"),
+    path("password-reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(
+        template_name="tenancy/reset_confirm.html", success_url=reverse_lazy("password_reset_complete")),
+        name="password_reset_confirm"),
+    path("password-reset/complete/", auth_views.PasswordResetCompleteView.as_view(
+        template_name="tenancy/reset_complete.html"), name="password_reset_complete"),
+    path("account/", accounts.account_page, name="account"),
+    path("account/sessions/revoke/", accounts.revoke_sessions, name="revoke_sessions"),
+    path("account/export/", accounts.export_download, name="account_export"),
+    path("account/delete/", accounts.delete_account, name="delete_account"),
     path("logout/", v2_auth.sign_out, name="logout"),
     path("security/authenticator/", totp_views.configure, name="totp_setup"),
     path("security/verify/", totp_views.challenge, name="totp_challenge"),
