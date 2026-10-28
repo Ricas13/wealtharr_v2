@@ -31,7 +31,7 @@ def _call(token, method, payload=None):
     request = Request(API % (token, method), data=data, method="POST",
                       headers={"Content-Type": "application/json", "User-Agent": "Wealtharr/2 (private tracker)"})
     try:
-        with urlopen(request, timeout=10) as response:
+        with urlopen(request, timeout=10) as response:  # nosec B310 - fixed https endpoint
             body = json.loads(response.read(1_000_000) or b"{}")
     except HTTPError as exc:
         raise TelegramError("Telegram refused the request (HTTP %s)." % exc.code) from None

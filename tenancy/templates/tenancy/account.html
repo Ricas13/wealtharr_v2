@@ -1,0 +1,31 @@
+{% extends 'v2/base.html' %}{% block title %}Account{% endblock %}{% block content %}
+<header class="w2-page-heading"><div><h1>Account</h1><p class="w2-overline">Sign-in, your data and closing your account</p></div></header>
+<section class="w2-panel w2-space-top">
+  <h2>Sign-in</h2>
+  <p><a href="{% url 'change_password' %}">Change password</a> · <a href="{% url 'totp_setup' %}">Authenticator app</a> · <a href="{% url 'v2_settings' %}">Alerts &amp; settings</a></p>
+  <h2 class="w2-subheading">Where you are signed in</h2>
+  <ul>
+    {% for s in sessions %}
+    <li>{{ s.ua }}{% if s.ip %} · {{ s.ip }}{% endif %}{% if s.at %} · since {{ s.at }}{% endif %}
+      {% if s.current %}<span class="w2-chip">This device</span>{% else %}
+      <form method="post" action="{% url 'revoke_sessions' %}" class="w2-inline">{% csrf_token %}<input type="hidden" name="session" value="{{ s.key }}"><button class="w2-button" type="submit">Sign out</button></form>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% if sessions|length > 1 %}<form method="post" action="{% url 'revoke_sessions' %}">{% csrf_token %}<input type="hidden" name="session" value="others"><button class="w2-button" type="submit">Sign out everywhere else</button></form>{% endif %}
+</section>
+<section class="w2-panel w2-space-top">
+  <h2>Your data</h2>
+  <p>Download everything stored about you (profile, accounts, strategies, ledger, reviews, preferences) as one JSON file. Saved passwords and tokens are never included.</p>
+  <form method="post" action="{% url 'account_export' %}">{% csrf_token %}<button class="w2-button" type="submit">Download my data</button></form>
+</section>
+{% if can_delete %}
+<section class="w2-panel w2-space-top">
+  <h2>Close my account</h2>
+  <p>This signs you out everywhere, removes your email, name, alert destinations, authenticator and saved connections, and makes the account unusable. Your recorded ledger and reviews stay in the database without your name, as the financial records are append-only; ask the site owner if you need them erased entirely. <strong>If you pay by subscription, cancel it with Stripe or PayPal separately.</strong></p>
+  <form method="post" action="{% url 'delete_account' %}" class="w2-auth-form">{% csrf_token %}
+    <label for="del-confirm">Type DELETE</label><input id="del-confirm" name="confirm" autocomplete="off" required>
+    <label for="del-pw">Password</label><input id="del-pw" name="password" type="password" autocomplete="current-password" required>
+    <button class="w2-button" type="submit">Close my account</button></form>
+</section>
+{% endif %}
+{% endblock %}

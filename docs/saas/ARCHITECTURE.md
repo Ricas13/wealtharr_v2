@@ -321,3 +321,11 @@ PR ladder (revision 2)
 - **One check** (`tenancy.access.can(user, key)`, `limit(user, key)`) and a view decorator. Platform
   admins (superusers) always pass. An unknown feature or an unresolvable plan denies (fail closed).
 - Changes to plans, to users and to their plans are written to the audit log.
+
+## 12. Plans page and Stripe webhook
+
+- `/plans/` (signed in) shows the user's plan and the plans marked public, with their Stripe and PayPal links. A Stripe link that has a *Payment Link id* set gets `?client_reference_id=<user id>` appended.
+- `POST /webhooks/stripe/` is **off** unless `STRIPE_WEBHOOK_SECRET` is set (then 404). Signatures are verified (HMAC-SHA256, 5-minute tolerance); every event id is stored once (`BillingEvent`), so redelivery changes nothing; each plan change is written to the audit log.
+- `checkout.session.completed` (paid) assigns the plan whose `stripe_payment_link_id` matches to the user in `client_reference_id`; `customer.subscription.deleted` returns that customer to the default plan. Nothing else is acted on.
+- PayPal has no automatic path: the owner assigns the plan under Admin → Users after seeing the payment.
+- Set up: in Stripe add a webhook to `https://<site>/webhooks/stripe/` for those two events, put its signing secret in `STRIPE_WEBHOOK_SECRET`, and put each Payment Link's id (`plink_…`) on its plan.

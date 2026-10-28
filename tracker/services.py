@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from .models import LedgerEntry, NotificationDelivery, NotificationPreference, PriceMark, SystemIntegration
+from .tenant_scope import strategies_of
 
 LOG = logging.getLogger(__name__)
 ZERO = Decimal("0")
@@ -93,7 +94,7 @@ def consolidated(owner, *, include_paper=False):
     contributed = ZERO
     total = ZERO
     missing = []
-    for s in owner.strategies.select_related("account", "preset").all():
+    for s in strategies_of(owner).select_related("account", "preset"):
         if s.account.kind == "PAPER" and not include_paper:
             continue
         summary = ledger_summary(s)
@@ -121,12 +122,22 @@ def encrypt_secret(raw):
         raw.encode("utf-8")).decode("ascii")
 
 
+def readable_with_current_key(encoded):
+    """True when the credential is already encrypted with the current data key."""
+    key = settings.DATA_ENCRYPTION_KEY or settings.SECRET_KEY
+    try:
+        _fernet_for_secret(key).decrypt(encoded.encode("ascii"))
+        return True
+    except InvalidToken:
+        return False
+
+
 def decrypt_secret(encoded):
     if not encoded:
         return ""
     # During migration legacy data stays readable; re-encrypt before rotating
     # Django's signing key.
-    for key in (settings.DATA_ENCRYPTION_KEY, settings.SECRET_KEY):
+    for key in (settings.DATA_ENCRYPTION_KEY, *settings.DATA_ENCRYPTION_KEYS_PREVIOUS, settings.SECRET_KEY):
         if key:
             try:
                 return _fernet_for_secret(key).decrypt(encoded.encode("ascii")).decode("utf-8")

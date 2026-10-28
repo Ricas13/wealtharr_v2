@@ -2,6 +2,7 @@
   <h2 class="w2-sr-only" id="w2-wizard-title">Add a strategy</h2>
   <p class="w2-muted w2-wizard-intro">Three choices, about two minutes. Wealtharr never connects to your broker or places orders. Past performance of every strategy is below.</p>
   {% if wizard_error %}<div class="w2-form-error" role="alert">{{ wizard_error }}</div>{% endif %}
+  {% if wizard_cap_reached and not wizard_error %}<p class="w2-notice" role="note">Your plan's strategy limit is reached. Ask for a bigger plan to add another.</p>{% endif %}
   <form action="{% url 'v2_add_strategy' %}" method="post" class="w2-wizard-form" novalidate>
     {% csrf_token %}
     <div class="w2-wizard-cards">

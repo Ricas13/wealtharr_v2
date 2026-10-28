@@ -1,0 +1,8 @@
+# Account lifecycle
+
+- **Sign-up** (`/signup/`) exists only when `SELF_SERVE_SIGNUP=1`; otherwise it is a 404 and accounts are still created by hand. Accounts start inactive; a signed link (2 days) emailed through the site SMTP, confirmed with a button (a plain GET activates nothing), activates them. An already-used email gets the same screen and creates nothing. Sign-up is rate-limited per address and uses Turnstile when required.
+- **Password reset** (`/password-reset/`): Django's token flow through the site SMTP; same answer for unknown addresses; limited per address; inactive accounts get nothing. Changing the password signs out other sessions.
+- **Sessions** (`/account/`): lists the user's live sessions (device, address, since) and can sign out one or all others.
+- **Export** (`POST /account/export/`): one JSON file of everything owned by the user. Fields holding secrets (ciphertext, tokens, passwords) are never included.
+- **Closing an account** (password + typing DELETE; staff cannot self-close): removes email, names, alert destinations, authenticator and saved connections, signs out every session, makes the account unusable, and writes an audit event. **The ledger, reviews and prices stay, pseudonymous (`deleted-<id>`)**, because those records are append-only. Hard-purging them needs the retention policy (compliance PR) and is not done here.
+- Email is needed for all of this: configure SMTP under Admin → Mail.

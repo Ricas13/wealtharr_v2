@@ -19,6 +19,7 @@ from .models import (
 )
 from .services import ledger_summary, validate_and_record
 from .strategies.instruments import symbols
+from .tenant_scope import strategies_of
 from .strategies.registry import is_current_review, module_for
 
 D = Decimal
@@ -113,8 +114,8 @@ def accept_action_as_done(*, owner, strategy_id, signal_id, action_index, note="
     when the review is finished.
     """
     with transaction.atomic():
-        locked = StrategyInstance.objects.select_for_update().select_related(
-            "account", "preset").get(pk=strategy_id, owner=owner)
+        locked = strategies_of(owner).select_for_update().select_related(
+            "account", "preset").get(pk=strategy_id)
         signal = StrategySignal.objects.select_for_update().get(pk=signal_id, strategy=locked)
         _check_current(locked, signal)
         rows = completion_rows(signal, _linked(locked, signal))
@@ -204,8 +205,8 @@ def record_single_fill(*, owner, strategy_id, signal_id, action_index,
     if executed_on > timezone.localdate():
         raise ValidationError("A future broker execution cannot be recorded.")
     with transaction.atomic():
-        locked = StrategyInstance.objects.select_for_update().select_related(
-            "account", "preset").get(pk=strategy_id, owner=owner)
+        locked = strategies_of(owner).select_for_update().select_related(
+            "account", "preset").get(pk=strategy_id)
         signal = StrategySignal.objects.select_for_update().get(
             pk=signal_id, strategy=locked)
         prior = SignalFill.objects.filter(
@@ -268,8 +269,8 @@ def finalize_manual_review(*, owner, strategy_id, signal_id):
     the immutable baseline (reset ONLY) and the execution completion marker.
     """
     with transaction.atomic():
-        locked = StrategyInstance.objects.select_for_update().select_related(
-            "account", "preset").get(pk=strategy_id, owner=owner)
+        locked = strategies_of(owner).select_for_update().select_related(
+            "account", "preset").get(pk=strategy_id)
         signal = StrategySignal.objects.select_for_update().get(
             pk=signal_id, strategy=locked)
         _check_current(locked, signal, allow_late=True)

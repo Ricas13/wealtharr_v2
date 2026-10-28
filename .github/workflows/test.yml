@@ -47,6 +47,11 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
       - name: Apply schema migrations
         run: python manage.py migrate --noinput
+      - name: Migrating again changes nothing and the data is consistent
+        run: |
+          python manage.py migrate --noinput | tee second_migrate.txt
+          grep -q "No migrations to apply" second_migrate.txt
+          python manage.py tenancy_check
       - name: Run tests
         run: python manage.py test tracker --parallel 4 --verbosity 2
       - name: Compile assets

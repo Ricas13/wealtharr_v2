@@ -3,6 +3,7 @@
 <div class="w2-grid2">
   <section class="w2-card" aria-labelledby="w2-destination-title">
     <div class="w2-ch"><h2 class="w2-ct" id="w2-destination-title">{% include 'partials/icon.html' with name='bell' %} Where alerts go</h2><span class="w2-muted">All strategies</span></div>
+    {% if plan_blocked_channels %}<p class="w2-notice" role="note">Your plan does not include alerts by {{ plan_blocked_channels|join:", " }}.</p>{% endif %}
     <form method="post" action="{% url 'v2_settings' %}">
       {% csrf_token %}
       <input type="hidden" name="form_kind" value="owner">
@@ -88,6 +89,7 @@
     <h2 class="w2-ct" id="w2-security-title" style="margin-bottom:6px">{% include 'partials/icon.html' with name='lock' %} Security</h2>
     <div class="w2-setting-row"><span>Password</span><a class="w2-button" href="{% url 'change_password' %}">Change password</a></div>
     <div class="w2-setting-row"><span>Two-factor authentication <span class="w2-muted">· {% if has_authenticator %}on{% else %}off (optional){% endif %}</span></span><a class="w2-button" href="{% url 'totp_setup' %}">{% if has_authenticator %}Manage{% else %}Turn on{% endif %}</a></div>
+    <div class="w2-setting-row"><span>Let the site owner look at my account metadata <span class="w2-muted">· off unless you allow it</span></span><a class="w2-button" href="{% url 'support_access' %}">Manage</a></div>
   </section>
 
   <section class="w2-card" aria-labelledby="w2-receipts-title">

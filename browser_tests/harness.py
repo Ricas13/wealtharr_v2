@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import override_settings
 from django.urls import reverse
+from tenancy.models import Plan
 from tracker.models import StrategyPreset
 
 @override_settings(TURNSTILE_REQUIRED=False)
@@ -33,6 +34,9 @@ class BrowserHarness(StaticLiveServerTestCase):
             super().tearDownClass()
 
     def setUp(self):
+        # The browser tests' database flush removes the plan the migration seeds.
+        Plan.objects.get_or_create(slug="full", defaults={
+            "name": "Full", "all_features": True, "is_default": True})
         self.owner = get_user_model().objects.create_user(
             "owner-browser", email="owner@example.invalid",
             password=self.PASSWORD)

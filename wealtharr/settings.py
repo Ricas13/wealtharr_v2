@@ -20,6 +20,12 @@ SECRET_KEY = _read_secret_file("SECRET_KEY_FILE") or os.environ.get("SECRET_KEY"
 # Optional separate encryption key; absent on old deployments until explicit upgrade.
 DATA_ENCRYPTION_KEY = (_read_secret_file("DATA_ENCRYPTION_KEY_FILE")
                        or os.environ.get("DATA_ENCRYPTION_KEY", ""))
+# Keys retired by a rotation: still used to read old records until `migrate_data_encryption` re-encrypts.
+DATA_ENCRYPTION_KEYS_PREVIOUS = [k.strip() for k in (
+    _read_secret_file("DATA_ENCRYPTION_KEYS_PREVIOUS_FILE")
+    or os.environ.get("DATA_ENCRYPTION_KEYS_PREVIOUS", "")).split(",") if k.strip()]
+# Most state-changing requests one signed-in user may make per minute (0 turns the limit off).
+WRITE_RATE_LIMIT_PER_MINUTE = int(os.environ.get("WRITE_RATE_LIMIT_PER_MINUTE", "120") or 0)
 if not SECRET_KEY:
     if not DEBUG:
         raise RuntimeError("SECRET_KEY or SECRET_KEY_FILE is required when DEBUG=0")
@@ -33,6 +39,7 @@ INSTALLED_APPS = [
     "tracker",
 ]
 MIDDLEWARE = [
+    "tenancy.ops.RequestIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "tracker.security_headers.RestrictiveResponseHeaders",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -42,6 +49,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "tracker.totp_middleware.RequireOwnerTOTP",
     "tenancy.middleware.TenantMiddleware",
+    "tenancy.ratelimit.WriteRateLimit",
     "tracker.seo.SeoMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -143,11 +151,30 @@ X_FRAME_OPTIONS = "DENY"
 TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
 # The one public origin search engines should index, e.g. https://www.example.com.
 # When set, every other host 301-redirects to it; add both hosts to ALLOWED_HOSTS.
-# Ask each person to confirm they chose their strategy themselves when adding one (off: today's flow).
+# Database row-level security (see docs/saas/RLS.md). Only on after `manage.py rls_apply`.
+RLS_ENABLED = os.environ.get("RLS_ENABLED", "0") == "1"
+# Public registration. Off: accounts are still created by hand in the admin.
+SELF_SERVE_SIGNUP = os.environ.get("SELF_SERVE_SIGNUP", "0") == "1"
+# Ask each person to confirm they chose their strategy themselves when adding one (off by default).
 REQUIRE_CHOICE_ACK = os.environ.get("REQUIRE_CHOICE_ACK", "0") == "1"
 SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/")
 # Shown on the privacy page for access and deletion requests; optional.
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "").strip()
+# Stripe signs webhook calls with this; leave empty and the webhook endpoint stays off.
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
 # Production login intentionally fails closed if Turnstile is not configured.
 TURNSTILE_REQUIRED = not DEBUG
+
+# Logs: plain text by default, one JSON object per line with LOG_FORMAT=json (each tagged with the request id).
+LOGGING = {
+    "version": 1, "disable_existing_loggers": False,
+    "filters": {"request_id": {"()": "tenancy.ops.RequestIdFilter"}},
+    "formatters": {
+        "json": {"()": "tenancy.ops.JsonFormatter"},
+        "plain": {"format": "%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s"},
+    },
+    "handlers": {"console": {"class": "logging.StreamHandler", "filters": ["request_id"],
+                             "formatter": "json" if os.environ.get("LOG_FORMAT") == "json" else "plain"}},
+    "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+}

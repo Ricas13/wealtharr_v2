@@ -1,7 +1,10 @@
+from .tenant_scope import strategies_of
+
+
 def chrome(request):
     if not request.user.is_authenticated:
         return {"nav_strategies": []}
-    return {"nav_strategies": request.user.strategies.select_related("account").all()}
+    return {"nav_strategies": strategies_of(request.user).select_related("account")}
 
 
 def public_site(request):
