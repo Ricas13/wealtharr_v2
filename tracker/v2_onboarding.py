@@ -15,6 +15,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from tenancy import access
+
 from .core.catalogue import (
     OFFERS, ACCOUNT_TYPES, platforms,
     CATALOGUE_VERSION, availability_reason, onboarding_manifest,
@@ -230,6 +232,13 @@ ROUTE_DEFAULTS = {
 }
 
 
+def strategy_cap_reached(request):
+    """True when the user's plan limits strategies and they already have that many."""
+    from .tenant_scope import strategy_queryset
+    cap = access.limit(request.user, "strategies.max")
+    return cap is not None and strategy_queryset(request).count() >= cap
+
+
 @require_http_methods(["GET", "POST"])
 @login_required
 def wizard(request):
@@ -263,6 +272,12 @@ def wizard(request):
             state["monthly"] = _decimal(post.get("monthly", ""), "your monthly top-up")
             if not state["ack"]:
                 raise ValidationError("Tick the box to confirm you checked these instruments in your own account.")
+            if strategy_cap_reached(request):
+                raise ValidationError(
+                    "Your plan allows %d strateg%s and you already have that many. "
+                    "Ask for a bigger plan to add another." % (
+                        access.limit(request.user, "strategies.max"),
+                        "y" if access.limit(request.user, "strategies.max") == 1 else "ies"))
             instance = _enroll(request.user, state)
             if post.get("go_live") == "yes":
                 from .v2_go_live import go_live
@@ -292,6 +307,7 @@ def wizard(request):
         # Hypothetical past performance of every strategy, before choosing one.
         compare=compare(1000, 100, "10y", real_names=True), compare_frames=FRAMES,
         wizard=state, wizard_error=error, wizard_offers=offers,
+        wizard_cap_reached=strategy_cap_reached(request),
         wizard_platforms=platforms(),
         wizard_account_options=[{"key": kind, "name": dict(ACCOUNT_TYPES)[kind], "enabled": kind in types}
                                 for kind in offered],

@@ -43,6 +43,13 @@ class PlanForm(forms.ModelForm):
     def clean_features(self):
         return sorted(self.cleaned_data["features"])
 
+    def clean_is_default(self):
+        # Without a default plan every user without their own plan would lose all features.
+        if self.instance.pk and self.instance.is_default and not self.cleaned_data["is_default"]:
+            raise forms.ValidationError("There must always be a default plan. To change it, tick this on "
+                                        "another plan instead.")
+        return self.cleaned_data["is_default"]
+
     def clean_stripe_link(self):
         return _https_only(self.cleaned_data["stripe_link"], "The Stripe link")
 
@@ -124,7 +131,7 @@ class PlanAdmin(admin.ModelAdmin):
     has_add_permission = has_change_permission = has_view_permission
 
     def has_delete_permission(self, request, obj=None):
-        return _platform_admin(request) and (obj is None or not obj.users.exists())
+        return _platform_admin(request) and (obj is None or not (obj.is_default or obj.users.exists()))
 
     @admin.display(description="Features")
     def feature_count(self, obj):
