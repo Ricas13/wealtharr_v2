@@ -146,6 +146,8 @@ TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
 SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/")
 # Shown on the privacy page for access and deletion requests; optional.
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "").strip()
+# Stripe signs webhook calls with this; leave empty and the webhook endpoint stays off.
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
 # Production login intentionally fails closed if Turnstile is not configured.
 TURNSTILE_REQUIRED = not DEBUG

@@ -59,6 +59,10 @@
          href="{% url 'v2_settings' %}" {% if page_key == 'settings' %}aria-current="page"{% endif %} title="Alerts &amp; settings">
         {% include 'partials/icon.html' with name='settings' %}<span class="w2-nav-label">Alerts &amp; settings</span>
       </a>
+      <a class="w2-nav-link {% if page_key == 'plans' %}w2-active{% endif %}"
+         href="{% url 'plans' %}" {% if page_key == 'plans' %}aria-current="page"{% endif %} title="Your plan">
+        {% include 'partials/icon.html' with name='coins' %}<span class="w2-nav-label">Your plan</span>
+      </a>
     </nav>
     {% if request.user.is_staff %}
     <nav class="w2-sidebar-admin" aria-label="Admin">
