@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "tracker",
 ]
 MIDDLEWARE = [
+    "tenancy.ops.RequestIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "tracker.security_headers.RestrictiveResponseHeaders",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -162,3 +163,16 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
 # Production login intentionally fails closed if Turnstile is not configured.
 TURNSTILE_REQUIRED = not DEBUG
+
+# Logs: plain text by default, one JSON object per line with LOG_FORMAT=json (each tagged with the request id).
+LOGGING = {
+    "version": 1, "disable_existing_loggers": False,
+    "filters": {"request_id": {"()": "tenancy.ops.RequestIdFilter"}},
+    "formatters": {
+        "json": {"()": "tenancy.ops.JsonFormatter"},
+        "plain": {"format": "%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s"},
+    },
+    "handlers": {"console": {"class": "logging.StreamHandler", "filters": ["request_id"],
+                             "formatter": "json" if os.environ.get("LOG_FORMAT") == "json" else "plain"}},
+    "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+}
