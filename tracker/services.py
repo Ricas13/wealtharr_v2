@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from .models import LedgerEntry, NotificationDelivery, NotificationPreference, PriceMark, SystemIntegration
+from .tenant_scope import strategies_of
 
 LOG = logging.getLogger(__name__)
 ZERO = Decimal("0")
@@ -93,7 +94,7 @@ def consolidated(owner, *, include_paper=False):
     contributed = ZERO
     total = ZERO
     missing = []
-    for s in owner.strategies.select_related("account", "preset").all():
+    for s in strategies_of(owner).select_related("account", "preset"):
         if s.account.kind == "PAPER" and not include_paper:
             continue
         summary = ledger_summary(s)

@@ -28,6 +28,7 @@ from .models import (
     StrategyPreset,
 )
 from .services import validate_and_record
+from .tenant_scope import accounts_of, strategies_of
 
 
 def _decimal(value, label, *, precision=2, allow_zero=True):
@@ -69,7 +70,7 @@ def isa_deposits(owner, start, end):
     from .v2_ledger_core import effective_entries
     return tuple(
         (e.occurred_on, e.amount)
-        for s in StrategyInstance.objects.filter(owner=owner, account__kind="ISA")
+        for s in strategies_of(owner).filter(account__kind="ISA")
         for e in effective_entries(s)
         if e.kind == LedgerEntry.DEPOSIT and start <= e.occurred_on <= end and e.note != OPENING_NOTE)
 
@@ -140,7 +141,7 @@ def _validated_start(post, state):
 
 def _unique_account_name(owner, display, kind):
     label = (display + " · " + kind)[:75]
-    existing = set(Account.objects.filter(owner=owner).values_list("name", flat=True))
+    existing = set(accounts_of(owner).values_list("name", flat=True))
     for index in range(1, 10001):
         candidate = label if index == 1 else (label[:70] + " #" + str(index))
         if candidate not in existing:
@@ -291,9 +292,8 @@ def wizard(request):
             error = exc.messages[0] if isinstance(exc, ValidationError) else "Cannot save these details safely. Nothing was created."
     lines = rows_for(strategy, platform, account_type) if account_type else ()
     known_isa, verified_year = _isa_recorded(request.user, timezone.localdate())
-    duplicate = bool(account_type and StrategyInstance.objects.filter(
-        owner=request.user, preset__slug=strategy,
-        account__kind=account_type, account__broker=platform,
+    duplicate = bool(account_type and strategies_of(request.user).filter(
+        preset__slug=strategy, account__kind=account_type, account__broker=platform,
     ).exists())
     hold_rows = [
         {"line": line,
