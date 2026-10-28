@@ -1,0 +1,6 @@
+Someone asked to reset the password for your Wealtharr account ({{ user.get_username }}).
+
+Open this link to choose a new one:
+{{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}
+
+If it was not you, ignore this message; nothing changes.

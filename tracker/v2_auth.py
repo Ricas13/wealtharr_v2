@@ -105,6 +105,7 @@ def sign_in(request):
     return render(request, "v2/login.html", {
         "form": form, "login_error": error, "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
         "turnstile_required": settings.TURNSTILE_REQUIRED,
+        "signup_open": settings.SELF_SERVE_SIGNUP,
     })
 
 

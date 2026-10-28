@@ -145,6 +145,8 @@ TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
 # When set, every other host 301-redirects to it; add both hosts to ALLOWED_HOSTS.
 # Database row-level security (see docs/saas/RLS.md). Only on after `manage.py rls_apply`.
 RLS_ENABLED = os.environ.get("RLS_ENABLED", "0") == "1"
+# Public registration. Off: accounts are still created by hand in the admin.
+SELF_SERVE_SIGNUP = os.environ.get("SELF_SERVE_SIGNUP", "0") == "1"
 SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/")
 # Shown on the privacy page for access and deletion requests; optional.
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "").strip()
