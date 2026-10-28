@@ -20,6 +20,12 @@ SECRET_KEY = _read_secret_file("SECRET_KEY_FILE") or os.environ.get("SECRET_KEY"
 # Optional separate encryption key; absent on old deployments until explicit upgrade.
 DATA_ENCRYPTION_KEY = (_read_secret_file("DATA_ENCRYPTION_KEY_FILE")
                        or os.environ.get("DATA_ENCRYPTION_KEY", ""))
+# Keys retired by a rotation: still used to read old records until `migrate_data_encryption` re-encrypts.
+DATA_ENCRYPTION_KEYS_PREVIOUS = [k.strip() for k in (
+    _read_secret_file("DATA_ENCRYPTION_KEYS_PREVIOUS_FILE")
+    or os.environ.get("DATA_ENCRYPTION_KEYS_PREVIOUS", "")).split(",") if k.strip()]
+# Most state-changing requests one signed-in user may make per minute (0 turns the limit off).
+WRITE_RATE_LIMIT_PER_MINUTE = int(os.environ.get("WRITE_RATE_LIMIT_PER_MINUTE", "120") or 0)
 if not SECRET_KEY:
     if not DEBUG:
         raise RuntimeError("SECRET_KEY or SECRET_KEY_FILE is required when DEBUG=0")
@@ -42,6 +48,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "tracker.totp_middleware.RequireOwnerTOTP",
     "tenancy.middleware.TenantMiddleware",
+    "tenancy.ratelimit.WriteRateLimit",
     "tracker.seo.SeoMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

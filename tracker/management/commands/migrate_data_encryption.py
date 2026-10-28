@@ -14,9 +14,20 @@ _FIELDS = (
 
 
 class Command(BaseCommand):
-    help = "Migrate all stored encrypted credentials to DATA_ENCRYPTION_KEY"
+    help = ("Migrate all stored encrypted credentials to DATA_ENCRYPTION_KEY (also the last step of a key "
+            "rotation: put the old key in DATA_ENCRYPTION_KEYS_PREVIOUS, set the new one, run this).")
+
+    def add_arguments(self, parser):
+        parser.add_argument("--check", action="store_true",
+                            help="Only count credentials not yet on the current key; change nothing.")
 
     def handle(self, *args, **options):
+        if options["check"]:
+            from tracker.services import readable_with_current_key
+            behind = sum(1 for model, fields in _FIELDS for row in model.objects.all() for f in fields
+                         if getattr(row, f) and not readable_with_current_key(getattr(row, f)))
+            self.stdout.write("Credentials not on the current key: %d" % behind)
+            return
         if not settings.DATA_ENCRYPTION_KEY:
             raise CommandError("Independent DATA_ENCRYPTION_KEY_FILE required; no changes made.")
         if settings.DATA_ENCRYPTION_KEY == settings.SECRET_KEY:

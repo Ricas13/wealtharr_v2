@@ -47,7 +47,7 @@ def _turnstile_verified(request):
             "https://challenges.cloudflare.com/turnstile/v0/siteverify",
             data=body, method="POST",
         )
-        with urlopen(req, timeout=8) as result:
+        with urlopen(req, timeout=8) as result:  # nosec B310 - fixed https endpoint
             return json.load(result).get("success") is True
     except Exception:
         return False
