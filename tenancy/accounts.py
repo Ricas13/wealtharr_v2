@@ -282,11 +282,16 @@ def delete_account(request):
             request, username=user.get_username(), password=request.POST.get("password", "")):
         messages.error(request, "Type DELETE and your password to confirm.")
         return redirect("account")
+    from . import gateways
+    failed = gateways.cancel_all_for_user(user)  # before the account is scrubbed, while we still know their ids
     with transaction.atomic():
-        audit.record("account.deleted", actor=user, subject=user.pk, target=user, request=request)
+        audit.record("account.deleted", actor=user, subject=user.pk, target=user, request=request,
+                     metadata={"subscription_cancel_failed": failed})
         scrub_account(user)
     logout(request)
     messages.success(request, "Your account has been closed and your personal details removed.")
+    if failed:
+        messages.warning(request, "We could not cancel your subscription with %s. Please cancel it there yourself so you are not charged." % " and ".join(failed))
     return redirect("login")
 
 

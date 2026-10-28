@@ -1,6 +1,15 @@
 <section class="w2-panel w2-space-top">
   <h2>Your plan</h2>
   <p>You are on <strong>{{ current_plan.name|default:"no plan" }}</strong>{% if current_plan.price_label %} ({{ current_plan.price_label }}){% endif %}. {{ current_plan.description }}</p>
+  {% if has_subscription %}
+  <h2 class="w2-subheading">Your subscription</h2>
+  {% if can_manage_stripe %}<form method="post" action="{% url 'manage_stripe' %}">{% csrf_token %}<button class="w2-button" type="submit">Manage billing (card, plan, cancel)</button></form>{% endif %}
+  {% for sub in paypal_subscriptions %}
+    <p>PayPal subscription{% if sub.ends_at %} · ends {{ sub.ends_at|date:"j M Y" }}{% endif %}</p>
+    {% if not sub.ends_at %}<form method="post" action="{% url 'cancel_paypal' %}">{% csrf_token %}<button class="w2-button" type="submit">Cancel PayPal subscription</button></form>{% endif %}
+  {% endfor %}
+  <p class="w2-note">To change plan, use the billing page above; you are not charged twice.</p>
+  {% endif %}
   {% if offers %}
   <h2 class="w2-subheading">Available plans</h2>
   <ul class="w2-plans">

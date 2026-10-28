@@ -261,3 +261,63 @@ def verify_paypal_webhook(headers, body_text):
     except (GatewayError, ValueError):
         return False
     return code == 200 and answer.get("verification_status") == "SUCCESS"
+
+
+# ---- managing and ending a subscription -----------------------------------------------------
+
+def active_subscriptions(user, provider=None):
+    from tracker.models import ProviderSubscription
+    rows = ProviderSubscription.objects.filter(user=user, ended_at__isnull=True)
+    return rows.filter(provider=provider) if provider else rows
+
+
+def stripe_portal_url(user, return_url):
+    """Stripe's own page where the customer updates a card, changes plan or cancels."""
+    from .models import UserAccess
+    access = UserAccess.objects.filter(user=user).first()
+    if access is None or not access.stripe_customer_id or not checkout_ready("stripe"):
+        raise GatewayError("There is no Stripe subscription to manage.")
+    code, body = call("POST", STRIPE_API + "/billing_portal/sessions", headers=_stripe_headers(effective("stripe")),
+                      form={"customer": access.stripe_customer_id, "return_url": return_url})
+    if code != 200 or not body.get("url"):
+        raise GatewayError((body.get("error") or {}).get("message") or f"Stripe returned HTTP {code}.")
+    return body["url"]
+
+
+def paypal_cancel(subscription):
+    cfg = effective("paypal")
+    token = paypal_token(cfg)
+    code, body = call("POST", f"{paypal_host(cfg.environment)}/v1/billing/subscriptions/{subscription.external_id}/cancel",
+                      headers={"Authorization": "Bearer " + token}, json_body={"reason": "Cancelled by the customer"})
+    if code not in (200, 204):
+        raise GatewayError(body.get("message") or f"PayPal returned HTTP {code}.")
+
+
+def cancel_all_for_user(user):
+    """End every running subscription at the gateways (used when an account is closed).
+    Returns a list of provider names that could not be cancelled, for the person to do by hand."""
+    from .models import UserAccess
+    failed = []
+    access = UserAccess.objects.filter(user=user).first()
+    if access is not None and access.stripe_customer_id and status("stripe")["credentials"]:
+        try:
+            cfg = effective("stripe")
+            code, body = call("GET", f"{STRIPE_API}/subscriptions?customer={access.stripe_customer_id}&status=active&limit=20",
+                              headers=_stripe_headers(cfg))
+            if code != 200:
+                raise GatewayError(f"Stripe returned HTTP {code}.")
+            for item in body.get("data", []):
+                sid = str(item.get("id", ""))
+                if EXTERNAL_ID.match(sid):
+                    code, _ = call("DELETE", f"{STRIPE_API}/subscriptions/{sid}", headers=_stripe_headers(cfg))
+                    if code != 200:
+                        raise GatewayError(f"Stripe returned HTTP {code}.")
+        except GatewayError:
+            failed.append("Stripe")
+    for sub in active_subscriptions(user, "paypal"):
+        try:
+            paypal_cancel(sub)
+        except GatewayError:
+            failed.append("PayPal")
+    active_subscriptions(user).update(ended_at=timezone.now())  # the account is closing either way
+    return failed

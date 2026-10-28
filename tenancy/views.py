@@ -33,6 +33,13 @@ def checkout(request, slug, provider):
     if provider not in gateways.PROVIDERS:
         return redirect("plans")
     base = request.build_absolute_uri(reverse("plans_return"))
+    # A second subscription would bill them twice: changing plan is done on the provider's own page.
+    from .access import _resolve
+    current, access = _resolve(request.user)
+    if gateways.active_subscriptions(request.user).exists() or (
+            current is not None and not current.is_default and access is not None and access.stripe_customer_id):
+        messages.error(request, "You already have a paid subscription. Use Manage billing to change plan or cancel it, so you are not charged twice.")
+        return redirect("plans")
     try:
         url = gateways.start_checkout(provider, request.user, plan, base + "?paid=1", base + "?paid=0")
     except GatewayError as exc:
@@ -42,6 +49,34 @@ def checkout(request, slug, provider):
     audit.record("billing.checkout_started", actor=request.user, request=request,
                  metadata={"plan": plan.slug, "provider": provider})
     return redirect(url)
+
+
+@login_required
+@require_POST
+def manage_stripe(request):
+    try:
+        url = gateways.stripe_portal_url(request.user, request.build_absolute_uri(reverse("plans")))
+    except GatewayError as exc:
+        messages.error(request, "Could not open billing: %s" % exc)
+        return redirect("plans")
+    return redirect(url)
+
+
+@login_required
+@require_POST
+def cancel_paypal(request):
+    done = 0
+    for sub in gateways.active_subscriptions(request.user, "paypal"):
+        try:
+            gateways.paypal_cancel(sub)
+            done += 1
+        except GatewayError as exc:
+            messages.error(request, "PayPal did not cancel the subscription: %s" % exc)
+    if done:
+        from . import audit
+        audit.record("billing.cancel_requested", actor=request.user, request=request, metadata={"provider": "paypal"})
+        messages.success(request, "Cancellation sent to PayPal. Your plan stays until the period you paid for ends.")
+    return redirect("plans")
 
 
 @login_required
@@ -58,7 +93,7 @@ def plans_return(request):
 @require_GET
 def plans_page(request):
     from tracker.v2_views import _render
-    current, _ = _resolve(request.user)
+    current, access = _resolve(request.user)
     offers = []
     for plan in Plan.objects.filter(is_public=True):
         link = plan.stripe_link
@@ -71,7 +106,12 @@ def plans_page(request):
                        "stripe_api": "stripe" in sellable, "paypal_api": "paypal" in sellable,
                        "current": current is not None and plan.pk == current.pk,
                        "automatic": bool(sellable) or bool(plan.stripe_payment_link_id)})
-    return _render(request, page_key="plans", page_title="Plans", current_plan=current, offers=offers)
+    subs = list(gateways.active_subscriptions(request.user))
+    can_manage_stripe = bool(access is not None and access.stripe_customer_id and gateways.checkout_ready("stripe"))
+    return _render(request, page_key="plans", page_title="Plans", current_plan=current, offers=offers,
+                   can_manage_stripe=can_manage_stripe,
+                   paypal_subscriptions=[x for x in subs if x.provider == "paypal"],
+                   has_subscription=bool(subs) or can_manage_stripe)
 
 
 def _platform_admin(view):

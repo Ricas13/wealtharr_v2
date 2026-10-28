@@ -11,8 +11,16 @@ import time
 
 from django.db import IntegrityError, transaction
 
+import logging
+
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
 from . import audit
+from .mail import send_system_email
 from .models import BillingEvent, Plan, UserAccess
+
+LOG = logging.getLogger(__name__)
 
 TOLERANCE_SECONDS = 300
 
@@ -41,15 +49,52 @@ def _user_for(client_reference_id):
         return None
 
 
+def _notify(user, subject, body):
+    """Tell the person by email. Never raises; no address, no email."""
+    if getattr(user, "email", ""):
+        send_system_email(user.email, subject, body)
+
+
 def _assign(user, plan, customer_id, event_type):
-    access, _ = UserAccess.objects.get_or_create(user=user, defaults={"plan": plan})
-    before = access.plan_id
+    access, created = UserAccess.objects.get_or_create(user=user, defaults={"plan": plan})
+    before = None if created else access.plan_id  # a brand-new row means they were on the default plan
     access.plan = plan
     if customer_id:
         access.stripe_customer_id = customer_id
     access.save()
     audit.record("billing.plan_assigned", actor=None, subject=user.pk, target=access,
                  metadata={"plan": plan.slug, "from_plan_id": before, "via": event_type})
+    if before != plan.pk and not (created and plan.is_default):
+        _notify(user, "Your Wealtharr plan changed",
+                f"You are now on the {plan.name} plan. You can see what it includes, and manage billing, on the Your plan page.")
+
+
+def _end_access(user, via, subscription=None):
+    """Back to the default plan, unless another subscription of theirs is still running."""
+    from tracker.models import ProviderSubscription
+    default = Plan.objects.filter(is_default=True).first()
+    if default is None:
+        return "ignored: no default plan"
+    others = ProviderSubscription.objects.filter(user=user, ended_at__isnull=True)
+    if subscription is not None:
+        others = others.exclude(pk=subscription.pk)
+    if others.exists():
+        return "kept: another subscription is active"
+    _assign(user, default, "", via)
+    return f"reverted to {default.slug}"
+
+
+def expire_due_subscriptions(now=None):
+    """Cancelled-with-time-left subscriptions whose paid period is over. Run by the hourly job."""
+    from tracker.models import ProviderSubscription
+    now = now or timezone.now()
+    count = 0
+    for sub in ProviderSubscription.objects.filter(ended_at__isnull=True, ends_at__lte=now).select_related("user"):
+        sub.ended_at = now
+        sub.save(update_fields=["ended_at"])
+        _end_access(sub.user, "paid period ended", sub)
+        count += 1
+    return count
 
 
 def _plan_for_stripe_session(obj):
@@ -75,14 +120,33 @@ def apply_event(event):
         if user is None or plan is None:
             return "ignored: unknown user or payment link"
         _assign(user, plan, obj.get("customer") or "", kind)
+        if obj.get("subscription"):
+            from tracker.models import ProviderSubscription
+            ProviderSubscription.objects.get_or_create(
+                provider="stripe", external_id=str(obj["subscription"])[:80], defaults={"user": user})
         return f"assigned {plan.slug}"
     if kind == "customer.subscription.deleted":
+        from tracker.models import ProviderSubscription
+        sub = ProviderSubscription.objects.filter(
+            provider="stripe", external_id=str(obj.get("id") or "-")).select_related("user").first()
+        if sub is not None:
+            sub.ended_at = timezone.now()
+            sub.save(update_fields=["ended_at"])
+            return _end_access(sub.user, kind, sub)
         access = UserAccess.objects.filter(stripe_customer_id=obj.get("customer") or "-").first()
         default = Plan.objects.filter(is_default=True).first()
         if access is None or default is None:
             return "ignored: unknown customer"
         _assign(access.user, default, "", kind)
         return f"reverted to {default.slug}"
+    if kind == "invoice.payment_failed":
+        access = UserAccess.objects.filter(stripe_customer_id=obj.get("customer") or "-").select_related("user").first()
+        if access is None:
+            return "ignored: unknown customer"
+        _notify(access.user, "Your Wealtharr payment failed",
+                "Your last payment did not go through. Open Your plan, choose Manage billing and update your payment method. "
+                "If it keeps failing the subscription ends and you return to the default plan.")
+        return "notified: payment failed"
     return "ignored: event type"
 
 
@@ -118,7 +182,13 @@ def process(payload, header, now=None):
     return _record_and_apply("stripe", event, apply_event)
 
 
-PAYPAL_ENDED = ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED")
+PAYPAL_ENDED_NOW = ("BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED")
+
+
+def _paypal_sub(resource):
+    from tracker.models import ProviderSubscription
+    return ProviderSubscription.objects.filter(
+        provider="paypal", external_id=str(resource.get("id") or "-")).select_related("user").first()
 
 
 def apply_paypal_event(event):
@@ -135,14 +205,34 @@ def apply_paypal_event(event):
             provider="paypal", external_id=str(resource["id"])[:80], defaults={"user": user})
         _assign(user, mapped.plan, "", kind)
         return f"assigned {mapped.plan.slug}"
-    if kind in PAYPAL_ENDED:
-        sub = ProviderSubscription.objects.filter(
-            provider="paypal", external_id=str(resource.get("id") or "-")).select_related("user").first()
-        default = Plan.objects.filter(is_default=True).first()
-        if sub is None or default is None:
+    sub = _paypal_sub(resource)
+    if kind == "BILLING.SUBSCRIPTION.CANCELLED":
+        if sub is None:
             return "ignored: unknown subscription"
-        _assign(sub.user, default, "", kind)
-        return f"reverted to {default.slug}"
+        paid_until = parse_datetime((resource.get("billing_info") or {}).get("next_billing_time") or "")
+        if paid_until is not None and timezone.is_naive(paid_until):
+            paid_until = timezone.make_aware(paid_until, timezone.utc)
+        if paid_until is not None and paid_until > timezone.now():
+            sub.ends_at = paid_until
+            sub.save(update_fields=["ends_at"])
+            _notify(sub.user, "Your Wealtharr subscription was cancelled",
+                    f"Your plan stays active until {paid_until:%d %b %Y}, then you return to the default plan.")
+            return "scheduled end"
+        sub.ended_at = timezone.now()
+        sub.save(update_fields=["ended_at"])
+        return _end_access(sub.user, kind, sub)
+    if kind in PAYPAL_ENDED_NOW:
+        if sub is None:
+            return "ignored: unknown subscription"
+        sub.ended_at = timezone.now()
+        sub.save(update_fields=["ended_at"])
+        return _end_access(sub.user, kind, sub)
+    if kind == "BILLING.SUBSCRIPTION.PAYMENT.FAILED":
+        if sub is None:
+            return "ignored: unknown subscription"
+        _notify(sub.user, "Your Wealtharr payment failed",
+                "PayPal could not take your last payment. Check your PayPal funding source; PayPal will retry, and if it keeps failing the subscription ends.")
+        return "notified: payment failed"
     return "ignored: event type"
 
 
