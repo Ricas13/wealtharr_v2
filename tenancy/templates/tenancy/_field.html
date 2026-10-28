@@ -1,0 +1,9 @@
+{% if field.widget_type == 'checkboxselectmultiple' %}
+  <fieldset class="w2-checklist"><legend>{{ field.label }}</legend>{{ field }}</fieldset>
+{% elif field.field.widget.input_type == 'checkbox' %}
+  <label class="w2-check" for="{{ field.id_for_label }}">{{ field }} <span>{{ field.label }}</span></label>
+{% else %}
+  <label class="w2-field" for="{{ field.id_for_label }}">{{ field.label }} {{ field }}</label>
+{% endif %}
+{% if field.help_text %}<p class="w2-note">{{ field.help_text }}</p>{% endif %}
+{% for e in field.errors %}<p class="w2-form-error" role="alert">{{ e }}</p>{% endfor %}

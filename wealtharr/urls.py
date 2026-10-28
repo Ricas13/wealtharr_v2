@@ -4,7 +4,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 from tracker import guides, pwa, seo, totp_views, v2_auth, v2_home
 
-from tenancy import support, views as tenancy_views
+from tenancy import console, support, views as tenancy_views
 from tenancy import ops
 from django.contrib.auth import views as auth_views
 from django.urls import reverse_lazy
@@ -67,6 +67,14 @@ urlpatterns = [
     path("plans/<slug:slug>/buy/<str:provider>/", tenancy_views.checkout, name="plan_checkout"),
     path("support-access/", support.my_support_access, name="support_access"),
     path("support-access/off/", support.revoke_support_access, name="revoke_support_access"),
+    path("console/users/", console.users_list, name="console_users"),
+    path("console/users/new/", console.user_new, name="console_user_new"),
+    path("console/users/bulk/", console.users_bulk, name="console_users_bulk"),
+    path("console/users/<int:pk>/", console.user_detail, name="console_user"),
+    path("console/plans/", console.plans_list, name="console_plans"),
+    path("console/plans/new/", console.plan_edit, name="console_plan_new"),
+    path("console/plans/<int:pk>/", console.plan_edit, name="console_plan"),
+    path("console/plans/<int:pk>/delete/", console.plan_delete, name="console_plan_delete"),
     path("support/", support.support_index, name="support_index"),
     path("support/<int:user_id>/", support.support_view, name="support_view"),
 ]

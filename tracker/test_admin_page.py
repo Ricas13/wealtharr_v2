@@ -28,7 +28,7 @@ class AdminPageTests(TestCase):
         page = self.client.get(reverse("v2_overview")).content.decode()
         for link in (reverse("v2_overview"), reverse("v2_add_strategy"), reverse("v2_settings"),
                      reverse("control"), reverse("admin:tracker_inviterequest_changelist"),
-                     reverse("admin:auth_user_changelist"), reverse("admin:index")):
+                     reverse("console_users"), reverse("admin:index")):
             self.assertIn('href="%s"' % link, page)
         # Admin links come after the personal menu, just above Collapse / Sign out.
         self.assertLess(page.index(reverse("v2_settings")), page.index('aria-label="Admin"'))

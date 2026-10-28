@@ -1,0 +1,10 @@
+{% extends 'v2/base.html' %}{% block title %}Add user{% endblock %}
+{% block extra_head %}{% include 'tenancy/_console_head.html' %}{% endblock %}
+{% block content %}
+<header class="w2-page-heading"><div><h1>Add user</h1><p class="w2-overline"><a href="{% url 'console_users' %}">← Users</a></p></div></header>
+<section class="w2-panel w2-space-top"><form method="post" class="w2-console-form">{% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}{% include 'tenancy/_field.html' %}{% endfor %}
+  <div class="w2-row"><button class="w2-button w2-button-primary" type="submit">Create user</button><a class="w2-button" href="{% url 'console_users' %}">Cancel</a></div>
+</form></section>
+{% endblock %}

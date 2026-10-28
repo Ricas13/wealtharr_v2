@@ -214,10 +214,10 @@ class UserManagementTests(AccessBase):
         page = self.client.get(reverse("admin:auth_user_changelist"))
         self.assertContains(page, "(default)")
         self.assertContains(page, "Assign plan: Full")
-        self.assertContains(self.client.get(reverse("v2_overview")), reverse("admin:tenancy_plan_changelist"))
+        self.assertContains(self.client.get(reverse("v2_overview")), reverse("console_plans"))
         staff = get_user_model().objects.create_user("helper", password="x" * 12, is_staff=True)
         self.client.force_login(staff)
-        self.assertNotContains(self.client.get(reverse("v2_overview")), reverse("admin:tenancy_plan_changelist"))
+        self.assertNotContains(self.client.get(reverse("v2_overview")), reverse("console_plans"))
 
     def test_editing_a_user_assigns_a_plan_and_feature_overrides_and_is_audited_without_secrets(self):
         plus = Plan.objects.create(slug="plus", name="Plus", features=["demo.email"])
