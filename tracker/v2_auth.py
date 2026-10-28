@@ -155,8 +155,8 @@ def _gateway_cards(request, forms):
         st = gateways.status(provider)
         st["form"] = forms[provider]
         st["webhook_url"] = base + reverse(provider + "_webhook")
-        st["summary"] = ("Ready for checkout" if st["checkout_ready"] else "Off" if not st["enabled"]
-                         else "Credentials set, webhook missing" if st["credentials"] else "Not set up")
+        st["summary"] = ("Ready for checkout" if st["checkout_ready"] else "Not set up" if not st["credentials"]
+                         else "Off" if not st["enabled"] else "Credentials set, webhook missing")
         cards.append(st)
     return cards
 

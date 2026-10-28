@@ -24,3 +24,6 @@ Put the old key in `DATA_ENCRYPTION_KEYS_PREVIOUS`, set the new `DATA_ENCRYPTION
 
 ## Not covered here
 Restore drills of the whole database (do them regularly), monitoring and paging, and the legal side of running the service.
+
+## Scale notes
+The hourly job handles users one after another, each inside their own scope. Price downloads are shared, not per user: each symbol is fetched at most once every 12 hours however many people hold it. What grows with users is the database work of reviewing each strategy; measure it on your own data (the "Yahoo monitoring" line and the scheduler run on the Admin page) before assuming you need to parallelise.
