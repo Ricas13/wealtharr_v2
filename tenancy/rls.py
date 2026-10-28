@@ -57,7 +57,7 @@ def _predicate(model):
         field = names.get(link)
         if field is not None and field.remote_field is not None:
             target = field.remote_field.model._meta.db_table
-            return f"{field.column} IN (SELECT id FROM {target})"
+            return f"{field.column} IN (SELECT id FROM {target})"  # nosec B608 - Django model/field identifiers, never request input
     return None
 
 
