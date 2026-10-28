@@ -40,6 +40,8 @@
     {% endfor %}</ul>
     <label class="w2-check w2-space-top"><input type="checkbox" name="ack" value="yes" {% if wizard.ack %}checked{% endif %} required>
       <span>I checked I can buy these exact funds in my own {{ wizard_lines.0.broker_name|default:"broker" }} account.</span></label>
+    {% if wizard_require_choice %}<label class="w2-check w2-space-top"><input type="checkbox" name="ack_choice" value="yes" {% if wizard.ack_choice %}checked{% endif %} required>
+      <span>I chose this strategy myself. I understand it follows fixed published rules, that what Wealtharr shows is a calculation and not advice, and that past results do not predict future ones.</span></label>{% endif %}
     </div>
 
     <div class="w2-panel w2-wizard-card">
